@@ -24,7 +24,8 @@ load_dotenv()
 if "POLARS_VERBOSE" not in os.environ:
     os.environ["POLARS_VERBOSE"] = "0"
 
-from genobear.pipelines.annotation import AnnotationPipelines
+from genobear.annotation.runners import annotate_vcf, download_ensembl_reference
+from genobear.config import get_profile_enabled
 from pycomfort.logging import to_nice_file, to_nice_stdout
 
 # Create the main CLI app
@@ -90,6 +91,21 @@ def vcf(
         "--run-folder",
         help="Optional run folder for pipeline execution and caching"
     ),
+    vortex: bool = typer.Option(
+        False,
+        "--vortex/--no-vortex",
+        help="Convert output to Vortex format for efficient storage and querying"
+    ),
+    profile: bool = typer.Option(
+        get_profile_enabled(),
+        "--profile/--no-profile",
+        help="Track CPU, memory, and execution time for each pipeline step (default: $GENOBEAR_PROFILE or True)"
+    ),
+    cache: bool = typer.Option(
+        True,
+        "--cache/--no-cache",
+        help="Enable pipeline caching for faster repeated runs (default: True)"
+    ),
 ):
     """
     Annotate a VCF file with ensembl_variations data.
@@ -99,6 +115,7 @@ def vcf(
     2. Parses the input VCF to identify chromosomes
     3. Performs lazy joins with reference data for each chromosome
     4. Saves the annotated result to parquet
+    5. Optionally converts to Vortex format for efficient storage
     
     Examples:
     
@@ -110,6 +127,9 @@ def vcf(
         
         # Force re-download of reference data
         annotate vcf input.vcf.gz --force-download
+        
+        # Annotate and convert to Vortex format
+        annotate vcf input.vcf.gz -o annotated.parquet --vortex
     """
     console.print("[bold cyan]GenoBear VCF Annotation[/bold cyan]")
     console.print(f"Input VCF: {vcf_path}")
@@ -133,48 +153,77 @@ def vcf(
     
     cache_path = Path(cache_dir) if cache_dir else None
     
-    try:
-        # Execute annotation pipeline
-        results = AnnotationPipelines.annotate_vcf(
-            vcf_path=vcf_input,
-            output_path=output_path,
-            cache_dir=cache_path,
-            repo_id=repo_id,
-            variant_type=variant_type,
-            token=token,
-            force_download=force_download,
-            workers=workers,
-            log=log,
-            run_folder=run_folder,
-        )
-        
-        console.print("[bold green]✓[/bold green] Annotation completed successfully!")
-        
-        # Get the actual saved path from results
-        saved_path = None
-        if results and isinstance(results, dict):
-            if "annotated_vcf_path" in results:
-                saved_path = results["annotated_vcf_path"]
-            elif output_path:
-                # Fallback to the provided output_path
-                saved_path = output_path
-        
-        if saved_path:
-            saved_path = Path(saved_path)
-            if saved_path.exists():
-                file_size_mb = saved_path.stat().st_size / (1024 * 1024)
-                console.print(f"Annotated file saved to: {saved_path}")
-                console.print(f"File size: {file_size_mb:.2f} MB")
-            else:
-                console.print(f"[bold yellow]Warning:[/bold yellow] Output path specified but file not found: {saved_path}")
+    # Execute annotation pipeline
+    results = annotate_vcf(
+        vcf_path=vcf_input,
+        output_path=output_path,
+        cache_dir=cache_path,
+        repo_id=repo_id,
+        variant_type=variant_type,
+        token=token,
+        force_download=force_download,
+        workers=workers,
+        log=log,
+        run_folder=run_folder,
+        save_vortex=vortex,
+        profile=profile,
+        cache=cache,
+    )
+    
+    console.print("[bold green]✓[/bold green] Annotation completed successfully!")
+    
+    # Get the actual saved path from results
+    saved_path = None
+    vortex_saved_path = None
+    if results and isinstance(results, dict):
+        if "annotated_vcf_path" in results:
+            saved_path = results["annotated_vcf_path"]
+        elif output_path:
+            # Fallback to the provided output_path
+            saved_path = output_path
+        if "vortex_path" in results:
+            vortex_saved_path = results["vortex_path"]
+    
+    if saved_path:
+        saved_path = Path(saved_path)
+        if saved_path.exists():
+            file_size_mb = saved_path.stat().st_size / (1024 * 1024)
+            console.print(f"Annotated file saved to: {saved_path}")
+            console.print(f"File size: {file_size_mb:.2f} MB")
         else:
-            console.print(f"[bold yellow]Warning:[/bold yellow] No output path returned from pipeline")
-            if output_path:
-                console.print(f"Expected output at: {output_path}")
+            console.print(f"[bold yellow]Warning:[/bold yellow] Output path specified but file not found: {saved_path}")
+    else:
+        console.print(f"[bold yellow]Warning:[/bold yellow] No output path returned from pipeline")
+        if output_path:
+            console.print(f"Expected output at: {output_path}")
+    
+    if vortex_saved_path:
+        vortex_saved_path = Path(vortex_saved_path)
+        if vortex_saved_path.exists():
+            vortex_size_mb = vortex_saved_path.stat().st_size / (1024 * 1024)
+            console.print(f"Vortex file saved to: {vortex_saved_path}")
+            console.print(f"Vortex file size: {vortex_size_mb:.2f} MB")
+            if saved_path and saved_path.exists():
+                compression_ratio = (1 - vortex_size_mb / file_size_mb) * 100
+                console.print(f"Compression ratio: {compression_ratio:.1f}%")
+        else:
+            console.print(f"[bold yellow]Warning:[/bold yellow] Vortex path specified but file not found: {vortex_saved_path}")
+    
+    # Display profiling stats if enabled
+    if profile and results and isinstance(results, dict) and "profiling_report" in results:
+        console.print("\n[bold cyan]Resource Usage Report:[/bold cyan]")
+        console.print(results["profiling_report"])
         
-    except Exception as e:
-        console.print(f"[bold red]Error during annotation:[/bold red] {e}")
-        raise typer.Exit(code=1)
+        # Warn if profiling shows zeros (caching)
+        report = results["profiling_report"]
+        if "| 0       " in report or any("| 0              " in line for line in report.split("\n")):
+            console.print(
+                "\n[bold yellow]Note:[/bold yellow] Profiling shows 0 calls because functions were skipped due to caching."
+            )
+            console.print(
+                "Use [cyan]--no-cache[/cyan] to force re-execution and see actual resource usage, "
+                "or use [cyan]htop[/cyan] / [cyan]/usr/bin/time -v[/cyan] for real-time monitoring."
+            )
 
 
 @app.command()
@@ -226,25 +275,20 @@ def download_reference(
     
     cache_path = Path(cache_dir) if cache_dir else None
     
-    try:
-        results = AnnotationPipelines.download_ensembl_reference(
-            cache_dir=cache_path,
-            repo_id=repo_id,
-            token=token,
-            force_download=force,
-            log=log,
-        )
-        
-        if "ensembl_cache_path" in results:
-            downloaded_path = results["ensembl_cache_path"]
-            console.print("[bold green]✓[/bold green] Download completed successfully!")
-            console.print(f"Reference data available at: {downloaded_path}")
-        else:
-            console.print("[bold yellow]Warning:[/bold yellow] No cache path returned")
-        
-    except Exception as e:
-        console.print(f"[bold red]Error during download:[/bold red] {e}")
-        raise typer.Exit(code=1)
+    results = download_ensembl_reference(
+        cache_dir=cache_path,
+        repo_id=repo_id,
+        token=token,
+        force_download=force,
+        log=log,
+    )
+    
+    if "ensembl_cache_path" in results:
+        downloaded_path = results["ensembl_cache_path"]
+        console.print("[bold green]✓[/bold green] Download completed successfully!")
+        console.print(f"Reference data available at: {downloaded_path}")
+    else:
+        console.print("[bold yellow]Warning:[/bold yellow] No cache path returned")
 
 
 if __name__ == "__main__":

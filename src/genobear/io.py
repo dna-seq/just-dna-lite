@@ -5,6 +5,7 @@ import polars_bio as pb
 from eliot import start_action
 import os
 import pooch
+import tempfile
 
 # Type variable for generic data types
 T = TypeVar('T')
@@ -21,6 +22,7 @@ AnnotatedLazyFrame = AnnotatedResult[pl.LazyFrame]
 # - Path: save to the provided absolute/relative path
 SaveParquet = Union[Path, Literal["auto"], None]
 
+SaveVortex = Union[Path, Literal["auto"], None]
 
 def _default_parquet_path(vcf_path: Path) -> Path:
     """Generate default parquet path next to VCF file."""
@@ -34,6 +36,20 @@ def _default_parquet_path(vcf_path: Path) -> Path:
     else:
         # Fallback for other file types
         return vcf_path.with_suffix('.parquet')
+
+
+def _default_vortex_path(vcf_path: Path) -> Path:
+    """Generate default vortex path next to VCF file."""
+    # Remove .vcf or .vcf.gz extension before adding .vortex
+    if vcf_path.suffixes == ['.vcf', '.gz']:
+        # Handle .vcf.gz files
+        return vcf_path.with_suffix('').with_suffix('.vortex')
+    elif vcf_path.suffix == '.vcf':
+        # Handle .vcf files
+        return vcf_path.with_suffix('.vortex')
+    else:
+        # Fallback for other file types
+        return vcf_path.with_suffix('.vortex')
 
 
 def resolve_genobear_subfolder(subdir_name: str, base: Optional[Union[str, Path]] = None) -> Path:
@@ -130,7 +146,9 @@ def get_info_fields(vcf_path: str) -> list[str]:
 def read_vcf_file(
     file_path: Union[str, Path],
     info_fields: Union[list[str], None] = None,
-    save_parquet: SaveParquet = "auto"
+    save_parquet: SaveParquet = "auto",
+    save_vortex: SaveVortex = None,
+    engine: str = "auto"
 ) -> pl.LazyFrame:
     """
     Read a VCF file using polars-bio, automatically handling gzipped files.
@@ -139,16 +157,14 @@ def read_vcf_file(
         file_path: Path to the VCF file (can be .vcf or .vcf.gz)
         info_fields: The fields to read from the INFO column.
         thread_num: The number of threads to use for reading the VCF file. Used **only** for parallel decompression of BGZF blocks. Works only for **local** files.
-        chunk_size: The size in MB of a chunk when reading from an object store. The default is 8 MB. For large scale operations, it is recommended to increase this value to 64.
-        concurrent_fetches: [GCS] The number of concurrent fetches when reading from an object store. The default is 1. For large scale operations, it is recommended to increase this value to 8 or even more.
-        allow_anonymous: [GCS, AWS S3] Whether to allow anonymous access to object storage.
-        enable_request_payer: [AWS S3] Whether to enable request payer for object storage. This is useful for reading files from AWS S3 buckets that require request payer.
-        max_retries: The maximum number of retries for reading the file from object storage.
-        timeout: The timeout in seconds for reading the file from object storage.
-        compression_type: The compression type of the VCF file. If not specified, it will be detected automatically based on the file extension. BGZF compression is supported ('bgz').
         save_parquet: Controls saving to parquet.
             - None: do not save
             - "auto": save next to the input, replacing .vcf/.vcf.gz with .parquet
+            - Path: save to the provided location
+        save_vortex: Controls saving to Vortex format.
+            - None: do not save
+            - "auto": if parquet saving is enabled, saves next to the parquet with .vortex extension;
+              otherwise saves next to the input, replacing .vcf/.vcf.gz with .vortex
             - Path: save to the provided location
 
     Returns:
@@ -169,8 +185,12 @@ def read_vcf_file(
     ) as action:
         file_path = Path(file_path)
 
-        # Prepare kwargs for pb.scan_vcf using locals(), excluding file_path and save_parquet
-        vcf_kwargs = {k: v for k, v in locals().items() if k not in ("file_path", "save_parquet", "action")}
+        # Prepare kwargs for pb.scan_vcf using locals(), excluding non-scan_vcf args
+        vcf_kwargs = {
+            k: v
+            for k, v in locals().items()
+            if k not in ("file_path", "save_parquet", "save_vortex", "action", "engine")
+        }
 
         # Resolve parquet path decision early
         if isinstance(save_parquet, Path):
@@ -180,10 +200,19 @@ def read_vcf_file(
         else:
             parquet_path = None
 
+        # Resolve vortex path decision early (can depend on parquet path)
+        if isinstance(save_vortex, Path):
+            vortex_path: Optional[Path] = save_vortex
+        elif save_vortex == "auto":
+            vortex_path = parquet_path.with_suffix(".vortex") if parquet_path is not None else _default_vortex_path(file_path)
+        else:
+            vortex_path = None
+
         action.log(
             message_type="info",
             step="reading_vcf",
-            parquet_path=str(parquet_path) if parquet_path else None
+            parquet_path=str(parquet_path) if parquet_path else None,
+            vortex_path=str(vortex_path) if vortex_path else None,
         )
 
         # Let polars-bio handle compression autodetection and any VCF format issues
@@ -198,29 +227,67 @@ def read_vcf_file(
             rows=result.height if hasattr(result, 'height') else 'unknown'
         )
 
-        # Handle parquet saving if requested
-        if parquet_path:
+        # Save parquet if requested (and/or needed for vortex)
+        effective_parquet_path: Optional[Path] = parquet_path
+        temp_parquet_path: Optional[Path] = None
+
+        if effective_parquet_path is None and vortex_path is not None:
+            # Need a parquet file for vortex conversion but user didn't request saving parquet.
+            # Write a temporary parquet into genobear cache and remove it after conversion.
+            cache_dir = resolve_genobear_subfolder("tmp")
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(prefix=f"{file_path.stem}_", suffix=".parquet", dir=str(cache_dir))
+            os.close(fd)
+            temp_parquet_path = Path(tmp_name)
+            effective_parquet_path = temp_parquet_path
+
+        if effective_parquet_path is not None:
             with start_action(
                 action_type="save_parquet",
-                parquet_path=str(parquet_path)
+                parquet_path=str(effective_parquet_path),
+                is_temporary=temp_parquet_path is not None,
             ) as save_action:
                 if isinstance(result, pl.LazyFrame):
                     # Stream directly to parquet without collecting into memory
-                    result.sink_parquet(str(parquet_path))
+                    result.sink_parquet(str(effective_parquet_path), engine=engine)
                 else:
                     # DataFrame path (rare here) – write directly
-                    result.write_parquet(str(parquet_path))
-                
+                    result.write_parquet(str(effective_parquet_path))
+
                 save_action.log(
                     message_type="info",
                     step="parquet_saved",
-                    parquet_path=str(parquet_path)
+                    parquet_path=str(effective_parquet_path),
                 )
-                
-                # Return a LazyFrame that reads from the parquet file
-                return pl.scan_parquet(str(parquet_path))
-        
-        # Return the original result if no parquet saving
+
+        # Save vortex if requested
+        if vortex_path is not None:
+            from genobear.vortex.parquet_to_vortex import parquet_to_vortex as _parquet_to_vortex
+
+            with start_action(
+                action_type="save_vortex",
+                parquet_path=str(effective_parquet_path) if effective_parquet_path else None,
+                vortex_path=str(vortex_path),
+            ) as vortex_action:
+                vortex_output_path = _parquet_to_vortex(
+                    parquet_path=effective_parquet_path if effective_parquet_path is not None else file_path,
+                    vortex_path=vortex_path,
+                    overwrite=False,
+                )
+                vortex_action.log(
+                    message_type="info",
+                    step="vortex_saved",
+                    vortex_path=str(vortex_output_path),
+                )
+
+        # Cleanup temp parquet if we created one for vortex-only conversion
+        if temp_parquet_path is not None:
+            temp_parquet_path.unlink(missing_ok=True)
+
+        # If we saved parquet (even temporarily), return a LazyFrame scanning it only when it's a user-visible parquet.
+        if parquet_path is not None:
+            return pl.scan_parquet(str(parquet_path))
+
         return result
 
 

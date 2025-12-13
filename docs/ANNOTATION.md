@@ -122,10 +122,10 @@ You can also use the annotation pipeline programmatically:
 
 ```python
 from pathlib import Path
-from genobear import AnnotationPipelines
+from genobear import annotate_vcf, download_ensembl_reference
 
 # Annotate a VCF file
-results = AnnotationPipelines.annotate_vcf(
+results = annotate_vcf(
     vcf_path=Path("sample.vcf.gz"),
     output_path=Path("annotated.parquet"),
     variant_type="SNV",
@@ -137,7 +137,7 @@ annotated_path = results["annotated_vcf_path"]
 print(f"Annotated file: {annotated_path}")
 
 # Download reference data
-cache_results = AnnotationPipelines.download_ensembl_reference(
+cache_results = download_ensembl_reference(
     cache_dir=Path("/data/cache"),
     force_download=False,
 )
@@ -149,17 +149,15 @@ print(f"Reference data at: {cache_path}")
 ### Low-Level Pipeline Components
 
 ```python
+from pathlib import Path
 from genobear.pipelines.annotation import (
-    download_ensembl_from_hf,
-    extract_chromosomes_from_vcf,
+    download_ensembl_annotations,
     load_vcf_as_lazy_frame,
-    find_annotation_parquet_files,
-    annotate_vcf_with_ensembl,
-    save_annotated_vcf,
+    annotate_with_ensembl,
 )
 
 # Download reference data
-cache_path = download_ensembl_from_hf(
+cache_path = download_ensembl_annotations(
     repo_id="just-dna-seq/ensembl_variations",
     cache_dir=None,  # Uses default
 )
@@ -167,55 +165,37 @@ cache_path = download_ensembl_from_hf(
 # Load VCF as LazyFrame
 vcf_lf = load_vcf_as_lazy_frame("sample.vcf.gz")
 
-# Extract chromosomes
-chromosomes = extract_chromosomes_from_vcf("sample.vcf.gz")
-print(f"Found chromosomes: {chromosomes}")
-
-# Find annotation files
-parquet_paths = find_annotation_parquet_files(
+# Annotate VCF directly
+annotated_lf = annotate_with_ensembl(
+    input_dataframe=vcf_lf,
     ensembl_cache_path=cache_path,
-    chromosomes=chromosomes,
     variant_type="SNV",
-)
-
-# Annotate VCF
-annotated_lf = annotate_vcf_with_ensembl(
-    vcf_lazy_frame=vcf_lf,
-    annotation_parquet_paths=parquet_paths,
-)
-
-# Save result
-output_path = save_annotated_vcf(
-    annotated_vcf_lazy=annotated_lf,
-    output_path=Path("annotated.parquet"),
+    output_path=Path("annotated.parquet"),  # Optional - saves if provided
 )
 ```
 
 ## Architecture
 
-The annotation pipeline consists of several components:
+The annotation pipeline consists of several simplified components:
 
-### 1. HF Dataset Downloader (`hf_dataset_downloader.py`)
+### 1. Ensembl Annotations (`ensembl_annotations.py`)
 - Downloads ensembl_variations dataset from HuggingFace Hub
 - Checks if cache exists and skips download if present (unless forced)
-- Uses `snapshot_download` to fetch parquet files
+- Scans all parquet files for the specified variant type
+- Performs efficient left join with VCF data using Polars lazy evaluation
 
 ### 2. VCF Parser (`vcf_parser.py`)
-- Extracts chromosome identifiers from input VCF
 - Loads VCF as Polars LazyFrame for efficient processing
 - Handles both compressed (.vcf.gz) and uncompressed (.vcf) files
 
-### 3. Annotator (`annotator.py`)
-- Finds annotation parquet files for each chromosome
-- Performs lazy left joins between VCF and reference data
-- Supports multiple join columns for precise matching
-- Saves annotated results with compression
-
-### 4. Pipeline Runners (`runners.py`)
-- Provides high-level `AnnotationPipelines` class
+### 3. Pipeline Runners (`runners.py`)
+- Provides high-level functions for annotation workflows:
+  - `annotate_vcf()`: Main function to annotate VCF files
+  - `download_ensembl_reference()`: Download reference data
+  - `ensembl_annotation_pipeline()`: Get a configured annotation pipeline
+  - `execute_annotation_pipeline()`: Execute pipelines with proper configuration
 - Composes individual functions into complete pipelines
-- Handles execution with proper configuration
-- Manages parallel processing and caching
+- Manages sequential processing optimized for LazyFrames
 
 ## Cache Structure
 
@@ -262,7 +242,7 @@ This ensures:
 The pipeline is optimized for performance:
 
 - **Lazy evaluation**: Uses Polars LazyFrames to minimize memory usage
-- **Parallel processing**: Annotates multiple chromosomes simultaneously
+- **Efficient file scanning**: Scans all chromosome parquet files at once, letting Polars optimizer handle filtering
 - **Streaming writes**: Uses `sink_parquet` for memory-efficient output
 - **Caching**: Reference data is downloaded once and reused
 - **Compression**: Output files use zstd compression by default

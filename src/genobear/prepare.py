@@ -15,6 +15,11 @@ import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from eliot import start_action
+from platformdirs import user_cache_dir
+from genobear.preparation.huggingface_uploader import collect_parquet_files
+from genobear.preparation.dataset_card_generator import generate_ensembl_card
+from platformdirs import user_cache_dir
+from huggingface_hub import HfApi
 
 from dotenv import load_dotenv
 
@@ -881,10 +886,6 @@ def update_ensembl_card(
         to_nice_stdout()
     
     with start_action(action_type="update_ensembl_card_command") as action:
-        from platformdirs import user_cache_dir
-        from genobear.pipelines.preparation.huggingface_uploader import collect_parquet_files
-        from genobear.pipelines.preparation.dataset_card_generator import generate_ensembl_card
-        from huggingface_hub import HfApi
         
         console.print("🔧 Updating Ensembl dataset card...")
         console.print(f"📦 Repository: [bold cyan]{repo_id}[/bold cyan]")
@@ -1013,10 +1014,6 @@ def update_clinvar_card(
         to_nice_stdout()
     
     with start_action(action_type="update_clinvar_card_command") as action:
-        from platformdirs import user_cache_dir
-        from genobear.pipelines.preparation.huggingface_uploader import collect_parquet_files
-        from genobear.pipelines.preparation.dataset_card_generator import generate_clinvar_card
-        from huggingface_hub import HfApi
         
         console.print("🔧 Updating ClinVar dataset card...")
         console.print(f"📦 Repository: [bold cyan]{repo_id}[/bold cyan]")

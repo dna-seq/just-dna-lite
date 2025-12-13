@@ -5,7 +5,7 @@ from typing import List
 import pytest
 from eliot import start_action
 
-from genobear.pipelines.vcf_downloader import make_vcf_pipeline, list_paths
+from genobear.preparation.vcf_downloader import make_vcf_pipeline, list_paths
 
 
 @pytest.mark.integration

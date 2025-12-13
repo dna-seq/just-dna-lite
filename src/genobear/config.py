@@ -29,3 +29,9 @@ def get_download_workers() -> int:
     return int(os.getenv("GENOBEAR_DOWNLOAD_WORKERS", os.cpu_count() or 1))
 
 
+def get_profile_enabled() -> bool:
+    """Return whether profiling is enabled (GENOBEAR_PROFILE), defaulting to True."""
+    value = os.getenv("GENOBEAR_PROFILE", "1").strip().lower()
+    return value not in {"0", "false", "no", "off", "n"}
+
+

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from eliot import start_action
 
-from genobear.pipelines.annotation import AnnotationPipelines
+from genobear.annotation.runners import annotate_vcf, download_ensembl_reference
 
 
 @pytest.mark.integration
@@ -24,7 +24,7 @@ def test_annotation_pipeline_with_local_vcf(tmp_path: Path) -> None:
     cached reference data.
     """
     # Use the small test VCF file
-    vcf_path = Path(__file__).parent.parent / "data" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
     
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
     
@@ -36,7 +36,7 @@ def test_annotation_pipeline_with_local_vcf(tmp_path: Path) -> None:
         output_path=str(output_path)
     ) as action:
         # Run annotation pipeline
-        results = AnnotationPipelines.annotate_vcf(
+        results = annotate_vcf(
             vcf_path=vcf_path,
             output_path=output_path,
             log=False,  # Disable logging for test
@@ -75,7 +75,7 @@ def test_download_ensembl_reference() -> None:
         action_type="test_download_reference"
     ) as action:
         # Use default cache location - don't force download
-        results = AnnotationPipelines.download_ensembl_reference(
+        results = download_ensembl_reference(
             log=False,  # Disable logging for test
             force_download=False,  # Use existing cache, don't download
         )
@@ -118,18 +118,18 @@ def test_annotation_pipeline_skips_download_if_cached() -> None:
     This test runs the annotation twice and verifies that the second
     run uses the cached data without re-downloading.
     """
-    vcf_path = Path(__file__).parent.parent / "data" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
     
     with start_action(action_type="test_cached_annotation") as action:
         # First run - may download reference data
-        results1 = AnnotationPipelines.annotate_vcf(
+        results1 = annotate_vcf(
             vcf_path=vcf_path,
             output_path=None,  # Don't save, just process
             log=False,
         )
         
-        cache_path1 = results1.get("ensembl_cache_path_checked")
+        cache_path1 = results1.get("ensembl_cache_path")
         
         action.log(
             message_type="info",
@@ -138,13 +138,13 @@ def test_annotation_pipeline_skips_download_if_cached() -> None:
         )
         
         # Second run - should use cached data
-        results2 = AnnotationPipelines.annotate_vcf(
+        results2 = annotate_vcf(
             vcf_path=vcf_path,
             output_path=None,
             log=False,
         )
         
-        cache_path2 = results2.get("ensembl_cache_path_checked")
+        cache_path2 = results2.get("ensembl_cache_path")
         
         action.log(
             message_type="info",

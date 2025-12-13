@@ -11,7 +11,7 @@ from eliot import start_action
 from pipefunc import pipefunc, Pipeline
 from huggingface_hub import HfApi, hf_hub_download, list_repo_files, CommitOperationAdd
 from huggingface_hub.utils import RepositoryNotFoundError, HfHubHTTPError
-from genobear.pipelines.preparation.dataset_card_generator import (
+from genobear.preparation.dataset_card_generator import (
     generate_ensembl_card, 
     generate_clinvar_card,
     save_dataset_card

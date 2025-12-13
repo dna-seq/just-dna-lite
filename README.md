@@ -123,11 +123,11 @@ results = gb.PreparationPipelines.execute(
 #### VCF Annotation
 
 ```python
-from genobear import AnnotationPipelines
+from genobear import annotate_vcf, download_ensembl_reference
 from pathlib import Path
 
 # Annotate a VCF file with Ensembl variations
-results = AnnotationPipelines.annotate_vcf(
+results = annotate_vcf(
     vcf_path=Path("sample.vcf.gz"),
     output_path=Path("annotated.parquet"),
     variant_type="SNV",
@@ -139,7 +139,7 @@ annotated_path = results["annotated_vcf_path"]
 print(f"Annotated file: {annotated_path}")
 
 # Pre-download reference data
-cache_results = AnnotationPipelines.download_ensembl_reference(
+cache_results = download_ensembl_reference(
     cache_dir=Path("/data/cache"),
     force_download=False,
 )

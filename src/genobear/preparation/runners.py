@@ -12,21 +12,21 @@ from typing import Optional
 from pipefunc import Pipeline
 from eliot import start_action
 
-from genobear.pipelines.preparation.vcf_downloader import (
+from genobear.preparation.vcf_downloader import (
     list_paths,
     download_path,
     convert_to_parquet,
     validate_downloads_and_parquet,
 )
-from genobear.pipelines.preparation.vcf_parquet_splitter import make_parquet_splitting_pipeline
-from genobear.pipelines.preparation.huggingface_uploader import (
+from genobear.preparation.vcf_parquet_splitter import make_parquet_splitting_pipeline
+from genobear.preparation.huggingface_uploader import (
     make_hf_upload_pipeline,
     upload_to_hf_if_changed,
     collect_parquet_files,
 )
 from pycomfort.logging import to_nice_stdout, to_nice_file
 from genobear.config import get_default_workers
-from genobear.pipelines.runtime import run_pipeline
+from genobear.runtime import run_pipeline
 
 
 class PreparationPipelines:
@@ -556,7 +556,7 @@ class PreparationPipelines:
         Returns:
             Validation results dictionary
         """
-        from genobear.pipelines.preparation.vcf_downloader import list_paths, make_validation_pipeline
+        from genobear.preparation.vcf_downloader import list_paths, make_validation_pipeline
         from platformdirs import user_cache_dir
         
         # Fetch URLs for Ensembl data
@@ -746,7 +746,7 @@ class PreparationPipelines:
             )
             
             # Generate dataset card
-            from genobear.pipelines.preparation.dataset_card_generator import generate_clinvar_card
+            from genobear.preparation.dataset_card_generator import generate_clinvar_card
             
             # Detect variant types from directory structure
             variant_types = set()
@@ -775,7 +775,7 @@ class PreparationPipelines:
             
             # Use upload_parquet_to_hf which handles directory structure preservation
             # This now uses batch upload - all files in ONE commit!
-            from genobear.pipelines.preparation.huggingface_uploader import upload_parquet_to_hf
+            from genobear.preparation.huggingface_uploader import upload_parquet_to_hf
             
             results = upload_parquet_to_hf(
                 parquet_files=parquet_files,
@@ -880,7 +880,7 @@ class PreparationPipelines:
             )
             
             # Generate dataset card
-            from genobear.pipelines.preparation.dataset_card_generator import generate_ensembl_card
+            from genobear.preparation.dataset_card_generator import generate_ensembl_card
             
             # Detect variant types from directory structure
             variant_types = set()
@@ -909,7 +909,7 @@ class PreparationPipelines:
             
             # Use upload_parquet_to_hf which handles directory structure preservation
             # This now uses batch upload - all files in ONE commit!
-            from genobear.pipelines.preparation.huggingface_uploader import upload_parquet_to_hf
+            from genobear.preparation.huggingface_uploader import upload_parquet_to_hf
             
             results = upload_parquet_to_hf(
                 parquet_files=parquet_files,

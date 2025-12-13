@@ -7,7 +7,8 @@ from eliot import start_action
 from pipefunc import pipefunc, Pipeline
 from pipefunc.typing import Array
 from genobear.config import get_default_workers
-
+from genobear.preparation.vcf_downloader import make_vcf_pipeline
+    
 
 @pipefunc(
     output_name="split_variants_dict",
@@ -245,7 +246,6 @@ def download_convert_and_split_vcf(
         Dictionary with pipeline results containing 'vcf_parquet_path' and 'split_variants_dict' by default
     """
     # Compose VCF download pipeline with splitting pipeline
-    from genobear.pipelines.preparation.vcf_downloader import make_vcf_pipeline
     vcf_pipeline = make_vcf_pipeline()
     splitting_pipeline = make_parquet_splitting_pipeline()
     pipeline = vcf_pipeline | splitting_pipeline
