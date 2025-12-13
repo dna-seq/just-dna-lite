@@ -24,6 +24,17 @@ load_dotenv()
 if "POLARS_VERBOSE" not in os.environ:
     os.environ["POLARS_VERBOSE"] = "0"
 
+# Set POLARS_ENGINE_AFFINITY to streaming by default for memory efficiency
+# Can be overridden in .env file or environment
+if "POLARS_ENGINE_AFFINITY" not in os.environ:
+    os.environ["POLARS_ENGINE_AFFINITY"] = "streaming"
+
+# Set POLARS_LOW_MEMORY to enable low memory mode by default
+# Reduces memory usage during data loading operations
+# Can be overridden in .env file or environment
+if "POLARS_LOW_MEMORY" not in os.environ:
+    os.environ["POLARS_LOW_MEMORY"] = "1"
+
 from genobear.annotation.runners import annotate_vcf, download_ensembl_reference
 from genobear.config import get_profile_enabled
 from pycomfort.logging import to_nice_file, to_nice_stdout
@@ -91,11 +102,6 @@ def vcf(
         "--run-folder",
         help="Optional run folder for pipeline execution and caching"
     ),
-    vortex: bool = typer.Option(
-        False,
-        "--vortex/--no-vortex",
-        help="Convert output to Vortex format for efficient storage and querying"
-    ),
     profile: bool = typer.Option(
         get_profile_enabled(),
         "--profile/--no-profile",
@@ -115,7 +121,7 @@ def vcf(
     2. Parses the input VCF to identify chromosomes
     3. Performs lazy joins with reference data for each chromosome
     4. Saves the annotated result to parquet
-    5. Optionally converts to Vortex format for efficient storage
+    5. Saves the annotated result to parquet
     
     Examples:
     
@@ -128,8 +134,6 @@ def vcf(
         # Force re-download of reference data
         annotate vcf input.vcf.gz --force-download
         
-        # Annotate and convert to Vortex format
-        annotate vcf input.vcf.gz -o annotated.parquet --vortex
     """
     console.print("[bold cyan]GenoBear VCF Annotation[/bold cyan]")
     console.print(f"Input VCF: {vcf_path}")
@@ -165,7 +169,6 @@ def vcf(
         workers=workers,
         log=log,
         run_folder=run_folder,
-        save_vortex=vortex,
         profile=profile,
         cache=cache,
     )
@@ -174,15 +177,12 @@ def vcf(
     
     # Get the actual saved path from results
     saved_path = None
-    vortex_saved_path = None
     if results and isinstance(results, dict):
         if "annotated_vcf_path" in results:
             saved_path = results["annotated_vcf_path"]
         elif output_path:
             # Fallback to the provided output_path
             saved_path = output_path
-        if "vortex_path" in results:
-            vortex_saved_path = results["vortex_path"]
     
     if saved_path:
         saved_path = Path(saved_path)
@@ -196,18 +196,6 @@ def vcf(
         console.print(f"[bold yellow]Warning:[/bold yellow] No output path returned from pipeline")
         if output_path:
             console.print(f"Expected output at: {output_path}")
-    
-    if vortex_saved_path:
-        vortex_saved_path = Path(vortex_saved_path)
-        if vortex_saved_path.exists():
-            vortex_size_mb = vortex_saved_path.stat().st_size / (1024 * 1024)
-            console.print(f"Vortex file saved to: {vortex_saved_path}")
-            console.print(f"Vortex file size: {vortex_size_mb:.2f} MB")
-            if saved_path and saved_path.exists():
-                compression_ratio = (1 - vortex_size_mb / file_size_mb) * 100
-                console.print(f"Compression ratio: {compression_ratio:.1f}%")
-        else:
-            console.print(f"[bold yellow]Warning:[/bold yellow] Vortex path specified but file not found: {vortex_saved_path}")
     
     # Display profiling stats if enabled
     if profile and results and isinstance(results, dict) and "profiling_report" in results:

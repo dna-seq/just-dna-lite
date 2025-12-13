@@ -134,7 +134,6 @@ def annotate_vcf(
     workers: Optional[int] = None,
     log: bool = True,
     run_folder: Optional[str] = None,
-    save_vortex: bool = False,
     profile: bool = True,
     cache: bool = True,
     **kwargs
@@ -154,7 +153,6 @@ def annotate_vcf(
         workers: Number of parallel workers
         log: Enable logging
         run_folder: Optional run folder for caching
-        save_vortex: If True, convert output to Vortex format
         profile: If True, track CPU, memory, and execution time (default: True)
         cache: If True, enable pipefunc caching for faster repeated runs (default: True)
         **kwargs: Additional pipeline inputs
@@ -193,11 +191,8 @@ def annotate_vcf(
         # - input_dataframe (from vcf_lazy_frame)
         # - ensembl_cache_path (from download_ensembl_annotations -> ensembl_cache_path)
         # - output_path (optional)
-        # - save_vortex (optional)
         if output_path:
             inputs["output_path"] = output_path
-        if save_vortex:
-            inputs["save_vortex"] = save_vortex
         
         inputs.update(kwargs)
         
@@ -270,14 +265,6 @@ def annotate_vcf(
                     results = {}
                 results["annotated_vcf_path"] = output_path_obj
             
-            # Check for vortex output if save_vortex was requested
-            if save_vortex:
-                vortex_path = output_path_obj.with_suffix(".vortex")
-                if vortex_path.exists():
-                    if results is None:
-                        results = {}
-                    results["vortex_path"] = vortex_path
-        
         return results or {}
 
 

@@ -31,6 +31,17 @@ load_dotenv()
 if "POLARS_VERBOSE" not in os.environ:
     os.environ["POLARS_VERBOSE"] = "0"
 
+# Set POLARS_ENGINE_AFFINITY to streaming by default for memory efficiency
+# Can be overridden in .env file or environment
+if "POLARS_ENGINE_AFFINITY" not in os.environ:
+    os.environ["POLARS_ENGINE_AFFINITY"] = "streaming"
+
+# Set POLARS_LOW_MEMORY to enable low memory mode by default
+# Reduces memory usage during data loading operations
+# Can be overridden in .env file or environment
+if "POLARS_LOW_MEMORY" not in os.environ:
+    os.environ["POLARS_LOW_MEMORY"] = "1"
+
 from genobear import PreparationPipelines
 from pycomfort.logging import to_nice_file, to_nice_stdout
 

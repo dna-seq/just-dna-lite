@@ -1,11 +1,13 @@
 """CLI for converting parquet files to Vortex format."""
 
+import os
 from pathlib import Path
 from typing import Optional
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from eliot import to_file
+from platformdirs import user_cache_dir
 from pycomfort.logging import to_nice_file, to_nice_stdout
 
 from genobear.vortex.parquet_to_vortex import (
@@ -19,6 +21,16 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+def _get_default_ensembl_cache_path() -> Path:
+    """Get the default Ensembl cache path."""
+    env_cache = os.getenv("GENOBEAR_CACHE_DIR")
+    if env_cache:
+        return Path(env_cache) / "ensembl_variations" / "splitted_variants"
+    else:
+        user_cache_path = Path(user_cache_dir(appname="genobear"))
+        return user_cache_path / "ensembl_variations" / "splitted_variants"
 
 
 @app.command()
@@ -120,13 +132,11 @@ def file(
 
 @app.command()
 def ensembl(
-    ensembl_cache_path: Path = typer.Argument(
-        ...,
-        help="Path to Ensembl cache directory (containing variant type subdirectories)",
-        exists=True,
+    ensembl_cache_path: Optional[Path] = typer.Argument(
+        None,
+        help="Path to Ensembl cache directory (containing variant type subdirectories). If not provided, uses default cache location.",
         file_okay=False,
         dir_okay=True,
-        readable=True,
     ),
     variant_type: str = typer.Option(
         "SNV",
@@ -166,12 +176,24 @@ def ensembl(
     and converts them all to Vortex format for improved query performance.
     Uses streaming to handle large multi-gigabyte files efficiently.
     
+    If no cache path is provided, uses the default cache location:
+    - Linux: ~/.cache/genobear/ensembl_variations/splitted_variants
+    - macOS: ~/Library/Caches/genobear/ensembl_variations/splitted_variants
+    - Windows: %LOCALAPPDATA%\\genobear\\Cache\\ensembl_variations\\splitted_variants
+    
+    Can be overridden with GENOBEAR_CACHE_DIR environment variable.
+    
     Example:
+        convert-vortex ensembl
         convert-vortex ensembl ~/.cache/genobear/ensembl_variations/splitted_variants
-        convert-vortex ensembl ./data/ensembl --variant-type SNV --batch-size 50000
-        convert-vortex ensembl ./data/ensembl --output-dir ./data/vortex
-        convert-vortex ensembl ./data/ensembl --overwrite
+        convert-vortex ensembl --variant-type SNV --batch-size 50000
+        convert-vortex ensembl --output-dir ./data/vortex
+        convert-vortex ensembl --overwrite
     """
+    # Use default cache path if not provided
+    if ensembl_cache_path is None:
+        ensembl_cache_path = _get_default_ensembl_cache_path()
+    
     # Setup logging
     log_dir.mkdir(parents=True, exist_ok=True)
     json_path = log_dir / "convert_ensembl_to_vortex.json"

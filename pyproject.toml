@@ -29,7 +29,7 @@ dependencies = [
 prepare = "genobear.prepare:app"
 annotate = "genobear.annotate:app"
 modules = "genobear.modules:app"
-convert-vortex = "genobear.convert_vortex:app"
+convert-vortex = "genobear.vortex.convert_vortex:app"
 
 [build-system]
 requires = ["hatchling"]
