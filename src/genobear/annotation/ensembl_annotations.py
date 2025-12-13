@@ -172,6 +172,11 @@ def _annotate_single_chromosome_file(
     # Scan the single Ensembl file
     ensembl_lf = pl.scan_parquet(ensembl_file)
 
+    # Rename Ensembl 'id' column to 'rsid' to avoid clash with VCF 'id' column
+    # (VCF id is often empty, while Ensembl id contains rsid values like "rs1570391677")
+    if "id" in ensembl_lf.collect_schema().names():
+        ensembl_lf = ensembl_lf.rename({"id": "rsid"})
+
     # Semi-join to filter Ensembl to only matching keys (keeps build side small)
     input_keys_lf = input_lf.select(join_columns).unique()
     ensembl_filtered_lf = ensembl_lf.join(
@@ -187,6 +192,14 @@ def _annotate_single_chromosome_file(
         how="left",
         suffix="_ensembl"
     )
+
+    # Reorder columns to put rsid before id
+    columns = annotated_lf.collect_schema().names()
+    if "rsid" in columns and "id" in columns:
+        id_idx = columns.index("id")
+        columns.remove("rsid")
+        columns.insert(id_idx, "rsid")
+        annotated_lf = annotated_lf.select(columns)
 
     # Write output using streaming engine for memory efficiency
     output_file.parent.mkdir(parents=True, exist_ok=True)
