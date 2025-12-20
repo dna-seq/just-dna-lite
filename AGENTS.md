@@ -1,58 +1,48 @@
 # Agent Guidelines
 
-This document outlines the coding standards and practices to follow when working on this project.
+This document outlines the coding standards and practices for **just-dna-lite**.
 
-## Error Handling
+## Repository layout (uv workspace)
 
-- **Avoid nested try-catch blocks**: Do not nest try-catch blocks unless absolutely necessary
-- **Eliot logging**: Avoid try-catch inside eliot catching unless absolutely necessary, as `action.log` can work with errors
-- **Minimize try-catch usage**: Try to avoid excessive try-catch-except blocks, especially inside loggable actions
+This repo is a **uv workspace** with two member projects:
 
-## Code Quality
+- `genobear/`: pipeline/CLI library (Python package: `genobear`)
+- `webui/`: Reflex Web UI (Python package: `webui`)
 
-- **No placeholders**: Do not put placeholders like `/my/custom/path/` in real code
-- **Type hints**: Always use type hints in Python projects
-- **No relative imports**: Do not use relative imports! Always use absolute imports
+Shared, repo-level folders live at the workspace root (e.g. `data/`, `docs/`, `logs/`, `notebooks/`).
+
+### Running the App
+
+The recommended way to start the application is from the repo root:
+
+- `uv run start` - Starts the Reflex Web UI development server.
+
+### Pipeline and CLI Development
+
+- `cd genobear`
+- `uv run annotate ...` - Run annotation pipelines
+- `uv run prepare ...` - Run data preparation pipelines
+- `uv run pytest` - Run the test suite
+
+## Coding Standards
+
+- **Avoid nested try-catch**: Minimize try-catch blocks, especially inside eliot actions.
+- **Type hints**: Mandatory for all Python code.
+- **No relative imports**: Always use absolute imports.
+- **Prefer Polars**: Use Polars over Pandas for all data processing tasks.
+- **Memory Efficiency**: Use lazy APIs (`scan_parquet`) and streaming (`sink_parquet`) where possible.
+- **Data Pattern**: Use `data/input`, `data/interim`, `data/output` for local data management.
+- **Eliot Logging**: Use `with start_action(...) as action` for structured logging.
+- **Typer CLI**: Use Typer for all command-line interfaces.
+- **Pydantic 2**: Use Pydantic version 2 for data validation.
 
 ## Testing
 
-- **Integration tests**: When asked to write integration tests, run real requests and work with real data. Do not mock stuff unless explicitly asked or if dealing with multi-gigabyte files
+- **Integration tests**: Use real requests and data. Do not mock unless dealing with multi-gigabyte files.
+- **Verbosity**: Run `pytest` with `-vvv` by default.
+- **Assertions**: Include explanatory messages in all assertion statements.
 
 ## Dependency Management
 
-- **Use `uv`**: In Python projects, always use `uv` with `project.toml`
-- **Avoid `uv pip install`**: Do not use `uv pip install`. Use `uv sync` to resolve dependencies and `uv add` to add new ones
-- **Version management**: Never hardcode version into `__init__.py` file (use `project.toml` instead)
-
-## Data Processing
-
-- **Prefer Polars**: Prefer Polars over Pandas for data processing
-- **Be memory efficient**: use scan_parquet and lazy api. Take into account that scan_parquet can open content of whole folder instead of opening separately. Also, you can write lazyly using sink_parquet. You can also apply compression (check what sink parquet supports) when saving. Avoid doing pl.scan_parquet().collect() if possible as it negates the benefits of lazy streaming.
-- **Use data/input, data/interim, data/output pattern** . Input and downloaded files you store at ./data/input, intermediates and interim and final at data/output
-
-## Logging
-
-- **Eliot logging**: Use eliot as the default logging library using the `with start_action(...) as action` pattern
-- **Use log folder**: use to_nice_file(output_file=json_path, rendered_file=log_path) and to_nice_stdout(output_file=json_path) from pycomfort library (for which you also check exact syntax as you may have bad intuition on it) to add file destination for logging
-
-## CLI Development
-
-- **Use Typer**: Always use the typer library when making CLI applications
-
-## Data Validation
-
-- **Pydantic version**: When using pydantic, assume pydantic 2 by default. Never use outdated pydantic 1
-
-## Debugging
-
-- **Print statements**: If debugging in bash with Python print statements, try to avoid using "!" character
-
-## UI/UX Libraries
-
-- **Dashly duplicates**: If using dashly, avoid allowing duplicates unless the user wants them explicitly
-
-## Documentation
-
-- **Markdown file placement**: For markdown files you generate, unless it is a README or dataset card, put them in the `docs` folder
-- **Avoid excessive markdown**: Avoid creating many markdown files when explaining what you changed in the code unless it is a README or explicitly requested
-- **No change summaries**: Do NOT create changes summaries as files unless explicitly asked
+- **Use `uv`**: Always manage dependencies via `uv sync` and `uv add`.
+- **No hardcoded versions**: Do not put versions in `__init__.py`; use `project.toml`.

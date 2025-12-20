@@ -1,82 +1,43 @@
-# GenoBear 🧬
+# just-dna-lite 🧬
 
 A unified toolkit for downloading, converting, processing, and annotating genomic databases.
+
+## Project Structure
+
+This is a **uv workspace** containing:
+- **`genobear/`**: The core pipeline and CLI library.
+- **`webui/`**: A modern Reflex-based web interface.
+
+## Getting Started
+
+### Prerequisites
+
+Ensure you have [uv](https://github.com/astral-sh/uv) installed.
+
+### Running the Web UI
+
+To start the development server for the web interface:
+
+```bash
+uv run start
+```
+
+### Using the CLI (genobear)
+
+```bash
+cd genobear
+uv run prepare --help
+uv run annotate --help
+```
 
 ## Features
 
 - **Download genomic databases**: Ensembl, ClinVar, dbSNP, gnomAD
-- **Convert VCF to Parquet**: Efficient columnar storage for large genomic datasets with polars-bio
-- **Split variants by type**: Organize variants by TSA (Trinucleotide Sequence Alteration) for efficient querying
-- **Annotate VCF files**: Annotate your VCF data with reference genomic databases using lazy joins
-- **CLI and Python API**: Use via command line or import as a Python library with pipeline-based workflows
-- **Parallel processing**: Download and process multiple chromosome files concurrently
-- **HuggingFace integration**: Upload processed datasets directly to HuggingFace Hub
-
-## Installation
-
-```bash
-# Using uv (recommended)
-uv add genobear
-
-# Using pip
-pip install genobear
-```
-
-## Quick Start
-
-### CLI Usage
-
-GenoBear provides two main CLI commands: `prepare` for data preparation and `annotate` for VCF annotation.
-
-#### Data Preparation
-
-```bash
-# Download Ensembl variation VCF files (all chromosomes) with better parallelization
-prepare ensembl --split --download-workers 8
-
-# Download specific chromosomes using pattern matching
-prepare ensembl --pattern "chr(21|22|X)"  # chromosomes 21, 22, and X
-prepare ensembl --pattern "chr[1-9]"      # chromosomes 1-9
-
-# Download ClinVar
-prepare clinvar --dest-dir ./my_data
-
-# Download dbSNP with specific build
-prepare dbsnp --build GRCh38 --split
-
-# Download gnomAD v4
-prepare gnomad --version v4
-
-# Control worker counts for optimal performance
-prepare ensembl --workers 4 --download-workers 8 --parquet-workers 2
-
-# Run with custom pipeline run folder for caching
-prepare ensembl --run-folder ./pipeline_cache
-
-# Get help
-prepare --help
-prepare ensembl --help
-```
-
-#### VCF Annotation
-
-```bash
-# Annotate a VCF file with Ensembl variations
-annotate vcf input.vcf.gz -o annotated.parquet
-
-# Pre-download reference data
-annotate download-reference
-
-# Annotate with custom cache directory
-annotate vcf sample.vcf.gz --cache-dir /data/cache
-
-# Force re-download of reference data
-annotate vcf sample.vcf.gz --force-download
-
-# Get help
-annotate --help
-annotate vcf --help
-```
+- **Convert VCF to Parquet**: Efficient columnar storage for large genomic datasets
+- **Annotate VCF files**: Fast, lazy-join based annotation
+- **Web Interface**: User-friendly UI for file uploads and job tracking
+- **Parallel processing**: Multi-threaded downloads and data processing
+- **HuggingFace integration**: Upload processed datasets directly to the Hub
 
 **Key Features:**
 - Better parallelization with separate worker controls for downloads vs. processing

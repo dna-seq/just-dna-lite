@@ -6,7 +6,7 @@ from genobear.io import read_vcf_file
 
 
 def test_read_vcf_file_save_vortex_auto_with_parquet(tmp_path: Path) -> None:
-    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).resolve().parents[2] / "data" / "input" / "tests" / "antku_small.vcf"
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
 
     parquet_path = tmp_path / "variants.parquet"
@@ -25,7 +25,7 @@ def test_read_vcf_file_save_vortex_auto_with_parquet(tmp_path: Path) -> None:
 
 
 def test_read_vcf_file_save_vortex_only(tmp_path: Path) -> None:
-    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).resolve().parents[2] / "data" / "input" / "tests" / "antku_small.vcf"
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
 
     vortex_path = tmp_path / "variants_only.vortex"

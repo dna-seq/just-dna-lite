@@ -24,7 +24,7 @@ def test_annotation_pipeline_with_local_vcf(tmp_path: Path) -> None:
     cached reference data.
     """
     # Use the small test VCF file
-    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).resolve().parents[2] / "data" / "input" / "tests" / "antku_small.vcf"
     
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
     
@@ -118,7 +118,7 @@ def test_annotation_pipeline_skips_download_if_cached() -> None:
     This test runs the annotation twice and verifies that the second
     run uses the cached data without re-downloading.
     """
-    vcf_path = Path(__file__).parent.parent / "data" / "input" / "tests" / "antku_small.vcf"
+    vcf_path = Path(__file__).resolve().parents[2] / "data" / "input" / "tests" / "antku_small.vcf"
     assert vcf_path.exists(), f"Test VCF file not found: {vcf_path}"
     
     with start_action(action_type="test_cached_annotation") as action:
