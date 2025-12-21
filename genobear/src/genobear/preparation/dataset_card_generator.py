@@ -241,7 +241,7 @@ This dataset is released under Apache 2.0 license. The original Ensembl data is 
 ## Maintenance
 
 This dataset is maintained by the GenoBear project. For issues or questions:
-- GitHub: [https://github.com/antonkulaga/genobear](https://github.com/antonkulaga/genobear)
+- GitHub: [https://github.com/dna-seq/just-dna-lite](https://github.com/dna-seq/just-dna-lite)
 - HuggingFace: [https://huggingface.co/just-dna-seq](https://huggingface.co/just-dna-seq)
 """
     
@@ -451,7 +451,7 @@ This dataset is processed from ClinVar public data. Please refer to [ClinVar's t
 ## Maintenance
 
 This dataset is maintained by the GenoBear project. For issues or questions:
-- GitHub: [https://github.com/antonkulaga/genobear](https://github.com/antonkulaga/genobear)
+- GitHub: [https://github.com/dna-seq/just-dna-lite](https://github.com/dna-seq/just-dna-lite)
 - HuggingFace: [https://huggingface.co/just-dna-seq](https://huggingface.co/just-dna-seq)
 """
     

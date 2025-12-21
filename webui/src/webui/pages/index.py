@@ -12,8 +12,8 @@ def index_page() -> rx.Component:
         rx.center(
             rx.vstack(
                 rx.icon("dna", size=64, color="var(--indigo-9)"),
-                rx.heading("Welcome to just-dna-lite", size="8"),
-                rx.text("A genomic annotation toolkit", size="4", color="gray"),
+                rx.heading("GenoBear Platform", size="8"),
+                rx.text("Personalized genomics platform", size="4", color="gray"),
                 rx.button(
                     "Go to Dashboard",
                     size="3",
