@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import app_shell
+from webui.components.layout import template
 from webui.state import AuthState
 
 
 @rx.page(route="/jobs")
 def jobs_page() -> rx.Component:
-    return app_shell(
+    return template(
         rx.cond(
             AuthState.is_authenticated | AuthState.login_disabled,
             rx.vstack(

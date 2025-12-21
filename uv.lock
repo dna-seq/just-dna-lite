@@ -2020,11 +2020,17 @@ name = "just-dna-lite"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [
+    { name = "genobear" },
     { name = "typer" },
+    { name = "webui" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.20.1" }]
+requires-dist = [
+    { name = "genobear", editable = "genobear" },
+    { name = "typer", specifier = ">=0.20.1" },
+    { name = "webui", editable = "webui" },
+]
 
 [[package]]
 name = "keyring"

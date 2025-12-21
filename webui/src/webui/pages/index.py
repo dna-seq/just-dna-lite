@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import app_shell
+from webui.components.layout import template
 
 
 @rx.page(route="/")
 def index_page() -> rx.Component:
     """Index page - welcome screen."""
-    return app_shell(
+    return template(
         rx.center(
             rx.vstack(
                 rx.image(

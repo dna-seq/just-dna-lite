@@ -113,7 +113,7 @@ def sidebar() -> rx.Component:
     )
 
 
-def app_shell(*children: rx.Component) -> rx.Component:
+def template(*children: rx.Component) -> rx.Component:
     return rx.vstack(
         topbar(),
         rx.hstack(

@@ -10,8 +10,8 @@ A unified personalized genomics platform for downloading, converting, processing
 
 This is a **uv workspace** containing two primary components:
 
-- **`webui/`**: A modern Reflex-based web interface for managing genomic data, running jobs, and visualizing analysis.
-- **`genobear/`**: The core pipeline and CLI library that powers the platform's genomic processing capabilities. For more details on the library, its Python API, and its CLI, see [genobear/README.md](genobear/README.md).
+- **`webui/`**: A modern Reflex-based web interface for managing genomic data. For details, see [webui/README.md](webui/README.md).
+- **`genobear/`**: The core pipeline and CLI library that powers the platform's genomic processing capabilities. For details, see [genobear/README.md](genobear/README.md).
 
 Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
 
@@ -21,33 +21,27 @@ Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `
 
 Ensure you have [uv](https://github.com/astral-sh/uv) installed.
 
-### Running the Web UI
+### Quick Start
 
-To start the development server for the web interface:
+To start the Web UI:
 
 ```bash
 uv run start
 ```
 
-### Using the CLI
+For more details on managing the UI, see [webui/README.md](webui/README.md).
 
-The platform's processing engine, `genobear`, provides several CLI tools for data preparation and annotation. See [genobear/README.md](genobear/README.md#cli-usage) for more detailed CLI documentation.
+### Pipeline CLI
 
-```bash
-cd genobear
-uv run prepare --help    # Data preparation pipelines (download/convert)
-uv run annotate --help   # VCF annotation pipelines
-```
+The core engine `genobear` provides CLI tools for data preparation and annotation. For details, see [genobear/README.md](genobear/README.md).
 
 ## Features
 
-- **Personalized Analysis**: Web UI for individual genomic file analysis and tracking.
-- **Download genomic databases**: Automated retrieval of Ensembl, ClinVar, dbSNP, gnomAD.
-- **Convert VCF to Parquet**: Efficient columnar storage using Polars for high-performance processing.
-- **Annotate VCF files**: Fast, lazy-join based annotation with reference datasets.
-- **Job Tracking**: Integrated UI for monitoring long-running genomic processing tasks.
-- **Parallel processing**: Multi-threaded downloads and data processing with granular controls.
-- **HuggingFace integration**: Seamlessly upload processed datasets to the Hub.
+- **Integrated Platform**: A unified interface for both CLI-based pipelines and a modern Web UI.
+- **High-Performance Engine**: Powered by `genobear` for fast VCF processing using Polars and lazy-join annotations.
+- **Automated Data Management**: Streamlined downloading and conversion of major genomic databases (Ensembl, ClinVar, etc.).
+- **Job Tracking & Visualization**: Monitor long-running tasks and visualize results through the Web UI.
+- **Cloud Ready**: Built-in support for HuggingFace Hub integration.
 
 ## Configuration
 

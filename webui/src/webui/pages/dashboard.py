@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import app_shell
+from webui.components.layout import template
 from webui.state import AuthState, UploadState
 
 
@@ -56,7 +56,7 @@ def upload_zone() -> rx.Component:
 
 @rx.page(route="/dashboard")
 def dashboard_page() -> rx.Component:
-    return app_shell(
+    return template(
         rx.cond(
             AuthState.is_authenticated,
             rx.vstack(
