@@ -2017,14 +2017,14 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.20.0" }]
+requires-dist = [{ name = "typer", specifier = ">=0.20.1" }]
 
 [[package]]
 name = "keyring"

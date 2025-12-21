@@ -26,7 +26,12 @@ def login_form() -> rx.Component:
 def topbar() -> rx.Component:
     return rx.hstack(
         rx.hstack(
-            rx.icon("dna", size=24, color=rx.color("indigo", 9)),
+            rx.image(
+                src="/just_dna_seq.jpg",
+                height="2rem",
+                width="auto",
+                border_radius="20%",
+            ),
             rx.heading("just-dna-lite", size="5", weight="bold"),
             align="center",
             spacing="2",

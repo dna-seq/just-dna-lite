@@ -1,4 +1,8 @@
+<div align="center">
+  <img src="webui/assets/just_dna_seq.jpg" alt="just-dna-lite logo" width="200px">
+
 # just-dna-lite: Personalized Genomics Platform 🧬
+</div>
 
 A unified personalized genomics platform for downloading, converting, processing, and annotating genomic data. It provides both a powerful engine for genomic pipelines and a modern user interface.
 

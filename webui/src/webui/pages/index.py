@@ -11,7 +11,12 @@ def index_page() -> rx.Component:
     return app_shell(
         rx.center(
             rx.vstack(
-                rx.icon("dna", size=64, color="var(--indigo-9)"),
+                rx.image(
+                    src="/just_dna_seq.jpg",
+                    width="120px",
+                    height="auto",
+                    border_radius="lg",
+                ),
                 rx.heading("GenoBear Platform", size="8"),
                 rx.text("Personalized genomics platform", size="4", color="gray"),
                 rx.button(
