@@ -89,12 +89,7 @@ def test_download_ensembl_reference() -> None:
         # Verify results
         assert results and "ensembl_cache_path" in results, "Expected ensembl_cache_path in results"
         
-        # Extract the actual path from Result object if needed
-        cache_path = results["ensembl_cache_path"]
-        if hasattr(cache_path, "output"):
-            cache_path = cache_path.output
-        
-        cache_path = Path(cache_path)
+        cache_path = Path(results["ensembl_cache_path"])
         assert cache_path.exists(), f"Cache directory not found: {cache_path}"
         
         # Check that parquet files exist in cache

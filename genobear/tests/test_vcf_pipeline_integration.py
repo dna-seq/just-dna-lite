@@ -5,12 +5,13 @@ from typing import List
 import pytest
 from eliot import start_action
 
-from genobear.preparation.vcf_downloader import make_vcf_pipeline, list_paths
+from genobear.preparation.runners_prefect import prepare_vcf_source_flow
+from genobear.preparation.vcf_downloader import list_paths
 
 
 @pytest.mark.integration
 def test_vcf_pipeline_downloads_to_temp(tmp_path: Path) -> None:
-    """Integration test for the `vcf_pipeline` using a temporary destination.
+    """Integration test for the `prepare_vcf_source_flow` using a temporary destination.
 
     Mirrors the logic while preferring a small index file (".tbi") to keep the
     test lightweight. Falls back to the larger VCF if needed.
@@ -25,53 +26,22 @@ def test_vcf_pipeline_downloads_to_temp(tmp_path: Path) -> None:
         preferred_urls = list_paths(url=base_url, pattern=preferred_pattern, file_only=True)
         pattern = preferred_pattern if preferred_urls else fallback_pattern
 
-        pipeline = make_vcf_pipeline()
-
-        # Run pipeline
-        results = pipeline.map(
-            inputs=dict(
-                url=base_url,
-                pattern=pattern,
-                file_only=True,
-                name="pytest_vcf_pipeline",
-                dest_dir=tmp_path,
-                check_files=True,
-                expiry_time=7 * 24 * 3600,
-            ),
-            output_names={"validated_vcf_local", "vcf_lazy_frame", "vcf_parquet_path"},
-            parallel=True,
-            return_results=True,
+        # Run Prefect flow
+        results = prepare_vcf_source_flow(
+            url=base_url,
+            pattern=pattern,
+            name="pytest_vcf_pipeline",
+            dest_dir=tmp_path,
+            profile=True,
         )
 
-        local_result = results["validated_vcf_local"]
-        parquet_result = results["vcf_parquet_path"]
-        lazy_frame_result = results["vcf_lazy_frame"]
-
-        # Extract local paths
-        local_out = local_result.output
-        if hasattr(local_out, "ravel"):
-            local_seq = local_out.ravel().tolist()
-        elif isinstance(local_out, list):
-            local_seq = local_out
-        else:
-            local_seq = [local_out]
-        local_paths: List[Path] = [p if isinstance(p, Path) else Path(p) for p in local_seq]
-
-        # Extract parquet paths
-        parquet_out = parquet_result.output
-        if hasattr(parquet_out, "ravel"):
-            parquet_seq = parquet_out.ravel().tolist()
-        elif isinstance(parquet_out, list):
-            parquet_seq = parquet_out
-        else:
-            parquet_seq = [parquet_out]
-        parquet_paths: List[Path] = [p if isinstance(p, Path) else Path(p) for p in parquet_seq]
+        local_paths = results["vcf_local"]
+        parquet_paths = results["vcf_parquet_path"]
 
         # Assertions with clear messages
         assert len(local_paths) >= 1, "Expected at least one downloaded file"
         assert len(parquet_paths) == len(local_paths), "Should have same number of parquet and local paths"
         
-        vcf_files = []
         for i, (local_p, parquet_p) in enumerate(zip(local_paths, parquet_paths)):
             assert local_p.exists(), f"Downloaded file does not exist: {local_p}"
             assert local_p.stat().st_size > 0, f"Downloaded file is empty: {local_p}"
@@ -85,29 +55,11 @@ def test_vcf_pipeline_downloads_to_temp(tmp_path: Path) -> None:
             )
             
             if is_vcf:
-                vcf_files.append((local_p, parquet_p))
                 assert parquet_p.suffix == ".parquet", f"Expected .parquet extension for VCF conversion: {parquet_p}"
                 assert parquet_p.exists(), f"Parquet file should exist for VCF: {parquet_p}"
                 assert parquet_p.stat().st_size > 0, f"Parquet file should not be empty: {parquet_p}"
             else:
                 # Non-VCF files should return the original path 
                 assert parquet_p == local_p, f"Non-VCF file should return original path: {local_p} != {parquet_p}"
-        
-        # If we have VCF files, verify lazy frames work
-        if vcf_files:
-            lazy_frame_out = lazy_frame_result.output
-            if hasattr(lazy_frame_out, "ravel"):
-                lazy_frames = lazy_frame_out.ravel().tolist()
-            elif isinstance(lazy_frame_out, list):
-                lazy_frames = lazy_frame_out
-            else:
-                lazy_frames = [lazy_frame_out]
-            
-            # Check that we can work with the lazy frames (at least for VCF files)
-            import polars as pl
-            for i, (vcf_path, parquet_path) in enumerate(vcf_files):
-                if i < len(lazy_frames):
-                    lazy_frame = lazy_frames[i]
-                    assert isinstance(lazy_frame, pl.LazyFrame), f"Expected LazyFrame for VCF: {vcf_path}"
 
 

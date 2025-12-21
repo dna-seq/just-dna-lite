@@ -9,8 +9,6 @@ from typing import Optional
 import polars as pl
 from eliot import start_action
 from huggingface_hub import snapshot_download
-from platformdirs import user_cache_dir
-from pipefunc import pipefunc
 
 from genobear.annotation.chromosomes import (
     detect_chrom_style_from_values,
@@ -40,7 +38,6 @@ def _configure_polars_memory_efficient() -> None:
 _configure_polars_memory_efficient()
 
 
-@pipefunc(output_name="ensembl_cache_path", cache=True)
 def download_ensembl_annotations(
     repo_id: str = "just-dna-seq/ensembl_variations",
     cache_dir: Optional[Path] = None,
@@ -213,7 +210,6 @@ def _annotate_single_chromosome_file(
     return pl.scan_parquet(output_file).select(pl.len()).collect().item()
 
 
-@pipefunc(output_name="annotated_dataframe", renames={"input_dataframe": "vcf_lazy_frame"}, cache=False)
 def annotate_with_ensembl(
     input_dataframe: pl.LazyFrame,
     ensembl_cache_path: Path,

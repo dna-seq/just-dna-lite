@@ -12,24 +12,27 @@ dependencies = [
     "eliot>=1.17.5",
     "fsspec>=2025.10.0",
     "huggingface-hub>=1.1.5",
-    "pipefunc[all]>=0.88.0",
     "polars-bio>=0.18.0",
     "pooch>=1.8.2",
+    "prefect>=3.6.7",
     "pycomfort>=0.0.18",
     "pydantic>=2.12.4",
     "python-dotenv>=1.2.1",
     "requests>=2.32.5",
     "rich>=14.2.0",
     "tenacity>=9.1.2",
-    "typer>=0.20.0"
+    "typer>=0.12.0",
 ]
 
 [project.scripts]
 #genobear = "genobear:app"
 prepare = "genobear.prepare:app"
 annotate = "genobear.annotate:app"
-modules = "genobear.modules:app"
+annotate-prefect = "genobear.annotate_prefect:app"
+modules = "genobear.oakvar.modules:app"
 convert-vortex = "genobear.vortex.convert_vortex:app"
+gb = "genobear.pipelines.cli:app"
+pipelines = "genobear.pipelines.serve:serve_pipelines"
 
 [build-system]
 requires = ["uv-build"]
@@ -59,6 +62,10 @@ markers = [
 # Default pytest behavior: extra verbose and no capture to allow Eliot/stdout output
 addopts = "-vvv -s -m 'not large_download'"
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:eliottree.*",
+    "ignore:datetime.datetime.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning",
+]
 
 
 [tool.marimo.runtime]

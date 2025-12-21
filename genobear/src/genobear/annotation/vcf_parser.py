@@ -5,12 +5,10 @@ from typing import Union
 
 import polars as pl
 from eliot import start_action
-from pipefunc import pipefunc
 
 from genobear.io import read_vcf_file
 
 
-@pipefunc(output_name="vcf_lazy_frame", cache=False)
 def load_vcf_as_lazy_frame(
     vcf_path: Union[str, Path],
     info_fields: Union[list[str], None] = None,

@@ -2,14 +2,14 @@
 
 ## Overview
 
-The GenoBear annotation pipeline allows you to annotate VCF files with reference genomic data from Ensembl variations. The pipeline is built using `pipefunc` for efficient parallel processing and lazy evaluation with Polars.
+The GenoBear annotation pipeline allows you to annotate VCF files with reference genomic data from Ensembl variations. The pipeline is built using **Prefect 3.x** for efficient parallel processing and lazy evaluation with Polars.
 
 ## Key Features
 
 - **Automatic cache management**: Downloads reference data from HuggingFace Hub only when needed
 - **Lazy evaluation**: Uses Polars LazyFrames for memory-efficient processing
 - **Parallel annotation**: Processes multiple chromosomes in parallel
-- **Pipeline-based**: Built on pipefunc for caching, composition, and parallel execution
+- **Pipeline-based**: Built on **Prefect 3.x** for task orchestration, caching, and parallel execution.
 
 ## Installation
 

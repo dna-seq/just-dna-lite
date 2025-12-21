@@ -1,5 +1,5 @@
 """
-Hugging Face dataset uploader pipeline.
+Hugging Face dataset uploader.
 
 This module provides functions to upload parquet files to Hugging Face datasets,
 with intelligent file comparison to avoid unnecessary uploads.
@@ -8,7 +8,6 @@ with intelligent file comparison to avoid unnecessary uploads.
 from pathlib import Path
 from typing import Optional, Dict, List
 from eliot import start_action
-from pipefunc import pipefunc, Pipeline
 from huggingface_hub import HfApi, hf_hub_download, list_repo_files, CommitOperationAdd
 from huggingface_hub.utils import RepositoryNotFoundError, HfHubHTTPError
 from genobear.preparation.dataset_card_generator import (
@@ -18,11 +17,6 @@ from genobear.preparation.dataset_card_generator import (
 )
 
 
-@pipefunc(
-    output_name="uploaded_files",
-    renames={"parquet_file": "parquet_files", "path_in_repo": "path_in_repos"},
-    mapspec="parquet_files[i], path_in_repos[i] -> uploaded_files[i]",
-)
 def upload_to_hf_if_changed(
     parquet_file: Path,
     repo_id: str,
@@ -412,11 +406,6 @@ def upload_files_batch(
         }
 
 
-def make_hf_upload_pipeline() -> Pipeline:
-    """Create a pipeline for uploading parquet files to Hugging Face."""
-    return Pipeline([upload_to_hf_if_changed], print_error=True)
-
-
 def upload_parquet_to_hf(
     parquet_files: List[Path] | Path,
     repo_id: str,
@@ -515,4 +504,3 @@ def upload_parquet_to_hf(
         }
         
         return results
-

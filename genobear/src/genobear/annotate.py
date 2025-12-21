@@ -14,11 +14,11 @@ import typer
 from rich.console import Console
 from eliot import start_action
 
-from dotenv import load_dotenv
+from genobear.runtime import load_env
 
 logs = Path("logs") if Path("logs").exists() else Path.cwd().parent / "logs"
 
-load_dotenv()
+load_env()
 
 # Set POLARS_VERBOSE from env if not already set (default: 0 for clean output)
 if "POLARS_VERBOSE" not in os.environ:

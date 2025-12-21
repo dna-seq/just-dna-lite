@@ -1,16 +1,88 @@
 from __future__ import annotations
 
 import os
+import time
+import psutil
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from eliot import start_action
 from dotenv import find_dotenv, load_dotenv
-from pipefunc import Pipeline
 
 from genobear.config import get_default_workers, get_parquet_workers
+
+
+def load_env(override: bool = False) -> Optional[str]:
+    """
+    Search for .env file in the current directory and its parents.
+    This is useful when running from subprojects (e.g. genobear/ or webui/)
+    to ensure the root .env is loaded.
+    
+    Returns:
+        The path to the .env file found and loaded, or None if not found.
+    """
+    env_path = find_dotenv(usecwd=True)
+    if env_path:
+        load_dotenv(env_path, override=override)
+        return env_path
+    return None
+
+
+@contextmanager
+def resource_tracker(name: str = "resource_usage"):
+    """Context manager to track execution time, CPU and peak memory usage."""
+    process = psutil.Process(os.getpid())
+    start_time = time.perf_counter()
+    start_mem = process.memory_info().rss
+    
+    # Start CPU tracking
+    process.cpu_percent(interval=None)
+    
+    data = {"name": name, "start_time": start_time, "start_mem": start_mem}
+    yield data
+    
+    end_time = time.perf_counter()
+    end_mem = process.memory_info().rss
+    cpu_usage = process.cpu_percent(interval=None)
+    
+    data["end_time"] = end_time
+    data["end_mem"] = end_mem
+    data["duration"] = end_time - start_time
+    data["cpu_usage_percent"] = cpu_usage
+    data["memory_delta"] = end_mem - start_mem
+    data["peak_memory_mb"] = max(start_mem, end_mem) / (1024 * 1024)
+    data["memory_delta_mb"] = (end_mem - start_mem) / (1024 * 1024)
+
+    # If running inside a Prefect flow/task, log and create artifact
+    try:
+        from prefect import get_run_logger
+        from prefect.artifacts import create_markdown_artifact
+        try:
+            logger = get_run_logger()
+            logger.info(
+                f"Resource Report [{name}]: Duration: {data['duration']:.2f}s, "
+                f"CPU: {data['cpu_usage_percent']:.1f}%, Peak RAM: {data['peak_memory_mb']:.2f}MB"
+            )
+            
+            create_markdown_artifact(
+                key=f"{name.replace(' ', '_').lower()}-resources",
+                markdown=f"""# Resource Report: {name}
+| Metric | Value |
+| :--- | :--- |
+| **Duration** | {data['duration']:.2f}s |
+| **CPU Usage** | {data['cpu_usage_percent']:.1f}% |
+| **Peak Memory** | {data['peak_memory_mb']:.2f} MB |
+| **Memory Delta** | {data['memory_delta_mb']:+.2f} MB |
+""",
+                description=f"Resource usage metrics for {name}"
+            )
+        except Exception:
+            # Not in a prefect context or logger not available
+            pass
+    except ImportError:
+        pass
 
 
 def resolve_worker_counts(
@@ -25,10 +97,10 @@ def resolve_worker_counts(
     - parquet_workers: from GENOBEAR_PARQUET_WORKERS or default of 4
     """
     # Load .env if present (does not override existing env vars)
-    env_path = find_dotenv(usecwd=True)
+    env_path = load_env(override=False)
     if env_path:
         with start_action(action_type="load_env", env_path=env_path):
-            load_dotenv(env_path, override=False)
+            pass
 
     env_dl = os.getenv("GENOBEAR_DOWNLOAD_WORKERS")
     env_workers = os.getenv("GENOBEAR_WORKERS")
@@ -55,175 +127,37 @@ def resolve_worker_counts(
     return resolved_download, resolved_workers, resolved_parquet
 
 
-@contextmanager
-def default_executors(
-    download_workers: Optional[int] = None,
-    workers: Optional[int] = None,
-    parquet_workers: Optional[int] = None,
-    executor_mode: str = "preparation",
-):
-    """Context manager that yields a pipefunc executors mapping.
-
-    Uses ThreadPool for download stages and ProcessPool for parquet and other CPU-bound tasks.
+def setup_prefect_api() -> bool:
+    """Setup Prefect API connection if environment variables are provided.
     
-    Args:
-        download_workers: Number of workers for I/O-bound downloads
-        workers: Number of workers for general CPU-bound tasks
-        parquet_workers: Number of workers for memory-intensive parquet operations
-        executor_mode: Either "preparation" (for VCF download pipelines) or "annotation" (for annotation pipelines)
-    
-    For preparation mode:
-    - "vcf_local": ThreadPoolExecutor(download_workers) - for I/O-bound downloads
-    - "vcf_parquet_path": ProcessPoolExecutor(parquet_workers) - for parquet conversion
-    - "": default fallback ProcessPoolExecutor(parquet_workers) - for other tasks including splitting
-    
-    For annotation mode:
-    - "": default ProcessPoolExecutor(workers) - for all annotation tasks
-    
-    Note: We use parquet_workers as the default to ensure memory-intensive operations like
-    splitting also use the conservative worker count. The split_variants_dict output uses
-    this default executor when splitting is enabled.
+    Returns:
+        bool: True if server-based Prefect is configured, False for ephemeral mode.
     """
-    dl_workers, cpu_workers, parq_workers = resolve_worker_counts(
-        download_workers=download_workers, 
-        workers=workers,
-        parquet_workers=parquet_workers
-    )
-    
-    if executor_mode == "preparation":
-        # Use parquet_workers for default to ensure all parquet operations use conservative count
-        default_exec = ProcessPoolExecutor(max_workers=parq_workers)
-        # Use threads for I/O-bound download stage
-        download_exec = ThreadPoolExecutor(max_workers=dl_workers)
-        # Use separate pool with conservative worker count for memory-intensive parquet operations
-        parquet_exec = ProcessPoolExecutor(max_workers=parq_workers)
-        # Log configured and actual executor worker counts
-        with start_action(
-            action_type="init_executors",
-            mode=executor_mode,
-            dl_workers=dl_workers,
-            workers=cpu_workers,
-            parquet_workers=parq_workers,
-        ) as action:
-            action.log(
-                message_type="executors_created",
-                download_executor="ThreadPoolExecutor",
-                download_max_workers=getattr(download_exec, "_max_workers", None),
-                parquet_executor="ProcessPoolExecutor",
-                parquet_max_workers=getattr(parquet_exec, "_max_workers", None),
-                default_executor="ProcessPoolExecutor",
-                default_max_workers=getattr(default_exec, "_max_workers", None),
-            )
-        try:
-            yield {
-                "vcf_local": download_exec,
-                "vcf_parquet_path": parquet_exec,
-                "": default_exec,  # Default for all other outputs (including split_variants_dict when present)
-            }
-        finally:
-            # Ensure clean shutdown
-            download_exec.shutdown(wait=True, cancel_futures=False)
-            parquet_exec.shutdown(wait=True, cancel_futures=False)
-            default_exec.shutdown(wait=True, cancel_futures=False)
-    else:  # annotation mode
-        # Use a single ProcessPoolExecutor for all annotation tasks
-        default_exec = ProcessPoolExecutor(max_workers=cpu_workers)
-        with start_action(
-            action_type="init_executors",
-            mode=executor_mode,
-            workers=cpu_workers,
-        ) as action:
-            action.log(
-                message_type="executors_created",
-                default_executor="ProcessPoolExecutor",
-                default_max_workers=getattr(default_exec, "_max_workers", None),
-            )
-        try:
-            yield {
-                "": default_exec,  # Default for all outputs
-            }
-        finally:
-            # Ensure clean shutdown
-            default_exec.shutdown(wait=True, cancel_futures=False)
-
-
-def run_pipeline(
-    pipeline: Pipeline,
-    inputs: dict,
-    output_names: Optional[set[str]] = None,
-    run_folder: Optional[str | Path] = None,
-    return_results: bool = True,
-    show_progress: str | bool = "rich",
-    parallel: Optional[bool] = None,
-    download_workers: Optional[int] = None,
-    workers: Optional[int] = None,
-    parquet_workers: Optional[int] = None,
-    executors: Optional[dict] = None,
-    executor_mode: str = "preparation",
-):
-    """Execute a pipefunc Pipeline with GENOBEAR executors configuration.
-    
-    Args:
-        pipeline: The pipefunc Pipeline to execute
-        inputs: Input parameters for the pipeline
-        output_names: Which outputs to return
-        run_folder: Optional folder for pipeline caching
-        return_results: Whether to return results
-        show_progress: Show progress indicator
-        parallel: Run in parallel mode
-        download_workers: Number of workers for I/O-bound downloads
-        workers: Number of workers for CPU-bound tasks
-        parquet_workers: Number of workers for memory-intensive parquet operations
-        executors: Optional custom executor mapping (overrides auto-configuration)
-        executor_mode: Either "preparation" or "annotation" - determines executor configuration
-    """
-    dl_workers, cpu_workers, parq_workers = resolve_worker_counts(
-        download_workers=download_workers,
-        workers=workers,
-        parquet_workers=parquet_workers
-    )
-
-    if executors is None:
-        with default_executors(
-            download_workers=dl_workers,
-            workers=cpu_workers,
-            parquet_workers=parq_workers,
-            executor_mode=executor_mode,
-        ) as exec_map:
-            with start_action(
-                action_type="execute_pipeline",
-                run_folder=str(run_folder) if run_folder else None,
-                executor_mode=executor_mode,
-                dl_workers=dl_workers,
-                workers=cpu_workers,
-                parquet_workers=parq_workers
-            ):
-                return pipeline.map(
-                    inputs=inputs,
-                    output_names=output_names,
-                    parallel=True if parallel is None else parallel,
-                    return_results=return_results,
-                    show_progress=show_progress,
-                    run_folder=run_folder,
-                    executor=exec_map,
-                )
+    api_url = os.getenv("PREFECT_API_URL")
+    if api_url:
+        print(f"🚀 Prefect configured for server at: {api_url}")
+        return True
     else:
-        with start_action(
-            action_type="execute_pipeline",
-            run_folder=str(run_folder) if run_folder else None,
-            executor_mode="custom",
-            dl_workers=dl_workers,
-            workers=cpu_workers,
-            parquet_workers=parq_workers
-        ):
-            return pipeline.map(
-                inputs=inputs,
-                output_names=output_names,
-                parallel=True if parallel is None else parallel,
-                return_results=return_results,
-                show_progress=show_progress,
-                run_folder=run_folder,
-                executor=executors,
-            )
+        print("💡 Prefect running in ephemeral (standalone) mode.")
+        return False
+
+
+@contextmanager
+def prefect_flow_run(name: str, profile: bool = True):
+    """Context manager for running a Prefect flow with optional resource tracking.
+    
+    Args:
+        name: Name of the flow/operation
+        profile: If True, tracks resource usage
+    """
+    setup_prefect_api()
+    if profile:
+        with resource_tracker(name) as tracker:
+            yield tracker
+    else:
+        yield {}
+
+
+
 
 

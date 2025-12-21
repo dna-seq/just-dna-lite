@@ -23,17 +23,24 @@ Ensure you have [uv](https://github.com/astral-sh/uv) installed.
 
 ### Quick Start
 
-To start the Web UI:
+To start the **entire platform** (Web UI + Genomic Pipelines):
 
 ```bash
 uv run start
 ```
 
-For more details on managing the UI, see [webui/README.md](webui/README.md).
+### Individual Components
 
-### Pipeline CLI
+If you want to run components separately:
 
-The core engine `genobear` provides CLI tools for data preparation and annotation. For details, see [genobear/README.md](genobear/README.md).
+- **Start Genomic Pipelines**: `uv run pipelines` (starts the engine and job tracker)
+- **Start Web UI**: `uv run ui` (starts the Reflex frontend)
+- **Manage Pipelines**: `uv run gb` (CLI for listing, info, and management)
+
+For example, to list all registered genomic pipelines:
+```bash
+uv run gb list
+```
 
 ## Features
 

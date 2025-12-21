@@ -5,7 +5,7 @@ description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "typer>=0.20.1",
+  "typer>=0.12.0",
   "genobear",
   "webui",
 ]
@@ -15,7 +15,11 @@ genobear = { workspace = true }
 webui = { workspace = true }
 
 [project.scripts]
-start = "just_dna_lite.cli:app"
+start = "just_dna_lite.cli:start_all"
+ui = "just_dna_lite.cli:start_ui"
+pipelines = "genobear.pipelines.serve:serve_pipelines"
+gb = "genobear.pipelines.cli:app"
+just-dna-lite = "just_dna_lite.cli:app"
 
 [tool.uv.workspace]
 members = ["genobear", "webui"]
@@ -23,3 +27,9 @@ members = ["genobear", "webui"]
 [build-system]
 requires = ["uv-build"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:eliottree.*",
+    "ignore:datetime.datetime.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning",
+]

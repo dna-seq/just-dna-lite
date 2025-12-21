@@ -5,10 +5,8 @@ from typing import Optional, Union
 import polars as pl
 import vortex as vx
 from eliot import start_action
-from pipefunc import pipefunc
 
 
-@pipefunc(output_name="vortex_output_path", cache=False)
 def parquet_to_vortex(
     parquet_path: Union[str, Path],
     vortex_path: Optional[Union[str, Path]] = None,
@@ -138,7 +136,6 @@ def parquet_to_vortex(
         return output_path
 
 
-@pipefunc(output_name="vortex_directory_path", cache=False)
 def convert_ensembl_directory_to_vortex(
     ensembl_cache_path: Path,
     variant_type: str = "SNV",

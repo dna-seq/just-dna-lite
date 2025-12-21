@@ -6,7 +6,7 @@ GenoBear is a powerful Python library and CLI for managing genomic databases and
 
 - **Automated Database Management**: Download and manage Ensembl, ClinVar, dbSNP, and gnomAD.
 - **High-Performance Processing**: Powered by Polars for fast VCF to Parquet conversion and lazy-join based annotation.
-- **Composable Pipelines**: Uses `pipefunc` to define and execute complex genomic workflows.
+- **Composable Pipelines**: Uses **Prefect 3.x** to define and execute complex genomic workflows with built-in resource tracking.
 - **Granular Parallelism**: Separate controls for download workers and processing workers.
 - **HuggingFace Hub Support**: Tools for uploading processed genomic datasets.
 
@@ -60,7 +60,7 @@ results = gb.PreparationPipelines.download_ensembl(with_splitting=True)
 
 GenoBear's architecture is built around three core concepts:
 1. **Pipeline Functions**: Atomic, typed functions for specific genomic tasks.
-2. **Pipelines**: Composable workflows using `pipefunc`.
+2. **Pipelines**: Composable workflows using **Prefect 3.x**.
 3. **Runtime**: Environment-aware executor that manages parallelism and resources.
 
 ## Configuration

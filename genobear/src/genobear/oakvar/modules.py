@@ -18,11 +18,11 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, FileSi
 from rich.table import Table
 from eliot import start_action
 
-from dotenv import load_dotenv
+from genobear.runtime import load_env
 
 logs = Path("logs") if Path("logs").exists() else Path.cwd().parent / "logs"
 
-load_dotenv()
+load_env()
 
 from pycomfort.logging import to_nice_file, to_nice_stdout
 

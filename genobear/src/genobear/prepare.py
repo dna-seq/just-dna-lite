@@ -17,15 +17,15 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from eliot import start_action
 from platformdirs import user_cache_dir
 from genobear.preparation.huggingface_uploader import collect_parquet_files
-from genobear.preparation.dataset_card_generator import generate_ensembl_card
+from genobear.preparation.dataset_card_generator import generate_ensembl_card, generate_clinvar_card
 from platformdirs import user_cache_dir
 from huggingface_hub import HfApi
 
-from dotenv import load_dotenv
+from genobear.runtime import load_env
 
 logs = Path("logs") if Path("logs").exists() else Path.cwd().parent / "logs"
 
-load_dotenv()
+load_env()
 
 # Set POLARS_VERBOSE from env if not already set (default: 0 for clean output)
 if "POLARS_VERBOSE" not in os.environ:
@@ -128,6 +128,11 @@ def ensembl(
         "--token",
         help="Hugging Face API token (uses HF_TOKEN env var if not provided)"
     ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
+    ),
 ):
     """
     Download Ensembl variation VCF files using the Pipelines approach.
@@ -210,17 +215,18 @@ def ensembl(
         ) as progress:
             task = progress.add_task("Running pipeline...", total=None)
             
-            results = PreparationPipelines.execute(
-                pipeline=pipeline,
-                inputs=inputs,
-                output_names=None,  # Get all outputs
-                run_folder=run_folder,
-                return_results=True,
-                show_progress="rich" if log else False,
-                parallel=True,
+            results = PreparationPipelines.download_ensembl(
+                dest_dir=Path(dest_dir) if dest_dir else None,
+                with_splitting=split,
                 download_workers=download_workers,
                 parquet_workers=parquet_workers,
                 workers=workers,
+                log=log,
+                timeout=timeout,
+                run_folder=run_folder,
+                pattern=pattern,
+                url=url,
+                profile=profile,
             )
             
             progress.update(task, description="✅ Pipeline completed")
@@ -358,6 +364,11 @@ def clinvar(
         "--token",
         help="Hugging Face API token (uses HF_TOKEN env var if not provided)"
     ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
+    ),
 ):
     """
     Download ClinVar VCF files using the Pipelines approach.
@@ -396,8 +407,9 @@ def clinvar(
             log=log,
             timeout=timeout,
             run_folder=run_folder,
+            profile=profile,
         )
-        
+
         console.print("✅ ClinVar download completed!")
         action.log(message_type="success", result_keys=list(results.keys()))
         
@@ -502,6 +514,11 @@ def dbsnp(
         "--log/--no-log",
         help="Enable detailed logging to files"
     ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
+    ),
 ):
     """
     Download dbSNP VCF files using the Pipelines approach.
@@ -533,6 +550,7 @@ def dbsnp(
             log=log,
             timeout=timeout,
             run_folder=run_folder,
+            profile=profile,
         )
         
         console.print(f"✅ dbSNP {build} download completed!")
@@ -586,6 +604,11 @@ def gnomad(
         "--log/--no-log",
         help="Enable detailed logging to files"
     ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
+    ),
 ):
     """
     Download gnomAD VCF files using the Pipelines approach.
@@ -617,6 +640,7 @@ def gnomad(
             log=log,
             timeout=timeout,
             run_folder=run_folder,
+            profile=profile,
         )
         
         console.print(f"✅ gnomAD {version} download completed!")
@@ -659,6 +683,11 @@ def upload_clinvar(
         True,
         "--log/--no-log",
         help="Enable detailed logging to files"
+    ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
     ),
 ):
     """
@@ -777,6 +806,11 @@ def upload_ensembl(
         "--log/--no-log",
         help="Enable detailed logging to files"
     ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
+    ),
 ):
     """
     Upload Ensembl variation parquet files to Hugging Face Hub.
@@ -878,6 +912,11 @@ def update_ensembl_card(
         True,
         "--log/--no-log",
         help="Enable detailed logging to files"
+    ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
     ),
 ):
     """
@@ -1006,6 +1045,11 @@ def update_clinvar_card(
         True,
         "--log/--no-log",
         help="Enable detailed logging to files"
+    ),
+    profile: bool = typer.Option(
+        True,
+        "--profile/--no-profile",
+        help="Track and display resource usage (time and memory)"
     ),
 ):
     """

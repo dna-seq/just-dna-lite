@@ -11,8 +11,6 @@ import polars as pl
 from aiohttp import ClientResponseError, ClientTimeout
 from eliot import start_action
 from fsspec.exceptions import FSTimeoutError
-from pipefunc import Pipeline, pipefunc
-from pipefunc.typing import Array
 from platformdirs import user_cache_dir
 from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -35,7 +33,6 @@ def _retryable_http_error(exc: BaseException) -> bool:
     return False
 
 
-@pipefunc(output_name="urls")
 def list_paths(url: str, pattern: str | None = None, file_only: bool = True) -> list[str]:
     fs, path = fsspec.core.url_to_fs(url)  # infer filesystem and strip protocol
     paths = fs.glob(path) if any(ch in path for ch in "*?[]") else [
@@ -46,11 +43,6 @@ def list_paths(url: str, pattern: str | None = None, file_only: bool = True) -> 
         paths = [p for p in paths if rx.search(p.rsplit("/", 1)[-1])]
     return paths
 
-@pipefunc(
-    output_name="vcf_local",
-    renames={"url": "urls"},
-    mapspec="urls[i] -> vcf_local[i]",
-)
 def download_path(
     url: str,
     name: str | Path = "downloads",
@@ -207,11 +199,6 @@ def download_path(
         action.log(message_type="info", step="download_finished", final_path=str(local))
         return local
         
-@pipefunc(
-    output_name=("vcf_lazy_frame", "vcf_parquet_path"),
-    renames={"vcf_path": "vcf_local"},
-    mapspec="vcf_local[i] -> vcf_lazy_frame[i], vcf_parquet_path[i]",
-)
 def convert_to_parquet(vcf_path: Path, overwrite: bool = False) -> AnnotatedLazyFrame:
     """Convert a VCF file to Parquet using io utilities.
 
@@ -240,18 +227,10 @@ def convert_to_parquet(vcf_path: Path, overwrite: bool = False) -> AnnotatedLazy
         return lazy_frame, parquet_path
 
 
-@pipefunc(
-    output_name=("validated_urls", "validated_vcf_local", "validated_vcf_parquet_path"),
-    renames={
-        "urls": "urls",
-        "vcf_local": "vcf_local",
-        "vcf_parquet_path": "vcf_parquet_path",
-    },
-)
 def validate_downloads_and_parquet(
     urls: list[str],
-    vcf_local: Array[Path],
-    vcf_parquet_path: Array[Path],
+    vcf_local: list[Path],
+    vcf_parquet_path: list[Path],
 ) -> tuple[list[str], list[Path], list[Path]]:
     """
     Reduce-style validator to ensure that for every discovered URL we have a
@@ -392,27 +371,6 @@ def validate_downloads_and_parquet(
         return urls, vcf_local_list, parquet_list
 
 
-def make_vcf_pipeline() -> Pipeline:
-    """Create the base VCF download + convert + validate pipeline."""
-    return Pipeline(
-        [
-            list_paths,
-            download_path,
-            convert_to_parquet,
-            validate_downloads_and_parquet,
-        ],
-        print_error=True,
-    )
-
-def make_validation_pipeline() -> Pipeline:
-    """Create a pipeline focused solely on validating already downloaded VCF and parquet files."""
-    return Pipeline(
-        [
-            validate_downloads_and_parquet,
-        ],
-        # Keep errors concise; avoid verbose pipefunc error snapshots that list all inputs
-        print_error=False,
-    )
 
 if __name__ == "__main__":
     from genobear import PreparationPipelines

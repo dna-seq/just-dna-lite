@@ -1,20 +1,12 @@
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import polars as pl
 from eliot import start_action
-from pipefunc import pipefunc, Pipeline
-from pipefunc.typing import Array
 from genobear.config import get_default_workers
-from genobear.preparation.vcf_downloader import make_vcf_pipeline
     
 
-@pipefunc(
-    output_name="split_variants_dict",
-    renames={"parquet_path": "vcf_parquet_path"},
-    mapspec="vcf_parquet_path[i] -> split_variants_dict[i]",
-)
 def split_variants_by_tsa(
     parquet_path: Path, 
     explode_snv_alt: bool = True,
@@ -104,21 +96,9 @@ def split_variants_by_tsa(
         return result
 
 
-def make_parquet_splitting_pipeline() -> Pipeline:
-    """Create a pipeline that only does splitting with parquet files as input."""
-    return Pipeline([split_variants_by_tsa, validate_split_outputs], print_error=True)
-
-
-@pipefunc(
-    output_name=("validated_split_parquet_path", "validated_split_variants_dict"),
-    renames={
-        "vcf_parquet_path": "vcf_parquet_path",
-        "split_variants_dict": "split_variants_dict",
-    },
-)
 def validate_split_outputs(
-    vcf_parquet_path: Array[Path],
-    split_variants_dict: Array[Dict[str, Path]],
+    vcf_parquet_path: list[Path],
+    split_variants_dict: list[Dict[str, Path]],
 ) -> tuple[list[Path], list[Dict[str, Path]]]:
     """
     Validate that for each input parquet file we produced split outputs and all
@@ -128,15 +108,6 @@ def validate_split_outputs(
         # Normalize to lists
         parquet_list = [vcf_parquet_path] if isinstance(vcf_parquet_path, Path) else list(vcf_parquet_path)
         split_list = [split_variants_dict] if isinstance(split_variants_dict, dict) else list(split_variants_dict)
-
-        # Align lengths best-effort; pipefunc mapspec should keep them aligned, but guard anyway
-        if len(split_list) != len(parquet_list):
-            action.log(
-                message_type="warning",
-                reason="length_mismatch",
-                parquet_count=len(parquet_list),
-                split_count=len(split_list),
-            )
 
         # Validate existence
         def _is_parquet(p: Path) -> bool:
@@ -167,9 +138,6 @@ def validate_split_outputs(
         return parquet_list, split_list
 
 
-# Legacy function removed - use PipelineFactory.vcf_splitter() from genobear.pipelines.helpers instead
-
-
 def split_parquet_variants(
     vcf_parquet_path: Path | list[Path],
     explode_snv_alt: bool = True,
@@ -179,45 +147,33 @@ def split_parquet_variants(
     return_results: bool = True,
     **kwargs
 ) -> dict:
-    """Split variants in parquet files by TSA using the parquet splitting pipeline.
+    """Split variants in parquet files by TSA using Prefect.
     
     Args:
         vcf_parquet_path: Path or list of paths to parquet files containing VCF data
         explode_snv_alt: Whether to explode ALT column on "|" separator for SNV variants
         write_to: Optional directory to write split parquet files to
-        parallel: Run pipeline in parallel (default True)
+        parallel: Handled by Prefect
         return_results: Return results dict (default True)
-        **kwargs: Additional parameters passed to pipeline.map()
+        **kwargs: Additional parameters
     
     Returns:
         Dictionary with pipeline results containing 'split_variants_dict'
     """
-    pipeline = make_parquet_splitting_pipeline()
+    from genobear.preparation.runners_prefect import split_parquets_task
+    from genobear.runtime import prefect_flow_run
     
     # Handle single path or list of paths
     if isinstance(vcf_parquet_path, Path):
         vcf_parquet_path = [vcf_parquet_path]
     
-    inputs = {
-        "vcf_parquet_path": vcf_parquet_path,
-        "explode_snv_alt": explode_snv_alt,
-        "write_to": write_to,
-        **kwargs
-    }
-    
-    # Determine workers for potential parallel execution
-    if workers is None:
-        workers = get_default_workers()
-
-    with start_action(action_type="split_parquet_variants", paths=[str(p) for p in vcf_parquet_path], explode_snv_alt=explode_snv_alt):
-        results = pipeline.map(
-            inputs=inputs,
-            output_names={"split_variants_dict"},
-            parallel=parallel and (workers > 1),
-            return_results=return_results,
-            executor=(None if not (parallel and workers > 1) else __import__("concurrent").futures.ProcessPoolExecutor(max_workers=workers))
+    with prefect_flow_run("Split Parquet Variants"):
+        results = split_parquets_task(
+            parquet_paths=vcf_parquet_path,
+            explode_snv_alt=explode_snv_alt,
+            write_to=write_to,
         )
-        return results
+        return {"split_variants_dict": results}
 
 
 def download_convert_and_split_vcf(
@@ -230,46 +186,28 @@ def download_convert_and_split_vcf(
     explode_snv_alt: bool = True,
     **kwargs
 ) -> dict:
-    """Download, convert VCF files to parquet, and split variants by TSA using the composed pipeline.
+    """Download, convert VCF files to parquet, and split variants by TSA using Prefect.
     
     Args:
         url: Base URL to search for VCF files
         pattern: Regex pattern to filter files (optional)
         name: Directory name or Path for downloads
-        output_names: Which outputs to return (defaults to parquet_path and split_variants_dict)
-        parallel: Run pipeline in parallel (default True)
+        output_names: Handled by return results
+        parallel: Handled by Prefect
         return_results: Return results dict (default True)
         explode_snv_alt: Whether to explode ALT column on "|" separator for SNV variants
-        **kwargs: Additional parameters passed to pipeline.map()
+        **kwargs: Additional parameters
     
     Returns:
-        Dictionary with pipeline results containing 'vcf_parquet_path' and 'split_variants_dict' by default
+        Dictionary with pipeline results containing 'vcf_parquet_path' and 'split_variants_dict'
     """
-    # Compose VCF download pipeline with splitting pipeline
-    vcf_pipeline = make_vcf_pipeline()
-    splitting_pipeline = make_parquet_splitting_pipeline()
-    pipeline = vcf_pipeline | splitting_pipeline
+    from genobear.preparation.runners_prefect import prepare_vcf_source_flow
     
-    # Default to the most useful outputs including split variants
-    if output_names is None:
-        output_names = {"vcf_parquet_path", "split_variants_dict"}
-    
-    inputs = {
-        "url": url,
-        "pattern": pattern,
-        "file_only": True,
-        "name": name,
-        "check_files": True,
-        "expiry_time": 7 * 24 * 3600,  # 7 days
-        "explode_snv_alt": explode_snv_alt,
+    return prepare_vcf_source_flow(
+        url=url,
+        pattern=pattern,
+        name=str(name),
+        with_splitting=True,
+        explode_snv_alt=explode_snv_alt,
         **kwargs
-    }
-    
-    with start_action(action_type="download_convert_and_split_vcf", url=url, name=str(name), explode_snv_alt=explode_snv_alt):
-        results = pipeline.map(
-            inputs=inputs,
-            output_names=output_names,
-            parallel=parallel,
-            return_results=return_results,
-        )
-        return results
+    )

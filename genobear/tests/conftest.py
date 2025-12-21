@@ -6,9 +6,18 @@ Pytest configuration and shared fixtures for genobear tests.
 import pytest
 import tempfile
 import shutil
+import os
 from pathlib import Path
 import pooch
 from pycomfort.logging import to_nice_stdout
+from prefect.testing.utilities import prefect_test_harness
+
+
+@pytest.fixture(scope="session", autouse=True)
+def prefect_test_fixture():
+    """Ensure Prefect is running in a test harness to avoid I/O errors and state leakage."""
+    with prefect_test_harness():
+        yield
 
 
 def pytest_addoption(parser):
