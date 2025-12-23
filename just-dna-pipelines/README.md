@@ -28,13 +28,20 @@ This workspace exposes two CLI entry points related to this package:
 
 ## VCF Annotation (via Dagster)
 
-VCF annotation is handled via Dagster assets and jobs. To annotate VCF files:
+We use **Dagster** as our orchestration engine because it treats data assets as first-class citizens. Unlike traditional task-based orchestrators (like Prefect or Airflow), Dagster focuses on **Software-Defined Assets (SDA)**—functions that declare what data they produce and what they depend on.
 
+### Key Dagster Concepts used here:
+
+- **Software-Defined Assets (SDA)**: Our pipelines (e.g., `ensembl_annotations`, `user_annotated_vcf`) are modeled as assets. This provides automatic lineage (knowing exactly which reference version produced a user result) and makes the state of your data products explicit and inspectable.
+- **Dynamic Partitions**: We use partitions to handle multi-user/multi-sample workflows. This allows us to track, materialize, and delete data for one user (e.g., `anton/sample1`) without touching others.
+- **IO Managers**: Our assets don't hardcode file paths. IO managers enforce storage contracts, handling where Parquet and VCF files live on disk based on our configuration.
+
+To run the pipelines:
 1. Start Dagster: `uv run dagster-ui` (or `uv run start`)
 2. Open `http://localhost:3005`
 3. Materialize the relevant assets (e.g. `ensembl_annotations`, then `user_annotated_vcf` partitions).
 
-See [docs/DAGSTER_GUIDE.md](../docs/DAGSTER_GUIDE.md) for more details.
+For a complete breakdown of our pipeline philosophy, see **[docs/DAGSTER_GUIDE.md](../docs/DAGSTER_GUIDE.md)**.
 
 ## Architecture
 

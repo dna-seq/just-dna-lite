@@ -10,10 +10,18 @@ Personal genomics workflows (pipelines + UI) for turning VCFs into annotated Par
 
 This repository is a uv workspace with two member projects:
 
-- `webui/`: Reflex Web UI. See [webui/README.md](webui/README.md).
-- `just-dna-pipelines/`: pipeline library used by Dagster and CLI. See [just-dna-pipelines/README.md](just-dna-pipelines/README.md).
+- `webui/`: Pure-Python [Reflex](https://reflex.dev/) Web UI.
+- `just-dna-pipelines/`: Declarative [Dagster](https://dagster.io/) pipeline library and CLI.
 
 Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
+
+### Why Dagster & Reflex?
+
+We selected these tools to prioritize **data lineage** and **developer velocity**:
+
+- **[Dagster](https://dagster.io/) for Pipelines**: Unlike traditional task-based orchestrators, Dagster treats data as the first-class citizen. It uses **Software-Defined Assets (SDA)** to model what data should exist rather than just how to run code. This gives us automatic lineage (knowing exactly which reference version produced a user result), built-in storage management, and easy engine swapping (e.g., Polars vs DuckDB).
+  - *See [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md) for a deep dive into our pipeline philosophy.*
+- **[Reflex](https://reflex.dev/) for Web UI**: We chose Reflex because it allows building a modern, reactive full-stack web application in **pure Python**. This eliminates the need for separate frontend/backend stacks (like React/FastAPI) and allows us to share models and logic directly between the UI and the pipelines. It perfectly fits our ["Chunky & Tactile"](docs/DESIGN.md) design system.
 
 ## Getting Started
 
