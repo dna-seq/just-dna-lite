@@ -22,7 +22,7 @@ The recommended way to start the Web UI is from the **workspace root**:
 uv run start
 ```
 
-This starts Reflex (frontend + backend dev server). For other entry points, see the root `README.md`.
+This starts Reflex (frontend + backend dev server). For other entry points, see the root [README.md](../README.md).
 
 If you need to run it directly from this directory:
 
@@ -63,4 +63,4 @@ To add a new feature:
 
 ## Configuration
 
-The Web UI uses the same environment variables as the Just DNA Pipelines library for backend operations. See the root `README.md` for more details.
+The Web UI uses the same environment variables as the Just DNA Pipelines library for backend operations. See the root [README.md](../README.md) for more details.

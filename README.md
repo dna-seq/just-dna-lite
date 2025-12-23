@@ -10,8 +10,8 @@ Personal genomics workflows (pipelines + UI) for turning VCFs into annotated Par
 
 This repository is a uv workspace with two member projects:
 
-- `webui/`: Reflex Web UI. See `webui/README.md`.
-- `just-dna-pipelines/`: pipeline library used by Dagster and CLI. See `just-dna-pipelines/README.md`.
+- `webui/`: Reflex Web UI. See [webui/README.md](webui/README.md).
+- `just-dna-pipelines/`: pipeline library used by Dagster and CLI. See [just-dna-pipelines/README.md](just-dna-pipelines/README.md).
 
 Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
 
@@ -96,4 +96,4 @@ uv run pytest just-dna-pipelines/tests/
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.

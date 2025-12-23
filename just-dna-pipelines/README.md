@@ -34,7 +34,7 @@ VCF annotation is handled via Dagster assets and jobs. To annotate VCF files:
 2. Open `http://localhost:3005`
 3. Materialize the relevant assets (e.g. `ensembl_annotations`, then `user_annotated_vcf` partitions).
 
-See `docs/DAGSTER_GUIDE.md` for more details.
+See [docs/DAGSTER_GUIDE.md](../docs/DAGSTER_GUIDE.md) for more details.
 
 ## Architecture
 
