@@ -1,17 +1,17 @@
 <div align="center">
   <img src="webui/assets/just_dna_seq.jpg" alt="just-dna-lite logo" width="200px">
 
-# just-dna-lite: Personalized Genomics Platform 🧬
+# just-dna-lite
 </div>
 
-A unified personalized genomics platform for downloading, converting, processing, and annotating genomic data. It provides both a powerful engine for genomic pipelines and a modern user interface.
+Personal genomics workflows (pipelines + UI) for turning VCFs into annotated Parquet outputs.
 
 ## Project Structure
 
-This is a **uv workspace** containing two primary components:
+This repository is a uv workspace with two member projects:
 
-- **`webui/`**: A modern Reflex-based web interface for managing genomic data. For details, see [webui/README.md](webui/README.md).
-- **`just-dna-pipelines/`**: The core pipeline and CLI library that powers the platform's genomic processing capabilities. For details, see [just-dna-pipelines/README.md](just-dna-pipelines/README.md).
+- `webui/`: Reflex Web UI. See `webui/README.md`.
+- `just-dna-pipelines/`: pipeline library used by Dagster and CLI. See `just-dna-pipelines/README.md`.
 
 Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
 
@@ -22,62 +22,62 @@ Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `
 Ensure you have [uv](https://github.com/astral-sh/uv) installed.
 
 ### Quick Start
-
-To start the **entire platform** (Web UI + Genomic Pipelines):
+Install dependencies and start the full stack (Web UI + Dagster):
 
 ```bash
+uv sync
 uv run start
 ```
 
 ### Individual Components
 
-If you want to run components separately:
+You can also run components separately:
 
-- **Start Dagster UI**: `uv run dagster-ui` (starts Dagster for VCF annotation)
-- **Start Web UI**: `uv run ui` (starts the Reflex frontend)
-- **CLI Tool**: `uv run just-dna-lite` (main CLI for management)
+- Dagster UI: `uv run dagster-ui`
+- Web UI: `uv run ui`
+- CLI: `uv run just-dna-lite --help`
 
-For example, to sync VCF partitions:
+If you add files under `data/input/users/`, you can register them as Dagster partitions:
+
 ```bash
 uv run just-dna-lite sync-vcf-partitions
 ```
 
 ## Features
 
-- **Integrated Platform**: A unified interface for both CLI-based pipelines and a modern Web UI.
-- **High-Performance Engine**: Powered by `just-dna-pipelines` for fast VCF processing using Polars and lazy-join annotations.
-- **Automated Data Management**: Streamlined downloading and conversion of major genomic databases (Ensembl, ClinVar, etc.).
-- **Job Tracking & Visualization**: Monitor long-running tasks and visualize results through the Web UI.
-- **Cloud Ready**: Built-in support for HuggingFace Hub integration.
+- VCF ingestion from `data/input/users/{user}/` and annotation outputs under `data/output/users/{user}/`.
+- Two join engines: Polars (default) and DuckDB (streaming, low memory).
+- Reference data assets cached under a per-user cache directory (see `JUST_DNA_PIPELINES_CACHE_DIR`).
+- Resource tracking (time / CPU / peak memory) surfaced in Dagster materializations.
 
 ## Configuration
 
-The platform uses environment variables for configuration. Create a `.env` file in your project root:
+The stack is configured via environment variables (a `.env` in the repo root is fine):
 
 ```bash
-export JUST_DNA_PIPELINES_FOLDER="~/just-dna-pipelines"                  # Base folder for all cache/data
-export JUST_DNA_PIPELINES_DOWNLOAD_WORKERS="8"                 # Number of parallel download workers
-export JUST_DNA_PIPELINES_PARQUET_WORKERS="4"                  # Number of workers for parquet operations
-export JUST_DNA_PIPELINES_WORKERS="4"                          # Number of workers for general processing
+export JUST_DNA_PIPELINES_CACHE_DIR="$HOME/.cache/just-dna-pipelines"
+export JUST_DNA_PIPELINES_OUTPUT_DIR="$PWD/data/output/users"
+export JUST_DNA_PIPELINES_INPUT_DIR="$PWD/data/input/users"
+
+export JUST_DNA_PIPELINES_DOWNLOAD_WORKERS="8"
+export JUST_DNA_PIPELINES_PARQUET_WORKERS="4"
+export JUST_DNA_PIPELINES_WORKERS="4"
 ```
 
 ## Development
 
 ### Setup
+
 ```bash
 git clone git@github.com:dna-seq/just-dna-lite.git
 cd just-dna-lite
 uv sync
 ```
 
-On first run, the application will automatically:
-- Create the necessary directory structure (`data/interim/dagster/`)
-- Generate `dagster.yaml` config with auto-materialization enabled
-- Initialize Dagster storage
-
-No manual configuration is required for a clean setup!
+On first run, `uv run start` / `uv run dagster-ui` will create `data/interim/dagster/dagster.yaml` if it doesn't exist.
 
 ### Testing
+
 ```bash
 # Run all tests
 uv run pytest
@@ -88,10 +88,10 @@ uv run pytest just-dna-pipelines/tests/
 
 ## Documentation
 
-- [Clean Setup Guide](docs/CLEAN_SETUP.md) - **Start here for first-time setup**
-- [Data Preparation Guide](docs/UPLOAD_HF.md)
-- [VCF Annotation Guide](docs/ANNOTATION.md)
-- [Dagster Multi-User Architecture](docs/DAGSTER_MULTI_USER.md)
+- [Clean setup](docs/CLEAN_SETUP.md)
+- [Dagster guide](docs/DAGSTER_GUIDE.md)
+- [Performance notes](docs/PERFORMANCE.md)
+- [Hugging Face datasets](docs/UPLOAD_HF.md)
 - [Agent Guidelines](AGENTS.md)
 
 ## License

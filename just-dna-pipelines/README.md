@@ -1,14 +1,13 @@
-# Just DNA Pipelines 🧬
+# Just DNA Pipelines
 
-Just DNA Pipelines is a powerful Python library and CLI for managing genomic databases and running high-performance annotation pipelines. It serves as the engine for the `just-dna-lite` personalized genomics platform.
+Just DNA Pipelines is a Python library used by `just-dna-lite` for downloading reference data and running annotation pipelines.
 
 ## Features
 
-- **Automated Database Management**: Download and manage Ensembl, ClinVar, dbSNP, and gnomAD.
-- **High-Performance Processing**: Powered by Polars for fast VCF to Parquet conversion and lazy-join based annotation.
-- **Composable Pipelines**: Define and execute complex genomic workflows with built-in resource tracking.
-- **Granular Parallelism**: Separate controls for download workers and processing workers.
-- **HuggingFace Hub Support**: Tools for uploading processed genomic datasets.
+- Downloads and manages reference datasets (Ensembl, ClinVar, ...)
+- VCF -> Parquet conversion and annotation (Polars; optional DuckDB streaming)
+- Dagster assets with resource tracking metadata
+- Hugging Face downloads for reference caches (e.g. Ensembl Parquet shards)
 
 ## Installation
 
@@ -22,26 +21,20 @@ uv sync
 
 ## CLI Usage
 
-Just DNA Pipelines provides several entry points for common tasks:
+This workspace exposes two CLI entry points related to this package:
 
-- `uv run prepare`: Download and convert genomic databases.
-- `uv run modules`: Manage genomic database modules.
-- `uv run dagster`: Start the Dagster UI for VCF annotation and asset tracking.
-
-Example:
-```bash
-uv run prepare download-clinvar --dest-dir ./data
-```
+- `uv run modules`: manage OakVar modules
+- `uv run dagster-ui`: start Dagster for annotation and asset tracking
 
 ## VCF Annotation (via Dagster)
 
 VCF annotation is handled via Dagster assets and jobs. To annotate VCF files:
 
-1. Start Dagster: `uv run start` (or `uv run dagster`)
-2. Navigate to `http://localhost:3005`
-3. Launch the `annotate_vcf_job` with appropriate configuration.
+1. Start Dagster: `uv run dagster-ui` (or `uv run start`)
+2. Open `http://localhost:3005`
+3. Materialize the relevant assets (e.g. `ensembl_annotations`, then `user_annotated_vcf` partitions).
 
-See `docs/ANNOTATION.md` for more details.
+See `docs/DAGSTER_GUIDE.md` for more details.
 
 ## Architecture
 
@@ -54,10 +47,12 @@ Just DNA Pipelines' architecture is built around three core concepts:
 
 Configure Just DNA Pipelines using environment variables:
 
-- `JUST_DNA_PIPELINES_FOLDER`: Base directory for cache and data.
-- `JUST_DNA_PIPELINES_DOWNLOAD_WORKERS`: Number of parallel downloads.
-- `JUST_DNA_PIPELINES_PARQUET_WORKERS`: Number of parallel parquet operations.
-- `JUST_DNA_PIPELINES_WORKERS`: Number of general processing workers.
+- `JUST_DNA_PIPELINES_CACHE_DIR`: base cache directory (reference data)
+- `JUST_DNA_PIPELINES_OUTPUT_DIR`: base output directory (user results)
+- `JUST_DNA_PIPELINES_INPUT_DIR`: base input directory (user VCFs)
+- `JUST_DNA_PIPELINES_DOWNLOAD_WORKERS`: parallel download workers
+- `JUST_DNA_PIPELINES_PARQUET_WORKERS`: parquet workers
+- `JUST_DNA_PIPELINES_WORKERS`: general workers
 
 ## Testing
 

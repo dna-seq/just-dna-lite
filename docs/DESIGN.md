@@ -9,10 +9,11 @@ This document defines the visual design language for **just-dna-lite** UI compon
 ## 1. Component Styling
 
 - **Buttons:** `btn-lg`, `rounded-md`, `font-bold`. Solid backgrounds only (no ghost buttons).
-- **Segments:** `card bg-base-100 border border-base-300 shadow-sm rounded-md p-6`.
+- **Segments:** `card card-bordered bg-base-100 p-8 rounded-md shadow-sm border-base-300`.
 - **Inputs:** `input-bordered`, `input-lg`. High contrast borders.
 - **Icons:** Oversized (min 2rem / `w-8 h-8`). Pair with every major label.
-- **Lucide Icons:** Use standard names: `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`.
+- **Icon Naming:** Always use **hyphenated** Lucide names (e.g., `cloud-upload`, not `upload_cloud`). Reflex translates these to the underlying library.
+    - Verified icons: `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`.
 
 ## 2. Layout & Spacing
 
@@ -75,9 +76,9 @@ This document defines the visual design language for **just-dna-lite** UI compon
 
 Avoid these patterns:
 
-- ❌ Ghost buttons (transparent backgrounds)
-- ❌ Small icons (< 2rem)
-- ❌ Thin borders
-- ❌ Subtle/muted colors for important actions
-- ❌ Dense layouts with tight spacing
+- Ghost buttons (transparent backgrounds)
+- Small icons (< 2rem)
+- Thin borders
+- Subtle/muted colors for important actions
+- Dense layouts with tight spacing
 

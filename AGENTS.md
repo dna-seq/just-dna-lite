@@ -41,14 +41,15 @@ The recommended way to start the application is from the repo root:
 
 ## Dagster Pipeline
 
-For any Dagster-related changes, see **[docs/DAGSTER_MULTI_USER.md](docs/DAGSTER_MULTI_USER.md)**.
+For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)** and **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)**.
 
 Key patterns:
 - **Auto-configuration**: Dagster config is automatically created on first run. See **[docs/CLEAN_SETUP.md](docs/CLEAN_SETUP.md)**.
-- **Reference assets** (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`
-- **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`
-- **Lazy materialization**: Assets check if cache exists before downloading
-- **Start UI**: `uv run dagster` or `uv run dagster dev -f just-dna-pipelines/src/just_dna_pipelines/annotation/definitions.py -p 3005`
+- **Declarative Assets**: We prioritize Software-Defined Assets (SDA) over imperative ops.
+- **IO Managers**: Reference assets (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`.
+- **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`.
+- **Lazy materialization**: Assets check if cache exists before downloading.
+- **Start UI**: `uv run dagster-ui` or `uv run start`.
 
 ## Design System
 

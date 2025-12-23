@@ -1,14 +1,12 @@
-# just-dna-lite Web UI 🧬
+# just-dna-lite Web UI
 
-A modern, Reflex-based web interface for the `just-dna-lite` genomic analysis platform.
+Reflex-based UI for the `just-dna-lite` workspace.
 
 ## Features
 
-- **Personal Dashboard**: Manage your genomic files and analysis results.
-- **Job Monitoring**: Track the progress of long-running genomic pipelines in real-time.
-- **Interactive Analysis**: Visualize genomic data and annotation results directly in the browser.
-- **File Management**: Upload and organize your VCF files.
-- **Configuration UI**: Manage platform settings and environment variables.
+- Dashboard for user files and outputs
+- Job tracking for pipeline runs
+- File upload / organization for VCF inputs
 
 ## Getting Started
 
@@ -24,7 +22,7 @@ The recommended way to start the Web UI is from the **workspace root**:
 uv run start
 ```
 
-This command automatically handles dependencies and starts the Reflex development server. For more advanced CLI options or library-specific instructions, see the root [README.md](../README.md).
+This starts Reflex (frontend + backend dev server). For other entry points, see the root `README.md`.
 
 If you need to run it directly from this directory:
 
@@ -59,9 +57,9 @@ To maintain a consistent look across the platform (sidebar, topbar, navigation),
 ## Development
 
 To add a new feature:
-1. **Define State**: Add variables and event handlers to `src/webui/state.py`.
-2. **Create Page**: Add a new file in `src/webui/pages/` using the `template` wrapper.
-3. **Register Route**: Add the page to `src/webui/app.py`.
+1. Define state: add variables and event handlers to `src/webui/state.py`.
+2. Create a page in `src/webui/pages/` using the `template` wrapper.
+3. Register the route in `src/webui/app.py`.
 
 ## Configuration
 
