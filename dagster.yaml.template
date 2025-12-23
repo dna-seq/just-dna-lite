@@ -1,0 +1,34 @@
+# Dagster instance configuration template
+# This file is automatically created at data/interim/dagster/dagster.yaml
+# when you first run the application.
+#
+# Storage defaults to DAGSTER_HOME (data/interim/dagster/)
+
+# Enable auto-materialization for assets with AutoMaterializePolicy
+auto_materialize:
+  enabled: true
+  minimum_interval_seconds: 60
+
+# Optional: Configure telemetry (default is enabled)
+# telemetry:
+#   enabled: false
+
+# Optional: Configure run launcher
+# run_launcher:
+#   module: dagster.core.launcher
+#   class: DefaultRunLauncher
+
+# Optional: Configure run storage
+# run_storage:
+#   module: dagster.core.storage.runs
+#   class: SqliteRunStorage
+#   config:
+#     base_dir: .
+
+# Optional: Configure event log storage
+# event_log_storage:
+#   module: dagster.core.storage.event_log
+#   class: SqliteEventLogStorage
+#   config:
+#     base_dir: .
+

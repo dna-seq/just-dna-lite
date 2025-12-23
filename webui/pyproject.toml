@@ -6,12 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "reflex>=0.8.23",
-  "genobear",
+  "just-dna-pipelines",
+  "granian>=2.6.0",
 ]
 
 [tool.uv.sources]
-# Use the workspace-local genobear package (pipelines) as a dependency.
-genobear = { workspace = true }
+# Use the workspace-local just-dna-pipelines package as a dependency.
+just-dna-pipelines = { workspace = true }
 
 [build-system]
 requires = ["uv-build"]

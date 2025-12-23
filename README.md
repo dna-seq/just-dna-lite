@@ -11,7 +11,7 @@ A unified personalized genomics platform for downloading, converting, processing
 This is a **uv workspace** containing two primary components:
 
 - **`webui/`**: A modern Reflex-based web interface for managing genomic data. For details, see [webui/README.md](webui/README.md).
-- **`genobear/`**: The core pipeline and CLI library that powers the platform's genomic processing capabilities. For details, see [genobear/README.md](genobear/README.md).
+- **`just-dna-pipelines/`**: The core pipeline and CLI library that powers the platform's genomic processing capabilities. For details, see [just-dna-pipelines/README.md](just-dna-pipelines/README.md).
 
 Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
 
@@ -33,19 +33,19 @@ uv run start
 
 If you want to run components separately:
 
-- **Start Genomic Pipelines**: `uv run pipelines` (starts the engine and job tracker)
+- **Start Dagster UI**: `uv run dagster-ui` (starts Dagster for VCF annotation)
 - **Start Web UI**: `uv run ui` (starts the Reflex frontend)
-- **Manage Pipelines**: `uv run gb` (CLI for listing, info, and management)
+- **CLI Tool**: `uv run just-dna-lite` (main CLI for management)
 
-For example, to list all registered genomic pipelines:
+For example, to sync VCF partitions:
 ```bash
-uv run gb list
+uv run just-dna-lite sync-vcf-partitions
 ```
 
 ## Features
 
 - **Integrated Platform**: A unified interface for both CLI-based pipelines and a modern Web UI.
-- **High-Performance Engine**: Powered by `genobear` for fast VCF processing using Polars and lazy-join annotations.
+- **High-Performance Engine**: Powered by `just-dna-pipelines` for fast VCF processing using Polars and lazy-join annotations.
 - **Automated Data Management**: Streamlined downloading and conversion of major genomic databases (Ensembl, ClinVar, etc.).
 - **Job Tracking & Visualization**: Monitor long-running tasks and visualize results through the Web UI.
 - **Cloud Ready**: Built-in support for HuggingFace Hub integration.
@@ -55,10 +55,10 @@ uv run gb list
 The platform uses environment variables for configuration. Create a `.env` file in your project root:
 
 ```bash
-export GENOBEAR_FOLDER="~/genobear"                  # Base folder for all cache/data
-export GENOBEAR_DOWNLOAD_WORKERS="8"                 # Number of parallel download workers
-export GENOBEAR_PARQUET_WORKERS="4"                  # Number of workers for parquet operations
-export GENOBEAR_WORKERS="4"                          # Number of workers for general processing
+export JUST_DNA_PIPELINES_FOLDER="~/just-dna-pipelines"                  # Base folder for all cache/data
+export JUST_DNA_PIPELINES_DOWNLOAD_WORKERS="8"                 # Number of parallel download workers
+export JUST_DNA_PIPELINES_PARQUET_WORKERS="4"                  # Number of workers for parquet operations
+export JUST_DNA_PIPELINES_WORKERS="4"                          # Number of workers for general processing
 ```
 
 ## Development
@@ -70,19 +70,28 @@ cd just-dna-lite
 uv sync
 ```
 
+On first run, the application will automatically:
+- Create the necessary directory structure (`data/interim/dagster/`)
+- Generate `dagster.yaml` config with auto-materialization enabled
+- Initialize Dagster storage
+
+No manual configuration is required for a clean setup!
+
 ### Testing
 ```bash
 # Run all tests
 uv run pytest
 
 # Run only library tests
-uv run pytest genobear/tests/
+uv run pytest just-dna-pipelines/tests/
 ```
 
 ## Documentation
 
+- [Clean Setup Guide](docs/CLEAN_SETUP.md) - **Start here for first-time setup**
 - [Data Preparation Guide](docs/UPLOAD_HF.md)
 - [VCF Annotation Guide](docs/ANNOTATION.md)
+- [Dagster Multi-User Architecture](docs/DAGSTER_MULTI_USER.md)
 - [Agent Guidelines](AGENTS.md)
 
 ## License

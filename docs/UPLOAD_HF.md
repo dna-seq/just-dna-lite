@@ -45,7 +45,7 @@ You need write access to the target repositories:
 prepare upload-ensembl
 ```
 
-> **Note:** When using the default cache without specifying `--source-dir`, the uploader will automatically use the `splitted_variants/` subdirectory if it exists. This preserves the variant type directory structure (SNV/, deletion/, indel/, etc.) in the uploaded dataset. If you want to upload the flat parquet files instead, explicitly specify the source directory: `--source-dir ~/.cache/genobear/ensembl_variations`
+> **Note:** When using the default cache without specifying `--source-dir`, the uploader will automatically use the `splitted_variants/` subdirectory if it exists. This preserves the variant type directory structure (SNV/, deletion/, indel/, etc.) in the uploaded dataset. If you want to upload the flat parquet files instead, explicitly specify the source directory: `--source-dir ~/.cache/just-dna-pipelines/ensembl_variations`
 
 **Upload from Custom Directory:**
 ```bash
@@ -87,7 +87,7 @@ prepare upload-ensembl --workers 8
 prepare upload-clinvar
 ```
 
-> **Note:** When using the default cache without specifying `--source-dir`, the uploader will automatically use the `splitted_variants/` subdirectory if it exists. This preserves the variant type directory structure (SNV/, deletion/, indel/, etc.) in the uploaded dataset. If you want to upload the flat parquet files instead, explicitly specify the source directory: `--source-dir ~/.cache/genobear/clinvar`
+> **Note:** When using the default cache without specifying `--source-dir`, the uploader will automatically use the `splitted_variants/` subdirectory if it exists. This preserves the variant type directory structure (SNV/, deletion/, indel/, etc.) in the uploaded dataset. If you want to upload the flat parquet files instead, explicitly specify the source directory: `--source-dir ~/.cache/just-dna-pipelines/clinvar`
 
 **Upload from Custom Directory:**
 ```bash
@@ -111,7 +111,7 @@ prepare upload-clinvar --repo-id username/my-dataset
 ### Python API
 
 ```python
-from genobear import PreparationPipelines
+from just_dna_pipelines.preparation.runners import PreparationPipelines
 from pathlib import Path
 
 # Ensembl: Basic upload from default cache
@@ -137,15 +137,15 @@ results = PreparationPipelines.upload_clinvar_to_hf(
 )
 
 # Check results
-uploaded_files = results["uploaded_files"]
-for file_info in uploaded_files.output.ravel().tolist():
-    print(f"{file_info['file']}: uploaded={file_info['uploaded']}, reason={file_info['reason']}")
+uploaded_files = results.uploaded_files
+for file_info in uploaded_files:
+    print(f"{file_info.file}: uploaded={file_info.uploaded}, reason={file_info.reason}")
 ```
 
 ### Low-Level API
 
 ```python
-from genobear.pipelines.huggingface_uploader import upload_parquet_to_hf
+from just_dna_pipelines.pipelines.huggingface_uploader import upload_parquet_to_hf
 from pathlib import Path
 
 # Collect your parquet files
@@ -255,7 +255,7 @@ The upload pipeline **automatically generates and uploads a README.md dataset ca
 
 - **Description**: What the dataset contains and why Parquet format is used
 - **Structure**: Directory organization and variant types
-- **Usage Examples**: Code snippets for Polars, DuckDB, and genobear
+- **Usage Examples**: Code snippets for Polars, DuckDB, and just-dna-pipelines
 - **Schema**: Column descriptions
 - **Citations**: How to cite the dataset and original data sources
 - **Metadata**: Dataset tags, license, and size categories for proper HuggingFace discovery
@@ -368,8 +368,8 @@ For very large files, consider:
 | Variable | Description |
 |----------|-------------|
 | `HF_TOKEN` | Hugging Face API token |
-| `GENOBEAR_WORKERS` | Default number of workers |
-| `GENOBEAR_FOLDER` | Base folder for GenoBear data |
+| `JUST_DNA_PIPELINES_WORKERS` | Default number of workers |
+| `JUST_DNA_PIPELINES_FOLDER` | Base folder for Just DNA Pipelines data |
 
 ## Notes
 

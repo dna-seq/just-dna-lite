@@ -6,23 +6,28 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "typer>=0.12.0",
-  "genobear",
+  "just-dna-pipelines",
   "webui",
+  "pyyaml>=6.0.3",
 ]
 
 [tool.uv.sources]
-genobear = { workspace = true }
+just-dna-pipelines = { workspace = true }
 webui = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+]
 
 [project.scripts]
 start = "just_dna_lite.cli:start_all"
 ui = "just_dna_lite.cli:start_ui"
-pipelines = "genobear.pipelines.serve:serve_pipelines"
-gb = "genobear.pipelines.cli:app"
+dagster-ui = "just_dna_lite.cli:start_dagster"
 just-dna-lite = "just_dna_lite.cli:app"
 
 [tool.uv.workspace]
-members = ["genobear", "webui"]
+members = ["just-dna-pipelines", "webui"]
 
 [build-system]
 requires = ["uv-build"]

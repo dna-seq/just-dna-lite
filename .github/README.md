@@ -1,6 +1,6 @@
-# GenoBear GitHub Actions CI
+# just-dna-pipelines GitHub Actions CI
 
-This directory contains the GitHub Actions workflows for GenoBear's continuous integration.
+This directory contains the GitHub Actions workflows for just-dna-pipelines' continuous integration.
 
 ## Workflows
 
@@ -37,16 +37,16 @@ Control CI behavior with these environment variables:
 
 ```bash
 # Enable CI mode (auto-detected in most CI environments)
-GENOBEAR_CI_MODE=true
+JUST_DNA_PIPELINES_CI_MODE=true
 
 # Download timeout in seconds (default: 600)
-GENOBEAR_DOWNLOAD_TIMEOUT=300
+JUST_DNA_PIPELINES_DOWNLOAD_TIMEOUT=300
 
 # Max concurrent downloads (default: 3, reduced to 2 in CI)
-GENOBEAR_MAX_CONCURRENT_DOWNLOADS=2
+JUST_DNA_PIPELINES_MAX_CONCURRENT_DOWNLOADS=2
 
 # Progress logging interval in CI (default: 30 seconds)
-GENOBEAR_CI_PROGRESS_INTERVAL=30
+JUST_DNA_PIPELINES_CI_PROGRESS_INTERVAL=30
 
 # Force unbuffered output
 PYTHONUNBUFFERED=1
@@ -85,15 +85,15 @@ Test CI behavior locally:
 
 ```bash
 # Set CI environment
-export GENOBEAR_CI_MODE=true
-export GENOBEAR_DOWNLOAD_TIMEOUT=180
+export JUST_DNA_PIPELINES_CI_MODE=true
+export JUST_DNA_PIPELINES_DOWNLOAD_TIMEOUT=180
 
 # Run tests as CI would
 uv run python -m pytest tests/ -v -k "not download"
 
 # Test pathogenicity analysis
 uv run python -c "
-from genobear.annotation.annotate import extract_pathogenicity_stats
+from just_dna_pipelines.annotation.annotate import extract_pathogenicity_stats
 import polars as pl
 # ... test code
 "
@@ -102,7 +102,7 @@ import polars as pl
 ## Troubleshooting
 
 ### Download Timeouts
-- Check `GENOBEAR_DOWNLOAD_TIMEOUT` setting
+- Check `JUST_DNA_PIPELINES_DOWNLOAD_TIMEOUT` setting
 - Verify network connectivity in CI environment
 - Review download progress logs
 

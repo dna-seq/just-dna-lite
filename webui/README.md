@@ -65,4 +65,4 @@ To add a new feature:
 
 ## Configuration
 
-The Web UI uses the same environment variables as the GenoBear library for backend operations. See the root `README.md` for more details.
+The Web UI uses the same environment variables as the Just DNA Pipelines library for backend operations. See the root `README.md` for more details.

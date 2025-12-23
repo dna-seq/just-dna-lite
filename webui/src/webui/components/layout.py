@@ -4,6 +4,13 @@ import reflex as rx
 
 from webui.state import AuthState
 
+# DaisyUI inspired classes from AGENTS.md
+DAISY_CARD = "card card-bordered bg-base-100 p-8 rounded-xl shadow-md border-base-300"
+DAISY_BUTTON_PRIMARY = "btn btn-primary btn-lg rounded-xl font-black uppercase tracking-tight shadow-md"
+DAISY_INPUT = "input input-bordered input-lg rounded-xl"
+DAISY_ALERT = "alert shadow-md border border-base-300 rounded-xl"
+DAISY_BADGE = "badge badge-outline p-4 font-bold rounded-lg"
+
 
 def login_form() -> rx.Component:
     return rx.form(
@@ -12,130 +19,134 @@ def login_form() -> rx.Component:
                 placeholder="Email",
                 name="email",
                 type="email",
-                size="1",
-                width="150px",
+                class_name="input input-bordered input-md font-bold",
+                width="200px",
             ),
-            rx.button("Sign in", type="submit", size="1"),
-            spacing="2",
+            rx.button(
+                "Sign in", 
+                type="submit", 
+                class_name="btn btn-primary btn-md font-black uppercase shadow-sm"
+            ),
+            spacing="3",
             align="center",
         ),
         on_submit=AuthState.login,
     )
 
 
-def topbar() -> rx.Component:
-    return rx.hstack(
-        rx.hstack(
-            rx.image(
-                src="/just_dna_seq.jpg",
-                height="2rem",
-                width="auto",
-                border_radius="20%",
-            ),
-            rx.heading("just-dna-lite", size="5", weight="bold"),
-            align="center",
-            spacing="2",
-            min_width="180px",
-        ),
-        rx.spacer(),
-        rx.cond(
-            AuthState.is_authenticated,
-            rx.hstack(
-                rx.text(AuthState.user_email, size="2", weight="medium"),
-                rx.button(
-                    "Logout",
-                    size="1",
-                    variant="ghost",
-                    on_click=AuthState.logout,
-                ),
-                spacing="3",
-                align="center",
-            ),
-            rx.cond(
-                AuthState.login_disabled,
-                rx.badge("Public Mode", color_scheme="gray", variant="soft"),
-                login_form(),
-            ),
-        ),
-        padding_x="6",
-        padding_y="3",
-        border_bottom="1px solid var(--gray-4)",
-        background_color="var(--gray-1)",
-        width="100%",
-        align="center",
-        position="sticky",
-        top="0",
-        z_index="100",
-    )
-
-
-def sidebar_item(text: str, icon: str, href: str) -> rx.Component:
+def nav_item(text: str, icon: str, href: str) -> rx.Component:
     return rx.link(
-        rx.hstack(
-            rx.icon(icon, size=18),
-            rx.text(text, size="2", weight="medium"),
-            align="center",
-            spacing="3",
-            padding_x="3",
-            padding_y="2",
-            border_radius="md",
-            width="100%",
-            _hover={
-                "background_color": "var(--gray-3)",
-            },
-            transition="background-color 0.2s",
+        rx.center(
+            rx.hstack(
+                rx.icon(icon, size=20, class_name="text-primary"),
+                rx.text(text, class_name="font-black uppercase tracking-widest text-xs"),
+                align="center",
+                spacing="2",
+            ),
+            class_name="h-full px-8 hover:bg-base-200 transition-all border-r border-base-300 active:bg-base-300 cursor-pointer",
         ),
         href=href,
-        width="100%",
         underline="none",
+        class_name="text-base-content h-full block",
     )
 
 
-def sidebar() -> rx.Component:
-    return rx.vstack(
-        sidebar_item("Dashboard", "layout-dashboard", "/dashboard"),
-        sidebar_item("Analysis", "microscope", "/analysis"),
-        sidebar_item("Jobs", "list-todo", "/jobs"),
-        rx.spacer(),
-        rx.divider(),
-        rx.vstack(
-            rx.text("v0.1.0", size="1", color_scheme="gray"),
-            align="center",
+def topbar() -> rx.Component:
+    return rx.box(
+        rx.flex(
+            # Brand section
+            rx.link(
+                rx.center(
+                    rx.hstack(
+                        rx.image(
+                            src="/just_dna_seq.jpg",
+                            height="2.5rem",
+                            width="auto",
+                            class_name="rounded-md shadow-sm",
+                        ),
+                        rx.heading(
+                            "just-dna-lite",
+                            size="7",
+                            weight="bold",
+                            class_name="text-primary tracking-tighter",
+                            style={"whiteSpace": "nowrap"},
+                        ),
+                        align="center",
+                        spacing="3",
+                    ),
+                    class_name="h-full px-8 border-r border-base-300 hover:bg-base-200 transition-all",
+                ),
+                href="/",
+                underline="none",
+                class_name="h-full block",
+            ),
+            
+            # Nav section
+            rx.hstack(
+                spacing="0",
+                align="stretch",
+                class_name="h-full",
+            ),
+            
+            rx.spacer(),
+            
+            # Auth section
+            rx.box(
+                rx.cond(
+                    AuthState.is_authenticated,
+                    rx.hstack(
+                        rx.center(
+                            rx.text(AuthState.user_email, weight="bold", class_name="text-sm px-6"),
+                            class_name="h-full border-l border-base-300",
+                        ),
+                        rx.button(
+                            rx.hstack(rx.icon("log-out", size=20), rx.text("Logout"), spacing="2"),
+                            class_name="btn btn-primary btn-lg h-full rounded-none border-l border-base-300 hover:bg-error transition-all font-black uppercase shadow-none border-y-0",
+                            on_click=AuthState.logout,
+                        ),
+                        spacing="0",
+                        align="stretch",
+                        class_name="h-full",
+                    ),
+                    rx.center(
+                        login_form(),
+                        class_name="h-full px-8 border-l border-base-300",
+                    ),
+                ),
+                class_name="h-full",
+            ),
             width="100%",
+            align="stretch",
+            justify="between",
+            class_name="h-full flex",
         ),
-        width="240px",
-        padding="4",
-        border_right="1px solid var(--gray-4)",
-        background_color="var(--gray-1)",
-        height="calc(100vh - 56px)",
-        spacing="2",
-        align="start",
+        class_name="bg-base-100 border-b-4 border-primary sticky top-0 z-[100] shadow-md h-20",
+        width="100%",
     )
 
 
 def template(*children: rx.Component) -> rx.Component:
-    return rx.vstack(
+    return rx.box(
         topbar(),
-        rx.hstack(
-            sidebar(),
+        rx.box(
             rx.scroll_area(
                 rx.box(
                     *children,
-                    padding="8",
+                    padding_y="16",
+                    padding_x="8",
                     width="100%",
-                    max_width="1200px",
-                    margin_x="auto",
+                    max_width="6xl", # Increased from 4xl for better dashboard layout
+                    class_name="mx-auto",
                 ),
                 width="100%",
-                height="calc(100vh - 56px)",
+                height="calc(100vh - 80px)", 
             ),
             width="100%",
-            height="calc(100vh - 56px)",
-            align="start",
-            spacing="0",
-            background_color="var(--gray-2)",
+            flex="1",
+            class_name="bg-base-200",
         ),
         width="100%",
-        height="100vh",
-        spacing="0",
+        min_height="100vh",
+        class_name="flex flex-col font-sans",
+        custom_attrs={"data-theme": "light"},
     )

@@ -1,15 +1,15 @@
-# GenoBear Annotation Pipeline
+# Just DNA Pipelines Annotation Pipeline
 
 ## Overview
 
-The GenoBear annotation pipeline allows you to annotate VCF files with reference genomic data from Ensembl variations. The pipeline is built using **Prefect 3.x** for efficient parallel processing and lazy evaluation with Polars.
+The Just DNA Pipelines annotation pipeline allows you to annotate VCF files with reference genomic data from Ensembl variations. The pipeline is built using **Dagster** for efficient parallel processing and lazy evaluation with Polars.
 
 ## Key Features
 
 - **Automatic cache management**: Downloads reference data from HuggingFace Hub only when needed
 - **Lazy evaluation**: Uses Polars LazyFrames for memory-efficient processing
 - **Parallel annotation**: Processes multiple chromosomes in parallel
-- **Pipeline-based**: Built on **Prefect 3.x** for task orchestration, caching, and parallel execution.
+- **Asset-based orchestration**: Built on **Dagster** for clear data lineage, asset tracking, and resource monitoring.
 
 ## Installation
 
@@ -17,286 +17,73 @@ The GenoBear annotation pipeline allows you to annotate VCF files with reference
 uv sync
 ```
 
-## Quick Start
+## Running Annotation
 
-### Basic VCF Annotation
+Annotation is handled via the Dagster UI or CLI.
 
-```bash
-# Annotate a VCF file with default settings
-annotate vcf input.vcf.gz -o annotated.parquet
-
-# The pipeline will:
-# 1. Check if ensembl_variations cache exists (~/.cache/genobear/ensembl_variations/splitted_variants)
-# 2. Download reference data if not cached (only on first run)
-# 3. Parse the VCF to identify chromosomes
-# 4. Perform lazy joins with reference data for each chromosome
-# 5. Save the annotated result to parquet
-```
-
-### Download Reference Data
+### 1. Start Dagster
 
 ```bash
-# Pre-download the reference data to default cache location
-annotate download-reference
+# Start the full stack (recommended)
+uv run start
 
-# Download to a custom location
-annotate download-reference --cache-dir /path/to/cache
-
-# Force re-download
-annotate download-reference --force
+# Or start only Dagster
+uv run dagster
 ```
 
-## CLI Commands
+Navigate to `http://localhost:3005` to view the asset graph.
 
-### `annotate vcf`
+### 2. Annotate a VCF
 
-Annotate a VCF file with ensembl_variations data.
+To annotate a VCF file:
 
-**Usage:**
-```bash
-annotate vcf [OPTIONS] VCF_PATH
-```
+1. Go to the **Assets** or **Jobs** tab in Dagster.
+2. Select `annotate_vcf_job`.
+3. Provide the configuration in the **Launchpad**:
+   - `vcf_path`: Path to your input VCF file.
+   - `user_name`: Your identifier.
+   - `sample_name`: Sample technical identifier.
+4. Click **Launch Run**.
 
-**Options:**
-- `-o, --output PATH`: Output path for annotated parquet file (default: `data/output/<vcf_name>_annotated.parquet`)
-- `--cache-dir PATH`: Cache directory for ensembl_variations data (default: uses `GENOBEAR_CACHE_DIR` env or platform-specific cache)
-- `--repo-id TEXT`: HuggingFace repository ID (default: `just-dna-seq/ensembl_variations`)
-- `--variant-type TEXT`: Variant type to use for annotation (default: `SNV`)
-- `--token TEXT`: HuggingFace API token (uses `HF_TOKEN` env variable if not specified)
-- `--force-download`: Force re-download of reference data even if cache exists
-- `--workers INT`: Number of workers for parallel processing
-- `--log/--no-log`: Enable detailed logging to files (default: enabled)
-- `--run-folder PATH`: Optional run folder for pipeline execution and caching
-
-**Examples:**
-
-```bash
-# Basic annotation
-annotate vcf sample.vcf.gz -o annotated.parquet
-
-# Annotate with custom cache directory
-annotate vcf sample.vcf.gz -o output.parquet --cache-dir /data/cache
-
-# Force re-download of reference data
-annotate vcf sample.vcf.gz --force-download
-
-# Use specific variant type
-annotate vcf sample.vcf.gz --variant-type INDEL
-
-# Disable logging for cleaner output
-annotate vcf sample.vcf.gz --no-log
-```
-
-### `annotate download-reference`
-
-Download ensembl_variations reference data from HuggingFace Hub.
-
-**Usage:**
-```bash
-annotate download-reference [OPTIONS]
-```
-
-**Options:**
-- `--cache-dir PATH`: Cache directory for data (default: uses `GENOBEAR_CACHE_DIR` env or platform-specific cache)
-- `--repo-id TEXT`: HuggingFace repository ID (default: `just-dna-seq/ensembl_variations`)
-- `--token TEXT`: HuggingFace API token
-- `--force/--no-force`: Force re-download even if cache exists
-- `--log/--no-log`: Enable detailed logging to files
-
-**Examples:**
-
-```bash
-# Download to default location
-annotate download-reference
-
-# Download to custom location
-annotate download-reference --cache-dir /data/ensembl_cache
-
-# Force re-download
-annotate download-reference --force
-```
-
-## Python API
-
-You can also use the annotation pipeline programmatically:
-
-```python
-from pathlib import Path
-from genobear import annotate_vcf, download_ensembl_reference
-
-# Annotate a VCF file
-results = annotate_vcf(
-    vcf_path=Path("sample.vcf.gz"),
-    output_path=Path("annotated.parquet"),
-    variant_type="SNV",
-    log=True,
-)
-
-# Access the annotated file path
-annotated_path = results["annotated_vcf_path"]
-print(f"Annotated file: {annotated_path}")
-
-# Download reference data
-cache_results = download_ensembl_reference(
-    cache_dir=Path("/data/cache"),
-    force_download=False,
-)
-
-cache_path = cache_results["ensembl_cache_path"]
-print(f"Reference data at: {cache_path}")
-```
-
-### Low-Level Pipeline Components
-
-```python
-from pathlib import Path
-from genobear.pipelines.annotation import (
-    download_ensembl_annotations,
-    load_vcf_as_lazy_frame,
-    annotate_with_ensembl,
-)
-
-# Download reference data
-cache_path = download_ensembl_annotations(
-    repo_id="just-dna-seq/ensembl_variations",
-    cache_dir=None,  # Uses default
-)
-
-# Load VCF as LazyFrame
-vcf_lf = load_vcf_as_lazy_frame("sample.vcf.gz")
-
-# Annotate VCF directly
-annotated_lf = annotate_with_ensembl(
-    input_dataframe=vcf_lf,
-    ensembl_cache_path=cache_path,
-    variant_type="SNV",
-    output_path=Path("annotated.parquet"),  # Optional - saves if provided
-)
-```
+The pipeline will:
+1. Check if `ensembl_variations` cache exists.
+2. Download reference data if not cached.
+3. Parse the VCF to identify chromosomes.
+4. Perform lazy joins with reference data.
+5. Save the annotated result to `data/output/users/{user_name}/{sample_name}/`.
 
 ## Architecture
 
-The annotation pipeline consists of several simplified components:
+The annotation pipeline is built on modern Dagster assets and ops:
 
-### 1. Ensembl Annotations (`ensembl_annotations.py`)
-- Downloads ensembl_variations dataset from HuggingFace Hub
-- Checks if cache exists and skips download if present (unless forced)
-- Scans all parquet files for the specified variant type
-- Performs efficient left join with VCF data using Polars lazy evaluation
+### 1. Ensembl Annotations Dagster (`definitions.py`)
+- **Assets**: Represent persistent data products (HF Repo, Local Cache, Annotated VCF)
+- **IO Managers**: Handle storage of reference data in cache and user data in output folders
+- **Resource Tracking**: Monitors CPU and memory usage during materialization
+- **Lazy Materialization**: Skips download if cache already exists
 
-### 2. VCF Parser (`vcf_parser.py`)
-- Loads VCF as Polars LazyFrame for efficient processing
-- Handles both compressed (.vcf.gz) and uncompressed (.vcf) files
-
-### 3. Pipeline Runners (`runners.py`)
-- Provides high-level functions for annotation workflows:
-  - `annotate_vcf()`: Main function to annotate VCF files
-  - `download_ensembl_reference()`: Download reference data
-  - `ensembl_annotation_pipeline()`: Get a configured annotation pipeline
-  - `execute_annotation_pipeline()`: Execute pipelines with proper configuration
-- Composes individual functions into complete pipelines
-- Manages sequential processing optimized for LazyFrames
+### 2. Multi-User Support
+- Uses dynamic partitions to track annotations per-user
+- Organizes output in `data/output/users/{user_name}/`
 
 ## Cache Structure
 
 The reference data is organized by variant type. By default, data is cached at:
-- Linux: `~/.cache/genobear/ensembl_variations/splitted_variants/`
-- macOS: `~/Library/Caches/genobear/ensembl_variations/splitted_variants/`
-- Windows: `%LOCALAPPDATA%\genobear\Cache\ensembl_variations\splitted_variants\`
-
-You can override the base cache directory with the `GENOBEAR_CACHE_DIR` environment variable:
-
-```bash
-export GENOBEAR_CACHE_DIR=/data/genobear_cache
-annotate vcf input.vcf.gz -o annotated.parquet
-```
-
-Directory structure:
-```
-${CACHE_DIR}/ensembl_variations/splitted_variants/
-└── data/
-    ├── SNV/
-    │   ├── homo_sapiens-chr1.parquet
-    │   ├── homo_sapiens-chr2.parquet
-    │   └── ...
-    ├── INDEL/
-    │   └── ...
-    └── ...
-```
+- Linux: `~/.cache/just-dna-pipelines/ensembl_variations/splitted_variants/`
+- macOS: `~/Library/Caches/just-dna-pipelines/ensembl_variations/splitted_variants/`
+- Windows: `%LOCALAPPDATA%\just-dna-pipelines\Cache\ensembl_variations\splitted_variants\`
 
 ## Join Strategy
 
 The annotation pipeline uses a **left join** strategy to preserve all variants from the input VCF:
 
 ```python
-join_columns = ["chromosome", "start", "reference", "alternate"]
+join_columns = ["chrom", "start", "ref", "alt"]
 ```
-
-This ensures:
-- All input variants are retained
-- Matching reference data is added where available
-- Non-matching variants have `null` values for reference columns
-
-## Performance
-
-The pipeline is optimized for performance:
-
-- **Lazy evaluation**: Uses Polars LazyFrames to minimize memory usage
-- **Efficient file scanning**: Scans all chromosome parquet files at once, letting Polars optimizer handle filtering
-- **Streaming writes**: Uses `sink_parquet` for memory-efficient output
-- **Caching**: Reference data is downloaded once and reused
-- **Compression**: Output files use zstd compression by default
 
 ## Environment Variables
 
-- `GENOBEAR_CACHE_DIR`: Override the base cache directory (default: `~/.cache/genobear` on Linux, varies by platform)
-- `GENOBEAR_WORKERS`: Number of workers for parallel processing (default: CPU count)
+- `DAGSTER_HOME`: Dagster internal storage (default: `data/interim/dagster/`)
+- `JUST_DNA_PIPELINES_CACHE_DIR`: Override the base cache directory
+- `JUST_DNA_PIPELINES_OUTPUT_DIR`: Custom output location
 - `HF_TOKEN`: HuggingFace API token for accessing datasets
-- `POLARS_VERBOSE`: Polars logging level (default: 0 for clean output)
-
-## Logging
-
-When logging is enabled, detailed logs are written to:
-- `logs/annotate_vcf.json`: JSON-formatted structured logs
-- `logs/annotate_vcf.log`: Human-readable logs
-
-Use Eliot tools to analyze JSON logs:
-```bash
-python -m eliot.tree logs/annotate_vcf.json
-```
-
-## Testing
-
-Run the integration tests:
-
-```bash
-# Run annotation pipeline tests
-pytest tests/test_annotation_pipeline_integration.py -vvv
-
-# Skip large download tests
-pytest tests/test_annotation_pipeline_integration.py -vvv -m "not large_download"
-```
-
-## Troubleshooting
-
-### Reference data not found
-- Ensure you have internet access on first run
-- Check HuggingFace Hub status
-- Try force re-download: `annotate download-reference --force`
-
-### Memory issues
-- The pipeline uses lazy evaluation to minimize memory usage
-- Adjust `--workers` to reduce parallel processing
-- Ensure sufficient disk space for output files
-
-### Slow performance
-- Reference data download is slow on first run (several GB)
-- Subsequent runs use cached data and are much faster
-- Consider pre-downloading: `annotate download-reference`
-
-## Related Commands
-
-See also:
-- `prepare ensembl`: Download and prepare Ensembl VCF data
-- `prepare clinvar`: Download and prepare ClinVar data
-

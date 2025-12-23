@@ -1,0 +1,68 @@
+[project]
+name = "just-dna-pipelines"
+version = "0.1.1"
+description = "Genomic Database Management and Annotation Tool"
+readme = "README.md"
+authors = [
+    { name = "antonkulaga", email = "antonkulaga@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.13.2",
+    "dagster>=1.12.7",
+    "dagster-duckdb>=0.28.7",
+    "dagster-webserver>=1.12.7",
+    "eliot>=1.17.5",
+    "fsspec>=2025.10.0",
+    "huggingface-hub>=1.1.5",
+    "polars-bio>=0.18.0",
+    "pooch>=1.8.2",
+    "psutil>=7.1.3",
+    "pycomfort>=0.0.18",
+    "pydantic>=2.12.4",
+    "python-dotenv>=1.2.1",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
+    "rich>=14.2.0",
+    "tenacity>=9.1.2",
+    "typer>=0.12.0",
+]
+
+[project.scripts]
+modules = "just_dna_pipelines.oakvar.modules:app"
+
+[build-system]
+requires = ["uv-build"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.5.0",
+    "marimo>=0.18.0",
+    "pytest>=9.0.1",
+    "python-lsp-server[all]>=1.13.2",
+    "google-genai>=1.52.0",
+    "ruff>=0.14.6",
+    "sqlglot>=28.0.0",
+    "vegafusion>=2.0.3",
+    "vl-convert-python>=1.8.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "large_download: marks tests that download large files (multi-GB) - skip by default",
+    "integration: marks integration tests that require network access",
+    "slow: marks tests that take a long time to run"
+]
+
+# Default pytest behavior: extra verbose and no capture to allow Eliot/stdout output
+addopts = "-vvv -s -m 'not large_download'"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:eliottree.*",
+    "ignore:datetime.datetime.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning",
+]
+
+
+[tool.marimo.runtime]
+dotenv = [".env"]
