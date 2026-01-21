@@ -11,6 +11,8 @@ from dagster import Definitions
 from just_dna_pipelines.annotation.assets import (
     ensembl_hf_dataset,
     ensembl_annotations,
+    longevitymap_sqlite_source,
+    longevitymap_sqlite,
     user_vcf_source,
     user_annotated_vcf,
 )
@@ -36,7 +38,14 @@ def _build_definitions() -> Definitions:
     """Build the combined definitions from core + discovered modules."""
     # 1. Core definitions (Polars-based)
     _core = Definitions(
-        assets=[ensembl_hf_dataset, ensembl_annotations, user_vcf_source, user_annotated_vcf],
+        assets=[
+            ensembl_hf_dataset,
+            ensembl_annotations,
+            longevitymap_sqlite_source,
+            longevitymap_sqlite,
+            user_vcf_source,
+            user_annotated_vcf,
+        ],
         jobs=[annotate_vcf_job, annotate_vcf_duckdb_job],
         sensors=[discover_user_vcf_sensor],
         resources={

@@ -218,3 +218,4 @@ data/interim/
 # Temporary files
 .tmp*
 tmp*
+.tmp_dagster_home_5uss_aeq/

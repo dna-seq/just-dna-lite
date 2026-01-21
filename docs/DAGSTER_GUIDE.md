@@ -94,11 +94,11 @@ Each run in our Dagster setup automatically tracks:
 * Start Dagster UI: `uv run dagster-ui`
 * Materialize an asset (CLI):
     ```bash
-    uv run dagster asset materialize --select ensembl_annotations
+    uv run dg asset materialize --select ensembl_annotations
     ```
 * Add partitions (CLI):
     ```bash
-    uv run dagster instance add-dynamic-partitions user_vcf_files "user1/sample1"
+    uv run dg instance add-dynamic-partitions user_vcf_files "user1/sample1"
     ```
 
 ## Environment variables

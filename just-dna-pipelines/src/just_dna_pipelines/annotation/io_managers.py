@@ -8,7 +8,12 @@ from pathlib import Path
 
 from dagster import IOManager, io_manager, InputContext, OutputContext
 
-from just_dna_pipelines.annotation.resources import get_cache_dir, get_user_output_dir, get_default_ensembl_cache_dir
+from just_dna_pipelines.annotation.resources import (
+    get_cache_dir,
+    get_user_output_dir,
+    get_default_ensembl_cache_dir,
+    get_longevitymap_sqlite_path,
+)
 
 
 class SourceMetadataIOManager(IOManager):
@@ -53,6 +58,8 @@ class AnnotationCacheIOManager(IOManager):
             return get_default_ensembl_cache_dir()
         if asset_key == "ensembl_duckdb":
             return get_default_ensembl_cache_dir() / "ensembl_variations.duckdb"
+        if asset_key == "longevitymap_sqlite":
+            return get_longevitymap_sqlite_path()
         return get_cache_dir() / asset_key
     
     def handle_output(self, context: OutputContext, obj: Path) -> None:

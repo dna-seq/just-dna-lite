@@ -20,11 +20,18 @@ from dagster import (
 )
 
 from just_dna_pipelines.runtime import resource_tracker
-from just_dna_pipelines.annotation.configs import EnsemblAnnotationsConfig, AnnotationConfig
+from just_dna_pipelines.annotation.configs import (
+    EnsemblAnnotationsConfig,
+    AnnotationConfig,
+    LongevityMapSqliteConfig,
+)
 from just_dna_pipelines.annotation.resources import (
     get_default_ensembl_cache_dir,
     get_user_input_dir,
     ensure_vcf_in_user_input_dir,
+    download_longevitymap_sqlite,
+    LONGEVITYMAP_SQLITE_SOURCE_URL,
+    LONGEVITYMAP_SQLITE_RAW_URL,
 )
 from just_dna_pipelines.annotation.logic import annotate_vcf_with_ensembl
 
@@ -44,6 +51,18 @@ ensembl_hf_dataset = AssetSpec(
         "repo_id": "just-dna-seq/ensembl_variations",
         "type": "external_dataset",
         "url": "https://huggingface.co/datasets/just-dna-seq/ensembl_variations",
+    },
+)
+
+
+longevitymap_sqlite_source = AssetSpec(
+    key="longevitymap_sqlite_source",
+    description="LongevityMap SQLite weights database hosted on GitHub (dna-seq/just_longevitymap).",
+    metadata={
+        "source": "GitHub",
+        "url": LONGEVITYMAP_SQLITE_SOURCE_URL,
+        "raw_url": LONGEVITYMAP_SQLITE_RAW_URL,
+        "type": "external_file",
     },
 )
 
@@ -227,6 +246,48 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
         })
     
     return Output(cache_dir, metadata=metadata_dict)
+
+
+@asset(
+    description="LongevityMap SQLite weights database downloaded from GitHub.",
+    compute_kind="download",
+    io_manager_key="annotation_cache_io_manager",
+    deps=[longevitymap_sqlite_source],
+    metadata={
+        "dataset": "dna-seq/just_longevitymap",
+        "source": "GitHub",
+        "storage": "cache",
+    },
+)
+def longevitymap_sqlite(
+    context: AssetExecutionContext,
+    config: LongevityMapSqliteConfig,
+) -> Output[Path]:
+    logger = context.log
+
+    with resource_tracker("Download LongevityMap SQLite") as tracker:
+        sqlite_path, downloaded = download_longevitymap_sqlite(
+            source_url=LONGEVITYMAP_SQLITE_RAW_URL,
+            force_download=config.force_download,
+            logger=logger,
+        )
+
+    file_size_mb = sqlite_path.stat().st_size / (1024 * 1024)
+    metadata_dict = {
+        "sqlite_path": MetadataValue.path(str(sqlite_path.absolute())),
+        "file_size_mb": MetadataValue.float(round(file_size_mb, 2)),
+        "source_url": MetadataValue.text(LONGEVITYMAP_SQLITE_SOURCE_URL),
+        "status": MetadataValue.text("downloaded" if downloaded else "cached"),
+    }
+
+    if "report" in tracker:
+        report = tracker["report"]
+        metadata_dict.update({
+            "download_duration_sec": MetadataValue.float(round(report.duration, 2)),
+            "download_cpu_percent": MetadataValue.float(round(report.cpu_usage_percent, 1)),
+        })
+
+    return Output(sqlite_path, metadata=metadata_dict)
 
 
 # ============================================================================

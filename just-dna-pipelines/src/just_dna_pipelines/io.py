@@ -129,9 +129,10 @@ def get_info_fields(vcf_path: str) -> list[str]:
 
 def read_vcf_file(
     file_path: Union[str, Path],
-    info_fields: Union[list[str], None] = None,
+    info_fields: Optional[list[str]] = None,
     save_parquet: SaveParquet = "auto",
-    engine: str = "auto"
+    engine: str = "streaming",
+    thread_num: int = 1,
 ) -> pl.LazyFrame:
     """
     Read a VCF file using polars-bio, automatically handling gzipped files.
@@ -139,22 +140,18 @@ def read_vcf_file(
     Args:
         file_path: Path to the VCF file (can be .vcf or .vcf.gz)
         info_fields: The fields to read from the INFO column.
-        thread_num: The number of threads to use for reading the VCF file. Used **only** for parallel decompression of BGZF blocks. Works only for **local** files.
         save_parquet: Controls saving to parquet.
             - None: do not save
-            - "auto": save next to the input, replacing .vcf/.vcf.gz with .parquet
+            - "auto" (default): save next to the input VCF, replacing .vcf/.vcf.gz with .parquet.
+              Example: data.vcf.gz -> data.parquet
             - Path: save to the provided location
+        engine: Parquet engine to use for sinking (defaults to "streaming")
+        thread_num: The number of threads to use for reading the VCF file. Used **only** for parallel decompression of BGZF blocks. Works only for **local** files.
 
     Returns:
-        Polars LazyFrame or DataFrame containing the VCF data.
-        When saving to parquet, returns a LazyFrame that reads from the parquet file
-        (preserving lazy evaluation while ensuring temp files are cleaned up).
-        When save_parquet=None, returns the original LazyFrame from polars-bio.
-
-    Note:
-        VCF reader uses **1-based** coordinate system for the `start` and `end` columns.
-        When saving to parquet, the function creates the parquet file next to the original VCF
-        (for "auto") or at the provided path.
+        Polars LazyFrame containing the VCF data.
+        If save_parquet is not None, returns a LazyFrame that scans the newly created parquet file.
+        If save_parquet is None, returns the original LazyFrame from polars-bio.
     """
     with start_action(
         action_type="read_vcf_file",
@@ -167,13 +164,6 @@ def read_vcf_file(
         if file_path.suffix == ".parquet":
             action.log(message_type="info", step="detected_parquet", path=str(file_path))
             return pl.scan_parquet(str(file_path))
-
-        # Prepare kwargs for pb.scan_vcf using locals(), excluding non-scan_vcf args
-        vcf_kwargs = {
-            k: v
-            for k, v in locals().items()
-            if k not in ("file_path", "save_parquet", "action", "engine")
-        }
 
         # Resolve parquet path decision early
         if isinstance(save_parquet, Path):
@@ -190,9 +180,13 @@ def read_vcf_file(
         )
 
         # Let polars-bio handle compression autodetection and any VCF format issues
-        vcf_kwargs["info_fields"] = get_info_fields(str(file_path)) if info_fields is None else info_fields
+        actual_info_fields = get_info_fields(str(file_path)) if info_fields is None else info_fields
 
-        result = pb.scan_vcf(str(file_path), **vcf_kwargs)
+        result = pb.scan_vcf(
+            str(file_path),
+            info_fields=actual_info_fields,
+            thread_num=thread_num
+        )
 
         action.log(
             message_type="info",
@@ -202,29 +196,25 @@ def read_vcf_file(
         )
 
         # Save parquet if requested
-        effective_parquet_path: Optional[Path] = parquet_path
-        temp_parquet_path: Optional[Path] = None
-
-        if effective_parquet_path is not None:
+        if parquet_path is not None:
             with start_action(
                 action_type="save_parquet",
-                parquet_path=str(effective_parquet_path),
-                is_temporary=temp_parquet_path is not None,
+                parquet_path=str(parquet_path),
             ) as save_action:
                 if isinstance(result, pl.LazyFrame):
                     # Stream directly to parquet without collecting into memory
-                    result.sink_parquet(str(effective_parquet_path), engine=engine)
+                    result.sink_parquet(str(parquet_path), engine=engine)
                 else:
                     # DataFrame path (rare here) – write directly
-                    result.write_parquet(str(effective_parquet_path))
+                    result.write_parquet(str(parquet_path))
 
                 save_action.log(
                     message_type="info",
                     step="parquet_saved",
-                    parquet_path=str(effective_parquet_path),
+                    parquet_path=str(parquet_path),
                 )
 
-        # If we saved parquet (even temporarily), return a LazyFrame scanning it only when it's a user-visible parquet.
+        # If we saved parquet, return a LazyFrame scanning it
         if parquet_path is not None:
             return pl.scan_parquet(str(parquet_path))
 
@@ -234,48 +224,26 @@ def read_vcf_file(
 def vcf_to_parquet(
     vcf_path: Union[str, Path],
     parquet_path: Optional[Union[str, Path]] = None,
-    info_fields: Union[list[str], None] = None,
+    info_fields: Optional[list[str]] = None,
+    thread_num: int = 1,
     overwrite: bool = False
 ) -> AnnotatedLazyFrame:
     """
     Read a VCF file and save it to Parquet format, returning both the path and LazyFrame.
     
-    This function is a convenience wrapper around read_vcf_file that focuses specifically
-    on VCF to Parquet conversion, ensuring the output is always saved and returning
-    both the path to the created Parquet file and a LazyFrame for immediate data access.
-    
     Args:
         vcf_path: Path to the input VCF file (can be .vcf or .vcf.gz)
-        parquet_path: Path where to save the Parquet file. If None, saves next to VCF with .parquet extension
+        parquet_path: Path where to save the Parquet file. 
+            If None (default), saves next to VCF with .parquet extension ("auto" behavior).
         info_fields: The fields to read from the INFO column. If None, reads all available fields
-        thread_num: Number of threads for parallel decompression (local files only)
-        chunk_size: Chunk size in MB for object store reading (default 8MB)
-        concurrent_fetches: Number of concurrent fetches for object store (default 1)
-        allow_anonymous: Whether to allow anonymous access to object storage
-        enable_request_payer: Whether to enable request payer for AWS S3
-        max_retries: Maximum retries for object storage operations
-        timeout: Timeout in seconds for object storage operations
-        compression_type: Compression type detection ("auto", "bgz", etc.)
+        thread_num: The number of threads to use for reading the VCF file. 
+            Used only for parallel decompression of BGZF blocks. Works only for local files.
         overwrite: Whether to overwrite existing Parquet file (default False)
         
     Returns:
         AnnotatedLazyFrame: A tuple containing:
             - LazyFrame reading from the Parquet file for immediate data access  
             - Path to the created Parquet file
-        
-    Raises:
-        FileExistsError: If parquet_path exists and overwrite=False
-        
-    Example:
-        >>> vcf_path = Path("data/variants.vcf.gz")
-        >>> lazy_df, parquet_path = vcf_to_parquet(vcf_path)
-        >>> print(f"Converted to: {parquet_path}")
-        >>> print(f"Shape: {lazy_df.select(pl.len()).collect().item()}")
-        
-        >>> # Custom output location
-        >>> df, custom_path = vcf_to_parquet(vcf_path, "output/my_variants.parquet")
-        >>> # Immediate data access
-        >>> variant_count = df.select(pl.len()).collect().item()
     """
     with start_action(
         action_type="vcf_to_parquet",
@@ -310,7 +278,8 @@ def vcf_to_parquet(
         lazy_frame = read_vcf_file(
             file_path=vcf_path,
             info_fields=info_fields,
-            save_parquet=output_path
+            save_parquet=output_path,
+            thread_num=thread_num
         )
         
         action.log(

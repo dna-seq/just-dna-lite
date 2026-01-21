@@ -56,6 +56,11 @@ class EnsemblAnnotationsConfig(Config):
     allow_patterns: Optional[list[str]] = None
 
 
+class LongevityMapSqliteConfig(Config):
+    """Configuration for the LongevityMap SQLite weights download."""
+    force_download: bool = False
+
+
 class DuckDBConfig(Config):
     """
     Configuration for DuckDB memory and performance settings.
