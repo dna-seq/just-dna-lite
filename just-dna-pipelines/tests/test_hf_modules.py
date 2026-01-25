@@ -2,7 +2,7 @@
 Integration tests for HuggingFace module annotation.
 
 These tests use real data from the just-dna-seq/annotators HuggingFace repository
-and a real VCF from antonkulaga/personal-health.
+and a real VCF from Zenodo.
 """
 
 import tempfile
@@ -13,7 +13,6 @@ import pytest
 from huggingface_hub import hf_hub_download
 
 from just_dna_pipelines.annotation.hf_modules import (
-    AnnotatorModule,
     ModuleTable,
     ModuleOutputMapping,
     AnnotationManifest,
@@ -21,6 +20,10 @@ from just_dna_pipelines.annotation.hf_modules import (
     scan_module_table,
     scan_module_weights,
     HF_REPO_ID,
+    DISCOVERED_MODULES,
+    get_all_modules,
+    validate_module,
+    validate_modules,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.hf_logic import (
@@ -30,61 +33,84 @@ from just_dna_pipelines.annotation.hf_logic import (
 
 
 # ============================================================================
-# TEST VCF FROM HUGGINGFACE
+# TEST VCF FROM ZENODO
 # ============================================================================
 
-TEST_VCF_REPO = "antonkulaga/personal-health"
-TEST_VCF_PATH = "genetics/antonkulaga.vcf"
+ZENODO_VCF_URL = "https://zenodo.org/api/records/18370498/files/antonkulaga.vcf/content"
 
 
 @pytest.fixture(scope="session")
-def real_vcf_path() -> Path:
+def real_vcf_path(tmp_path_factory) -> Path:
     """
-    Download the real VCF from HuggingFace for testing.
+    Download the real VCF from Zenodo for testing.
     
-    This VCF is from antonkulaga/personal-health and contains real genomic data
-    with proper FORMAT fields (GT, GQ, DP, AD, VAF, PL).
+    This VCF is from Zenodo (https://zenodo.org/records/18370498) and contains 
+    real genomic data with proper FORMAT fields (GT, GQ, DP, AD, VAF, PL).
     """
-    vcf_path = hf_hub_download(
-        repo_id=TEST_VCF_REPO,
-        filename=TEST_VCF_PATH,
-        repo_type="dataset",
-    )
-    return Path(vcf_path)
+    import requests
+    
+    # Simple caching in ~/.cache/just-dna-pipelines/test_data/
+    cache_dir = Path.home() / ".cache" / "just-dna-pipelines" / "test_data"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    vcf_path = cache_dir / "antonkulaga.vcf"
+    
+    if not vcf_path.exists():
+        print(f"\nDownloading test VCF from Zenodo to {vcf_path}...")
+        response = requests.get(ZENODO_VCF_URL, stream=True)
+        response.raise_for_status()
+        with open(vcf_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+    
+    return vcf_path
 
 
 # ============================================================================
-# UNIT TESTS - No network required after initial enum definition
+# UNIT TESTS - Dynamic module discovery
 # ============================================================================
 
-class TestAnnotatorModuleEnum:
-    """Test the AnnotatorModule enum."""
+class TestDynamicModuleDiscovery:
+    """Test the dynamic module discovery system."""
     
-    def test_all_modules_returns_all(self):
-        """All modules should be returned."""
-        modules = AnnotatorModule.all_modules()
-        assert len(modules) == 5
-        assert AnnotatorModule.LONGEVITYMAP in modules
-        assert AnnotatorModule.LIPIDMETABOLISM in modules
-        assert AnnotatorModule.VO2MAX in modules
-        assert AnnotatorModule.SUPERHUMAN in modules
-        assert AnnotatorModule.CORONARY in modules
+    def test_discovered_modules_not_empty(self):
+        """Discovered modules list should not be empty."""
+        assert len(DISCOVERED_MODULES) > 0
     
-    def test_from_string_case_insensitive(self):
-        """Module parsing should be case-insensitive."""
-        assert AnnotatorModule.from_string("longevitymap") == AnnotatorModule.LONGEVITYMAP
-        assert AnnotatorModule.from_string("LONGEVITYMAP") == AnnotatorModule.LONGEVITYMAP
-        assert AnnotatorModule.from_string("LongevityMap") == AnnotatorModule.LONGEVITYMAP
+    def test_discovered_modules_contains_known_modules(self):
+        """Discovered modules should contain known modules."""
+        # These are the expected modules based on static fallback
+        expected = {"longevitymap", "lipidmetabolism", "vo2max", "superhuman", "coronary"}
+        discovered_set = set(DISCOVERED_MODULES)
+        assert expected.issubset(discovered_set), f"Missing modules: {expected - discovered_set}"
     
-    def test_from_string_invalid_raises(self):
-        """Invalid module name should raise ValueError."""
-        with pytest.raises(ValueError, match="Unknown module"):
-            AnnotatorModule.from_string("invalid_module")
+    def test_get_all_modules_returns_copy(self):
+        """get_all_modules should return a copy to prevent mutation."""
+        modules = get_all_modules()
+        modules.append("fake_module")
+        assert "fake_module" not in DISCOVERED_MODULES
     
-    def test_module_value_is_lowercase(self):
-        """Module values should be lowercase for HF path compatibility."""
-        for module in AnnotatorModule.all_modules():
-            assert module.value == module.value.lower()
+    def test_validate_module_valid(self):
+        """validate_module should return True for valid modules."""
+        assert validate_module("longevitymap")
+        assert validate_module("LONGEVITYMAP")  # Case-insensitive
+        assert validate_module("LongevityMap")
+    
+    def test_validate_module_invalid(self):
+        """validate_module should return False for invalid modules."""
+        assert not validate_module("invalid_module")
+        assert not validate_module("")
+    
+    def test_validate_modules_filters_invalid(self):
+        """validate_modules should filter out invalid modules."""
+        result = validate_modules(["longevitymap", "invalid", "coronary", "fake"])
+        assert len(result) == 2
+        assert "longevitymap" in result
+        assert "coronary" in result
+    
+    def test_module_names_are_lowercase(self):
+        """Module names should be lowercase for HF path compatibility."""
+        for module_name in DISCOVERED_MODULES:
+            assert module_name == module_name.lower()
 
 
 class TestModuleTableUrl:
@@ -92,15 +118,20 @@ class TestModuleTableUrl:
     
     def test_url_format(self):
         """URLs should follow HF datasets format."""
-        url = get_module_table_url(AnnotatorModule.LONGEVITYMAP, ModuleTable.WEIGHTS)
+        url = get_module_table_url("longevitymap", ModuleTable.WEIGHTS)
+        assert url == f"hf://datasets/{HF_REPO_ID}/data/longevitymap/weights.parquet"
+    
+    def test_url_format_with_string_table(self):
+        """URLs should work with string table names too."""
+        url = get_module_table_url("longevitymap", "weights")
         assert url == f"hf://datasets/{HF_REPO_ID}/data/longevitymap/weights.parquet"
     
     def test_all_table_types(self):
         """All table types should generate valid URLs."""
-        module = AnnotatorModule.CORONARY
+        module_name = "coronary"
         for table in ModuleTable:
-            url = get_module_table_url(module, table)
-            assert f"/{module.value}/" in url
+            url = get_module_table_url(module_name, table)
+            assert f"/{module_name}/" in url
             assert f"/{table.value}.parquet" in url
 
 
@@ -108,11 +139,12 @@ class TestHfModuleAnnotationConfig:
     """Test the HfModuleAnnotationConfig."""
     
     def test_default_modules_is_all(self):
-        """Default should include all modules."""
+        """Default should include all discovered modules."""
         config = HfModuleAnnotationConfig(vcf_path="/tmp/test.vcf")
         modules = config.get_modules()
         
-        assert len(modules) == len(AnnotatorModule.all_modules())
+        assert len(modules) == len(DISCOVERED_MODULES)
+        assert set(modules) == set(DISCOVERED_MODULES)
     
     def test_specific_modules_selection(self):
         """Can select specific modules."""
@@ -123,8 +155,19 @@ class TestHfModuleAnnotationConfig:
         modules = config.get_modules()
         
         assert len(modules) == 2
-        assert AnnotatorModule.LONGEVITYMAP in modules
-        assert AnnotatorModule.CORONARY in modules
+        assert "longevitymap" in modules
+        assert "coronary" in modules
+    
+    def test_invalid_modules_filtered(self):
+        """Invalid module names should be filtered out."""
+        config = HfModuleAnnotationConfig(
+            vcf_path="/tmp/test.vcf",
+            modules=["longevitymap", "invalid_module", "coronary"]
+        )
+        modules = config.get_modules()
+        
+        assert len(modules) == 2
+        assert "invalid_module" not in modules
 
 
 class TestAnnotationManifest:
@@ -170,7 +213,7 @@ class TestHfModuleLoading:
     @pytest.mark.integration
     def test_scan_longevitymap_weights(self):
         """Load longevitymap weights table from HF."""
-        lf = scan_module_weights(AnnotatorModule.LONGEVITYMAP)
+        lf = scan_module_weights("longevitymap")
         schema = lf.collect_schema()
         
         # Required columns per HF_MODULES.md
@@ -192,17 +235,17 @@ class TestHfModuleLoading:
         """All modules should have a weights table with required columns."""
         required_cols = {"rsid", "genotype", "module", "chrom", "start"}
         
-        for module in AnnotatorModule.all_modules():
-            lf = scan_module_table(module, ModuleTable.WEIGHTS)
+        for module_name in DISCOVERED_MODULES:
+            lf = scan_module_table(module_name, ModuleTable.WEIGHTS)
             schema = lf.collect_schema()
             
             missing = required_cols - set(schema.names())
-            assert not missing, f"Module {module.value} missing columns: {missing}"
+            assert not missing, f"Module {module_name} missing columns: {missing}"
     
     @pytest.mark.integration
     def test_genotype_is_sorted_list(self):
         """Genotypes in weights table should be sorted alphabetically."""
-        lf = scan_module_weights(AnnotatorModule.LONGEVITYMAP)
+        lf = scan_module_weights("longevitymap")
         
         # Check first 100 rows
         df = lf.head(100).collect()
@@ -271,7 +314,7 @@ class TestAnnotationWithRealData:
         output_path = tmp_path / "longevitymap_weights.parquet"
         result_path, num_rows = annotate_vcf_with_module_weights(
             vcf_lf,
-            AnnotatorModule.LONGEVITYMAP,
+            "longevitymap",
             output_path,
             join_on="position",
         )
@@ -296,46 +339,46 @@ class TestAnnotationWithRealData:
         """Annotate real VCF with multiple modules."""
         vcf_lf = prepare_vcf_for_module_annotation(real_vcf_path)
         
-        modules_to_test = [AnnotatorModule.LONGEVITYMAP, AnnotatorModule.CORONARY]
+        modules_to_test = ["longevitymap", "coronary"]
         
-        for module in modules_to_test:
-            output_path = tmp_path / f"{module.value}_weights.parquet"
+        for module_name in modules_to_test:
+            output_path = tmp_path / f"{module_name}_weights.parquet"
             result_path, num_rows = annotate_vcf_with_module_weights(
                 vcf_lf,
-                module,
+                module_name,
                 output_path,
                 join_on="position",
             )
             
-            assert result_path.exists(), f"Output not created for {module.value}"
-            print(f"{module.value}: {num_rows} variants")
+            assert result_path.exists(), f"Output not created for {module_name}"
+            print(f"{module_name}: {num_rows} variants")
 
 
 class TestModuleWeightsSchema:
     """Verify the schema of HF module weights tables."""
     
     @pytest.mark.integration
-    @pytest.mark.parametrize("module", AnnotatorModule.all_modules())
-    def test_module_has_position_columns(self, module: AnnotatorModule):
+    @pytest.mark.parametrize("module_name", DISCOVERED_MODULES)
+    def test_module_has_position_columns(self, module_name: str):
         """Each module should have position columns for joining."""
-        lf = scan_module_weights(module)
+        lf = scan_module_weights(module_name)
         schema = lf.collect_schema()
         
         # Position columns
-        assert "chrom" in schema.names(), f"{module.value} missing 'chrom'"
-        assert "start" in schema.names(), f"{module.value} missing 'start'"
+        assert "chrom" in schema.names(), f"{module_name} missing 'chrom'"
+        assert "start" in schema.names(), f"{module_name} missing 'start'"
         
         # Genotype column
-        assert "genotype" in schema.names(), f"{module.value} missing 'genotype'"
-        assert schema["genotype"] == pl.List(pl.String), f"{module.value} genotype is not List[String]"
+        assert "genotype" in schema.names(), f"{module_name} missing 'genotype'"
+        assert schema["genotype"] == pl.List(pl.String), f"{module_name} genotype is not List[String]"
     
     @pytest.mark.integration
-    @pytest.mark.parametrize("module", AnnotatorModule.all_modules())
-    def test_module_has_annotation_columns(self, module: AnnotatorModule):
+    @pytest.mark.parametrize("module_name", DISCOVERED_MODULES)
+    def test_module_has_annotation_columns(self, module_name: str):
         """Each module should have annotation columns."""
-        lf = scan_module_weights(module)
+        lf = scan_module_weights(module_name)
         schema = lf.collect_schema()
         
         # Core annotation columns
-        assert "weight" in schema.names(), f"{module.value} missing 'weight'"
-        assert "state" in schema.names(), f"{module.value} missing 'state'"
+        assert "weight" in schema.names(), f"{module_name} missing 'weight'"
+        assert "state" in schema.names(), f"{module_name} missing 'state'"

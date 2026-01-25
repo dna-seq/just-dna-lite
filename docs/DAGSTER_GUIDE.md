@@ -81,6 +81,7 @@ Self-contained annotation modules from [just-dna-seq/annotators](https://hugging
 - Position-based joining (works with VCFs without rsids)
 - Genotype-aware scoring (matches on sorted allele lists)
 - Memory-efficient streaming with lazy Polars
+- Supports local VCF files or Zenodo URLs as input source
 
 See [HF_MODULES.md](HF_MODULES.md) for detailed documentation.
 
@@ -170,10 +171,15 @@ Modules are discovered via the registry in `registry.py`. A module typically pro
     # Local VCF
     uv run pipelines annotate-modules --vcf /path/to/sample.vcf --user myuser
 
+    # From Zenodo (Recommended for personal health data)
+    uv run pipelines annotate-modules \
+        --zenodo https://zenodo.org/records/18370498 \
+        --user antonkulaga
+
     # From HuggingFace
     uv run pipelines annotate-modules \
-        --hf-source antonkulaga/personal-health/genetics/antonkulaga.vcf \
-        --user antonkulaga
+        --hf-source some-repo/data/sample.vcf \
+        --user someuser
 
     # Specific modules only
     uv run pipelines annotate-modules --vcf /path/to/vcf --user myuser --modules longevitymap,coronary

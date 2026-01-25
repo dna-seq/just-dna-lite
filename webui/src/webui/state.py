@@ -9,6 +9,7 @@ from reflex.event import EventSpec
 from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, Output, AssetMaterialization, EventRecordsFilter, DagsterEventType
 from just_dna_pipelines.annotation.definitions import defs
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS
 
 
 def _ensure_dagster_config(dagster_home: Path) -> None:
@@ -101,6 +102,15 @@ class UploadState(rx.State):
     
     # Cache user info to avoid async get_state in computed vars
     safe_user_id: str = ""
+    
+    # HF Module selection - all modules selected by default
+    available_modules: list[str] = DISCOVERED_MODULES.copy()
+    selected_modules: list[str] = DISCOVERED_MODULES.copy()
+
+    @rx.var
+    def module_details(self) -> Dict[str, Dict[str, Any]]:
+        """Return details (logo, repo, etc.) for each available module."""
+        return {name: info.model_dump() for name, info in MODULE_INFOS.items()}
 
     def _get_safe_user_id(self, auth_email: str) -> str:
         """Sanitize user_id for path and partition key."""
@@ -222,6 +232,80 @@ class UploadState(rx.State):
         instance.submit_run(run.run_id, workspace_snapshot=None)
         
         yield rx.toast.info(f"Started annotation for {sample_name} (Run ID: {run.run_id[:8]}...)")
+
+    def toggle_module(self, module: str):
+        """Toggle a module on/off in the selection."""
+        if module in self.selected_modules:
+            self.selected_modules = [m for m in self.selected_modules if m != module]
+        else:
+            self.selected_modules = self.selected_modules + [module]
+
+    def select_all_modules(self):
+        """Select all available modules."""
+        self.selected_modules = self.available_modules.copy()
+
+    def deselect_all_modules(self):
+        """Deselect all modules."""
+        self.selected_modules = []
+
+    async def run_hf_annotation(self, filename: str):
+        """
+        Trigger HF module annotation for a file.
+        
+        Uses the selected_modules list to determine which modules to use.
+        If no modules are selected, uses all available modules.
+        """
+        if not self.safe_user_id:
+            auth_state = await self.get_state(AuthState)
+            self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
+        
+        sample_name = filename.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+        
+        root = Path(__file__).resolve().parents[3]
+        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        
+        instance = get_dagster_instance()
+        
+        # Update status to running immediately
+        if partition_key not in self.asset_statuses:
+            self.asset_statuses[partition_key] = {}
+        self.asset_statuses[partition_key]["hf_annotated"] = "running"
+        yield
+        
+        job_name = "annotate_with_hf_modules_job"
+        
+        # Use selected modules, or None for all if none selected
+        modules_to_use = self.selected_modules if self.selected_modules else None
+        
+        # Asset jobs use "assets" config key, not "ops"
+        run_config = {
+            "assets": {
+                "user_hf_module_annotations": {
+                    "config": {
+                        "vcf_path": str(vcf_path.absolute()),
+                        "user_name": self.safe_user_id,
+                        "sample_name": sample_name,
+                        "modules": modules_to_use,
+                    }
+                }
+            }
+        }
+
+        # Create the run
+        job_def = defs.get_job_def(job_name)
+        
+        run = instance.create_run_for_job(
+            job_def=job_def,
+            partition_key=partition_key,
+            run_config=run_config
+        )
+        
+        # Submit the run
+        instance.submit_run(run.run_id, workspace_snapshot=None)
+        
+        modules_info = ", ".join(modules_to_use) if modules_to_use else "all modules"
+        yield rx.toast.info(f"Started HF annotation for {sample_name} with {modules_info} (Run ID: {run.run_id[:8]}...)")
 
     @rx.var
     def file_statuses(self) -> Dict[str, str]:

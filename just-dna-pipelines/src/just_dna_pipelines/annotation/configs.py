@@ -8,7 +8,7 @@ import psutil
 from dagster import Config
 
 from just_dna_pipelines.models import SampleInfo
-from just_dna_pipelines.annotation.hf_modules import AnnotatorModule
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, validate_modules
 
 
 def get_default_duckdb_memory_limit() -> str:
@@ -105,18 +105,28 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     """
     Configuration for annotating VCF with HuggingFace modules.
     
-    The HF modules (just-dna-seq/annotators) are self-contained and include
-    all annotation data. No Ensembl join is required.
+    Modules are discovered dynamically from one or more HuggingFace repositories.
+    By default, scans 'just-dna-seq/annotators'.
+    
+    Pass None for modules to use all discovered modules, or a list of
+    specific module names to use a subset.
     
     VCF must have FORMAT fields (GT) to compute genotype for joining with
     the weights table. The genotype is computed as List[String] sorted alphabetically.
+    
+    VCF Source Options (use ONE of these):
+    - vcf_path: Local path to VCF file
+    - zenodo_url: Zenodo record URL (e.g., https://zenodo.org/records/18370498)
     """
-    vcf_path: str
+    vcf_path: Optional[str] = None
+    zenodo_url: Optional[str] = None  # Zenodo record or file URL
     user_name: Optional[str] = None
     
-    # Module selection - list of module names (all by default)
-    # Valid values: longevitymap, lipidmetabolism, vo2max, superhuman, coronary, drugs
-    modules: Optional[list[str]] = None  # None means all modules
+    # Repositories to scan for modules
+    repos: list[str] = ["just-dna-seq/annotators"]
+    
+    # Module selection - list of module names (all discovered modules by default)
+    modules: Optional[list[str]] = None  # None means all discovered modules from the repos
     
     # Output settings
     output_dir: Optional[str] = None  # If None, uses data/output/users/{user_name}/modules/
@@ -126,10 +136,56 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     info_fields: Optional[list[str]] = None
     format_fields: Optional[list[str]] = None  # Default: ["GT", "GQ", "DP", "AD", "VAF", "PL"]
     
-    def get_modules(self) -> list[AnnotatorModule]:
-        """Get list of modules to annotate with."""
+    def get_modules(self) -> list[str]:
+        """
+        Get list of modules to annotate with.
+        
+        Discovers modules from the configured repos and returns the
+        selected subset (or all if none specified).
+        """
+        from just_dna_pipelines.annotation.hf_modules import discover_hf_modules
+        
+        # Discover modules from the configured repos
+        module_infos = discover_hf_modules(self.repos)
+        discovered_names = sorted(list(module_infos.keys()))
+        
         if self.modules is None:
-            return AnnotatorModule.all_modules()
-        return [AnnotatorModule.from_string(m) for m in self.modules]
+            return discovered_names
+            
+        # Validate selected modules
+        valid = []
+        requested = [m.lower() for m in self.modules]
+        for name in discovered_names:
+            if name.lower() in requested:
+                valid.append(name)
+        return valid
+    
+    def resolve_vcf_path(self, logger=None) -> str:
+        """
+        Resolve the VCF path from the configured source.
+        
+        Supports:
+        - vcf_path: Local file path (returned as-is)
+        - zenodo_url: Downloads from Zenodo and returns cached path
+        
+        Returns:
+            String path to the VCF file
+            
+        Raises:
+            ValueError: If no source is configured or both are provided
+        """
+        from just_dna_pipelines.annotation.resources import download_vcf_from_zenodo
+        
+        if self.vcf_path and self.zenodo_url:
+            raise ValueError("Provide only one of vcf_path or zenodo_url, not both")
+        
+        if self.zenodo_url:
+            vcf_path = download_vcf_from_zenodo(self.zenodo_url, logger=logger)
+            return str(vcf_path)
+        
+        if self.vcf_path:
+            return self.vcf_path
+        
+        raise ValueError("Must provide either vcf_path or zenodo_url")
 
 

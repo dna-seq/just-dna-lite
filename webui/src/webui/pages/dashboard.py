@@ -4,6 +4,7 @@ import reflex as rx
 
 from webui.components.layout import template, DAISY_CARD, DAISY_BUTTON_PRIMARY, DAISY_BADGE
 from webui.state import AuthState, UploadState
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES
 
 
 def upload_zone() -> rx.Component:
@@ -59,6 +60,61 @@ def upload_zone() -> rx.Component:
     )
 
 
+def module_selector() -> rx.Component:
+    """Component for selecting which HF modules to use for annotation."""
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("boxes", size=32, class_name="text-info"),
+                rx.heading("Annotation Modules", size="5", class_name="font-bold"),
+                rx.spacer(),
+                rx.hstack(
+                    rx.button(
+                        "All",
+                        on_click=UploadState.select_all_modules,
+                        class_name="btn btn-xs btn-ghost",
+                    ),
+                    rx.button(
+                        "None",
+                        on_click=UploadState.deselect_all_modules,
+                        class_name="btn btn-xs btn-ghost",
+                    ),
+                    spacing="2",
+                ),
+                spacing="3",
+                align="center",
+                width="100%",
+            ),
+            rx.text(
+                "Select which modules to use for HF annotation:",
+                class_name="text-sm text-base-content/60",
+            ),
+            rx.hstack(
+                rx.foreach(
+                    UploadState.available_modules,
+                    lambda m: rx.button(
+                        m,
+                        on_click=UploadState.toggle_module(m),
+                        class_name=rx.cond(
+                            UploadState.selected_modules.contains(m),
+                            "btn btn-sm btn-info",
+                            "btn btn-sm btn-ghost btn-outline",
+                        ),
+                    ),
+                ),
+                spacing="2",
+                flex_wrap="wrap",
+                width="100%",
+            ),
+            width="100%",
+            spacing="3",
+            align="stretch",
+        ),
+        class_name="p-4 bg-base-200/50 rounded-xl border border-base-300",
+        width="100%",
+    )
+
+
 def sample_catalog() -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -75,6 +131,7 @@ def sample_catalog() -> rx.Component:
             width="100%",
         ),
         rx.divider(class_name="divider my-4"),
+        module_selector(),
         rx.list(
             rx.foreach(
                 UploadState.files,
@@ -99,19 +156,32 @@ def sample_catalog() -> rx.Component:
                             spacing="2",
                         ),
                         rx.spacer(),
-                        rx.button(
-                            rx.cond(
-                                UploadState.file_statuses[f] == "running",
-                                rx.icon("loader-circle", size=32, class_name="animate-spin"),
-                                rx.hstack(
-                                    rx.icon("play", size=32),
-                                    rx.text("Run"),
-                                    spacing="3",
+                        rx.vstack(
+                            rx.button(
+                                rx.cond(
+                                    UploadState.file_statuses[f] == "running",
+                                    rx.icon("loader-circle", size=24, class_name="animate-spin"),
+                                    rx.hstack(
+                                        rx.icon("database", size=24),
+                                        rx.text("Ensembl"),
+                                        spacing="2",
+                                    ),
                                 ),
+                                on_click=UploadState.run_annotation(f),
+                                disabled=UploadState.file_statuses[f] == "running",
+                                class_name="btn btn-success btn-md px-6 shadow-md hover:shadow-lg active:scale-95 transition-all",
                             ),
-                            on_click=UploadState.run_annotation(f),
-                            disabled=UploadState.file_statuses[f] == "running",
-                            class_name="btn btn-success btn-lg h-20 px-8 text-xl shadow-lg hover:shadow-xl active:scale-95 transition-all",
+                            rx.button(
+                                rx.hstack(
+                                    rx.icon("boxes", size=24),
+                                    rx.text("HF Modules"),
+                                    spacing="2",
+                                ),
+                                on_click=UploadState.run_hf_annotation(f),
+                                class_name="btn btn-info btn-md px-6 shadow-md hover:shadow-lg active:scale-95 transition-all",
+                            ),
+                            spacing="2",
+                            align="stretch",
                         ),
                         align="center",
                         width="100%",

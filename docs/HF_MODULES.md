@@ -108,12 +108,20 @@ uv run pipelines annotate-modules \
     --sample sample1
 ```
 
+### Annotate from Zenodo (Recommended for personal health data)
+```bash
+uv run pipelines annotate-modules \
+    --zenodo https://zenodo.org/records/18370498 \
+    --user antonkulaga \
+    --sample genome
+```
+
 ### Annotate from HuggingFace
 ```bash
 uv run pipelines annotate-modules \
-    --hf-source antonkulaga/personal-health/genetics/antonkulaga.vcf \
-    --user antonkulaga \
-    --sample genome
+    --hf-source some-repo/data/sample.vcf \
+    --user someuser \
+    --sample sample1
 ```
 
 ---

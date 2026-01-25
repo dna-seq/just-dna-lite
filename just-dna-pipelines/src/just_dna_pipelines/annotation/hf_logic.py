@@ -4,6 +4,9 @@ Logic for annotating VCF files with HuggingFace modules.
 This module contains the core annotation logic using lazy Polars
 for memory-efficient processing. HF modules are self-contained
 and don't require Ensembl joins.
+
+Modules are identified by string names (e.g., "longevitymap") rather than
+enums, enabling dynamic discovery of new modules from the HF repository.
 """
 
 from pathlib import Path
@@ -16,11 +19,12 @@ from eliot import start_action
 from just_dna_pipelines.io import read_vcf_file
 from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.annotation.hf_modules import (
-    AnnotatorModule,
     ModuleTable,
     ModuleOutputMapping,
     AnnotationManifest,
     scan_module_table,
+    get_module_info,
+    ModuleInfo,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.resources import get_user_output_dir
@@ -92,10 +96,11 @@ def prepare_vcf_rsid_only(
 
 def annotate_vcf_with_module_weights(
     vcf_lf: pl.LazyFrame,
-    module: AnnotatorModule,
+    module_name: str,
     output_path: Path,
     compression: str = "zstd",
     join_on: str = "position",
+    module_info: Optional[ModuleInfo] = None,
 ) -> tuple[Path, int]:
     """
     Annotate VCF variants with a module's weights table.
@@ -108,17 +113,18 @@ def annotate_vcf_with_module_weights(
     
     Args:
         vcf_lf: Prepared VCF LazyFrame with genotype column
-        module: The annotator module to use
+        module_name: Name of the annotator module (e.g., "longevitymap")
         output_path: Where to write the output parquet
         compression: Parquet compression (default: zstd)
         join_on: Join strategy - "position" or "rsid"
+        module_info: Optional ModuleInfo for the module
         
     Returns:
         Tuple of (output_path, num_annotated_variants)
     """
-    with start_action(action_type="annotate_with_module_weights", module=module.value, join_on=join_on) as action:
+    with start_action(action_type="annotate_with_module_weights", module=module_name, join_on=join_on) as action:
         # Load module weights table (lazy)
-        weights_lf = scan_module_table(module, ModuleTable.WEIGHTS)
+        weights_lf = scan_module_table(module_name, ModuleTable.WEIGHTS, module_info=module_info)
         
         if join_on == "rsid":
             # Join on rsid + genotype (requires VCF to have rsids)
@@ -129,7 +135,7 @@ def annotate_vcf_with_module_weights(
                 weights_lf,
                 on=["rsid", "genotype"],
                 how="left",
-                suffix=f"_{module.value}"
+                suffix=f"_{module_name}"
             )
         else:
             # Join on position (chrom, start) + genotype
@@ -156,7 +162,7 @@ def annotate_vcf_with_module_weights(
                 weights_lf.drop("ref"),  # Drop ref to avoid conflict
                 on=["chrom", "start", "genotype"],
                 how="left",
-                suffix=f"_{module.value}"
+                suffix=f"_{module_name}"
             )
         
         # Write to parquet using streaming
@@ -169,7 +175,7 @@ def annotate_vcf_with_module_weights(
         action.log(
             message_type="info",
             step="weights_annotation_complete",
-            module=module.value,
+            module=module_name,
             num_variants=num_rows,
             join_on=join_on,
             output_path=str(output_path)
@@ -180,9 +186,10 @@ def annotate_vcf_with_module_weights(
 
 def annotate_vcf_with_module_annotations(
     vcf_lf: pl.LazyFrame,
-    module: AnnotatorModule,
+    module_name: str,
     output_path: Path,
     compression: str = "zstd",
+    module_info: Optional[ModuleInfo] = None,
 ) -> tuple[Path, int]:
     """
     Annotate VCF variants with a module's annotations table.
@@ -191,15 +198,16 @@ def annotate_vcf_with_module_annotations(
     
     Args:
         vcf_lf: Prepared VCF LazyFrame with rsid column
-        module: The annotator module to use
+        module_name: Name of the annotator module (e.g., "longevitymap")
         output_path: Where to write the output parquet
         compression: Parquet compression (default: zstd)
+        module_info: Optional ModuleInfo for the module
         
     Returns:
         Tuple of (output_path, num_annotated_variants)
     """
-    with start_action(action_type="annotate_with_module_annotations", module=module.value) as action:
-        annotations_lf = scan_module_table(module, ModuleTable.ANNOTATIONS)
+    with start_action(action_type="annotate_with_module_annotations", module=module_name) as action:
+        annotations_lf = scan_module_table(module_name, ModuleTable.ANNOTATIONS, module_info=module_info)
         
         # Pre-filter VCF to only rsids that exist in the module
         module_rsids = annotations_lf.select("rsid").unique()
@@ -210,7 +218,7 @@ def annotate_vcf_with_module_annotations(
             annotations_lf,
             on="rsid",
             how="left",
-            suffix=f"_{module.value}"
+            suffix=f"_{module_name}"
         )
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -221,7 +229,7 @@ def annotate_vcf_with_module_annotations(
         action.log(
             message_type="info",
             step="annotations_complete",
-            module=module.value,
+            module=module_name,
             num_variants=num_rows
         )
         
@@ -230,9 +238,10 @@ def annotate_vcf_with_module_annotations(
 
 def annotate_vcf_with_module_studies(
     vcf_lf: pl.LazyFrame,
-    module: AnnotatorModule,
+    module_name: str,
     output_path: Path,
     compression: str = "zstd",
+    module_info: Optional[ModuleInfo] = None,
 ) -> tuple[Path, int]:
     """
     Annotate VCF variants with a module's studies table.
@@ -242,15 +251,16 @@ def annotate_vcf_with_module_studies(
     
     Args:
         vcf_lf: Prepared VCF LazyFrame with rsid column
-        module: The annotator module to use
+        module_name: Name of the annotator module (e.g., "longevitymap")
         output_path: Where to write the output parquet
         compression: Parquet compression (default: zstd)
+        module_info: Optional ModuleInfo for the module
         
     Returns:
         Tuple of (output_path, num_rows)
     """
-    with start_action(action_type="annotate_with_module_studies", module=module.value) as action:
-        studies_lf = scan_module_table(module, ModuleTable.STUDIES)
+    with start_action(action_type="annotate_with_module_studies", module=module_name) as action:
+        studies_lf = scan_module_table(module_name, ModuleTable.STUDIES, module_info=module_info)
         
         # Pre-filter VCF to only rsids that exist in the module
         module_rsids = studies_lf.select("rsid").unique()
@@ -261,7 +271,7 @@ def annotate_vcf_with_module_studies(
             studies_lf,
             on="rsid",
             how="left",
-            suffix=f"_{module.value}"
+            suffix=f"_{module_name}"
         )
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -272,11 +282,51 @@ def annotate_vcf_with_module_studies(
         action.log(
             message_type="info",
             step="studies_complete",
-            module=module.value,
+            module=module_name,
             num_rows=num_rows
         )
         
         return output_path, num_rows
+
+
+def download_file(url: str, output_path: Path) -> Path:
+    """Download a file from a URL or HuggingFace."""
+    import requests
+    
+    # hf:// protocol handling
+    if url.startswith("hf://"):
+        from huggingface_hub import hf_hub_download
+        
+        # hf://datasets/repo/data/module/file -> repo, data/module/file
+        parts = url.replace("hf://datasets/", "").split("/", 1)
+        repo_id = parts[0]
+        subpath = parts[1]
+        
+        downloaded_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=subpath,
+            repo_type="dataset"
+        )
+        import shutil
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(downloaded_path, output_path)
+        return output_path
+    
+    # Zenodo URL handling
+    if "zenodo.org/record" in url or "zenodo.org/api/records" in url:
+        # If it's a record URL but not a direct content link, we might need to resolve it
+        if "content" not in url and "/files/" in url:
+             # Already a file link, might work directly or need /content
+             pass
+    
+    # Regular URL handling
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    return output_path
 
 
 def annotate_vcf_with_all_modules(
@@ -304,7 +354,12 @@ def annotate_vcf_with_all_modules(
     Returns:
         Tuple of (AnnotationManifest, metadata_dict)
     """
-    modules = config.get_modules()
+    from just_dna_pipelines.annotation.hf_modules import discover_hf_modules
+    
+    # Discover modules from the configured repos
+    module_infos = discover_hf_modules(config.repos)
+    selected_names = config.get_modules()
+    
     sample_name = sample_name or config.sample_name or vcf_path.stem
     
     # Determine output directory
@@ -315,7 +370,7 @@ def annotate_vcf_with_all_modules(
     
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Output directory: {output_dir}")
-    logger.info(f"Annotating with modules: {[m.value for m in modules]}")
+    logger.info(f"Annotating with modules: {selected_names}")
     
     with resource_tracker("Annotate VCF with HF Modules") as tracker:
         # Prepare VCF once (with genotype column)
@@ -330,32 +385,72 @@ def annotate_vcf_with_all_modules(
         module_outputs: list[ModuleOutputMapping] = []
         total_annotated = 0
         
-        for module in modules:
-            logger.info(f"Processing module: {module.value}")
+        for module_name in selected_names:
+            logger.info(f"Processing module: {module_name}")
+            info = module_infos[module_name]
             
             # Weights (genotype-specific) - main annotation
-            weights_path = output_dir / f"{module.value}_weights.parquet"
+            weights_path = output_dir / f"{module_name}_weights.parquet"
             weights_path, num_weights = annotate_vcf_with_module_weights(
-                vcf_lf, module, weights_path, config.compression
+                vcf_lf, module_name, weights_path, config.compression, module_info=info
             )
             
+            # Download logo if exists
+            logo_path = None
+            if info.logo_url:
+                try:
+                    ext = info.logo_url.split(".")[-1]
+                    target = output_dir / f"{module_name}_logo.{ext}"
+                    logo_path = str(download_file(info.logo_url, target))
+                    logger.info(f"  Downloaded logo: {logo_path}")
+                except Exception as e:
+                    logger.warning(f"  Failed to download logo for {module_name}: {e}")
+
+            # Download metadata if exists
+            metadata_json_path = None
+            if info.metadata_url:
+                try:
+                    target = output_dir / f"{module_name}_metadata.json"
+                    metadata_json_path = str(download_file(info.metadata_url, target))
+                    logger.info(f"  Downloaded metadata: {metadata_json_path}")
+                except Exception as e:
+                    logger.warning(f"  Failed to download metadata for {module_name}: {e}")
+            
             module_output = ModuleOutputMapping(
-                module=module.value,
+                module=module_name,
                 weights_path=str(weights_path),
+                logo_path=logo_path,
+                metadata_path=metadata_json_path,
             )
             
             total_annotated += num_weights
             module_outputs.append(module_output)
             
-            logger.info(f"  {module.value}: {num_weights} variants with weights")
+            logger.info(f"  {module_name}: {num_weights} variants with weights")
     
-    # Build manifest
+    # Get execution metrics from resource tracker
+    from datetime import datetime, timezone
+    duration_sec = None
+    cpu_percent = None
+    peak_memory_mb = None
+    
+    if "report" in tracker:
+        report = tracker["report"]
+        duration_sec = round(report.duration, 2)
+        cpu_percent = round(report.cpu_usage_percent, 1)
+        peak_memory_mb = round(report.peak_memory_mb, 2)
+    
+    # Build manifest with execution metrics
     manifest = AnnotationManifest(
         user_name=user_name,
         sample_name=sample_name,
         source_vcf=str(vcf_path),
         modules=module_outputs,
         total_variants_annotated=total_annotated,
+        duration_sec=duration_sec,
+        cpu_percent=cpu_percent,
+        peak_memory_mb=peak_memory_mb,
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
     
     # Write manifest to JSON
@@ -370,19 +465,18 @@ def annotate_vcf_with_all_modules(
         "source_vcf": MetadataValue.path(str(vcf_path.absolute())),
         "output_dir": MetadataValue.path(str(output_dir.absolute())),
         "manifest_path": MetadataValue.path(str(manifest_path.absolute())),
-        "modules_processed": MetadataValue.int(len(modules)),
-        "module_names": MetadataValue.text(", ".join(m.value for m in modules)),
+        "modules_processed": MetadataValue.int(len(selected_names)),
+        "module_names": MetadataValue.text(", ".join(selected_names)),
         "total_variants_annotated": MetadataValue.int(total_annotated),
         "compression": MetadataValue.text(config.compression),
     }
     
-    # Add resource metrics if available
-    if "report" in tracker:
-        report = tracker["report"]
+    # Add resource metrics to Dagster metadata
+    if duration_sec is not None:
         metadata_dict.update({
-            "duration_sec": MetadataValue.float(round(report.duration, 2)),
-            "cpu_percent": MetadataValue.float(round(report.cpu_usage_percent, 1)),
-            "peak_memory_mb": MetadataValue.float(round(report.peak_memory_mb, 2)),
+            "duration_sec": MetadataValue.float(duration_sec),
+            "cpu_percent": MetadataValue.float(cpu_percent),
+            "peak_memory_mb": MetadataValue.float(peak_memory_mb),
         })
     
     return manifest, metadata_dict

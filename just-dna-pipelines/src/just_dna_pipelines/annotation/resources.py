@@ -8,7 +8,9 @@ determining cache, input, and output directories.
 import os
 import shutil
 from pathlib import Path
+from typing import Optional
 
+import requests
 from platformdirs import user_cache_dir
 
 
@@ -88,6 +90,90 @@ def get_user_input_dir() -> Path:
     if env_input:
         return Path(env_input)
     return Path("data") / "input" / "users"
+
+
+def download_vcf_from_zenodo(
+    zenodo_url: str,
+    filename: Optional[str] = None,
+    logger=None,
+) -> Path:
+    """
+    Download a VCF file from Zenodo.
+    
+    Supports:
+    - Record URLs: https://zenodo.org/records/18370498 (finds first VCF)
+    - Direct file URLs: https://zenodo.org/api/records/18370498/files/antonkulaga.vcf/content
+    
+    Downloaded files are cached in ~/.cache/just-dna-pipelines/zenodo/
+    
+    Args:
+        zenodo_url: Zenodo record URL or direct file URL
+        filename: Optional filename override (auto-detected if not provided)
+        logger: Optional logger for messages
+        
+    Returns:
+        Path to the downloaded VCF file
+    """
+    cache_dir = get_cache_dir() / "zenodo"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Handle record URLs: https://zenodo.org/records/{record_id}
+    if "/records/" in zenodo_url and "/files/" not in zenodo_url:
+        record_id = zenodo_url.split("/records/")[-1].split("?")[0].split("/")[0]
+        api_url = f"https://zenodo.org/api/records/{record_id}"
+        
+        if logger:
+            logger.info(f"Fetching Zenodo record metadata: {api_url}")
+        
+        response = requests.get(api_url)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Find the first VCF file
+        vcf_file = next(
+            (f for f in data["files"] if f["key"].endswith(".vcf") or f["key"].endswith(".vcf.gz")),
+            None
+        )
+        if not vcf_file:
+            raise ValueError(f"No VCF file found in Zenodo record {record_id}")
+        
+        download_url = vcf_file["links"]["self"]
+        resolved_filename = filename or vcf_file["key"]
+    else:
+        # Direct file URL
+        download_url = zenodo_url
+        if filename:
+            resolved_filename = filename
+        else:
+            # Extract filename from URL
+            resolved_filename = zenodo_url.split("/")[-1].split("?")[0]
+            if not (resolved_filename.endswith(".vcf") or resolved_filename.endswith(".vcf.gz")):
+                resolved_filename = "genome.vcf"
+    
+    vcf_path = cache_dir / resolved_filename
+    
+    # Check if already cached
+    if vcf_path.exists():
+        if logger:
+            logger.info(f"Using cached VCF from Zenodo: {vcf_path}")
+        return vcf_path
+    
+    # Download
+    if logger:
+        logger.info(f"Downloading VCF from Zenodo: {download_url}")
+    
+    response = requests.get(download_url, stream=True)
+    response.raise_for_status()
+    
+    with open(vcf_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    
+    if logger:
+        size_mb = vcf_path.stat().st_size / (1024 * 1024)
+        logger.info(f"Downloaded VCF: {vcf_path} ({size_mb:.1f} MB)")
+    
+    return vcf_path
 
 
 def ensure_vcf_in_user_input_dir(

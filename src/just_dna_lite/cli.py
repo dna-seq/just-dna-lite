@@ -43,7 +43,7 @@ auto_materialize:
 """
     
     config_file.write_text(config_content, encoding="utf-8")
-    print(f"✅ Created Dagster config at {config_file}")
+    typer.secho(f"✅ Created Dagster config at {config_file}", fg=typer.colors.GREEN)
 
 
 def _find_workspace_root(start: Path) -> Optional[Path]:
@@ -73,7 +73,7 @@ def _kill_process_group(proc: Optional[subprocess.Popen]) -> None:
         except ProcessLookupError:
             pass
     except Exception as e:
-        print(f"Error killing process group: {e}")
+        typer.secho(f"Error killing process group: {e}", fg=typer.colors.RED, err=True)
 
 
 def _kill_port_owner(port: int) -> None:
@@ -93,7 +93,7 @@ def _kill_port_owner(port: int) -> None:
             pass
 
     try:
-        print(f"🔍 Port {port} is in use, searching for owner...")
+        typer.secho(f"🔍 Port {port} is in use, searching for owner...", fg=typer.colors.CYAN)
         
         # Try lsof with more specific flags
         result = subprocess.run(
@@ -118,7 +118,7 @@ def _kill_port_owner(port: int) -> None:
                 pids = output.split()
 
         if not pids:
-            print(f"⚠️  Port {port} is busy (maybe in TIME_WAIT?) but owner PID could not be found.")
+            typer.secho(f"⚠️  Port {port} is busy (maybe in TIME_WAIT?) but owner PID could not be found.", fg=typer.colors.YELLOW)
             return
 
         for pid_str in pids:
@@ -127,7 +127,7 @@ def _kill_port_owner(port: int) -> None:
                     pid = int(pid_str)
                     if pid == os.getpid():
                         continue
-                    print(f"Stopping process {pid} on port {port}...")
+                    typer.secho(f"Stopping process {pid} on port {port}...", fg=typer.colors.YELLOW)
                     os.kill(pid, signal.SIGTERM)
                     time.sleep(0.5)
                     try:
@@ -138,7 +138,7 @@ def _kill_port_owner(port: int) -> None:
                 except (ValueError, ProcessLookupError):
                     pass
     except Exception as e:
-        print(f"Error during port cleanup for {port}: {e}")
+        typer.secho(f"Error during port cleanup for {port}: {e}", fg=typer.colors.RED, err=True)
 
 
 @app.command("ui")
@@ -159,7 +159,15 @@ def start_ui(
     if not webui_dir.exists():
         raise typer.BadParameter(f"webui folder not found: {webui_dir}")
 
-    print("🚀 Starting Reflex Web UI...")
+    typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    
+    typer.echo("\n" + "═" * 65)
+    typer.secho("⏳ The UI is initializing. It will be available shortly at:", fg=typer.colors.YELLOW)
+    typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
+    typer.echo(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
+    typer.secho("\nNote: It may take 10-20 seconds to compile the frontend.", fg=typer.colors.DIM)
+    typer.echo("═" * 65 + "\n")
+
     # Clean up UI ports
     for port in [3000, 3001, 8000]:
         _kill_port_owner(port)
@@ -173,7 +181,7 @@ def start_ui(
     try:
         proc.wait()
     except KeyboardInterrupt:
-        print("\nStopping UI...")
+        typer.secho("\nStopping UI...", fg=typer.colors.YELLOW)
         _kill_process_group(proc)
 
 
@@ -217,11 +225,11 @@ def start_dagster(
     _ensure_dagster_config(dagster_home_path)
     os.environ["DAGSTER_HOME"] = dagster_home
     
-    print(f"🚀 Starting Dagster Dev (UI + Daemon) for {file}...")
-    print(f"📁 Dagster home: {dagster_home}")
+    typer.secho(f"🚀 Starting Dagster Dev (UI + Daemon) for {file}...", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.echo(f"📁 Dagster home: {dagster_home}")
     _kill_port_owner(port)
     
-    print(f"\n💡 Dagster UI will be available at: http://localhost:{port}\n")
+    typer.secho(f"\n💡 Dagster UI will be available at: http://localhost:{port}\n", fg=typer.colors.GREEN, bold=True)
     
     # Use os.execvp to replace the current process with dagster dev
     # This ensures all output is properly forwarded and the process behaves correctly
@@ -265,17 +273,17 @@ def start_all(
     _ensure_dagster_config(dagster_home_path)
     os.environ["DAGSTER_HOME"] = dagster_home
 
-    print("🏗️  Starting full Just DNA Pipelines stack...")
+    typer.secho("🏗️  Starting full Just DNA Pipelines stack...", fg=typer.colors.BRIGHT_MAGENTA, bold=True)
     
     # 0. Clean up orphan processes
     ports_to_clean = [3000, 3001, 8000, dagster_port]
-    print(f"🧹 Cleaning up existing processes on ports {', '.join(map(str, ports_to_clean))}...")
+    typer.echo(f"🧹 Cleaning up existing processes on ports {', '.join(map(str, ports_to_clean))}...")
     for port in ports_to_clean:
         _kill_port_owner(port)
 
     # 1. Start the UI in the background
     webui_dir = root / "webui"
-    print("🚀 Starting Reflex Web UI...")
+    typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
     # Reflex will run in the background but share the same process group
     subprocess.Popen(
         [sys.executable, "-m", "reflex", "run"],
@@ -288,16 +296,17 @@ def start_all(
     # 2. Start Dagster by REPLACING this process (exec)
     # This ensures Dagster has full control of stdout/stderr and terminal signals,
     # making it behave exactly like the `uv run dagster-ui` command.
-    print(f"🧬 Starting Dagster Pipelines for {dagster_file}...")
-    print(f"📁 Dagster home: {dagster_home}")
+    typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
+    typer.echo(f"📁 Dagster home: {dagster_home}")
     dagster_file_path = root / dagster_file
 
-    print("\n" + "═" * 65)
-    print("🚀 Just DNA Pipelines Stack is starting!")
-    print(f"  • Web UI:       http://localhost:3000 (Main Interface)")
-    print(f"  • Pipelines UI: http://localhost:{dagster_port} (Dagster Dashboard)")
-    print(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
-    print("═" * 65 + "\n")
+    typer.echo("\n" + "═" * 65)
+    typer.secho("🚀 Just DNA Pipelines Stack is starting!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("⏳ Note: Reflex UI takes ~20s to initialize.", fg=typer.colors.YELLOW)
+    typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
+    typer.echo(f"  • Pipelines UI: http://localhost:{dagster_port} (Dagster Dashboard)")
+    typer.echo(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
+    typer.echo("═" * 65 + "\n")
 
     # This replaces the current process with dagster dev
     os.execvp(
@@ -328,21 +337,21 @@ def sync_vcf_partitions_cmd() -> None:
     Path(dagster_home).mkdir(parents=True, exist_ok=True)
     os.environ["DAGSTER_HOME"] = dagster_home
     
-    print("🔍 Scanning for VCF files in data/input/users/...\n")
+    typer.secho("🔍 Scanning for VCF files in data/input/users/...\n", fg=typer.colors.CYAN)
     
     new, existing = sync_vcf_partitions(verbose=True)
     
-    print("\n" + "="*60)
-    print(f"📊 Summary:")
-    print(f"   New partitions added: {len(new)}")
-    print(f"   Existing partitions: {len(existing)}")
-    print(f"   Total partitions: {len(new) + len(existing)}")
-    print("="*60)
+    typer.echo("\n" + "="*60)
+    typer.secho("📊 Summary:", fg=typer.colors.BRIGHT_WHITE, bold=True)
+    typer.echo(f"   New partitions added: {len(new)}")
+    typer.echo(f"   Existing partitions: {len(existing)}")
+    typer.echo(f"   Total partitions: {len(new) + len(existing)}")
+    typer.echo("="*60)
     
     if new:
-        print("\n✅ Partitions are now available in Dagster UI!")
-        print("   Go to Assets → user_vcf_source or user_annotated_vcf")
-        print("   to materialize these partitions.")
+        typer.secho("\n✅ Partitions are now available in Dagster UI!", fg=typer.colors.GREEN)
+        typer.echo("   Go to Assets → user_vcf_source or user_annotated_vcf")
+        typer.echo("   to materialize these partitions.")
 
 
 @app.command("list-vcf-partitions")
@@ -365,12 +374,12 @@ def list_vcf_partitions_cmd() -> None:
     partitions = list_vcf_partitions()
     
     if not partitions:
-        print("📭 No VCF partitions found.")
-        print("\nRun 'uv run pipelines sync-vcf-partitions' to discover and add VCF files.")
+        typer.secho("📭 No VCF partitions found.", fg=typer.colors.YELLOW)
+        typer.echo("\nRun 'uv run pipelines sync-vcf-partitions' to discover and add VCF files.")
     else:
-        print(f"📋 Found {len(partitions)} VCF partition(s):\n")
+        typer.secho(f"📋 Found {len(partitions)} VCF partition(s):\n", fg=typer.colors.CYAN, bold=True)
         for p in sorted(partitions):
-            print(f"   • {p}")
+            typer.echo(f"   • {p}")
 
 
 if __name__ == "__main__":

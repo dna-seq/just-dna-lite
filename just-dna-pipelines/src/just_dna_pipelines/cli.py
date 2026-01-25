@@ -30,8 +30,12 @@ def annotate_modules(
     hf_source: Optional[str] = typer.Option(
         None,
         "--hf-source", "-s",
-        help="HuggingFace dataset source in format 'repo_id/path/to/file.vcf'. "
-             "Example: 'antonkulaga/personal-health/genetics/antonkulaga.vcf'",
+        help="HuggingFace dataset source in format 'repo_id/path/to/file.vcf'.",
+    ),
+    zenodo_source: Optional[str] = typer.Option(
+        None,
+        "--zenodo", "-z",
+        help="Zenodo record URL or direct file URL. Example: 'https://zenodo.org/records/18370498'",
     ),
     user_name: str = typer.Option(
         ...,
@@ -71,11 +75,16 @@ def annotate_modules(
         # Annotate a local VCF with all modules
         uv run pipelines annotate-modules --vcf /path/to/sample.vcf --user myuser
 
-        # Annotate from HuggingFace with specific modules
+        # Annotate from Zenodo with specific modules (recommended for personal health data)
         uv run pipelines annotate-modules \\
-            --hf-source antonkulaga/personal-health/genetics/antonkulaga.vcf \\
+            --zenodo https://zenodo.org/records/18370498 \\
             --user antonkulaga \\
             --modules longevitymap,coronary
+
+        # Annotate from HuggingFace
+        uv run pipelines annotate-modules \\
+            --hf-source some-repo/data/sample.vcf \\
+            --user someuser
     """
     from huggingface_hub import hf_hub_download
 
@@ -84,16 +93,59 @@ def annotate_modules(
     from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 
     # Validate input source
-    if vcf_path is None and hf_source is None:
-        console.print("[red]Error: You must provide either --vcf or --hf-source[/red]")
+    sources = [vcf_path, hf_source, zenodo_source]
+    num_sources = sum(1 for s in sources if s is not None)
+    
+    if num_sources == 0:
+        console.print("[red]Error: You must provide either --vcf, --hf-source, or --zenodo[/red]")
         raise typer.Exit(1)
-
-    if vcf_path is not None and hf_source is not None:
-        console.print("[red]Error: Provide only one of --vcf or --hf-source, not both[/red]")
+        
+    if num_sources > 1:
+        console.print("[red]Error: Provide only one of --vcf, --hf-source, or --zenodo, not multiple[/red]")
         raise typer.Exit(1)
 
     # Resolve VCF path
-    if hf_source:
+    if zenodo_source:
+        console.print(f"[blue]Downloading VCF from Zenodo: {zenodo_source}[/blue]")
+        import requests
+        
+        # If it's a record URL, we need to find the VCF file
+        if "/records/" in zenodo_source and "/files/" not in zenodo_source:
+            record_id = zenodo_source.split("/records/")[-1].split("?")[0]
+            api_url = f"https://zenodo.org/api/records/{record_id}"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Find the first VCF file
+            vcf_file = next((f for f in data["files"] if f["key"].endswith(".vcf") or f["key"].endswith(".vcf.gz")), None)
+            if not vcf_file:
+                console.print(f"[red]Error: No VCF file found in Zenodo record {record_id}[/red]")
+                raise typer.Exit(1)
+            
+            download_url = vcf_file["links"]["self"]
+            filename = vcf_file["key"]
+        else:
+            download_url = zenodo_source
+            filename = zenodo_source.split("/")[-1].split("?")[0]
+            if not (filename.endswith(".vcf") or filename.endswith(".vcf.gz")):
+                filename = "genome.vcf"
+
+        # Use ~/.cache/just-dna-pipelines/zenodo/ for caching
+        cache_dir = Path.home() / ".cache" / "just-dna-pipelines" / "zenodo"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        resolved_vcf_path = cache_dir / filename
+        
+        if not resolved_vcf_path.exists():
+            response = requests.get(download_url, stream=True)
+            response.raise_for_status()
+            with open(resolved_vcf_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        
+        console.print(f"[green]Downloaded to: {resolved_vcf_path}[/green]")
+
+    elif hf_source:
         console.print(f"[blue]Downloading VCF from HuggingFace: {hf_source}[/blue]")
         
         # Parse HuggingFace source: repo_id/path/to/file.vcf
