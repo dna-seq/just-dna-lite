@@ -7,19 +7,9 @@ determining cache, input, and output directories.
 
 import os
 import shutil
-import tempfile
-import urllib.request
 from pathlib import Path
-from typing import Optional
 
 from platformdirs import user_cache_dir
-
-LONGEVITYMAP_SQLITE_SOURCE_URL = (
-    "https://github.com/dna-seq/just_longevitymap/blob/master/data/longevitymap.sqlite"
-)
-LONGEVITYMAP_SQLITE_RAW_URL = (
-    "https://raw.githubusercontent.com/dna-seq/just_longevitymap/master/data/longevitymap.sqlite"
-)
 
 
 def get_default_ensembl_cache_dir() -> Path:
@@ -78,46 +68,6 @@ def get_cache_dir() -> Path:
     if env_cache:
         return Path(env_cache)
     return Path(user_cache_dir(appname="just-dna-pipelines"))
-
-
-def get_longevitymap_sqlite_path() -> Path:
-    """Get the default cache path for the LongevityMap SQLite weights."""
-    return get_cache_dir() / "longevitymap" / "longevitymap.sqlite"
-
-
-def download_longevitymap_sqlite(
-    source_url: str = LONGEVITYMAP_SQLITE_RAW_URL,
-    force_download: bool = False,
-    logger=None,
-) -> tuple[Path, bool]:
-    """
-    Download the LongevityMap SQLite weights database.
-
-    Returns:
-        (sqlite_path, downloaded) where downloaded is True if a new download happened.
-    """
-    sqlite_path = get_longevitymap_sqlite_path()
-    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if sqlite_path.exists() and not force_download:
-        if logger:
-            logger.info(f"Using cached LongevityMap SQLite at {sqlite_path}")
-        return sqlite_path, False
-
-    if logger:
-        logger.info(f"Downloading LongevityMap SQLite from {source_url} to {sqlite_path}")
-
-    with urllib.request.urlopen(source_url) as response:
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            dir=sqlite_path.parent,
-            suffix=".sqlite",
-        ) as tmp_file:
-            shutil.copyfileobj(response, tmp_file)
-            tmp_path = Path(tmp_file.name)
-
-    tmp_path.replace(sqlite_path)
-    return sqlite_path, True
 
 
 def get_user_output_dir() -> Path:

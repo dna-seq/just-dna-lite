@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-modules = "just_dna_pipelines.oakvar.modules:app"
+pipelines = "just_dna_pipelines.cli:main"
 
 [build-system]
 requires = ["uv-build"]

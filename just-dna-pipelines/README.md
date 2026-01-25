@@ -21,9 +21,8 @@ uv sync
 
 ## CLI Usage
 
-This workspace exposes two CLI entry points related to this package:
+This workspace exposes a CLI entry point related to this package:
 
-- `uv run modules`: manage OakVar modules
 - `uv run dagster-ui`: start Dagster for annotation and asset tracking
 
 ## VCF Annotation (via Dagster)

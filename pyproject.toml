@@ -24,7 +24,7 @@ dev = [
 start = "just_dna_lite.cli:start_all"
 ui = "just_dna_lite.cli:start_ui"
 dagster-ui = "just_dna_lite.cli:start_dagster"
-just-dna-lite = "just_dna_lite.cli:app"
+pipelines = "just_dna_lite.cli:app"
 
 [tool.uv.workspace]
 members = ["just-dna-pipelines", "webui"]

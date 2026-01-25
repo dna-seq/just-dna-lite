@@ -34,6 +34,6 @@ jobs:
 
       - name: Check CLI
         run: |
-          uv run just-dna-lite --help
+          uv run pipelines --help
           uv run modules --help
 

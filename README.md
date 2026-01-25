@@ -43,12 +43,12 @@ You can also run components separately:
 
 - Dagster UI: `uv run dagster-ui`
 - Web UI: `uv run ui`
-- CLI: `uv run just-dna-lite --help`
+- CLI: `uv run pipelines --help`
 
 If you add files under `data/input/users/`, you can register them as Dagster partitions:
 
 ```bash
-uv run just-dna-lite sync-vcf-partitions
+uv run pipelines sync-vcf-partitions
 ```
 
 ## Features
@@ -98,9 +98,14 @@ uv run pytest just-dna-pipelines/tests/
 
 - [Clean setup](docs/CLEAN_SETUP.md)
 - [Dagster guide](docs/DAGSTER_GUIDE.md)
-- [Performance notes](docs/PERFORMANCE.md)
-- [Hugging Face datasets](docs/UPLOAD_HF.md)
+- [Performance & Engines](docs/DAGSTER_GUIDE.md#performance--engine-optimization)
+- [Hugging Face Integration](docs/DAGSTER_GUIDE.md#hugging-face-integration--authentication)
+- [Hugging Face Modules](docs/HF_MODULES.md)
 - [Agent Guidelines](AGENTS.md)
+
+## Connected Repositories
+
+- [dna-seq/prepare-annotations](https://github.com/dna-seq/prepare-annotations): Upstream repository used to download, process, and upload the Ensembl and module annotations used by this project.
 
 ## License
 

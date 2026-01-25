@@ -6,19 +6,22 @@ to discover all assets, jobs, and resources.
 """
 
 from pathlib import Path
-from dagster import Definitions
+from dagster import Definitions, define_asset_job, AssetSelection
 
 from just_dna_pipelines.annotation.assets import (
     ensembl_hf_dataset,
     ensembl_annotations,
-    longevitymap_sqlite_source,
-    longevitymap_sqlite,
     user_vcf_source,
     user_annotated_vcf,
 )
 from just_dna_pipelines.annotation.duckdb_assets import (
     ensembl_duckdb,
     user_annotated_vcf_duckdb,
+)
+from just_dna_pipelines.annotation.hf_assets import (
+    hf_annotators_dataset,
+    user_hf_module_annotations,
+    hf_module_source_assets,
 )
 from just_dna_pipelines.annotation.jobs import (
     annotate_vcf_job, 
@@ -34,15 +37,22 @@ from just_dna_pipelines.annotation.io_managers import (
 from just_dna_pipelines.annotation.registry import load_module_definitions
 
 
+# Job for HF module annotation
+annotate_with_hf_modules_job = define_asset_job(
+    name="annotate_with_hf_modules_job",
+    selection=AssetSelection.assets(user_hf_module_annotations),
+    description="Annotate user VCF with HuggingFace modules (longevitymap, lipidmetabolism, vo2max, etc.)",
+    tags={"annotation": "hf_modules", "multi-user": "true"},
+)
+
+
 def _build_definitions() -> Definitions:
     """Build the combined definitions from core + discovered modules."""
-    # 1. Core definitions (Polars-based)
+    # 1. Core definitions (Ensembl-based, Polars)
     _core = Definitions(
         assets=[
             ensembl_hf_dataset,
             ensembl_annotations,
-            longevitymap_sqlite_source,
-            longevitymap_sqlite,
             user_vcf_source,
             user_annotated_vcf,
         ],
@@ -61,15 +71,26 @@ def _build_definitions() -> Definitions:
         jobs=[build_ensembl_duckdb_job],
     )
     
-    # 3. Discover and merge module definitions
+    # 3. HuggingFace module annotation assets (self-contained, no Ensembl needed)
+    _hf_modules = Definitions(
+        assets=[
+            hf_annotators_dataset,
+            user_hf_module_annotations,
+            *hf_module_source_assets,
+        ],
+        jobs=[annotate_with_hf_modules_job],
+    )
+    
+    # 4. Discover and merge module definitions from data/modules/
     modules_dir = Path("data") / "modules"
     module_defs_list = load_module_definitions(modules_dir)
     
-    # 4. Merge everything
+    # 5. Merge everything
+    all_defs = [_core, _duckdb, _hf_modules]
     if module_defs_list:
-        return Definitions.merge(_core, _duckdb, *module_defs_list)
-    else:
-        return Definitions.merge(_core, _duckdb)
+        all_defs.extend(module_defs_list)
+    
+    return Definitions.merge(*all_defs)
 
 
 # Single Definitions object at module scope (required by Dagster)

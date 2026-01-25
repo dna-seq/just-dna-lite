@@ -151,6 +151,6 @@ chmod 755 data/interim/dagster
 ## Related Documentation
 
 - [Dagster Comprehensive Guide](DAGSTER_GUIDE.md)
-- [Performance & Resource Tracking](PERFORMANCE.md)
+- [Hugging Face Modules](HF_MODULES.md)
 - [Main README](../README.md)
 

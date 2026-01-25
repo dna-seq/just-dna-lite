@@ -8,6 +8,7 @@ import psutil
 from dagster import Config
 
 from just_dna_pipelines.models import SampleInfo
+from just_dna_pipelines.annotation.hf_modules import AnnotatorModule
 
 
 def get_default_duckdb_memory_limit() -> str:
@@ -56,11 +57,6 @@ class EnsemblAnnotationsConfig(Config):
     allow_patterns: Optional[list[str]] = None
 
 
-class LongevityMapSqliteConfig(Config):
-    """Configuration for the LongevityMap SQLite weights download."""
-    force_download: bool = False
-
-
 class DuckDBConfig(Config):
     """
     Configuration for DuckDB memory and performance settings.
@@ -100,6 +96,40 @@ class AnnotationConfig(Config, SampleInfo):
     output_path: Optional[str] = None
     compression: str = "zstd"
     info_fields: Optional[list[str]] = None
+    with_formats: Optional[bool] = None  # Whether to extract FORMAT fields. If None, auto-detected in read_vcf_file.
+    format_fields: Optional[list[str]] = None  # Specific FORMAT fields to extract
     duckdb_config: Optional[DuckDBConfig] = None  # Optional DuckDB tuning
+
+
+class HfModuleAnnotationConfig(Config, SampleInfo):
+    """
+    Configuration for annotating VCF with HuggingFace modules.
+    
+    The HF modules (just-dna-seq/annotators) are self-contained and include
+    all annotation data. No Ensembl join is required.
+    
+    VCF must have FORMAT fields (GT) to compute genotype for joining with
+    the weights table. The genotype is computed as List[String] sorted alphabetically.
+    """
+    vcf_path: str
+    user_name: Optional[str] = None
+    
+    # Module selection - list of module names (all by default)
+    # Valid values: longevitymap, lipidmetabolism, vo2max, superhuman, coronary, drugs
+    modules: Optional[list[str]] = None  # None means all modules
+    
+    # Output settings
+    output_dir: Optional[str] = None  # If None, uses data/output/users/{user_name}/modules/
+    compression: str = "zstd"
+    
+    # VCF parsing options
+    info_fields: Optional[list[str]] = None
+    format_fields: Optional[list[str]] = None  # Default: ["GT", "GQ", "DP", "AD", "VAF", "PL"]
+    
+    def get_modules(self) -> list[AnnotatorModule]:
+        """Get list of modules to annotate with."""
+        if self.modules is None:
+            return AnnotatorModule.all_modules()
+        return [AnnotatorModule.from_string(m) for m in self.modules]
 
 

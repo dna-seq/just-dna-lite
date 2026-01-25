@@ -61,8 +61,13 @@ def annotate_vcf_with_ensembl(
     
     with resource_tracker("Annotate VCF with Ensembl") as tracker:
         # Load VCF
-        logger.info(f"Loading VCF from {vcf_path}...")
-        input_dataframe = read_vcf_file(vcf_path, info_fields=config.info_fields)
+        logger.info(f"Loading VCF from {vcf_path} (with_formats={config.with_formats})...")
+        input_dataframe = read_vcf_file(
+            vcf_path, 
+            info_fields=config.info_fields,
+            with_formats=config.with_formats,
+            format_fields=config.format_fields
+        )
         
         # Default join columns
         join_columns = config.join_columns or ["chrom", "start", "ref", "alt"]
@@ -219,8 +224,13 @@ def annotate_vcf_with_duckdb(
     
     with resource_tracker("Annotate VCF with DuckDB") as tracker:
         # Load VCF as LazyFrame (not collected!)
-        logger.info(f"Loading VCF from {vcf_path}...")
-        input_lf = read_vcf_file(vcf_path, info_fields=config.info_fields)
+        logger.info(f"Loading VCF from {vcf_path} (with_formats={config.with_formats})...")
+        input_lf = read_vcf_file(
+            vcf_path, 
+            info_fields=config.info_fields,
+            with_formats=config.with_formats,
+            format_fields=config.format_fields
+        )
         
         # Join columns
         join_columns = config.join_columns or ["chrom", "start", "ref", "alt"]

@@ -12,8 +12,8 @@ import typer
 
 
 app = typer.Typer(
-    name="just-dna-lite",
-    help="Just DNA Lite - Genomic analysis stack",
+    name="pipelines",
+    help="Pipelines - Genomic analysis stack",
     no_args_is_help=True,
     add_completion=False
 )
@@ -366,7 +366,7 @@ def list_vcf_partitions_cmd() -> None:
     
     if not partitions:
         print("📭 No VCF partitions found.")
-        print("\nRun 'uv run just-dna-lite sync-vcf-partitions' to discover and add VCF files.")
+        print("\nRun 'uv run pipelines sync-vcf-partitions' to discover and add VCF files.")
     else:
         print(f"📋 Found {len(partitions)} VCF partition(s):\n")
         for p in sorted(partitions):

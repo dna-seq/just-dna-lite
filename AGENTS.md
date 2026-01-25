@@ -45,7 +45,7 @@ The recommended way to start the application is from the repo root:
 
 ## Dagster Pipeline
 
-For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)** and **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)**.
+For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)**.
 
 ### Project-Specific Patterns
 

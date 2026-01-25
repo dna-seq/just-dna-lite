@@ -46,34 +46,103 @@ For multi-user support, we use **Dynamic Partitions**. Each partition key (e.g.,
 
 ---
 
-## Annotation pipeline in this repo
+## Annotation Pipelines
 
-Our annotation logic (`just-dna-pipelines/src/just_dna_pipelines/annotation/`) uses these concepts to provide a robust, multi-user system.
+Our annotation logic (`just-dna-pipelines/src/just_dna_pipelines/annotation/`) provides two annotation systems:
 
-### The Asset Graph
-1. `ensembl_hf_dataset`: external asset representing the Hugging Face dataset.
-2. `ensembl_annotations`: local cache materialized from the external source.
-3. `user_vcf_source`: partitioned source asset for input VCFs.
-4. `user_annotated_vcf`: join of reference + input into an annotated Parquet.
+### 1. Ensembl Annotations (Legacy)
+
+Position-based annotation using Ensembl variation database.
+
+**Asset Graph:**
+1. `ensembl_hf_dataset`: External HuggingFace dataset source
+2. `ensembl_annotations`: Local cache from HuggingFace
+3. `user_vcf_source`: Partitioned source for input VCFs
+4. `user_annotated_vcf`: Annotated output (Polars-based)
+5. `user_annotated_vcf_duckdb`: Alternative DuckDB-based annotation
+
+### 2. HuggingFace Module Annotations (Recommended)
+
+Self-contained annotation modules from [just-dna-seq/annotators](https://huggingface.co/datasets/just-dna-seq/annotators).
+
+**Available Modules:**
+- `longevitymap`: Longevity-associated variants
+- `lipidmetabolism`: Lipid metabolism and cardiovascular risk
+- `vo2max`: Athletic performance variants
+- `superhuman`: Elite performance variants
+- `coronary`: Coronary artery disease associations
+
+**Asset Graph:**
+1. `hf_annotators_dataset`: External HuggingFace modules source
+2. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
+
+**Key Features:**
+- No Ensembl join required (modules are self-contained)
+- Position-based joining (works with VCFs without rsids)
+- Genotype-aware scoring (matches on sorted allele lists)
+- Memory-efficient streaming with lazy Polars
+
+See [HF_MODULES.md](HF_MODULES.md) for detailed documentation.
 
 ### Why both assets and jobs?
-You’ll see `assets.py` plus `ops.py` / `jobs.py`:
+
+You'll see `assets.py` plus `ops.py` / `jobs.py`:
 
 - `assets.py`: the main, declarative pipeline (best for tracking and automation).
 - `ops.py` / `jobs.py`: job-style entry points used by the UI for ad-hoc runs with parameters that don't always fit the asset-partition model.
 
 ---
 
-## Performance: Polars vs DuckDB
+## Performance & Engine Optimization
 
-We provide two engines for annotation. This is a great example of Dagster's flexibility:
+We provide two distinct engines for the annotation join, selectable via configuration.
 
 | Engine | Implementation | Best For |
-|--------|----------------|----------|
-| Polars | `user_annotated_vcf` | Fast when the join fits in RAM. |
-| DuckDB | `user_annotated_vcf_duckdb` | Low-memory / large joins; streams from disk. |
+| :--- | :--- | :--- |
+| **Polars (Default)** | `user_annotated_vcf` | Fast when the join fits in RAM. |
+| **DuckDB (Streaming)** | `user_annotated_vcf_duckdb` | Low-memory / large joins; streams from disk. |
 
-DuckDB uses VIEWs over Parquet and writes the join result directly to Parquet, so it doesn't need to hold the join output in a Python object.
+### Polars
+*   **Logic**: `annotate_vcf_with_ensembl`
+*   **Implementation**: Polars LazyFrames + streaming Parquet writes.
+*   **Trade-off**: Fastest when the join fits in RAM; may OOM on join explosion or in low-RAM environments.
+
+### DuckDB
+*   **Logic**: `annotate_vcf_with_duckdb`
+*   **Implementation**: DuckDB views over Parquet + `COPY ... TO ... (FORMAT PARQUET)` for streaming.
+*   **Trade-off**: Low memory usage; slightly slower for small/medium files.
+
+#### DuckDB Memory Optimizations
+The DuckDB engine is tuned for out-of-core processing:
+1.  **Views instead of tables**: We create views that reference Parquet files directly without copying data into DuckDB.
+2.  **Auto-config**: Detects system RAM and CPU count to set DuckDB's `memory_limit` and `threads` (defaults to 75% of system resources).
+3.  **Direct streaming**: The join result streams from `Input Parquet -> DuckDB Join -> Output Parquet` without being collected in Python.
+
+---
+
+## Hugging Face Integration & Authentication
+
+The pipeline pulls reference data (like Ensembl shards) from Hugging Face Hub. This data is prepared and maintained using the [dna-seq/prepare-annotations](https://github.com/dna-seq/prepare-annotations) upstream repository.
+
+### Authentication
+If the dataset is private or you encounter rate limits, set your Hugging Face token:
+```bash
+export HF_TOKEN="your_token_here"
+```
+
+### Resource Caching
+The `ensembl_annotations` asset downloads reference shards into a local cache.
+*   **Default Location**: Your OS user cache for `just-dna-pipelines`.
+*   **Override**: Set `JUST_DNA_PIPELINES_CACHE_DIR`.
+
+---
+
+## Monitoring & Metrics
+
+Each run in our Dagster setup automatically tracks:
+*   **Resource Usage**: CPU% and peak RAM via `resource_tracker`.
+*   **File Metadata**: Output size, row count, and column schema.
+*   **Lineage**: Which reference cache was used for a given user output.
 
 ---
 
@@ -82,37 +151,51 @@ DuckDB uses VIEWs over Parquet and writes the join result directly to Parquet, s
 ### Adding a new data module
 Modules are discovered via the registry in `registry.py`. A module typically provides a Dagster `Definitions` object.
 
-### Monitoring & Metrics
-Each run in our Dagster setup automatically tracks:
-* CPU% and peak RAM (via `resource_tracker`)
-* file metadata (output size, row count)
-* lineage (which reference cache was used for a given user output)
+---
 
 ## Commands
 
-* Start everything: `uv run start`
-* Start Dagster UI: `uv run dagster-ui`
-* Materialize an asset (CLI):
+*   Start everything: `uv run start`
+*   Start Dagster UI: `uv run dagster-ui`
+*   Materialize an asset (CLI):
     ```bash
     uv run dg asset materialize --select ensembl_annotations
     ```
-* Add partitions (CLI):
+*   Add partitions (CLI):
     ```bash
     uv run dg instance add-dynamic-partitions user_vcf_files "user1/sample1"
     ```
+*   **Annotate with HF modules (CLI):**
+    ```bash
+    # Local VCF
+    uv run pipelines annotate-modules --vcf /path/to/sample.vcf --user myuser
+
+    # From HuggingFace
+    uv run pipelines annotate-modules \
+        --hf-source antonkulaga/personal-health/genetics/antonkulaga.vcf \
+        --user antonkulaga
+
+    # Specific modules only
+    uv run pipelines annotate-modules --vcf /path/to/vcf --user myuser --modules longevitymap,coronary
+    ```
+*   **List available modules:**
+    ```bash
+    uv run pipelines list-modules
+    ```
+
+---
 
 ## Environment variables
 
-* `DAGSTER_HOME`: Dagster instance storage (default: `data/interim/dagster/`).
-* `JUST_DNA_PIPELINES_CACHE_DIR`: base directory for reference caches.
-* `JUST_DNA_PIPELINES_OUTPUT_DIR`: base directory for user outputs.
-* `JUST_DNA_PIPELINES_INPUT_DIR`: base directory for user inputs.
-* `HF_TOKEN`: Hugging Face token (needed for private datasets).
+*   `DAGSTER_HOME`: Dagster instance storage (default: `data/interim/dagster/`).
+*   `JUST_DNA_PIPELINES_CACHE_DIR`: base directory for reference caches.
+*   `JUST_DNA_PIPELINES_OUTPUT_DIR`: base directory for user outputs.
+*   `JUST_DNA_PIPELINES_INPUT_DIR`: base directory for user inputs.
+*   `HF_TOKEN`: Hugging Face token (needed for private datasets).
 
 ---
 
 For more details:
-
-* `docs/PERFORMANCE.md`
-* `docs/CLEAN_SETUP.md`
-
+*   `docs/CLEAN_SETUP.md`
+*   `docs/HF_MODULES.md`
+*   `docs/DESIGN.md`
