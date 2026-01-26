@@ -35,11 +35,13 @@ The recommended way to start the application is from the repo root:
 - **Typer CLI**: Mandatory for all CLI tools.
 - **Pydantic 2**: Mandatory for data classes.
 - **Eliot**: Used for structured logging and action tracking.
+- **Pay attention to terminal warnings**: Always check terminal output for warnings, especially deprecation ones. AI knowledge of APIs can be outdated; these warnings are critical hints to update code to the current version.
 - **No placeholders**: Never use `/my/custom/path/` in code.
 - **No legacy support**: Refactor aggressively; do not keep old API functions.
 - **Dependency Management**: Use `uv sync` and `uv add`. NEVER use `uv pip install`.
 - **Versions**: Do not hardcode versions in `__init__.py`; use `project.toml`.
 - **Avoid __all__**: Avoid `__init__.py` with `__all__` as it confuses where things are located.
+- **Self-Correction**: If you make an API mistake that leads to a system error (e.g. a crash or a major logic failure due to outdated knowledge), you MUST update this file (`AGENTS.md`) with the correct API usage or pattern. This ensures future agents don't repeat the same mistake.
 
 ---
 
@@ -86,12 +88,80 @@ For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUID
 - **Same DAGSTER_HOME** for UI and execution: `dagster dev -m module.definitions`
 - **All assets in `Definitions(assets=[...])`** for lineage visibility in UI
 
+### API Gotchas
+
+**Timestamps are on `RunRecord`, not `DagsterRun`:**
+
+```python
+# WRONG - DagsterRun has no start_time/end_time
+runs = instance.get_runs(limit=10)
+for run in runs:
+    print(run.start_time)  # AttributeError!
+
+# CORRECT - Use get_run_records() to access timestamps
+records = instance.get_run_records(limit=10)
+for record in records:
+    run = record.dagster_run
+    # record.start_time and record.end_time are Unix timestamps (floats)
+    # record.create_timestamp is a datetime object
+    started = datetime.fromtimestamp(record.start_time) if record.start_time else None
+```
+
+**Partition keys via tags, not direct parameter:**
+
+```python
+# WRONG - create_run_for_job doesn't accept partition_key
+run = instance.create_run_for_job(job_def=job, partition_key=pk)
+
+# CORRECT - pass partition via tags
+run = instance.create_run_for_job(
+    job_def=job,
+    run_config=config,
+    tags={"dagster/partition": pk},
+)
+```
+
+**Submit run without workspace_snapshot:**
+
+```python
+# WRONG - workspace_snapshot parameter was removed
+instance.submit_run(run.run_id, workspace_snapshot=None)
+
+# CORRECT - just pass run_id
+instance.submit_run(run.run_id)
+```
+
+**Asset job config uses "ops" key, not "assets":**
+
+```python
+# WRONG - "assets" key causes DagsterInvalidConfigError
+run_config = {
+    "assets": {"user_hf_module_annotations": {"config": {...}}}
+}
+
+# CORRECT - use "ops" key for asset job config
+run_config = {
+    "ops": {"user_hf_module_annotations": {"config": {...}}}
+}
+```
+
+**Run logs via `all_logs`, not `EventRecordsFilter`:**
+
+```python
+# WRONG - EventRecordsFilter doesn't have run_ids
+records = instance.get_event_records(EventRecordsFilter(run_ids=[run_id]))
+
+# CORRECT - use all_logs(run_id)
+events = instance.all_logs(run_id)
+```
+
 ### Anti-Patterns
 
 - `dagster job execute` CLI (deprecated)
 - Hardcoded asset names; use `defs.get_all_asset_specs()`
 - Config for unselected assets (validation errors)
 - Suspended jobs holding DuckDB file locks
+- **Accessing `run.start_time` on DagsterRun** - use RunRecord instead
 
 ---
 
@@ -171,12 +241,145 @@ assert valid_states == {"active", "inactive", "pending"}  # from API spec
 
 ---
 
+## Reflex UI Framework
+
+The webui uses **Reflex** (Python-based React framework). See **[docs/DESIGN.md](docs/DESIGN.md)** for visual design.
+
+- **Check terminal for frontend errors**: Reflex often displays frontend/compilation errors and warnings directly in the terminal where `uv run start` or `reflex run` is running. Always monitor the terminal for these issues when working on the UI.
+
+### Critical Reflex Patterns
+
+**1. Icons require STATIC strings:**
+
+```python
+# CRASHES - rx.icon() cannot accept rx.Var
+rx.icon(module["icon_name"], size=24)
+
+# WORKS - use rx.match for dynamic icons
+rx.match(
+    module["name"],
+    ("heart", rx.icon("heart", size=24)),
+    ("star", rx.icon("star", size=24)),
+    rx.icon("database", size=24),  # default
+)
+```
+
+**2. Icon naming - use HYPHENATED Lucide names:**
+
+| Wrong | Correct |
+| :--- | :--- |
+| `check-circle` | `circle-check` |
+| `check_circle` | `circle-check` |
+| `upload_cloud` | `cloud-upload` |
+| `alert-circle` | `circle-alert` |
+| `play-circle` | `circle-play` |
+
+Verified icons: `circle-check`, `circle-x`, `circle-alert`, `circle-play`, `cloud-upload`, `upload`, `download`, `file-text`, `files`, `dna`, `heart`, `heart-pulse`, `activity`, `zap`, `droplets`, `pill`, `loader-circle`, `refresh-cw`, `external-link`, `terminal`, `database`, `boxes`, `inbox`, `history`, `chart-bar`, `play`.
+
+**3. Use `rx.cond()` for reactive styling:**
+
+```python
+# GOOD - reactive
+class_name=rx.cond(is_active, "ui primary button", "ui button")
+
+# BAD - not reactive, evaluated once at compile time
+class_name="ui primary button" if is_active else "ui button"
+```
+
+**4. rx.foreach with dictionaries:**
+
+Values from dicts in `rx.foreach` are typed as `Any`. This can cause type errors in components that expect specific types (e.g. `rx.checkbox` expecting `bool`). Cast when needed using `.to()`:
+
+```python
+# Cast to int for text/formatting
+rx.text(item["count"].to(int))
+
+# Cast to bool for control props
+rx.checkbox(checked=item["is_checked"].to(bool))
+```
+
+**5. Use `class_name` not `class`:**
+
+Reflex uses `class_name` for CSS classes. Using `class` will cause a Python `SyntaxError` as it is a reserved keyword.
+
+```python
+# GOOD
+rx.box(class_name="ui segment")
+
+# BAD - SyntaxError
+rx.box(class="ui segment")
+```
+
+### Reflex Anti-Patterns
+
+- **Dynamic icon names** - Will crash with "Icon name must be a string"
+- **Underscore icon names** - Use hyphens: `heart-pulse` not `heart_pulse`
+- **Wrong icon order** - It's `circle-check` not `check-circle`
+- **Python conditionals for state** - Use `rx.cond()` instead
+- **Missing `.to()` casts in foreach** - Can cause type errors
+
+### Fomantic UI + Reflex Gotchas
+
+**1. Fomantic UI Grid does NOT work reliably in Reflex:**
+
+```python
+# UNRELIABLE - columns may stack vertically instead of side-by-side
+rx.el.div(
+    rx.el.div(..., class_name="five wide column"),
+    rx.el.div(..., class_name="six wide column"),
+    class_name="ui grid",
+)
+
+# GOOD - use CSS flexbox for multi-column layouts
+rx.el.div(
+    rx.el.div(left, style={"flex": "0 0 30%"}),
+    rx.el.div(center, style={"flex": "0 0 40%"}),
+    rx.el.div(right, style={"flex": "1 1 30%"}),
+    style={"display": "flex", "flexDirection": "row"},
+)
+```
+
+**2. Fomantic UI Menu may not render horizontally:**
+
+Use flexbox for reliable horizontal menus instead of `ui fixed menu`.
+
+**3. Fomantic UI Checkbox requires specific HTML structure:**
+
+```python
+# BAD - rx.checkbox() doesn't use Fomantic styling
+rx.checkbox(checked=is_checked)
+
+# GOOD - proper Fomantic checkbox structure
+rx.el.div(
+    rx.el.input(type="checkbox", checked=is_checked, read_only=True),
+    rx.el.label("Label"),
+    on_click=handler,
+    class_name=rx.cond(is_checked, "ui checked checkbox", "ui checkbox"),
+)
+```
+
+**4. What DOES work from Fomantic UI in Reflex:**
+- `ui segment`, `ui raised segment` - work well
+- `ui button`, `ui primary button` - work well
+- `ui label`, `ui mini label`, `ui green label` - work well
+- `ui divider` - works well
+- `ui message` - works well
+
+**5. What does NOT work reliably:**
+- `ui grid` with column widths - use flexbox instead
+- `ui fixed menu` - use flexbox instead
+- `ui accordion` - may need JS initialization
+- Native `rx.checkbox()` styling - use Fomantic structure instead
+
+---
+
 ## Design System
 
 For UI/frontend changes, see **[docs/DESIGN.md](docs/DESIGN.md)**.
 
 Key principles:
 - **"Chunky & Tactile"** aesthetic with high affordance
-- **DaisyUI + Tailwind** component classes
-- **Oversized icons** (min 2rem), **large buttons** (`btn-lg`), **generous spacing** (`gap-8`)
-- **Semantic colors**: `bg-success` (benign), `bg-error` (pathogenic), `bg-info` (VUS)
+- **Fomantic UI** component classes (segments, buttons, labels work best)
+- **CSS Flexbox** for layouts (not Fomantic grid)
+- **Oversized icons** (min 2rem), **large buttons**, **generous spacing**
+- **Semantic colors**: `success` (benign), `error` (pathogenic), `info` (VUS)

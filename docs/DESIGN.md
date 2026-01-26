@@ -1,6 +1,6 @@
-# Design System: Fomantic-Legacy with DaisyUI and Reflex
+# Design System: Fomantic-UI and Reflex
 
-This document defines the visual design language for **just-dna-lite** UI components.
+This document defines the visual design language for **just-dna-lite** UI components using **Fomantic UI**.
 
 ## Core Aesthetic
 
@@ -8,71 +8,243 @@ This document defines the visual design language for **just-dna-lite** UI compon
 
 ## 1. Component Styling
 
-- **Buttons:** `btn-lg`, `rounded-md`, `font-bold`. Solid backgrounds only (no ghost buttons).
-- **Segments:** `card card-bordered bg-base-100 p-8 rounded-md shadow-sm border-base-300`.
-- **Inputs:** `input-bordered`, `input-lg`. High contrast borders.
-- **Icons:** Oversized (min 2rem / `w-8 h-8`). Pair with every major label.
+- **Buttons:** `ui primary button`, `ui massive button`. Solid backgrounds only.
+- **Segments:** `ui segment`, `ui raised segment`, `ui piled segment`.
+- **Inputs:** `ui input`, `ui fluid input`.
+- **Icons:** Oversized (min 2rem). Pair with every major label.
 - **Icon Naming:** Always use **hyphenated** Lucide names (e.g., `cloud-upload`, not `upload_cloud`). Reflex translates these to the underlying library.
     - Verified icons: `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`.
 
 ## 2. Layout & Spacing
 
-- **Spacing:** Liberal use of `gap-8` and `<div class="divider"></div>`.
-- **Typography:** Base `text-lg`, headers `text-3xl` or larger.
+- **Spacing:** Liberal use of `ui segments` and `ui divider`.
+- **Typography:** Large font sizes. Headers should use `ui header`.
+
+### Grid Layout (IMPORTANT)
+
+Fomantic UI's grid system uses a **16-column** layout. However, **in Reflex, Fomantic grids often don't work reliably** and columns may stack vertically instead of horizontally.
+
+**Recommended: Use CSS Flexbox instead of Fomantic grid for multi-column layouts:**
+
+```python
+# GOOD - Flexbox for reliable horizontal columns
+rx.el.div(
+    rx.el.div(left_content, style={"flex": "0 0 30%"}),
+    rx.el.div(center_content, style={"flex": "0 0 40%"}),
+    rx.el.div(right_content, style={"flex": "1 1 30%"}),
+    style={"display": "flex", "flexDirection": "row", "gap": "10px"},
+)
+
+# UNRELIABLE - Fomantic grid may not work in Reflex
+rx.el.div(
+    rx.el.div(..., class_name="five wide column"),
+    rx.el.div(..., class_name="six wide column"),
+    class_name="ui grid",
+)
+```
+
+**For scrollable columns:**
+
+```python
+column_style = {
+    "height": "calc(100vh - 140px)",
+    "overflowY": "auto",
+    "overflowX": "hidden",
+}
+```
+
+### Menu/Navigation
+
+**Use flexbox for horizontal menus**, not `ui fixed menu`:
+
+```python
+# GOOD - Flexbox menu
+rx.el.div(
+    rx.el.div(..., style={"display": "flex", "alignItems": "center"}),  # left items
+    rx.el.div(..., style={"marginLeft": "auto"}),  # right items
+    style={
+        "display": "flex",
+        "justifyContent": "space-between",
+        "position": "fixed",
+        "top": "0",
+        "left": "0",
+        "right": "0",
+        "height": "50px",
+        "backgroundColor": "#fff",
+        "zIndex": "1000",
+    },
+)
+```
 
 ## 3. Color & Feedback
 
-- **Semantic Colors:**
-  - `bg-success` - Safe/Benign variants
-  - `bg-error` - Pathogenic variants
-  - `bg-info` - VUS (Variant of Uncertain Significance) / Info
+- **Semantic Colors (Fomantic Classes):**
+  - `success` / `positive` / `green` - Safe/Benign variants
+  - `error` / `negative` / `red` - Pathogenic variants
+  - `info` / `blue` - VUS (Variant of Uncertain Significance) / Info
 
 - **Tactile Feedback:**
-  - `hover:shadow-lg` - Elevation on hover
-  - `active:scale-95` - Press-in effect
-  - `transition-all` - Smooth transitions
+  - Fomantic UI provides built-in hover and active states for most elements.
+  - For custom effects, use inline styles: `hover: shadow-lg`, `active: scale-95`.
 
-## 4. Component Mapping (Fomantic → DaisyUI)
+## 4. Component Mapping (Fomantic)
 
-| Fomantic | daisyUI / Tailwind |
+| Component Type | Fomantic Class |
 | :--- | :--- |
-| `ui segment` | `card card-bordered bg-base-100 p-8 rounded-md shadow-sm` |
-| `ui primary button` | `btn btn-primary btn-lg rounded-md font-black uppercase shadow-md` |
-| `ui message` | `alert shadow-sm border border-base-300` |
-| `ui divider` | `div class="divider font-bold uppercase text-base-content/30"` |
-| `ui label` | `badge badge-outline p-4 font-bold` |
+| Segment | `ui segment` |
+| Primary Button | `ui primary button` |
+| Message | `ui message` |
+| Divider | `ui divider` |
+| Label | `ui label` |
+| Checkbox | `ui checkbox` (requires specific structure) |
+| Checked Checkbox | `ui checked checkbox` |
+
+### Fomantic UI Checkbox (IMPORTANT)
+
+Fomantic UI checkboxes require **specific HTML structure** to work correctly. Do NOT use Reflex's `rx.checkbox()` if you want Fomantic styling.
+
+**Required structure:**
+```html
+<div class="ui checkbox">
+  <input type="checkbox">
+  <label>Label text</label>
+</div>
+```
+
+**In Reflex:**
+```python
+def fomantic_checkbox(checked: rx.Var[bool], on_click: rx.EventHandler) -> rx.Component:
+    """Fomantic UI styled checkbox."""
+    return rx.el.div(
+        rx.el.input(
+            type="checkbox",
+            checked=checked,
+            read_only=True,  # Controlled by parent click
+        ),
+        rx.el.label(),  # Can be empty or contain label text
+        on_click=on_click,
+        class_name=rx.cond(checked, "ui checked checkbox", "ui checkbox"),
+    )
+```
+
+**Checkbox variations:**
+- `ui checkbox` - Standard checkbox
+- `ui checked checkbox` - Checked state (add dynamically)
+- `ui toggle checkbox` - Toggle switch style
+- `ui slider checkbox` - Slider style
+- `ui radio checkbox` - Radio button
+- `ui disabled checkbox` - Disabled state
 
 ## 5. Example Components
 
 ### Primary Button
 
-```html
-<button class="btn btn-primary btn-lg rounded-md font-black uppercase shadow-md hover:shadow-lg active:scale-95 transition-all">
-  <lucide-icon name="circle-play" class="w-8 h-8" />
-  Run Analysis
-</button>
+```python
+rx.el.button(
+    rx.icon("circle-play", size=32),
+    " Run Analysis",
+    class_name="ui primary massive button"
+)
 ```
 
 ### Card/Segment
 
-```html
-<div class="card card-bordered bg-base-100 p-8 rounded-md shadow-sm">
-  <h2 class="text-3xl font-bold">Card Title</h2>
-  <div class="divider font-bold uppercase text-base-content/30">Section</div>
-  <p class="text-lg">Content goes here...</p>
-</div>
+```python
+rx.el.div(
+    rx.el.h2("Card Title", class_name="ui header"),
+    rx.el.div(class_name="ui divider"),
+    rx.el.p("Content goes here...", style={"fontSize": "1.2rem"}),
+    class_name="ui segment raised"
+)
 ```
 
 ### Alert/Message
 
-```html
-<div class="alert bg-success shadow-sm border border-base-300">
-  <lucide-icon name="circle-check" class="w-8 h-8" />
-  <span class="text-lg font-bold">Variant is benign</span>
-</div>
+```python
+rx.el.div(
+    rx.icon("circle-check", size=32),
+    rx.el.div(
+        rx.el.div("Variant is benign", class_name="header"),
+        class_name="content"
+    ),
+    class_name="ui positive message"
+)
 ```
 
-## 6. Anti-Patterns
+## 6. Reflex Component Patterns
+
+### Icon Usage (CRITICAL)
+
+**Icons require STATIC string names.** You cannot pass a dynamic `rx.Var` to `rx.icon()`.
+
+```python
+# BAD - will crash with "Icon name must be a string, got typing.Any"
+rx.foreach(
+    items,
+    lambda item: rx.icon(item["icon_name"], size=24)  # CRASHES
+)
+
+# GOOD - use rx.match for dynamic icons
+def get_icon(name: rx.Var[str]) -> rx.Component:
+    return rx.match(
+        name,
+        ("heart", rx.icon("heart", size=24)),
+        ("star", rx.icon("star", size=24)),
+        rx.icon("circle", size=24),  # default
+    )
+
+rx.foreach(items, lambda item: get_icon(item["icon_name"]))
+```
+
+### Verified Lucide Icon Names
+
+Always use **hyphenated** names. Common mistakes:
+
+| Wrong | Correct |
+| :--- | :--- |
+| `check-circle` | `circle-check` |
+| `check_circle` | `circle-check` |
+| `upload_cloud` | `cloud-upload` |
+| `alert-circle` | `circle-alert` |
+| `play-circle` | `circle-play` |
+
+**Verified working icons:**
+- `circle-check`, `circle-x`, `circle-alert`, `circle-play`
+- `cloud-upload`, `upload`, `download`, `file-text`, `files`
+- `dna`, `heart`, `heart-pulse`, `activity`, `zap`, `droplets`, `pill`
+- `loader-circle` (for spinners), `refresh-cw`
+- `external-link`, `terminal`, `database`, `boxes`
+- `inbox`, `history`, `chart-bar`, `play`
+
+Full list: https://reflex.dev/docs/library/data-display/icon/#icons-list
+
+### rx.foreach Limitations
+
+Inside `rx.foreach`, values from dictionaries are typed as `Any`. This breaks components that require specific types:
+
+```python
+# BAD - checkbox checked expects bool, gets Any
+rx.foreach(items, lambda item: rx.checkbox(checked=item["is_checked"]))
+
+# GOOD - explicitly handle the type or use rx.cond
+rx.foreach(items, lambda item: rx.checkbox(
+    checked=item["is_checked"].to(bool)
+))
+```
+
+### Conditional Styling
+
+Use `rx.cond()` for conditional classes, not Python ternary:
+
+```python
+# GOOD
+class_name=rx.cond(is_active, "ui primary button", "ui button")
+
+# BAD - won't react to state changes
+class_name="ui primary button" if is_active else "ui button"
+```
+
+## 7. Anti-Patterns
 
 Avoid these patterns:
 
@@ -81,4 +253,6 @@ Avoid these patterns:
 - Thin borders
 - Subtle/muted colors for important actions
 - Dense layouts with tight spacing
-
+- **Dynamic values in `rx.icon()` name parameter**
+- **Underscore or wrong-order icon names** (use hyphenated Lucide names)
+- **Python conditionals for reactive styling** (use `rx.cond`)

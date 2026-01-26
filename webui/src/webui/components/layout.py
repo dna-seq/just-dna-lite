@@ -2,151 +2,155 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.state import AuthState
-
-# DaisyUI inspired classes from AGENTS.md
-DAISY_CARD = "card card-bordered bg-base-100 p-8 rounded-xl shadow-md border-base-300"
-DAISY_BUTTON_PRIMARY = "btn btn-primary btn-lg rounded-xl font-black uppercase tracking-tight shadow-md"
-DAISY_INPUT = "input input-bordered input-lg rounded-xl"
-DAISY_ALERT = "alert shadow-md border border-base-300 rounded-xl"
-DAISY_BADGE = "badge badge-outline p-4 font-bold rounded-lg"
-
-
-def login_form() -> rx.Component:
-    return rx.form(
-        rx.hstack(
-            rx.input(
-                placeholder="Email",
-                name="email",
-                type="email",
-                class_name="input input-bordered input-md font-bold",
-                width="200px",
-            ),
-            rx.button(
-                "Sign in", 
-                type="submit", 
-                class_name="btn btn-primary btn-md font-black uppercase shadow-sm"
-            ),
-            spacing="3",
-            align="center",
-        ),
-        on_submit=AuthState.login,
-    )
-
-
-def nav_item(text: str, icon: str, href: str) -> rx.Component:
-    return rx.link(
-        rx.center(
-            rx.hstack(
-                rx.icon(icon, size=20, class_name="text-primary"),
-                rx.text(text, class_name="font-black uppercase tracking-widest text-xs"),
-                align="center",
-                spacing="2",
-            ),
-            class_name="h-full px-8 hover:bg-base-200 transition-all border-r border-base-300 active:bg-base-300 cursor-pointer",
-        ),
-        href=href,
-        underline="none",
-        class_name="text-base-content h-full block",
-    )
-
 
 def topbar() -> rx.Component:
-    return rx.box(
-        rx.flex(
-            # Brand section
-            rx.link(
-                rx.center(
-                    rx.hstack(
-                        rx.image(
-                            src="/just_dna_seq.jpg",
-                            height="2.5rem",
-                            width="auto",
-                            class_name="rounded-md shadow-sm",
-                        ),
-                        rx.heading(
-                            "just-dna-lite",
-                            size="7",
-                            weight="bold",
-                            class_name="text-primary tracking-tighter",
-                            style={"whiteSpace": "nowrap"},
-                        ),
-                        align="center",
-                        spacing="3",
-                    ),
-                    class_name="h-full px-8 border-r border-base-300 hover:bg-base-200 transition-all",
+    """Top navigation bar using flexbox for reliable horizontal layout."""
+    return rx.el.div(
+        # Left: Logo and Nav
+        rx.el.div(
+            # Logo
+            rx.el.a(
+                rx.el.img(
+                    src="/just_dna_seq.jpg",
+                    style={"height": "32px", "width": "auto", "marginRight": "12px"},
+                ),
+                rx.el.span(
+                    "just-dna-lite",
+                    style={"fontSize": "1.3rem", "fontWeight": "600", "color": "#333"},
                 ),
                 href="/",
-                underline="none",
-                class_name="h-full block",
+                style={"display": "flex", "alignItems": "center", "textDecoration": "none", "marginRight": "30px"},
             ),
-            
-            # Nav section
-            rx.hstack(
-                spacing="0",
-                align="stretch",
-                class_name="h-full",
+            # Nav Links
+            rx.el.a(
+                rx.icon("dna", size=18),
+                rx.el.span(" Annotate", style={"marginLeft": "6px"}),
+                href="/",
+                style={"display": "flex", "alignItems": "center", "padding": "10px 16px", "color": "#555", "textDecoration": "none", "borderRadius": "4px", "fontSize": "1rem"},
             ),
-            
-            rx.spacer(),
-            
-            # Auth section
-            rx.box(
-                rx.cond(
-                    AuthState.is_authenticated,
-                    rx.hstack(
-                        rx.center(
-                            rx.text(AuthState.user_email, weight="bold", class_name="text-sm px-6"),
-                            class_name="h-full border-l border-base-300",
-                        ),
-                        rx.button(
-                            rx.hstack(rx.icon("log-out", size=20), rx.text("Logout"), spacing="2"),
-                            class_name="btn btn-primary btn-lg h-full rounded-none border-l border-base-300 hover:bg-error transition-all font-black uppercase shadow-none border-y-0",
-                            on_click=AuthState.logout,
-                        ),
-                        spacing="0",
-                        align="stretch",
-                        class_name="h-full",
-                    ),
-                    rx.center(
-                        login_form(),
-                        class_name="h-full px-8 border-l border-base-300",
-                    ),
-                ),
-                class_name="h-full",
+            rx.el.a(
+                rx.icon("chart-bar", size=18),
+                rx.el.span(" Analysis", style={"marginLeft": "6px"}),
+                href="/analysis",
+                style={"display": "flex", "alignItems": "center", "padding": "10px 16px", "color": "#555", "textDecoration": "none", "borderRadius": "4px", "fontSize": "1rem"},
             ),
-            width="100%",
-            align="stretch",
-            justify="between",
-            class_name="h-full flex",
+            style={"display": "flex", "alignItems": "center"},
         ),
-        class_name="bg-base-100 border-b-4 border-primary sticky top-0 z-[100] shadow-md h-20",
-        width="100%",
+        # Right: External Links
+        rx.el.div(
+            rx.el.a(
+                rx.icon("external-link", size=16),
+                rx.el.span(" Dagster", style={"marginLeft": "6px"}),
+                href="http://localhost:3005",
+                target="_blank",
+                class_name="ui button",
+                style={"display": "flex", "alignItems": "center", "marginRight": "10px", "whiteSpace": "nowrap"},
+            ),
+            rx.el.a(
+                rx.icon("git-fork", size=16),
+                rx.el.span(" Fork on GitHub", style={"marginLeft": "6px"}),
+                href="https://github.com/dna-seq/just-dna-lite",
+                target="_blank",
+                class_name="ui button",
+                style={"display": "flex", "alignItems": "center", "whiteSpace": "nowrap"},
+            ),
+            style={"display": "flex", "alignItems": "center"},
+        ),
+        style={
+            "position": "fixed",
+            "top": "0",
+            "left": "0",
+            "right": "0",
+            "height": "56px",
+            "backgroundColor": "#ffffff",
+            "borderBottom": "1px solid #e0e0e0",
+            "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "padding": "0 24px",
+            "zIndex": "1000",
+        },
     )
 
 
 def template(*children: rx.Component) -> rx.Component:
-    return rx.box(
+    """Main page template with Fomantic UI styling."""
+    return rx.el.div(
         topbar(),
-        rx.box(
-            rx.scroll_area(
-                rx.box(
-                    *children,
-                    padding_y="16",
-                    padding_x="8",
-                    width="100%",
-                    max_width="6xl", # Increased from 4xl for better dashboard layout
-                    class_name="mx-auto",
-                ),
-                width="100%",
-                height="calc(100vh - 80px)", 
+        rx.el.div(
+            rx.el.div(
+                *children,
+                class_name="ui fluid container",
             ),
-            width="100%",
-            flex="1",
-            class_name="bg-base-200",
+            style={
+                "marginTop": "56px",
+                "padding": "20px",
+                "minHeight": "calc(100vh - 56px)",
+                "backgroundColor": "#f5f7fa",
+            },
         ),
-        width="100%",
-        min_height="100vh",
-        class_name="flex flex-col font-sans",
-        custom_attrs={"data-theme": "light"},
+        style={"fontFamily": "'Lato', 'Helvetica Neue', Arial, Helvetica, sans-serif"},
+    )
+
+
+def three_column_layout(
+    left: rx.Component,
+    center: rx.Component,
+    right: rx.Component,
+) -> rx.Component:
+    """
+    Three-column layout with independently scrollable columns.
+    
+    Uses flexbox for reliable horizontal layout with dividers between columns.
+    """
+    # 56px header + 20px padding top + 20px padding bottom + ~50px page header
+    column_height = "calc(100vh - 150px)"
+    
+    # Common column styles
+    column_base = {
+        "height": column_height,
+        "overflowY": "auto",
+        "overflowX": "hidden",
+        "padding": "16px",
+        "backgroundColor": "#ffffff",
+        "borderRadius": "4px",
+        "boxShadow": "0 1px 2px rgba(0,0,0,0.1)",
+    }
+    
+    # Divider style
+    divider_style = {
+        "width": "1px",
+        "backgroundColor": "#e0e0e0",
+        "margin": "0 10px",
+        "flexShrink": "0",
+    }
+    
+    return rx.el.div(
+        # Left Column (width: 30%)
+        rx.el.div(
+            left,
+            style={**column_base, "flex": "0 0 30%", "minWidth": "280px"},
+        ),
+        # Divider
+        rx.el.div(style=divider_style),
+        # Center Column (width: 40%)
+        rx.el.div(
+            center,
+            style={**column_base, "flex": "0 0 35%", "minWidth": "320px"},
+        ),
+        # Divider
+        rx.el.div(style=divider_style),
+        # Right Column (width: 30%)
+        rx.el.div(
+            right,
+            style={**column_base, "flex": "1 1 30%", "minWidth": "280px"},
+        ),
+        style={
+            "display": "flex",
+            "flexDirection": "row",
+            "gap": "0",
+            "width": "100%",
+            "alignItems": "stretch",
+        },
     )

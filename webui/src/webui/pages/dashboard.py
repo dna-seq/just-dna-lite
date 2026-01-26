@@ -2,29 +2,34 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import template, DAISY_CARD, DAISY_BUTTON_PRIMARY, DAISY_BADGE
+from webui.components.layout import template
 from webui.state import AuthState, UploadState
-from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES
 
 
 def upload_zone() -> rx.Component:
-    return rx.vstack(
+    """Upload zone for VCF files using Fomantic UI styling."""
+    return rx.el.div(
         rx.upload(
-            rx.vstack(
-                rx.icon("cloud-upload", size=80, class_name="text-primary mb-4"),
-                rx.button(
+            rx.el.div(
+                rx.icon("cloud-upload", size=80, style={"color": "#2185d0", "marginBottom": "20px"}),
+                rx.el.button(
                     "Select VCF Files",
-                    class_name="btn btn-primary btn-lg px-12",
+                    class_name="ui primary massive button",
                 ),
-                rx.text(
+                rx.el.p(
                     "Drag and drop VCF files here or click to select",
-                    class_name="text-xl text-base-content/60 font-bold mt-4",
+                    style={"fontSize": "1.5rem", "color": "#666", "fontWeight": "bold", "marginTop": "20px"},
                 ),
-                spacing="0",
-                align="center",
+                style={"textAlign": "center", "padding": "60px"},
             ),
             id="vcf_upload",
-            class_name="border-4 border-dashed border-base-300 rounded-3xl bg-base-100 hover:border-primary transition-all hover:bg-base-200 cursor-pointer w-full p-20",
+            style={
+                "border": "4px dashed #ccc",
+                "borderRadius": "1.5rem",
+                "backgroundColor": "#fff",
+                "cursor": "pointer",
+                "width": "100%",
+            },
             multiple=True,
             accept={
                 "application/vcf": [".vcf", ".vcf.gz"],
@@ -32,273 +37,233 @@ def upload_zone() -> rx.Component:
                 "application/gzip": [".vcf.gz"],
             },
         ),
-        rx.hstack(
+        rx.el.div(
             rx.foreach(
                 rx.selected_files("vcf_upload"),
-                lambda f: rx.badge(
+                lambda f: rx.el.div(
                     f, 
-                    class_name="badge badge-primary badge-lg p-6 font-bold rounded-xl"
+                    class_name="ui blue large label",
+                    style={"margin": "5px"},
                 ),
             ),
-            spacing="4",
-            flex_wrap="wrap",
-            width="100%",
+            style={"display": "flex", "flexWrap": "wrap", "marginTop": "20px"},
         ),
-        rx.button(
-            rx.hstack(
-                rx.icon("upload", size=32),
-                rx.text("Upload & Register"),
-                spacing="4",
-            ),
+        rx.el.button(
+            rx.icon("upload", size=32),
+            " Upload & Register",
             on_click=UploadState.handle_upload(rx.upload_files(upload_id="vcf_upload")),
             loading=UploadState.uploading,
-            class_name=DAISY_BUTTON_PRIMARY + " w-full h-24 text-2xl shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all",
+            class_name="ui primary massive button fluid",
+            style={"height": "6rem", "fontSize": "1.5rem", "marginTop": "20px"},
         ),
-        width="100%",
-        spacing="8",
-        align="stretch",
+        class_name="ui segment",
+        style={"width": "100%"},
     )
 
 
 def module_selector() -> rx.Component:
     """Component for selecting which HF modules to use for annotation."""
-    return rx.box(
-        rx.vstack(
-            rx.hstack(
-                rx.icon("boxes", size=32, class_name="text-info"),
-                rx.heading("Annotation Modules", size="5", class_name="font-bold"),
-                rx.spacer(),
-                rx.hstack(
-                    rx.button(
-                        "All",
-                        on_click=UploadState.select_all_modules,
-                        class_name="btn btn-xs btn-ghost",
-                    ),
-                    rx.button(
-                        "None",
-                        on_click=UploadState.deselect_all_modules,
-                        class_name="btn btn-xs btn-ghost",
-                    ),
-                    spacing="2",
+    return rx.el.div(
+        rx.el.div(
+            rx.el.h3(
+                rx.icon("boxes", size=24),
+                " Annotation Modules",
+                class_name="ui header",
+                style={"flex": "1"},
+            ),
+            rx.el.div(
+                rx.el.button(
+                    "All",
+                    on_click=UploadState.select_all_modules,
+                    class_name="ui mini button",
                 ),
-                spacing="3",
-                align="center",
-                width="100%",
-            ),
-            rx.text(
-                "Select which modules to use for HF annotation:",
-                class_name="text-sm text-base-content/60",
-            ),
-            rx.hstack(
-                rx.foreach(
-                    UploadState.available_modules,
-                    lambda m: rx.button(
-                        m,
-                        on_click=UploadState.toggle_module(m),
-                        class_name=rx.cond(
-                            UploadState.selected_modules.contains(m),
-                            "btn btn-sm btn-info",
-                            "btn btn-sm btn-ghost btn-outline",
-                        ),
-                    ),
+                rx.el.button(
+                    "None",
+                    on_click=UploadState.deselect_all_modules,
+                    class_name="ui mini button",
                 ),
-                spacing="2",
-                flex_wrap="wrap",
-                width="100%",
+                class_name="ui buttons",
             ),
-            width="100%",
-            spacing="3",
-            align="stretch",
+            style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
-        class_name="p-4 bg-base-200/50 rounded-xl border border-base-300",
-        width="100%",
+        rx.el.p(
+            "Select which modules to use for HF annotation:",
+            style={"color": "#666", "marginBottom": "10px"},
+        ),
+        rx.el.div(
+            rx.foreach(
+                UploadState.available_modules,
+                lambda m: rx.el.button(
+                    m,
+                    on_click=UploadState.toggle_module(m),
+                    class_name=rx.cond(
+                        UploadState.selected_modules.contains(m),
+                        "ui info small button",
+                        "ui basic small button",
+                    ),
+                    style={"margin": "2px"},
+                ),
+            ),
+            style={"display": "flex", "flexWrap": "wrap"},
+        ),
+        class_name="ui secondary segment",
+        style={"marginTop": "20px", "marginBottom": "20px"},
     )
 
 
 def sample_catalog() -> rx.Component:
-    return rx.vstack(
-        rx.hstack(
-            rx.icon("files", size=48, class_name="text-primary"),
-            rx.heading("Sample Catalog", size="8", class_name="font-black"),
-            rx.spacer(),
-            rx.button(
+    """List of uploaded samples using Fomantic UI."""
+    return rx.el.div(
+        rx.el.div(
+            rx.el.h2(
+                rx.icon("files", size=32),
+                " Sample Catalog",
+                class_name="ui header",
+                style={"flex": "1"},
+            ),
+            rx.el.button(
                 rx.icon("refresh-cw", size=24),
                 on_click=UploadState.on_load,
-                class_name="btn btn-ghost btn-circle btn-lg",
+                class_name="ui massive icon button",
             ),
-            spacing="4",
-            align="center",
-            width="100%",
+            style={"display": "flex", "alignItems": "center", "width": "100%", "marginBottom": "20px"},
         ),
-        rx.divider(class_name="divider my-4"),
         module_selector(),
-        rx.list(
+        rx.el.div(
             rx.foreach(
                 UploadState.files,
-                lambda f: rx.list_item(
-                    rx.hstack(
-                        rx.icon("file-text", size=40, class_name="text-primary"),
-                        rx.vstack(
-                            rx.text(f, class_name="font-black text-2xl tracking-tight"),
-                            rx.badge(
+                lambda f: rx.el.div(
+                    rx.el.div(
+                        rx.icon("file-text", size=40, style={"color": "#2185d0"}),
+                        rx.el.div(
+                            rx.el.div(f, class_name="header", style={"fontSize": "1.5rem", "fontWeight": "bold"}),
+                            rx.el.div(
                                 UploadState.file_statuses[f],
                                 class_name=rx.match(
                                     UploadState.file_statuses[f],
-                                    ("materialized", "badge badge-success badge-lg p-4 font-bold"),
-                                    ("running", "badge badge-info badge-lg p-4 font-bold animate-pulse"),
-                                    ("pending", "badge badge-warning badge-lg p-4 font-bold"),
-                                    ("completed", "badge badge-success badge-lg p-4 font-bold"),
-                                    ("error", "badge badge-error badge-lg p-4 font-bold"),
-                                    "badge badge-ghost badge-lg p-4 font-bold"
+                                    ("completed", "ui green label"),
+                                    ("running", "ui blue label"),
+                                    ("pending", "ui yellow label"),
+                                    ("error", "ui red label"),
+                                    "ui grey label"
                                 ),
                             ),
-                            align_items="start",
-                            spacing="2",
+                            class_name="content",
+                            style={"marginLeft": "15px", "flex": "1"},
                         ),
-                        rx.spacer(),
-                        rx.vstack(
-                            rx.button(
-                                rx.cond(
-                                    UploadState.file_statuses[f] == "running",
-                                    rx.icon("loader-circle", size=24, class_name="animate-spin"),
-                                    rx.hstack(
-                                        rx.icon("database", size=24),
-                                        rx.text("Ensembl"),
-                                        spacing="2",
-                                    ),
-                                ),
-                                on_click=UploadState.run_annotation(f),
+                        rx.el.div(
+                            rx.el.button(
+                                rx.icon("database", size=20),
+                                " Ensembl",
+                                on_click=lambda: UploadState.run_annotation(f),
                                 disabled=UploadState.file_statuses[f] == "running",
-                                class_name="btn btn-success btn-md px-6 shadow-md hover:shadow-lg active:scale-95 transition-all",
+                                class_name="ui green button",
+                                style={"marginBottom": "5px"},
                             ),
-                            rx.button(
-                                rx.hstack(
-                                    rx.icon("boxes", size=24),
-                                    rx.text("HF Modules"),
-                                    spacing="2",
-                                ),
-                                on_click=UploadState.run_hf_annotation(f),
-                                class_name="btn btn-info btn-md px-6 shadow-md hover:shadow-lg active:scale-95 transition-all",
+                            rx.el.button(
+                                rx.icon("boxes", size=20),
+                                " HF Modules",
+                                on_click=lambda: UploadState.run_hf_annotation(f),
+                                class_name="ui blue button",
                             ),
-                            spacing="2",
-                            align="stretch",
+                            style={"display": "flex", "flexDirection": "column"},
                         ),
-                        align="center",
-                        width="100%",
-                        class_name="p-8 bg-base-100 border-4 border-base-200 rounded-2xl mb-6 hover:border-primary transition-all shadow-sm",
-                    )
+                        style={"display": "flex", "alignItems": "center", "padding": "20px"},
+                    ),
+                    class_name="ui raised segment",
+                    style={"marginBottom": "15px"},
                 )
             ),
-            class_name="w-full",
+            class_name="ui segments",
+            style={"border": "none", "boxShadow": "none"},
         ),
         rx.cond(
-            UploadState.files.length == 0,
-            rx.vstack(
-                rx.icon("inbox", size=100, class_name="text-base-content/10"),
-                rx.text("No files uploaded yet.", class_name="text-3xl text-base-content/20 italic font-black"),
-                spacing="6",
-                padding="20",
-                align="center",
-                width="100%",
+            UploadState.files.length() == 0,
+            rx.el.div(
+                rx.icon("inbox", size=100, style={"color": "#eee"}),
+                rx.el.h2("No files uploaded yet.", style={"color": "#ccc", "fontStyle": "italic"}),
+                class_name="ui placeholder segment",
+                style={"textAlign": "center", "padding": "60px"},
             ),
         ),
-        width="100%",
-        spacing="6",
-        align="stretch",
+        class_name="ui segment",
     )
 
 
 def dagster_section() -> rx.Component:
-    return rx.box(
-        rx.vstack(
-            rx.hstack(
-                rx.icon("activity", size=48, class_name="text-success"),
-                rx.heading("Pipeline Engine", size="8", class_name="font-black"),
-                spacing="4",
-                align="center",
-            ),
-            rx.text(
-                "Powered by Dagster. All annotation runs are orchestrated and tracked for full data lineage.",
-                class_name="text-xl text-base-content/70 font-medium",
-            ),
-            rx.hstack(
-                rx.link(
-                    rx.button(
-                        rx.hstack(
-                            rx.icon("external-link", size=28),
-                            rx.text("Open Dagster UI"),
-                            spacing="3",
-                        ),
-                        class_name="btn btn-outline btn-success btn-lg px-8 rounded-xl font-black",
-                    ),
-                    href="http://localhost:3005",
-                    is_external=True,
-                ),
-                rx.badge("Daemon Running", class_name="badge badge-success badge-outline p-6 text-lg font-black rounded-xl"),
-                spacing="6",
-                align="center",
-            ),
-            width="100%",
-            spacing="6",
-            align="stretch",
+    """External link to Dagster UI using Fomantic UI."""
+    return rx.el.div(
+        rx.el.h2(
+            rx.icon("activity", size=32),
+            " Pipeline Engine",
+            class_name="ui header",
         ),
-        class_name=DAISY_CARD + " border-success/30 bg-success/5 mt-12",
-        width="100%",
+        rx.el.p(
+            "Powered by Dagster. All annotation runs are orchestrated and tracked for full data lineage.",
+            style={"fontSize": "1.2rem", "color": "#666"},
+        ),
+        rx.el.div(
+            rx.el.a(
+                rx.el.button(
+                    rx.icon("external-link", size=24),
+                    " Open Dagster UI",
+                    class_name="ui positive massive button",
+                ),
+                href="http://localhost:3005",
+                target="_blank",
+            ),
+            rx.el.div(
+                "Daemon Running",
+                class_name="ui green circular label",
+                style={"marginLeft": "20px", "fontSize": "1.2rem", "padding": "15px"},
+            ),
+            style={"display": "flex", "alignItems": "center", "marginTop": "20px"},
+        ),
+        class_name="ui segment positive",
+        style={"marginTop": "40px"},
     )
 
 
 @rx.page(route="/dashboard", on_load=UploadState.on_load)
 def dashboard_page() -> rx.Component:
+    """Dashboard page with Fomantic UI layout."""
     return template(
-        rx.vstack(
-            rx.hstack(
-                rx.icon("dna", size=64, class_name="text-primary"),
-                rx.vstack(
-                    rx.heading("Genomic Dashboard", size="9", class_name="text-primary font-black uppercase tracking-tight"),
-                    rx.text(
+        rx.el.div(
+            rx.el.div(
+                rx.icon("dna", size=64, style={"color": "#2185d0"}),
+                rx.el.div(
+                    rx.el.h1("Genomic Dashboard", class_name="ui header", style={"fontSize": "3rem", "margin": "0"}),
+                    rx.el.p(
                         "Sequencing ➔ Upload ➔ Annotation ➔ Interpretation", 
-                        class_name="text-2xl text-base-content/40 font-black italic"
+                        style={"fontSize": "1.5rem", "color": "#999", "fontStyle": "italic", "fontWeight": "bold"}
                     ),
-                    align_items="start",
-                    spacing="0",
+                    style={"marginLeft": "20px"},
                 ),
-                spacing="6",
-                align="center",
-                width="100%",
-                margin_bottom="12",
+                style={"display": "flex", "alignItems": "center", "marginBottom": "40px"},
             ),
             
-            rx.grid(
-                rx.box(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.icon("cloud-upload", size=48, class_name="text-primary"),
-                            rx.heading("Upload VCF", size="8", class_name="font-black"),
-                            spacing="4",
-                            align="center",
+            rx.el.div(
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.h2(
+                            rx.icon("cloud-upload", size=32),
+                            " Upload VCF",
+                            class_name="ui header",
                         ),
-                        rx.divider(class_name="divider my-6"),
+                        rx.el.div(class_name="ui divider"),
                         upload_zone(),
-                        width="100%",
-                        spacing="6",
-                        align="stretch",
+                        class_name="column",
                     ),
-                    class_name=DAISY_CARD,
+                    rx.el.div(
+                        sample_catalog(),
+                        class_name="column",
+                    ),
+                    class_name="row",
                 ),
-                rx.box(
-                    sample_catalog(),
-                    class_name=DAISY_CARD,
-                ),
-                columns=rx.breakpoints(initial="1", lg="2"),
-                spacing="8",
-                width="100%",
-                align_items="stretch",
+                class_name="ui two column stackable grid",
             ),
             
             dagster_section(),
-            
-            spacing="0",
-            width="100%",
-            align="stretch",
+            style={"width": "100%"},
         )
     )
