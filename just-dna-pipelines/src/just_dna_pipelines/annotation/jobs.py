@@ -6,12 +6,14 @@ Jobs define complete workflows that can be triggered manually or scheduled.
 
 from dagster import job, AssetSelection, define_asset_job
 
+from just_dna_pipelines.annotation.utils import resource_summary_hook
 from just_dna_pipelines.annotation.ops import annotate_user_vcf_op, annotate_user_vcf_duckdb_op
 
 
 @job(
     description="Annotate user VCF files with Ensembl annotations. Use this for per-user processing.",
     tags={"multi-user": "true", "vcf": "annotation"},
+    hooks={resource_summary_hook},
 )
 def annotate_vcf_job():
     """
@@ -28,6 +30,7 @@ def annotate_vcf_job():
 @job(
     description="Annotate user VCF files using DuckDB. Faster for large datasets.",
     tags={"multi-user": "true", "vcf": "annotation", "duckdb": "true"},
+    hooks={resource_summary_hook},
 )
 def annotate_vcf_duckdb_job():
     """
@@ -44,5 +47,6 @@ build_ensembl_duckdb_job = define_asset_job(
     selection=AssetSelection.assets("ensembl_duckdb"),
     description="Build DuckDB database from Ensembl Parquet annotations for faster queries.",
     tags={"reference": "true", "duckdb": "true"},
+    hooks={resource_summary_hook},
 )
 

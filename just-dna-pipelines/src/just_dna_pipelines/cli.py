@@ -88,7 +88,7 @@ def annotate_modules(
     """
     from huggingface_hub import hf_hub_download
 
-    from just_dna_pipelines.annotation.hf_modules import AnnotatorModule
+    from just_dna_pipelines.annotation.hf_modules import get_all_modules, DISCOVERED_MODULES
     from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_all_modules
     from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 
@@ -180,7 +180,7 @@ def annotate_modules(
     if modules:
         module_list = [m.strip().lower() for m in modules.split(",")]
         # Validate modules
-        valid_modules = {m.value for m in AnnotatorModule.all_modules()}
+        valid_modules = set(DISCOVERED_MODULES)
         for m in module_list:
             if m not in valid_modules:
                 console.print(f"[red]Error: Unknown module '{m}'. Valid: {sorted(valid_modules)}[/red]")
@@ -251,7 +251,7 @@ def list_modules() -> None:
     """
     List all available annotation modules.
     """
-    from just_dna_pipelines.annotation.hf_modules import AnnotatorModule
+    from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES
 
     table = Table(title="Available Annotation Modules")
     table.add_column("Module", style="cyan")
@@ -265,8 +265,8 @@ def list_modules() -> None:
         "coronary": "Coronary artery disease associations",
     }
 
-    for module in AnnotatorModule.all_modules():
-        table.add_row(module.value, descriptions.get(module.value, ""))
+    for module in DISCOVERED_MODULES:
+        table.add_row(module, descriptions.get(module, ""))
 
     console.print(table)
     console.print("\n[dim]Use --modules with comma-separated values to select specific modules.[/dim]")

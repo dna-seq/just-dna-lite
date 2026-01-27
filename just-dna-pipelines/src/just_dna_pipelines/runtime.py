@@ -33,8 +33,14 @@ def load_env(override: bool = False) -> Optional[str]:
 
 
 @contextmanager
-def resource_tracker(name: str = "resource_usage"):
-    """Context manager to track execution time, CPU and peak memory usage."""
+def resource_tracker(name: str = "resource_usage", context: Optional[Any] = None):
+    """
+    Context manager to track execution time, CPU and peak memory usage.
+    
+    Args:
+        name: Name of the resource being tracked
+        context: Optional Dagster context. If provided, metadata will be logged to Dagster.
+    """
     process = psutil.Process(os.getpid())
     start_time = time.perf_counter()
     start_mem = process.memory_info().rss
@@ -71,43 +77,40 @@ def resource_tracker(name: str = "resource_usage"):
     # Store report in the data dict so calling code can access it
     data["report"] = report
 
-    # If running inside a Dagster context, log and create artifact
+    # Log to Eliot/standard logger
     try:
-        from dagster import get_dagster_logger, log_asset_metadata
-        from dagster import MetadataValue
-        # This will fail if not in a dagster context
+        from dagster import get_dagster_logger
         logger = get_dagster_logger()
         logger.info(
             f"📊 Resource Report [{name}]: Duration: {report.duration:.2f}s, "
             f"CPU: {report.cpu_usage_percent:.1f}%, Peak RAM: {report.peak_memory_mb:.2f}MB"
         )
-        
-        # Try to add metadata to the current op run
+    except Exception:
+        pass
+
+    # If running inside a Dagster context, log metadata
+    if context is not None:
         try:
-            from dagster import get_dagster_context
-            context = get_dagster_context()
+            from dagster import MetadataValue
             
             # Clean name for metadata key
             clean_key = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
             if not clean_key:
                 clean_key = "resource_usage"
             
-            # Log metadata directly to the current op
-            context.log.info(
-                "resource_metrics",
-                metadata={
-                    f"{clean_key}_duration_sec": MetadataValue.float(round(report.duration, 2)),
-                    f"{clean_key}_cpu_percent": MetadataValue.float(round(report.cpu_usage_percent, 1)),
-                    f"{clean_key}_peak_memory_mb": MetadataValue.float(round(report.peak_memory_mb, 2)),
-                    f"{clean_key}_memory_delta_mb": MetadataValue.float(round(report.memory_delta_mb, 2)),
-                }
-            )
+            # Dagster 1.12.x compatible metadata logging
+            # Note: context.log.info does not take metadata, use add_output_metadata or log separately
+            # For assets, the standard way is to return Output with metadata, 
+            # but inside the asset we can use context.add_output_metadata
+            context.add_output_metadata({
+                f"{clean_key}_duration_sec": MetadataValue.float(round(report.duration, 2)),
+                f"{clean_key}_cpu_percent": MetadataValue.float(round(report.cpu_usage_percent, 1)),
+                f"{clean_key}_peak_memory_mb": MetadataValue.float(round(report.peak_memory_mb, 2)),
+                f"{clean_key}_memory_delta_mb": MetadataValue.float(round(report.memory_delta_mb, 2)),
+            })
         except Exception:
-            # Context not available or metadata logging failed
+            # Metadata logging failed
             pass
-            
-    except ImportError:
-        pass
 
 
 def resolve_worker_counts(

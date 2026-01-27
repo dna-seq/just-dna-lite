@@ -4,3 +4,7 @@ __pycache__/
 .states
 .web
 assets/external/
+
+# User data - input VCF files and output results
+data/input/users/
+data/output/users/

@@ -203,24 +203,24 @@ def module_icon(name: rx.Var[str]) -> rx.Component:
     )
 
 
-def fomantic_checkbox(checked: rx.Var[bool], on_click: rx.EventHandler) -> rx.Component:
+def fomantic_checkbox(checked: rx.Var[bool]) -> rx.Component:
     """
-    Fomantic UI styled checkbox.
+    Fomantic UI styled checkbox (display only, parent handles click).
     
     Structure: <div class="ui checkbox"><input type="checkbox"><label></label></div>
     The checkbox state is controlled via class name (checked adds 'checked' class).
+    Note: No on_click here - parent card handles the toggle to avoid double-firing.
     """
     return rx.el.div(
         rx.el.input(
             type="checkbox",
             checked=checked,
             read_only=True,  # Controlled by parent click
-            style={"cursor": "pointer"},
+            style={"pointerEvents": "none"},  # Let clicks pass through to parent
         ),
         rx.el.label(),
-        on_click=on_click,
         class_name=rx.cond(checked, "ui checked checkbox", "ui checkbox"),
-        style={"marginRight": "12px"},
+        style={"marginRight": "12px", "pointerEvents": "none"},  # Let clicks pass through
     )
 
 
@@ -231,11 +231,8 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
     """
     return rx.el.div(
         rx.el.div(
-            # Left: Fomantic UI Checkbox
-            fomantic_checkbox(
-                checked=module["selected"].to(bool),
-                on_click=lambda: UploadState.toggle_module(module["name"]),
-            ),
+            # Left: Fomantic UI Checkbox (display only, card handles click)
+            fomantic_checkbox(checked=module["selected"].to(bool)),
             # Module icon (colored box with Lucide icon)
             rx.el.div(
                 module_icon(module["name"]),
@@ -265,14 +262,7 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                     module["description"],
                     style={"fontSize": "0.85rem", "color": "#666", "lineHeight": "1.3", "marginBottom": "6px"},
                 ),
-                rx.el.div(
-                    rx.el.span("annotator", class_name="ui mini grey label"),
-                    rx.cond(
-                        module["selected"].to(bool),
-                        rx.el.span("Selected", class_name="ui mini green label", style={"marginLeft": "4px"}),
-                        rx.box(),
-                    ),
-                ),
+                # No confusing labels - selection state is shown by checkbox and background color
                 style={"flex": "1"},
             ),
             style={"display": "flex", "alignItems": "flex-start", "width": "100%"},
@@ -331,32 +321,28 @@ def module_column_content() -> rx.Component:
         
         rx.el.div(class_name="ui divider", style={"margin": "16px 0"}),
         
-        # Selected file indicator
-        rx.el.div(
-            rx.cond(
-                UploadState.has_selected_file,
-                rx.el.div(
-                    rx.icon("file-text", size=16),
-                    rx.el.span(" ", UploadState.selected_file),
-                    class_name="ui label",
-                ),
-                rx.el.div(
-                    rx.icon("file-text", size=16),
-                    " No file selected",
-                    class_name="ui grey label",
-                ),
-            ),
-            style={"marginBottom": "12px"},
-        ),
-        
-        # Run button
+        # Run button - large, prominent with inline icon
         rx.el.button(
-            rx.icon("play", size=18),
-            " Start Analysis",
+            rx.el.span(
+                rx.icon("play", size=20),
+                " Start Analysis",
+                style={"display": "inline-flex", "alignItems": "center", "gap": "8px"},
+            ),
             on_click=UploadState.start_annotation_run,
             disabled=~UploadState.can_run_annotation,
             loading=UploadState.running,
             class_name="ui primary large button fluid",
+            style={"cursor": rx.cond(UploadState.can_run_annotation, "pointer", "not-allowed")},
+        ),
+        
+        # Show selected file below button as helper text
+        rx.cond(
+            ~UploadState.has_selected_file,
+            rx.el.div(
+                "Select a file from the library to start",
+                style={"color": "#888", "fontSize": "0.85rem", "marginTop": "8px", "textAlign": "center"},
+            ),
+            rx.box(),
         ),
     )
 

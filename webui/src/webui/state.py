@@ -229,6 +229,28 @@ class UploadState(rx.State):
         else:
             yield rx.toast.warning("No files were uploaded")
 
+    def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
+        """
+        Execute a Dagster job in-process (like prepare-annotations does).
+        
+        This avoids all the daemon/workspace mismatch issues that submit_run has.
+        The job runs synchronously in the current process.
+        """
+        job_def = defs.resolve_job_def(job_name)
+        
+        # Ensure the partition exists before running
+        from just_dna_pipelines.annotation.assets import user_vcf_partitions
+        existing_partitions = instance.get_dynamic_partitions(user_vcf_partitions.name)
+        if partition_key not in existing_partitions:
+            instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+        
+        result = job_def.execute_in_process(
+            run_config=run_config,
+            instance=instance,
+            tags={"dagster/partition": partition_key},
+        )
+        return result
+
     async def run_annotation(self, filename: str = ""):
         """Trigger materialization of user_annotated_vcf_duckdb for a file."""
         if not filename:
@@ -269,19 +291,16 @@ class UploadState(rx.State):
             }
         }
 
-        # Create the run - partition_key must be passed via tags
-        job_def = defs.get_job_def(job_name)
+        # Execute job in-process (like prepare-annotations does)
+        # This avoids daemon/workspace mismatch issues
+        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
         
-        run = instance.create_run_for_job(
-            job_def=job_def,
-            run_config=run_config,
-            tags={"dagster/partition": partition_key},
-        )
-        
-        # Submit the run
-        instance.submit_run(run.run_id)
-        
-        yield rx.toast.info(f"Started annotation for {sample_name} (Run ID: {run.run_id[:8]}...)")
+        if result.success:
+            self.asset_statuses[partition_key]["annotated"] = "completed"
+            yield rx.toast.success(f"Annotation completed for {sample_name}")
+        else:
+            self.asset_statuses[partition_key]["annotated"] = "failed"
+            yield rx.toast.error(f"Annotation failed for {sample_name}")
 
     def toggle_module(self, module: str):
         """Toggle a module on/off in the selection."""
@@ -347,20 +366,16 @@ class UploadState(rx.State):
             }
         }
 
-        # Create the run - partition_key must be passed via tags
-        job_def = defs.get_job_def(job_name)
-        
-        run = instance.create_run_for_job(
-            job_def=job_def,
-            run_config=run_config,
-            tags={"dagster/partition": partition_key},
-        )
-        
-        # Submit the run
-        instance.submit_run(run.run_id)
-        
+        # Execute job in-process (like prepare-annotations does)
         modules_info = ", ".join(modules_to_use) if modules_to_use else "all modules"
-        yield rx.toast.info(f"Started HF annotation for {sample_name} with {modules_info} (Run ID: {run.run_id[:8]}...)")
+        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
+        
+        if result.success:
+            self.asset_statuses[partition_key]["hf_annotated"] = "completed"
+            yield rx.toast.success(f"HF annotation completed for {sample_name} with {modules_info}")
+        else:
+            self.asset_statuses[partition_key]["hf_annotated"] = "failed"
+            yield rx.toast.error(f"HF annotation failed for {sample_name}")
 
     @rx.var
     def file_statuses(self) -> Dict[str, str]:
@@ -519,32 +534,38 @@ class UploadState(rx.State):
             }
         }
 
-        job_def = defs.get_job_def(job_name)
-        run = instance.create_run_for_job(
-            job_def=job_def,
-            run_config=run_config,
-            tags={"dagster/partition": partition_key},
-        )
-
-        instance.submit_run(run.run_id)
+        # Execute job in-process (like prepare-annotations does)
+        # This avoids daemon/workspace mismatch issues
+        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
 
         # Add to run history
         run_info = {
-            "run_id": run.run_id,
+            "run_id": result.run_id if result else "unknown",
             "filename": self.selected_file,
             "sample_name": sample_name,
             "modules": modules_to_use,
-            "status": "QUEUED",
+            "status": "SUCCESS" if result.success else "FAILURE",
             "started_at": datetime.now().isoformat(),
-            "ended_at": None,
+            "ended_at": datetime.now().isoformat(),
             "output_path": None,
         }
+        
+        # Find output path if successful
+        if result.success:
+            output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+            if output_dir.exists():
+                run_info["output_path"] = str(output_dir)
+        
         self.runs = [run_info] + self.runs
-        self.active_run_id = run.run_id
-        self.run_logs = [f"[{datetime.now().strftime('%H:%M:%S')}] Run submitted: {run.run_id[:8]}..."]
-        self.polling_active = True
+        self.active_run_id = run_info["run_id"]
+        self.run_logs = [f"[{datetime.now().strftime('%H:%M:%S')}] Run completed: {run_info['status']}"]
+        self.polling_active = False
+        self.running = False
 
-        yield rx.toast.info(f"Started annotation for {sample_name} with {len(modules_to_use)} modules")
+        if result.success:
+            yield rx.toast.success(f"Annotation completed for {sample_name} with {len(modules_to_use)} modules")
+        else:
+            yield rx.toast.error(f"Annotation failed for {sample_name}")
 
     async def poll_run_status(self):
         """Poll Dagster for run status updates."""

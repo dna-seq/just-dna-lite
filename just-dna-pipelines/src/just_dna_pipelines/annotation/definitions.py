@@ -8,6 +8,7 @@ to discover all assets, jobs, and resources.
 from pathlib import Path
 from dagster import Definitions, define_asset_job, AssetSelection
 
+from just_dna_pipelines.annotation.utils import resource_summary_hook
 from just_dna_pipelines.annotation.assets import (
     ensembl_hf_dataset,
     ensembl_annotations,
@@ -40,9 +41,10 @@ from just_dna_pipelines.annotation.registry import load_module_definitions
 # Job for HF module annotation
 annotate_with_hf_modules_job = define_asset_job(
     name="annotate_with_hf_modules_job",
-    selection=AssetSelection.assets(user_hf_module_annotations),
+    selection=AssetSelection.assets("user_hf_module_annotations"),
     description="Annotate user VCF with HuggingFace modules (longevitymap, lipidmetabolism, vo2max, etc.)",
     tags={"annotation": "hf_modules", "multi-user": "true"},
+    hooks={resource_summary_hook},
 )
 
 

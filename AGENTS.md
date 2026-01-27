@@ -41,6 +41,7 @@ The recommended way to start the application is from the repo root:
 - **Dependency Management**: Use `uv sync` and `uv add`. NEVER use `uv pip install`.
 - **Versions**: Do not hardcode versions in `__init__.py`; use `project.toml`.
 - **Avoid __all__**: Avoid `__init__.py` with `__all__` as it confuses where things are located.
+- **Cross-Project Knowledge**: We sometimes add `prepare-annotations` to the workspace. This folder is **READ-ONLY**. You MUST check `@prepare-annotations/AGENTS.md` for shared Dagster patterns, resource tracking, and best practices. If you find a superior pattern there that is applicable to `just-dna-lite`, you should adopt it and update this file.
 - **Self-Correction**: If you make an API mistake that leads to a system error (e.g. a crash or a major logic failure due to outdated knowledge), you MUST update this file (`AGENTS.md`) with the correct API usage or pattern. This ensures future agents don't repeat the same mistake.
 
 ---
@@ -48,6 +49,49 @@ The recommended way to start the application is from the repo root:
 ## Dagster Pipeline
 
 For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)**.
+
+### Resource Tracking (MANDATORY)
+
+**Always track CPU and RAM consumption** for all compute-heavy assets using `resource_tracker` from `just_dna_pipelines.runtime`:
+
+```python
+from just_dna_pipelines.runtime import resource_tracker
+
+@asset
+def my_asset(context: AssetExecutionContext) -> Output[Path]:
+    with resource_tracker("my_asset", context=context):
+        # ... compute-heavy code ...
+        pass
+```
+
+**Important:** Always pass `context=context` to enable Dagster UI charts. Without it, metrics only go to Eliot logs.
+This automatically logs to Dagster UI: `duration_sec`, `cpu_percent`, `peak_memory_mb`, `memory_delta_mb`.
+
+### Run-Level Resource Summaries (MANDATORY)
+
+All jobs must include the `resource_summary_hook` from `just_dna_pipelines.annotation.utils` to provide aggregated resource metrics at the run level:
+
+```python
+from just_dna_pipelines.annotation.utils import resource_summary_hook
+
+my_job = define_asset_job(
+    name="my_job",
+    selection=AssetSelection.assets(...),
+    hooks={resource_summary_hook},  # Note: must be a set, not a list
+)
+```
+
+This hook logs a summary at the end of each successful run: Total Duration, Max Peak Memory, and Top memory consumers.
+
+### Dagster Version Notes (1.12.x)
+
+**API differences from newer versions (MANDATORY reference):**
+- `get_dagster_context()` does NOT exist - you must pass `context` explicitly.
+- `context.log.info()` does NOT accept a `metadata` keyword argument - use `context.add_output_metadata()` separately.
+- `EventRecordsFilter` does NOT have `run_ids` parameter - use `instance.all_logs(run_id, of_type=...)` instead.
+- For asset materializations, use `EventLogEntry.asset_materialization` (returns `Optional[AssetMaterialization]`), not `DagsterEvent.asset_materialization`.
+- `hooks` parameter in `define_asset_job` must be a `set`, not a list: `hooks={my_hook}`.
+- Use `defs.resolve_all_asset_specs()` instead of deprecated `defs.get_all_asset_specs()`.
 
 ### Project-Specific Patterns
 
@@ -121,15 +165,33 @@ run = instance.create_run_for_job(
 )
 ```
 
-**Submit run without workspace_snapshot:**
+**Prefer `execute_in_process` over `submit_run` for CLI/UI:**
+
+Using `submit_run` requires a daemon running with matching workspace context, which is fragile (location name mismatches, daemon coordination). For CLI tools and web UIs, use `execute_in_process` instead:
 
 ```python
-# WRONG - workspace_snapshot parameter was removed
-instance.submit_run(run.run_id, workspace_snapshot=None)
+# RECOMMENDED - execute_in_process (no daemon required, runs synchronously)
+job_def = defs.resolve_job_def(job_name)
 
-# CORRECT - just pass run_id
-instance.submit_run(run.run_id)
+# Ensure partition exists (for dynamic partitions)
+existing = instance.get_dynamic_partitions(partition_def.name)
+if partition_key not in existing:
+    instance.add_dynamic_partitions(partition_def.name, [partition_key])
+
+result = job_def.execute_in_process(
+    run_config=run_config,
+    instance=instance,
+    tags={"dagster/partition": partition_key},
+)
+if result.success:
+    print("Job completed successfully")
+else:
+    print(f"Job failed: {result.all_events}")
 ```
+
+**Avoid `submit_run` unless running via Dagster UI daemon:**
+
+`submit_run` requires matching workspace context between the caller and the daemon. This is error-prone when the UI/CLI creates runs with a different location name than what the daemon loads. If you must use `submit_run`, see the Dagster 1.12+ API notes above about `WorkspaceProcessContext`.
 
 **Asset job config uses "ops" key, not "assets":**
 
