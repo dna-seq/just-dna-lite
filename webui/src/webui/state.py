@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import asyncio
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Optional
@@ -95,6 +97,11 @@ def get_dagster_instance() -> DagsterInstance:
     return DagsterInstance.get()
 
 
+def get_dagster_web_url() -> str:
+    """Get the URL for the Dagster web UI from environment or default."""
+    return os.getenv("DAGSTER_WEB_URL", "http://localhost:3005").rstrip("/")
+
+
 class AuthState(rx.State):
     """Session-based authentication state."""
 
@@ -153,6 +160,11 @@ class UploadState(rx.State):
     selected_modules: list[str] = DISCOVERED_MODULES.copy()
 
     @rx.var
+    def dagster_web_url(self) -> str:
+        """Get the Dagster web UI URL."""
+        return get_dagster_web_url()
+
+    @rx.var
     def module_details(self) -> Dict[str, Dict[str, Any]]:
         """Return details (logo, repo, etc.) for each available module."""
         return {name: info.model_dump() for name, info in MODULE_INFOS.items()}
@@ -165,7 +177,6 @@ class UploadState(rx.State):
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of VCF files and register them in Dagster."""
         self.uploading = True
-        yield
         
         auth_state = await self.get_state(AuthState)
         self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
@@ -225,6 +236,8 @@ class UploadState(rx.State):
         
         self.uploading = False
         if new_files:
+            # Automatically select the last uploaded file
+            self.selected_file = new_files[-1]
             yield rx.toast.success(f"Uploaded and registered {len(new_files)} files.")
         else:
             yield rx.toast.warning("No files were uploaded")
@@ -558,7 +571,6 @@ class UploadState(rx.State):
         self._add_log(f"User: {self.safe_user_id}")
 
         instance = get_dagster_instance()
-
         job_name = "annotate_with_hf_modules_job"
         modules_to_use = self.selected_modules.copy()
 
@@ -575,81 +587,64 @@ class UploadState(rx.State):
             }
         }
 
-        self._add_log("Executing Dagster job...")
-        
-        # Execute job in-process with error handling
-        result = None
-        error_message = None
+        # Create the run in Dagster immediately to get a REAL Run ID
         try:
-            result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
+            job_def = defs.resolve_job_def(job_name)
+            run = instance.create_run_for_job(
+                job_def=job_def,
+                run_config=run_config,
+                tags={"dagster/partition": partition_key},
+            )
+            run_id = run.run_id
+            self._add_log(f"Created Dagster run: {run_id}")
         except Exception as e:
-            error_message = str(e)
-            self._add_log(f"ERROR: {error_message}")
-            # Extract key error info
-            if "invalid reference bases length" in error_message:
-                self._add_log("HINT: VCF file may be corrupted or truncated")
-            elif "ComputeError" in error_message:
-                self._add_log("HINT: Data processing error - check VCF file format")
+            self._add_log(f"Failed to create run: {str(e)}")
+            self.running = False
+            yield rx.toast.error(f"Failed to start job: {str(e)}")
+            return
 
-        # Determine success
-        success = result is not None and result.success
-        status = "SUCCESS" if success else "FAILURE"
-        
-        # Get run_id and create Dagster URL
-        run_id = result.run_id if result else "unknown"
-        dagster_url = f"http://localhost:3005/runs/{run_id}"
-        
-        # Log run info with URL
-        self._add_log(f"Run ID: {run_id}")
-        self._add_log(f"Dagster URL: {dagster_url}")
-        self._add_log(f"Status: {status}")
-        
-        # Add to run history
+        # Add the real run to history immediately
         run_info = {
             "run_id": run_id,
             "filename": self.selected_file,
             "sample_name": sample_name,
             "modules": modules_to_use,
-            "status": status,
+            "status": "RUNNING",
             "started_at": datetime.now().isoformat(),
-            "ended_at": datetime.now().isoformat(),
+            "ended_at": None,
             "output_path": None,
-            "error": error_message,
-            "dagster_url": dagster_url,
+            "error": None,
+            "dagster_url": f"{get_dagster_web_url()}/runs/{run_id}",
         }
-        
-        # Find output path if successful
-        if success:
-            output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
-            if output_dir.exists():
-                run_info["output_path"] = str(output_dir)
-                self._add_log(f"Output: {output_dir}")
-        
-        # Fetch Dagster logs if we have a run_id
-        if result and result.run_id:
-            self._add_log("Fetching run logs...")
-            try:
-                events = instance.all_logs(result.run_id)
-                for event in events[-20:]:  # Last 20 events
-                    timestamp = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S")
-                    msg = event.message or (event.dagster_event.event_type_value if event.dagster_event else "Event")
-                    # Truncate long messages
-                    if len(msg) > 100:
-                        msg = msg[:100] + "..."
-                    self._add_log(f"[{timestamp}] {msg}")
-            except Exception as log_err:
-                self._add_log(f"Could not fetch logs: {log_err}")
-        
         self.runs = [run_info] + self.runs
-        self.active_run_id = run_info.get("run_id", "")
-        self.polling_active = False
-        self.running = False
-        self.last_run_success = success
+        self.active_run_id = run_id
+        self.polling_active = True
+        self._add_log("Submitting run to Dagster daemon...")
+        yield
 
-        if success:
-            yield rx.toast.success(f"Annotation completed for {sample_name} with {len(modules_to_use)} modules")
-        else:
-            yield rx.toast.error(f"Annotation failed for {sample_name}")
+        # Execute the run. We use submit_run so it handled by the daemon and we have the ID immediately.
+        # This requires the dagster-daemon to be running (which it is via `uv run start`)
+        try:
+            instance.submit_run(run_id, workspace_process_context=None)
+            self._add_log(f"Run {run_id} submitted successfully.")
+        except Exception as e:
+            error_message = str(e)
+            self._add_log(f"Submission failed: {error_message}")
+            # Fallback to in-process execution if submission fails (e.g. no daemon)
+            self._add_log("Attempting in-process execution fallback...")
+            try:
+                # We can't easily reuse the run_id with execute_in_process as it creates its own,
+                # but we can try to run it anyway.
+                await asyncio.to_thread(
+                    self._execute_job_in_process, 
+                    instance, job_name, run_config, partition_key
+                )
+            except Exception as fallback_err:
+                self._add_log(f"Fallback failed: {str(fallback_err)}")
+
+        # The actual status monitoring is handled by poll_run_status which is triggered by rx.moment
+        # We don't block here anymore.
+        yield rx.toast.info(f"Annotation started for {sample_name}")
     
     def _add_log(self, message: str):
         """Add a timestamped log entry."""
@@ -659,6 +654,10 @@ class UploadState(rx.State):
     async def poll_run_status(self):
         """Poll Dagster for run status updates."""
         if not self.active_run_id or not self.polling_active:
+            return
+
+        # Don't poll for temporary IDs
+        if str(self.active_run_id).startswith("running-"):
             return
 
         instance = get_dagster_instance()

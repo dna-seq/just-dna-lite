@@ -1,7 +1,11 @@
 import reflex as rx
+import os
+
+api_url = os.getenv("API_URL", "http://localhost:8000")
 
 config = rx.Config(
     app_name="webui",
+    api_url=api_url,
     disable_plugins=["reflex.plugins.sitemap.SitemapPlugin"],
     # Fomantic UI styling
     stylesheets=[

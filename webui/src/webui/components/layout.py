@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import reflex as rx
+import os
+
+
+def get_dagster_web_url() -> str:
+    """Get the URL for the Dagster web UI from environment or default."""
+    return os.getenv("DAGSTER_WEB_URL", "http://localhost:3005").rstrip("/")
 
 
 def topbar() -> rx.Component:
     """Top navigation bar using flexbox for reliable horizontal layout."""
+    dagster_url = get_dagster_web_url()
     return rx.el.div(
         # Left: Logo and Nav
         rx.el.div(
@@ -43,7 +50,7 @@ def topbar() -> rx.Component:
             rx.el.a(
                 rx.icon("external-link", size=16),
                 rx.el.span(" Dagster", style={"marginLeft": "6px"}),
-                href="http://localhost:3005",
+                href=dagster_url,
                 target="_blank",
                 class_name="ui button",
                 id="topbar-dagster-link",

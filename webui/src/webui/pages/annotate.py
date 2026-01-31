@@ -108,7 +108,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
-        id=rx.Var.create("file-item-") + filename.to_string(),
+        id=rx.Var.create("file-item-") + filename.to(str),
         on_click=lambda: UploadState.select_file(filename),
         class_name=rx.cond(
             is_selected,
@@ -142,6 +142,21 @@ def file_column_content() -> rx.Component:
             style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
         ),
         
+        # Instruction message when no file is selected
+        rx.cond(
+            ~UploadState.has_selected_file,
+            rx.el.div(
+                rx.el.div(
+                    rx.el.div("Please upload or select vcf file", class_name="header"),
+                    rx.el.p("Choose a file from the library below or upload a new one to begin analysis."),
+                    class_name="content",
+                ),
+                class_name="ui info message",
+                style={"marginBottom": "16px"},
+            ),
+            rx.fragment(),
+        ),
+        
         rx.el.div(class_name="ui divider", style={"margin": "0 0 16px 0"}),
         
         # Upload Section
@@ -158,11 +173,12 @@ def file_column_content() -> rx.Component:
         
         # Upload button
         rx.el.button(
-            rx.icon("upload", size=16),
-            " Upload",
+            rx.el.i("", class_name="upload icon"),
+            " Upload Files",
             on_click=UploadState.handle_upload(rx.upload_files(upload_id="vcf_upload")),
             loading=UploadState.uploading,
-            class_name="ui primary button fluid",
+            disabled=rx.selected_files("vcf_upload").length() == 0,
+            class_name="ui positive inverted big labeled icon button fluid",
             id="upload-button",
             style={"marginTop": "10px"},
         ),
@@ -293,7 +309,7 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                 "opacity": rx.cond(has_file, "1.0", "0.5"),
             },
         ),
-        id=rx.Var.create("module-card-") + module["name"].to_string(),
+        id=rx.Var.create("module-card-") + module["name"].to(str),
         on_click=rx.cond(has_file, UploadState.toggle_module(module["name"]), UploadState.do_nothing),
         class_name=rx.cond(has_file, "ui segment", "ui disabled segment"),
         style={
@@ -407,14 +423,15 @@ def module_column_content() -> rx.Component:
 
 def run_card(run: rx.Var[dict]) -> rx.Component:
     """Run history card with status badge, timing, and Dagster link."""
-    dagster_url = rx.Var.create("http://localhost:3005/runs/") + run["run_id"].to_string()
+    run_id_str = run["run_id"].to(str)
+    dagster_url = UploadState.dagster_web_url + "/runs/" + run_id_str
     
     return rx.el.div(
         # Header row: Status + Timestamp
         rx.el.div(
             # Status badge
             rx.el.div(
-                run["status"],
+                run["status"].to(str),
                 class_name=rx.cond(
                     run["status"] == "SUCCESS",
                     "ui green label",
@@ -431,7 +448,7 @@ def run_card(run: rx.Var[dict]) -> rx.Component:
             ),
             # Timestamp
             rx.el.div(
-                run["started_at"],
+                run["started_at"].to(str),
                 style={"fontSize": "0.85rem", "color": "#666", "marginLeft": "10px"},
             ),
             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
@@ -443,7 +460,7 @@ def run_card(run: rx.Var[dict]) -> rx.Component:
                 rx.icon("external-link", size=12),
                 rx.el.span(
                     " ",
-                    run["run_id"].to_string(),
+                    run_id_str,
                     style={"fontFamily": "monospace", "fontSize": "0.75rem"},
                 ),
                 href=dagster_url,
@@ -465,7 +482,7 @@ def run_card(run: rx.Var[dict]) -> rx.Component:
             rx.el.span("Modules: ", style={"color": "#888", "fontSize": "0.85rem"}),
             rx.foreach(
                 run["modules"].to(list),
-                lambda m: rx.el.span(m, class_name="ui mini label", style={"marginRight": "3px"}),
+                lambda m: rx.el.span(m.to(str), class_name="ui mini label", style={"marginRight": "3px"}),
             ),
             style={"marginBottom": "8px"},
         ),
@@ -494,7 +511,7 @@ def run_card(run: rx.Var[dict]) -> rx.Component:
             ),
             style={"display": "flex", "alignItems": "center", "marginTop": "4px"},
         ),
-        id=rx.Var.create("run-card-") + run["run_id"].to_string(),
+        id=rx.Var.create("run-card-") + run_id_str,
         class_name="ui segment",
         style={
             "margin": "0 0 10px 0",
@@ -634,7 +651,7 @@ def results_column_content() -> rx.Component:
             rx.el.a(
                 rx.icon("external-link", size=14),
                 " Open Dagster UI",
-                href="http://localhost:3005",
+                href=UploadState.dagster_web_url,
                 target="_blank",
                 class_name="ui button",
                 id="dagster-ui-link",
