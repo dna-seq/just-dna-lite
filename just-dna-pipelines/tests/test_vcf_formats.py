@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
-Tests for scan_vcf_with_formats function.
+Tests for VCF FORMAT field reading via read_vcf_file.
 
 Tests verify:
-- Type correctness: FORMAT fields have proper types (Int64, List[Int64], etc.)
+- Type correctness: FORMAT fields have proper types (Int32, List[Int32], etc.)
 - Genotype computation: GT + ref + alt → sorted allele list
 - Determinism: multiple collects return identical results
 - Row alignment: FORMAT fields are correctly aligned with VCF coordinates
 - Ground truth: FORMAT values match raw VCF parsing when converted
+
+Note: polars-bio natively handles FORMAT fields with types:
+- GT: String
+- GQ: Int32
+- DP: Int32
+- AD: List(Int32)
+- VAF: List(Float32)
+- PL: List(Int32)
 """
 
 from pathlib import Path
@@ -16,7 +24,7 @@ from typing import Any
 import polars as pl
 import pytest
 
-from just_dna_pipelines.io import scan_vcf_with_formats
+from just_dna_pipelines.io import read_vcf_file
 
 
 @pytest.fixture
@@ -99,31 +107,31 @@ def parse_gt_to_genotype(gt: str, ref: str, alt: str) -> list[str]:
 
 
 def test_format_field_types(test_vcf_path: Path) -> None:
-    """FORMAT fields should have correct Polars types per VCF spec."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    """FORMAT fields should have correct Polars types per polars-bio spec."""
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     schema = lf.collect_schema()
     
     # GT stays as String
     assert schema["GT"] == pl.String, f"GT should be String, got {schema['GT']}"
     
-    # Integer fields
-    assert schema["GQ"] == pl.Int64, f"GQ should be Int64, got {schema['GQ']}"
-    assert schema["DP"] == pl.Int64, f"DP should be Int64, got {schema['DP']}"
+    # Integer fields (polars-bio uses Int32)
+    assert schema["GQ"] == pl.Int32, f"GQ should be Int32, got {schema['GQ']}"
+    assert schema["DP"] == pl.Int32, f"DP should be Int32, got {schema['DP']}"
     
-    # List of integers
-    assert schema["AD"] == pl.List(pl.Int64), f"AD should be List(Int64), got {schema['AD']}"
-    assert schema["PL"] == pl.List(pl.Int64), f"PL should be List(Int64), got {schema['PL']}"
+    # List of integers (polars-bio uses Int32)
+    assert schema["AD"] == pl.List(pl.Int32), f"AD should be List(Int32), got {schema['AD']}"
+    assert schema["PL"] == pl.List(pl.Int32), f"PL should be List(Int32), got {schema['PL']}"
     
-    # List of floats (VAF can be multi-valued for multi-allelic sites)
-    assert schema["VAF"] == pl.List(pl.Float64), f"VAF should be List(Float64), got {schema['VAF']}"
+    # List of floats (polars-bio uses Float32)
+    assert schema["VAF"] == pl.List(pl.Float32), f"VAF should be List(Float32), got {schema['VAF']}"
     
-    # Genotype column
+    # Genotype column (computed by read_vcf_file)
     assert schema["genotype"] == pl.List(pl.String), f"genotype should be List(String), got {schema['genotype']}"
 
 
 def test_integer_fields_values(test_vcf_path: Path, raw_vcf_ground_truth: list[dict]) -> None:
     """GQ and DP values should match raw VCF when parsed as integers."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     # Sample multiple rows for verification
@@ -149,7 +157,7 @@ def test_integer_fields_values(test_vcf_path: Path, raw_vcf_ground_truth: list[d
 
 def test_list_integer_fields_values(test_vcf_path: Path, raw_vcf_ground_truth: list[dict]) -> None:
     """AD and PL values should match raw VCF when parsed as list of integers."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     sample_indices = [0, 1, 10, 50, 100, len(raw_vcf_ground_truth) - 1]
@@ -180,7 +188,7 @@ def test_list_integer_fields_values(test_vcf_path: Path, raw_vcf_ground_truth: l
 
 def test_vaf_float_list_values(test_vcf_path: Path, raw_vcf_ground_truth: list[dict]) -> None:
     """VAF values should match raw VCF when parsed as list of floats."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     sample_indices = [0, 1, 10, 50, 100, len(raw_vcf_ground_truth) - 1]
@@ -211,7 +219,7 @@ def test_vaf_float_list_values(test_vcf_path: Path, raw_vcf_ground_truth: list[d
 
 def test_genotype_computation_heterozygous(test_vcf_path: Path) -> None:
     """Heterozygous variants should have two different alleles in genotype."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.filter(pl.col("GT") == "0/1").collect()
     
     # Should have heterozygous variants
@@ -237,7 +245,7 @@ def test_genotype_computation_heterozygous(test_vcf_path: Path) -> None:
 
 def test_genotype_computation_homozygous_ref(test_vcf_path: Path) -> None:
     """Homozygous ref variants should have two copies of REF allele."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.filter(pl.col("GT") == "0/0").collect()
     
     # Should have homozygous ref variants
@@ -257,7 +265,7 @@ def test_genotype_computation_homozygous_ref(test_vcf_path: Path) -> None:
 
 def test_genotype_computation_homozygous_alt(test_vcf_path: Path) -> None:
     """Homozygous alt variants should have two copies of ALT allele."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.filter(pl.col("GT") == "1/1").collect()
     
     # Should have homozygous alt variants
@@ -280,7 +288,7 @@ def test_genotype_ground_truth_alignment(
     raw_vcf_ground_truth: list[dict]
 ) -> None:
     """Genotype column should match computed ground truth for all rows."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     assert df.height == len(raw_vcf_ground_truth), "Row count mismatch with ground truth"
@@ -302,7 +310,7 @@ def test_genotype_ground_truth_alignment(
 
 def test_genotype_disabled(test_vcf_path: Path) -> None:
     """compute_genotype=False should not add genotype column."""
-    lf = scan_vcf_with_formats(str(test_vcf_path), compute_genotype=False)
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None, compute_genotype=False)
     df = lf.collect()
     
     assert "genotype" not in df.columns, "genotype column should not be present when disabled"
@@ -310,13 +318,11 @@ def test_genotype_disabled(test_vcf_path: Path) -> None:
 
 def test_genotype_requires_gt_field(test_vcf_path: Path) -> None:
     """Genotype is only computed when GT is in format_fields."""
-    # Note: format_fields must match VCF FORMAT order since extraction is by index.
-    # To skip GT, we'd need a different approach. Instead, test that when
-    # GT is excluded from format_fields, genotype column is not added.
-    
     # Use only GT field to verify genotype is computed
-    lf_with_gt = scan_vcf_with_formats(
+    lf_with_gt = read_vcf_file(
         str(test_vcf_path), 
+        with_formats=True,
+        save_parquet=None,
         format_fields=["GT"],
         compute_genotype=True
     )
@@ -326,8 +332,10 @@ def test_genotype_requires_gt_field(test_vcf_path: Path) -> None:
     )
     
     # When format_fields is empty, no genotype should be computed
-    lf_no_formats = scan_vcf_with_formats(
+    lf_no_formats = read_vcf_file(
         str(test_vcf_path), 
+        with_formats=True,
+        save_parquet=None,
         format_fields=[],
         compute_genotype=True
     )
@@ -342,14 +350,14 @@ def test_genotype_requires_gt_field(test_vcf_path: Path) -> None:
 # =============================================================================
 
 
-def test_scan_vcf_with_formats_determinism(
+def test_read_vcf_determinism(
     test_vcf_path: Path, 
     expected_format_order: list[str]
 ) -> None:
     """Multiple collects should return identical results."""
     results = []
     for _ in range(5):
-        lf = scan_vcf_with_formats(str(test_vcf_path), format_fields=expected_format_order)
+        lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None, format_fields=expected_format_order)
         df = lf.collect()
         results.append(df)
     
@@ -357,12 +365,12 @@ def test_scan_vcf_with_formats_determinism(
         assert results[0].equals(results[i]), f"Result {i} differs from result 0"
 
 
-def test_scan_vcf_with_formats_row_count(
+def test_read_vcf_row_count(
     test_vcf_path: Path, 
     raw_vcf_ground_truth: list[dict]
 ) -> None:
     """Row count should match raw VCF line count."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     assert df.height == len(raw_vcf_ground_truth), (
@@ -370,12 +378,12 @@ def test_scan_vcf_with_formats_row_count(
     )
 
 
-def test_scan_vcf_with_formats_columns(
+def test_read_vcf_columns(
     test_vcf_path: Path, 
     expected_format_order: list[str]
 ) -> None:
     """Output should contain standard VCF columns plus requested FORMAT fields."""
-    lf = scan_vcf_with_formats(str(test_vcf_path), format_fields=expected_format_order)
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None, format_fields=expected_format_order)
     df = lf.collect()
     
     # Standard polars-bio columns
@@ -397,12 +405,12 @@ def test_scan_vcf_with_formats_columns(
     assert "genotype" in actual_cols, "genotype column should be present by default"
 
 
-def test_scan_vcf_with_formats_coordinate_alignment(
+def test_read_vcf_coordinate_alignment(
     test_vcf_path: Path, 
     raw_vcf_ground_truth: list[dict],
 ) -> None:
     """Coordinates and alleles should be correctly aligned with VCF."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     # Check alignment for multiple rows
@@ -421,9 +429,9 @@ def test_scan_vcf_with_formats_coordinate_alignment(
         assert actual["alt"] == expected["alt"], f"Row {idx}: alt mismatch"
 
 
-def test_scan_vcf_with_formats_empty_format_fields(test_vcf_path: Path) -> None:
+def test_read_vcf_empty_format_fields(test_vcf_path: Path) -> None:
     """Empty format_fields should return polars-bio result only."""
-    lf = scan_vcf_with_formats(str(test_vcf_path), format_fields=[])
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None, format_fields=[])
     df = lf.collect()
     
     # Should not have any FORMAT columns
@@ -442,7 +450,7 @@ def test_scan_vcf_with_formats_empty_format_fields(test_vcf_path: Path) -> None:
 
 def test_filter_by_depth(test_vcf_path: Path) -> None:
     """Should be able to filter variants by read depth (DP)."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     
     # Filter for high-depth variants
     df_high_dp = lf.filter(pl.col("DP") >= 30).collect()
@@ -457,7 +465,7 @@ def test_filter_by_depth(test_vcf_path: Path) -> None:
 
 def test_filter_by_genotype_quality(test_vcf_path: Path) -> None:
     """Should be able to filter variants by genotype quality (GQ)."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     
     # Filter for high-quality genotype calls
     df_high_gq = lf.filter(pl.col("GQ") >= 20).collect()
@@ -468,7 +476,7 @@ def test_filter_by_genotype_quality(test_vcf_path: Path) -> None:
 
 def test_filter_by_genotype(test_vcf_path: Path) -> None:
     """Should be able to filter variants by GT string."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     
     # Filter for heterozygous variants
     df_het = lf.filter(pl.col("GT") == "0/1").collect()
@@ -479,7 +487,7 @@ def test_filter_by_genotype(test_vcf_path: Path) -> None:
 
 def test_aggregate_ad_values(test_vcf_path: Path) -> None:
     """AD (allelic depth) list should be usable for computations."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     # Compute total AD per variant (sum of all allele depths)
@@ -501,7 +509,7 @@ def test_aggregate_ad_values(test_vcf_path: Path) -> None:
 
 def test_vaf_range(test_vcf_path: Path) -> None:
     """VAF values should be in valid range [0, 1]."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     # Explode VAF list to check all values
@@ -516,7 +524,7 @@ def test_vaf_range(test_vcf_path: Path) -> None:
 
 def test_pl_genotype_likelihood_structure(test_vcf_path: Path) -> None:
     """PL (Phred-scaled likelihoods) should have expected structure."""
-    lf = scan_vcf_with_formats(str(test_vcf_path))
+    lf = read_vcf_file(str(test_vcf_path), with_formats=True, save_parquet=None)
     df = lf.collect()
     
     # For diploid biallelic variants, PL should have 3 values: [0/0, 0/1, 1/1]

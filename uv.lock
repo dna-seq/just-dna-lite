@@ -1672,7 +1672,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "just-dna-pipelines" },
@@ -1744,7 +1744,7 @@ requires-dist = [
     { name = "eliot", specifier = ">=1.17.5" },
     { name = "fsspec", specifier = ">=2025.10.0" },
     { name = "huggingface-hub", specifier = ">=1.1.5" },
-    { name = "polars-bio", specifier = ">=0.19.0" },
+    { name = "polars-bio", specifier = ">=0.20.1" },
     { name = "pooch", specifier = ">=1.8.2" },
     { name = "psutil", specifier = ">=7.1.3" },
     { name = "pycomfort", specifier = ">=0.0.18" },
@@ -2326,48 +2326,60 @@ wheels = [
 
 [[package]]
 name = "polars"
-version = "1.36.1"
+version = "1.37.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars-runtime-32" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/dc/56f2a90c79a2cb13f9e956eab6385effe54216ae7a2068b3a6406bae4345/polars-1.36.1.tar.gz", hash = "sha256:12c7616a2305559144711ab73eaa18814f7aa898c522e7645014b68f1432d54c", size = 711993, upload-time = "2025-12-10T01:14:53.033Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/84/ae/dfebf31b9988c20998140b54d5b521f64ce08879f2c13d9b4d44d7c87e32/polars-1.37.1.tar.gz", hash = "sha256:0309e2a4633e712513401964b4d95452f124ceabf7aec6db50affb9ced4a274e", size = 715572, upload-time = "2026-01-12T23:27:03.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/c6/36a1b874036b49893ecae0ac44a2f63d1a76e6212631a5b2f50a86e0e8af/polars-1.36.1-py3-none-any.whl", hash = "sha256:853c1bbb237add6a5f6d133c15094a9b727d66dd6a4eb91dbb07cdb056b2b8ef", size = 802429, upload-time = "2025-12-10T01:13:53.838Z" },
+    { url = "https://files.pythonhosted.org/packages/08/75/ec73e38812bca7c2240aff481b9ddff20d1ad2f10dee4b3353f5eeaacdab/polars-1.37.1-py3-none-any.whl", hash = "sha256:377fed8939a2f1223c1563cfabdc7b4a3d6ff846efa1f2ddeb8644fafd9b1aff", size = 805749, upload-time = "2026-01-12T23:25:48.595Z" },
 ]
 
 [[package]]
 name = "polars-bio"
-version = "0.19.0"
+version = "0.20.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "datafusion" },
     { name = "mkdocs-glightbox" },
     { name = "polars" },
+    { name = "polars-config-meta" },
     { name = "pyarrow" },
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/9e/fca4986cc3e19fda600f6481547ee904dcbf57b534dfec215a23a1d80d4e/polars_bio-0.19.0.tar.gz", hash = "sha256:89a4f0871b3c74c0643a6fc0d6c084ba0b6c1f226afa5562f2b8b4a9a3ad6b2f", size = 35125217, upload-time = "2025-12-08T17:23:46.173Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/5b/eabd5bdbf0de03661033c217adc6d5ce626375ee54253d07d1d7e1c06f5b/polars_bio-0.20.1.tar.gz", hash = "sha256:868509e3bdc87723bab02f7d78109eb3a450e5d5623bf36a674395346f8f0e49", size = 35143384, upload-time = "2026-01-25T18:38:16.953Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/85/5bbbc4576f9f147fad99f3e0fa0153f989269a2c15a068064b044afce98d/polars_bio-0.19.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:0e146bda7ee36e6bb70ef0ad5d30299919dea2c518842d652bedda9eac85e80d", size = 58309548, upload-time = "2025-12-08T17:23:37.221Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/8a/396e10b4640dbc1519c1e84ed50e86d2c3161b49287730ce1649a4199c8f/polars_bio-0.19.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:6034281471de87f0228939442dacf025fb065d00e1a3beaae44fa07cad1e8443", size = 55350833, upload-time = "2025-12-08T17:23:34.111Z" },
-    { url = "https://files.pythonhosted.org/packages/59/1d/9a1ce799dab933e930216c0a5c902175a2c25aa8e2d7d9019c6369952389/polars_bio-0.19.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6997b57666fb9af6be32da66a1fbe8eedcd2e62e3473eca82c34657c5ba828b1", size = 62799802, upload-time = "2025-12-08T17:23:39.971Z" },
-    { url = "https://files.pythonhosted.org/packages/4b/cf/d2abbdfc85812b0bee8a88c60a4f375bcde35eb4bb463d64f1a4a6cb9b50/polars_bio-0.19.0-cp39-abi3-win_amd64.whl", hash = "sha256:6e93833f60a10851dd798c63ac853c4d82ecb0b8af0a35d92367f95ac04dcc15", size = 54970814, upload-time = "2025-12-08T17:23:48.915Z" },
+    { url = "https://files.pythonhosted.org/packages/33/37/fda3664d6cd731fae900fcd76468a6a1e22a3343aa53ef888a8e0fa6cb69/polars_bio-0.20.1-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:2f22cd51e4122ff5e65e35a8c856b3188aa1d5d49c4e9f80736847291cdd9a51", size = 58422967, upload-time = "2026-01-25T18:38:04.669Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/e5/6dc3400bc4bea5e6576c2468536bad65b956483f2c32ec9af9c98e7c068d/polars_bio-0.20.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:61ef513e3ec2d089684337f6017d1ed1a6a760b7acbe67697d3c706ff7dadd3f", size = 55432775, upload-time = "2026-01-25T18:38:00.701Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/66/4f1f8decc506e7a561245982832e4ab87d95e6b08b1b9ec657f2c91ad5e1/polars_bio-0.20.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:87a7cbcdb0b68f3366955b8033a34538c9c59f9ef02d05ccdfe0fe4b46dd6c23", size = 62917598, upload-time = "2026-01-25T18:38:09.216Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/5b/3f1a09eeafb626095e7ce3f977bf023ebf396640761bb838d79287f8fb9b/polars_bio-0.20.1-cp39-abi3-win_amd64.whl", hash = "sha256:6aeabd6e282587a9d2219dad891b8b68db9dd1086efc310a40e292f4ed599a62", size = 55092530, upload-time = "2026-01-25T18:38:20.822Z" },
+]
+
+[[package]]
+name = "polars-config-meta"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/c2/794a7e877e2e598c9a3cdc321d63e1d65d59595997880edf2577831ee6fc/polars_config_meta-0.3.2.tar.gz", hash = "sha256:b1fa809357776c751a57212f155bfbefd9bf02faead5ec59d0d5d4cd4fcf52e1", size = 16730, upload-time = "2026-01-05T12:50:04.783Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/e1/fed85aa50b0ad75d4b3cae94962148b4f03338b240a74afdc8400c73203f/polars_config_meta-0.3.2-py3-none-any.whl", hash = "sha256:efd6e7df6410b10695f1ee23d1ffc0d5292320aea6a273345f6849ae34d9d14e", size = 13057, upload-time = "2026-01-05T12:50:03.68Z" },
 ]
 
 [[package]]
 name = "polars-runtime-32"
-version = "1.36.1"
+version = "1.37.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/31/df/597c0ef5eb8d761a16d72327846599b57c5d40d7f9e74306fc154aba8c37/polars_runtime_32-1.36.1.tar.gz", hash = "sha256:201c2cfd80ceb5d5cd7b63085b5fd08d6ae6554f922bcb941035e39638528a09", size = 2788751, upload-time = "2025-12-10T01:14:54.172Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/40/0b/addabe5e8d28a5a4c9887a08907be7ddc3fce892dc38f37d14b055438a57/polars_runtime_32-1.37.1.tar.gz", hash = "sha256:68779d4a691da20a5eb767d74165a8f80a2bdfbde4b54acf59af43f7fa028d8f", size = 2818945, upload-time = "2026-01-12T23:27:04.653Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/ea/871129a2d296966c0925b078a9a93c6c5e7facb1c5eebfcd3d5811aeddc1/polars_runtime_32-1.36.1-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:327b621ca82594f277751f7e23d4b939ebd1be18d54b4cdf7a2f8406cecc18b2", size = 43494311, upload-time = "2025-12-10T01:13:56.096Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/76/0038210ad1e526ce5bb2933b13760d6b986b3045eccc1338e661bd656f77/polars_runtime_32-1.36.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:ab0d1f23084afee2b97de8c37aa3e02ec3569749ae39571bd89e7a8b11ae9e83", size = 39300602, upload-time = "2025-12-10T01:13:59.366Z" },
-    { url = "https://files.pythonhosted.org/packages/54/1e/2707bee75a780a953a77a2c59829ee90ef55708f02fc4add761c579bf76e/polars_runtime_32-1.36.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:899b9ad2e47ceb31eb157f27a09dbc2047efbf4969a923a6b1ba7f0412c3e64c", size = 44511780, upload-time = "2025-12-10T01:14:02.285Z" },
-    { url = "https://files.pythonhosted.org/packages/11/b2/3fede95feee441be64b4bcb32444679a8fbb7a453a10251583053f6efe52/polars_runtime_32-1.36.1-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:d9d077bb9df711bc635a86540df48242bb91975b353e53ef261c6fae6cb0948f", size = 40688448, upload-time = "2025-12-10T01:14:05.131Z" },
-    { url = "https://files.pythonhosted.org/packages/05/0f/e629713a72999939b7b4bfdbf030a32794db588b04fdf3dc977dd8ea6c53/polars_runtime_32-1.36.1-cp39-abi3-win_amd64.whl", hash = "sha256:cc17101f28c9a169ff8b5b8d4977a3683cd403621841623825525f440b564cf0", size = 44464898, upload-time = "2025-12-10T01:14:08.296Z" },
-    { url = "https://files.pythonhosted.org/packages/d1/d8/a12e6aa14f63784cead437083319ec7cece0d5bb9a5bfe7678cc6578b52a/polars_runtime_32-1.36.1-cp39-abi3-win_arm64.whl", hash = "sha256:809e73857be71250141225ddd5d2b30c97e6340aeaa0d445f930e01bef6888dc", size = 39798896, upload-time = "2025-12-10T01:14:11.568Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/a2/e828ea9f845796de02d923edb790e408ca0b560cd68dbd74bb99a1b3c461/polars_runtime_32-1.37.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:0b8d4d73ea9977d3731927740e59d814647c5198bdbe359bcf6a8bfce2e79771", size = 43499912, upload-time = "2026-01-12T23:25:51.182Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/46/81b71b7aa9e3703ee6e4ef1f69a87e40f58ea7c99212bf49a95071e99c8c/polars_runtime_32-1.37.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:c682bf83f5f352e5e02f5c16c652c48ca40442f07b236f30662b22217320ce76", size = 39695707, upload-time = "2026-01-12T23:25:54.289Z" },
+    { url = "https://files.pythonhosted.org/packages/81/2e/20009d1fde7ee919e24040f5c87cb9d0e4f8e3f109b74ba06bc10c02459c/polars_runtime_32-1.37.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fc82b5bbe70ca1a4b764eed1419f6336752d6ba9fc1245388d7f8b12438afa2c", size = 41467034, upload-time = "2026-01-12T23:25:56.925Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/21/9b55bea940524324625b1e8fd96233290303eb1bf2c23b54573487bbbc25/polars_runtime_32-1.37.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a8362d11ac5193b994c7e9048ffe22ccfb976699cfbf6e128ce0302e06728894", size = 45142711, upload-time = "2026-01-12T23:26:00.817Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/25/c5f64461aeccdac6834a89f826d051ccd3b4ce204075e562c87a06ed2619/polars_runtime_32-1.37.1-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:04f5d5a2f013dca7391b7d8e7672fa6d37573a87f1d45d3dd5f0d9b5565a4b0f", size = 41638564, upload-time = "2026-01-12T23:26:04.186Z" },
+    { url = "https://files.pythonhosted.org/packages/35/af/509d3cf6c45e764ccf856beaae26fc34352f16f10f94a7839b1042920a73/polars_runtime_32-1.37.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:fbfde7c0ca8209eeaed546e4a32cca1319189aa61c5f0f9a2b4494262bd0c689", size = 44721136, upload-time = "2026-01-12T23:26:07.088Z" },
+    { url = "https://files.pythonhosted.org/packages/af/d1/5c0a83a625f72beef59394bebc57d12637997632a4f9d3ab2ffc2cc62bbf/polars_runtime_32-1.37.1-cp310-abi3-win_amd64.whl", hash = "sha256:da3d3642ae944e18dd17109d2a3036cb94ce50e5495c5023c77b1599d4c861bc", size = 44948288, upload-time = "2026-01-12T23:26:10.214Z" },
+    { url = "https://files.pythonhosted.org/packages/10/f3/061bb702465904b6502f7c9081daee34b09ccbaa4f8c94cf43a2a3b6dd6f/polars_runtime_32-1.37.1-cp310-abi3-win_arm64.whl", hash = "sha256:55f2c4847a8d2e267612f564de7b753a4bde3902eaabe7b436a0a4abf75949a0", size = 41001914, upload-time = "2026-01-12T23:26:12.997Z" },
 ]
 
 [[package]]
@@ -3058,7 +3070,7 @@ wheels = [
 
 [[package]]
 name = "reflex"
-version = "0.8.23"
+version = "0.8.26"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -3079,14 +3091,14 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/e5/39f2f6f0997af976aa0029dbbb31a739c6e39f60c8d187f431e86bd7b24d/reflex-0.8.23.tar.gz", hash = "sha256:296d4f75ab6d1a70639780842d3e38985365e53f10e2620fab80428ce7e6748a", size = 569386, upload-time = "2025-12-15T23:23:33.806Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/7d/b4e6e7de6eae4258bae3dee3e2196eca0f8a59655c471be3e9beb51734bf/reflex-0.8.26.tar.gz", hash = "sha256:27e0571b5422454032674d155a4372fe526670312ddeb9b137bbe1e14d6835d9", size = 572220, upload-time = "2026-01-20T22:54:43.21Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/c0/faa8e59e770c401ddcad0d555b6840c467b90c80a0da605e9eced4b1f700/reflex-0.8.23-py3-none-any.whl", hash = "sha256:a9efe8f360c6fa703f3a3d38a1c0fe6a63902f3fcd8a72ea1fe0eb506321d8f3", size = 811480, upload-time = "2025-12-15T23:23:35.727Z" },
+    { url = "https://files.pythonhosted.org/packages/11/49/0441019df3c113927cdb5d439a975c5c6674183d637186f439e4a25d7d58/reflex-0.8.26-py3-none-any.whl", hash = "sha256:b51bc6c1a5087f52c1567ace3752edcbff4bd12453fee0f90384271d0cc4da48", size = 814949, upload-time = "2026-01-20T22:54:41.292Z" },
 ]
 
 [[package]]
 name = "reflex-hosting-cli"
-version = "0.1.60"
+version = "0.1.61"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -3095,9 +3107,9 @@ dependencies = [
     { name = "platformdirs" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/64/eff9f89e813ef7b8506a943807bce577b6e7fdfdc96d60cc39a09c771e7a/reflex_hosting_cli-0.1.60.tar.gz", hash = "sha256:cabb03e5a5e034393c9c3ce12088fadafc49ad933efe1555bb9cb93afd9a819f", size = 35718, upload-time = "2025-12-16T20:23:46.44Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/8e/10d095093ac7f08f5a0c286b5be289bfee978ebe51f66884cae6df080b7c/reflex_hosting_cli-0.1.61.tar.gz", hash = "sha256:064520951559e7382777bb28bc03b95e0418fd97c0f69751a2f00920453b82d8", size = 35774, upload-time = "2025-12-23T23:50:47.94Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/45/8e06fb70e2d6b29efc49ad7210624706056046163be8d3e20112b79aaf00/reflex_hosting_cli-0.1.60-py3-none-any.whl", hash = "sha256:26b340ea1cc4ee007c21d1ef7df200265f7e1d4551a826825f1f76ac04fe0c29", size = 45291, upload-time = "2025-12-16T20:23:45.448Z" },
+    { url = "https://files.pythonhosted.org/packages/96/97/2b058a398a9ebaa75b5220801c0d0c997b0e743bc3d2045de0fb19580d10/reflex_hosting_cli-0.1.61-py3-none-any.whl", hash = "sha256:e4cc91aaef63027c0ec175aeb54e6c6d25eb7b79214039d3fc2790c3fdb8c3d4", size = 45339, upload-time = "2025-12-23T23:50:46.617Z" },
 ]
 
 [[package]]
@@ -3993,7 +4005,7 @@ dev = [
 requires-dist = [
     { name = "granian", specifier = ">=2.6.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "reflex", specifier = ">=0.8.23" },
+    { name = "reflex", specifier = ">=0.8.26" },
 ]
 
 [package.metadata.requires-dev]

@@ -12,12 +12,8 @@ from webui.pages.annotate import annotate_page
 load_env()
 
 app = rx.App(
-    theme=rx.theme(
-        appearance="light",
-        has_background=True,
-        accent_color="indigo",
-        radius="medium",
-    ),
+    # Disable Radix theme to let Fomantic UI styles work properly
+    theme=None,
 )
 
 # Ensure pages are registered.

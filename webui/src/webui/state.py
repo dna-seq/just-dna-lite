@@ -304,6 +304,7 @@ class UploadState(rx.State):
 
     def toggle_module(self, module: str):
         """Toggle a module on/off in the selection."""
+        self.last_run_success = False
         if module in self.selected_modules:
             self.selected_modules = [m for m in self.selected_modules if m != module]
         else:
@@ -311,10 +312,12 @@ class UploadState(rx.State):
 
     def select_all_modules(self):
         """Select all available modules."""
+        self.last_run_success = False
         self.selected_modules = self.available_modules.copy()
 
     def deselect_all_modules(self):
         """Deselect all modules."""
+        self.last_run_success = False
         self.selected_modules = []
 
     async def run_hf_annotation(self, filename: str = ""):
@@ -396,10 +399,15 @@ class UploadState(rx.State):
     active_run_id: str = ""
     run_logs: List[str] = []
     polling_active: bool = False
+    
+    # Tracking for the UI button state
+    last_run_success: bool = False
 
     def select_file(self, filename: str):
         """Select a file and pre-select modules from its latest run if available."""
         self.selected_file = filename
+        # Reset success state on selection change
+        self.last_run_success = False
         
         # Find the latest run for this file to pre-select modules
         file_runs = [r for r in self.runs if r.get("filename") == filename]
@@ -461,6 +469,33 @@ class UploadState(rx.State):
         return bool(self.selected_file) and len(self.selected_modules) > 0
 
     @rx.var
+    def analysis_button_text(self) -> str:
+        """Get the text for the analysis button based on state."""
+        if self.running:
+            return "Analysis Running..."
+        if self.last_run_success:
+            return "Analysis Complete"
+        return "Start Analysis"
+
+    @rx.var
+    def analysis_button_icon(self) -> str:
+        """Get the icon for the analysis button based on state."""
+        if self.running:
+            return "loader-circle"
+        if self.last_run_success:
+            return "circle-check"
+        return "play"
+
+    @rx.var
+    def analysis_button_color(self) -> str:
+        """Get the color class for the analysis button (Fomantic UI right labeled icon)."""
+        if self.running:
+            return "ui blue right labeled icon large button fluid"
+        if self.last_run_success:
+            return "ui green right labeled icon large button fluid"
+        return "ui primary right labeled icon large button fluid"
+
+    @rx.var
     def module_metadata_list(self) -> List[Dict[str, Any]]:
         """Return module metadata for UI display."""
         result = []
@@ -504,6 +539,8 @@ class UploadState(rx.State):
             return
 
         self.running = True
+        self.run_logs = []  # Clear previous logs
+        self._add_log("Starting annotation job...")
         yield
 
         if not self.safe_user_id:
@@ -515,6 +552,10 @@ class UploadState(rx.State):
 
         root = Path(__file__).resolve().parents[3]
         vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+
+        self._add_log(f"File: {self.selected_file}")
+        self._add_log(f"Modules: {', '.join(self.selected_modules)}")
+        self._add_log(f"User: {self.safe_user_id}")
 
         instance = get_dagster_instance()
 
@@ -534,38 +575,86 @@ class UploadState(rx.State):
             }
         }
 
-        # Execute job in-process (like prepare-annotations does)
-        # This avoids daemon/workspace mismatch issues
-        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
+        self._add_log("Executing Dagster job...")
+        
+        # Execute job in-process with error handling
+        result = None
+        error_message = None
+        try:
+            result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
+        except Exception as e:
+            error_message = str(e)
+            self._add_log(f"ERROR: {error_message}")
+            # Extract key error info
+            if "invalid reference bases length" in error_message:
+                self._add_log("HINT: VCF file may be corrupted or truncated")
+            elif "ComputeError" in error_message:
+                self._add_log("HINT: Data processing error - check VCF file format")
 
+        # Determine success
+        success = result is not None and result.success
+        status = "SUCCESS" if success else "FAILURE"
+        
+        # Get run_id and create Dagster URL
+        run_id = result.run_id if result else "unknown"
+        dagster_url = f"http://localhost:3005/runs/{run_id}"
+        
+        # Log run info with URL
+        self._add_log(f"Run ID: {run_id}")
+        self._add_log(f"Dagster URL: {dagster_url}")
+        self._add_log(f"Status: {status}")
+        
         # Add to run history
         run_info = {
-            "run_id": result.run_id if result else "unknown",
+            "run_id": run_id,
             "filename": self.selected_file,
             "sample_name": sample_name,
             "modules": modules_to_use,
-            "status": "SUCCESS" if result.success else "FAILURE",
+            "status": status,
             "started_at": datetime.now().isoformat(),
             "ended_at": datetime.now().isoformat(),
             "output_path": None,
+            "error": error_message,
+            "dagster_url": dagster_url,
         }
         
         # Find output path if successful
-        if result.success:
+        if success:
             output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
             if output_dir.exists():
                 run_info["output_path"] = str(output_dir)
+                self._add_log(f"Output: {output_dir}")
+        
+        # Fetch Dagster logs if we have a run_id
+        if result and result.run_id:
+            self._add_log("Fetching run logs...")
+            try:
+                events = instance.all_logs(result.run_id)
+                for event in events[-20:]:  # Last 20 events
+                    timestamp = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S")
+                    msg = event.message or (event.dagster_event.event_type_value if event.dagster_event else "Event")
+                    # Truncate long messages
+                    if len(msg) > 100:
+                        msg = msg[:100] + "..."
+                    self._add_log(f"[{timestamp}] {msg}")
+            except Exception as log_err:
+                self._add_log(f"Could not fetch logs: {log_err}")
         
         self.runs = [run_info] + self.runs
-        self.active_run_id = run_info["run_id"]
-        self.run_logs = [f"[{datetime.now().strftime('%H:%M:%S')}] Run completed: {run_info['status']}"]
+        self.active_run_id = run_info.get("run_id", "")
         self.polling_active = False
         self.running = False
+        self.last_run_success = success
 
-        if result.success:
+        if success:
             yield rx.toast.success(f"Annotation completed for {sample_name} with {len(modules_to_use)} modules")
         else:
             yield rx.toast.error(f"Annotation failed for {sample_name}")
+    
+    def _add_log(self, message: str):
+        """Add a timestamped log entry."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.run_logs = self.run_logs + [f"[{timestamp}] {message}"]
 
     async def poll_run_status(self):
         """Poll Dagster for run status updates."""
@@ -605,6 +694,7 @@ class UploadState(rx.State):
         if run.status in (DagsterRunStatus.SUCCESS, DagsterRunStatus.FAILURE, DagsterRunStatus.CANCELED):
             self.polling_active = False
             self.running = False
+            self.last_run_success = (run.status == DagsterRunStatus.SUCCESS)
             if run.status == DagsterRunStatus.SUCCESS:
                 yield rx.toast.success("Annotation completed successfully!")
             elif run.status == DagsterRunStatus.FAILURE:
@@ -644,6 +734,20 @@ class UploadState(rx.State):
     def has_runs(self) -> bool:
         """Check if there are any runs."""
         return len(self.runs) > 0
+
+    @rx.var
+    def has_logs(self) -> bool:
+        """Check if there are any log entries."""
+        return len(self.run_logs) > 0
+
+    @rx.var
+    def log_count(self) -> int:
+        """Get the number of log entries."""
+        return len(self.run_logs)
+
+    def do_nothing(self):
+        """No-op event handler."""
+        pass
 
     async def on_load(self):
         """Discover existing files and their statuses when the dashboard loads."""

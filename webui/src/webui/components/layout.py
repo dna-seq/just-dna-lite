@@ -27,12 +27,14 @@ def topbar() -> rx.Component:
                 rx.el.span(" Annotate", style={"marginLeft": "6px"}),
                 href="/",
                 style={"display": "flex", "alignItems": "center", "padding": "10px 16px", "color": "#555", "textDecoration": "none", "borderRadius": "4px", "fontSize": "1rem"},
+                id="nav-annotate",
             ),
             rx.el.a(
                 rx.icon("chart-bar", size=18),
                 rx.el.span(" Analysis", style={"marginLeft": "6px"}),
                 href="/analysis",
                 style={"display": "flex", "alignItems": "center", "padding": "10px 16px", "color": "#555", "textDecoration": "none", "borderRadius": "4px", "fontSize": "1rem"},
+                id="nav-analysis",
             ),
             style={"display": "flex", "alignItems": "center"},
         ),
@@ -44,6 +46,7 @@ def topbar() -> rx.Component:
                 href="http://localhost:3005",
                 target="_blank",
                 class_name="ui button",
+                id="topbar-dagster-link",
                 style={"display": "flex", "alignItems": "center", "marginRight": "10px", "whiteSpace": "nowrap"},
             ),
             rx.el.a(
@@ -52,6 +55,7 @@ def topbar() -> rx.Component:
                 href="https://github.com/dna-seq/just-dna-lite",
                 target="_blank",
                 class_name="ui button",
+                id="topbar-github-link",
                 style={"display": "flex", "alignItems": "center", "whiteSpace": "nowrap"},
             ),
             style={"display": "flex", "alignItems": "center"},
@@ -71,12 +75,27 @@ def topbar() -> rx.Component:
             "padding": "0 24px",
             "zIndex": "1000",
         },
+        id="topbar",
+    )
+
+
+def fomantic_stylesheets() -> rx.Component:
+    """Load Fomantic UI stylesheets directly (rxconfig stylesheets may not load)."""
+    return rx.fragment(
+        rx.el.link(
+            rel="stylesheet",
+            href="https://cdn.jsdelivr.net/npm/fomantic-ui@2.9.4/dist/semantic.min.css",
+        ),
+        rx.script(src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"),
+        rx.script(src="https://cdn.jsdelivr.net/npm/fomantic-ui@2.9.4/dist/semantic.min.js"),
     )
 
 
 def template(*children: rx.Component) -> rx.Component:
     """Main page template with Fomantic UI styling."""
     return rx.el.div(
+        # Load Fomantic UI directly
+        fomantic_stylesheets(),
         topbar(),
         rx.el.div(
             rx.el.div(
@@ -131,6 +150,7 @@ def three_column_layout(
         rx.el.div(
             left,
             style={**column_base, "flex": "0 0 30%", "minWidth": "280px"},
+            id="layout-left-column",
         ),
         # Divider
         rx.el.div(style=divider_style),
@@ -138,6 +158,7 @@ def three_column_layout(
         rx.el.div(
             center,
             style={**column_base, "flex": "0 0 35%", "minWidth": "320px"},
+            id="layout-center-column",
         ),
         # Divider
         rx.el.div(style=divider_style),
@@ -145,6 +166,7 @@ def three_column_layout(
         rx.el.div(
             right,
             style={**column_base, "flex": "1 1 30%", "minWidth": "280px"},
+            id="layout-right-column",
         ),
         style={
             "display": "flex",
@@ -153,4 +175,5 @@ def three_column_layout(
             "width": "100%",
             "alignItems": "stretch",
         },
+        id="three-column-layout",
     )

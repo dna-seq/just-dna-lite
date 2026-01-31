@@ -15,6 +15,7 @@ def upload_zone() -> rx.Component:
                 rx.el.button(
                     "Select VCF Files",
                     class_name="ui primary massive button",
+                    id="select-vcf-files-button",
                 ),
                 rx.el.p(
                     "Drag and drop VCF files here or click to select",
@@ -47,6 +48,7 @@ def upload_zone() -> rx.Component:
                 ),
             ),
             style={"display": "flex", "flexWrap": "wrap", "marginTop": "20px"},
+            id="selected-files-list",
         ),
         rx.el.button(
             rx.icon("upload", size=32),
@@ -54,10 +56,12 @@ def upload_zone() -> rx.Component:
             on_click=UploadState.handle_upload(rx.upload_files(upload_id="vcf_upload")),
             loading=UploadState.uploading,
             class_name="ui primary massive button fluid",
+            id="upload-register-button",
             style={"height": "6rem", "fontSize": "1.5rem", "marginTop": "20px"},
         ),
         class_name="ui segment",
         style={"width": "100%"},
+        id="upload-zone-container",
     )
 
 
@@ -76,11 +80,13 @@ def module_selector() -> rx.Component:
                     "All",
                     on_click=UploadState.select_all_modules,
                     class_name="ui mini button",
+                    id="dashboard-select-all-modules",
                 ),
                 rx.el.button(
                     "None",
                     on_click=UploadState.deselect_all_modules,
                     class_name="ui mini button",
+                    id="dashboard-deselect-all-modules",
                 ),
                 class_name="ui buttons",
             ),
@@ -101,13 +107,16 @@ def module_selector() -> rx.Component:
                         "ui info small button",
                         "ui basic small button",
                     ),
+                    id=rx.Var.create("module-button-") + m.to_string(),
                     style={"margin": "2px"},
                 ),
             ),
             style={"display": "flex", "flexWrap": "wrap"},
+            id="dashboard-module-list",
         ),
         class_name="ui secondary segment",
         style={"marginTop": "20px", "marginBottom": "20px"},
+        id="dashboard-module-selector",
     )
 
 
@@ -125,6 +134,7 @@ def sample_catalog() -> rx.Component:
                 rx.icon("refresh-cw", size=24),
                 on_click=UploadState.on_load,
                 class_name="ui massive icon button",
+                id="dashboard-refresh-samples-button",
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%", "marginBottom": "20px"},
         ),
@@ -159,12 +169,14 @@ def sample_catalog() -> rx.Component:
                                 disabled=UploadState.file_statuses[f] == "running",
                                 class_name="ui green button",
                                 style={"marginBottom": "5px"},
+                                id=rx.Var.create("ensembl-button-") + f.to_string(),
                             ),
                             rx.el.button(
                                 rx.icon("boxes", size=20),
                                 " HF Modules",
                                 on_click=lambda: UploadState.run_hf_annotation(f),
                                 class_name="ui blue button",
+                                id=rx.Var.create("hf-modules-button-") + f.to_string(),
                             ),
                             style={"display": "flex", "flexDirection": "column"},
                         ),
@@ -172,10 +184,12 @@ def sample_catalog() -> rx.Component:
                     ),
                     class_name="ui raised segment",
                     style={"marginBottom": "15px"},
+                    id=rx.Var.create("sample-segment-") + f.to_string(),
                 )
             ),
             class_name="ui segments",
             style={"border": "none", "boxShadow": "none"},
+            id="sample-catalog-list",
         ),
         rx.cond(
             UploadState.files.length() == 0,
@@ -184,9 +198,11 @@ def sample_catalog() -> rx.Component:
                 rx.el.h2("No files uploaded yet.", style={"color": "#ccc", "fontStyle": "italic"}),
                 class_name="ui placeholder segment",
                 style={"textAlign": "center", "padding": "60px"},
+                id="empty-sample-catalog",
             ),
         ),
         class_name="ui segment",
+        id="sample-catalog-container",
     )
 
 
@@ -240,6 +256,7 @@ def dashboard_page() -> rx.Component:
                     style={"marginLeft": "20px"},
                 ),
                 style={"display": "flex", "alignItems": "center", "marginBottom": "40px"},
+                id="dashboard-header",
             ),
             
             rx.el.div(
@@ -253,17 +270,21 @@ def dashboard_page() -> rx.Component:
                         rx.el.div(class_name="ui divider"),
                         upload_zone(),
                         class_name="column",
+                        id="dashboard-upload-column",
                     ),
                     rx.el.div(
                         sample_catalog(),
                         class_name="column",
+                        id="dashboard-catalog-column",
                     ),
                     class_name="row",
                 ),
                 class_name="ui two column stackable grid",
+                id="dashboard-grid",
             ),
             
             dagster_section(),
             style={"width": "100%"},
+            id="dashboard-main-container",
         )
     )
