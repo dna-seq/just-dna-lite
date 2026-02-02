@@ -2,25 +2,42 @@
 
 ## Current State
 
-**Single-page genomic annotation app** with a 3-column layout using Fomantic UI styling + CSS flexbox.
+**Functional genomic annotation app** with a 2-panel run-centric layout using Fomantic UI styling + CSS flexbox. The UI is integrated with Dagster for running and monitoring annotation jobs.
 
 ### What's Working
 
-1. **3-column layout** - Files (left), Modules (center), Results (right) - side-by-side with independent scrolling
-2. **Horizontal top menu** - Logo, nav links (Annotate, Analysis), external buttons (Dagster, Fork on GitHub)
-3. **File management** - Upload zone, file library with status badges, delete buttons
-4. **Module selection** - 5 modules with checkboxes, icons, titles, descriptions, Select All/None buttons
-5. **Fomantic UI checkboxes** - Properly styled using Fomantic structure (not rx.checkbox)
-6. **Module icons** - Dynamic icons via `rx.match()` (heart, droplets, heart-pulse, zap, activity)
-7. **Status polling** - Background polling for run status updates
+1. **2-Panel Run-Centric Layout**:
+   - **Files (Left Panel)**: Upload zone for VCF files, file library with status badges (`ready`, `running`, `completed`, `error`), and file deletion.
+   - **Right Panel (Three Collapsible Sections)**:
+     - **Outputs Section** (teal segment, top): Inline display of output files for the selected sample with type icons, module labels, file sizes, and download buttons. Shows "No outputs yet" with a prompt to run analysis when empty.
+     - **Run History** (green segment, middle): Unified timeline of all runs for the selected file. The most recent run is highlighted with a "latest" badge and includes Re-run/Modify action buttons. Each run expands to show modules, run ID, and Dagster link.
+     - **New Analysis Section** (blue segment, bottom): Collapsible module selection grid with "Select All/None" controls and Start Analysis button.
 
-### Known Issues (TODO)
+2. **Dagster Integration**:
+   - **Real-time Status Polling**: Uses `rx.moment` to poll Dagster for run status updates every 3 seconds.
+   - **Live Logs**: Fetches and displays the last 50 events from the Dagster event log for the active run.
+   - **Run Submission**: Submits runs to Dagster daemon with automatic fallback to in-process execution if needed.
+   - **History Persistence**: Persists run history by querying the Dagster instance on load.
+   - **Materialization Tracking**: Queries Dagster for asset materializations to determine file annotation status.
 
-1. ~~**Job config error**~~ - **FIXED**: Changed `"assets"` to `"ops"` in config
+3. **Design System**:
+   - **Fomantic UI**: Uses segments, buttons, labels, and messages for a "chunky & tactile" look.
+   - **Lucide Icons**: Dynamic icon rendering via `rx.match` (Lucide names like `heart`, `droplets`, `dna`).
+   - **Responsive Flexbox**: Column layout and top menu implemented with flexbox for reliability (avoiding Fomantic Grid issues).
 
-2. **Selected file persists after deletion** - When a file is deleted, `selected_file` should be cleared
+4. **File Management**:
+   - Files are saved to `data/input/users/{user_id}/`.
+   - Automatic registration of uploaded files as Dagster assets (`user_vcf_source`).
+   - Cleanup of state and filesystem on file deletion.
 
-3. **Granian websocket errors** - Still occurring occasionally, use `REFLEX_USE_GRANIAN=false`
+5. **Output Files**:
+   - Annotation outputs are stored at `data/output/users/{user_id}/{sample_name}/modules/`.
+   - File types:
+     - `{module}_weights.parquet` - Genotype-specific scores
+     - `{module}_annotations.parquet` - Variant facts (optional)
+     - `{module}_studies.parquet` - Literature evidence (optional)
+   - Inline outputs section shows files with type icons (scale/file-text/book-open), module labels, file sizes, and download buttons.
+   - Empty state shows "No outputs yet" with prompt to run analysis.
 
 ### Architecture
 
@@ -28,56 +45,157 @@
 webui/
 ├── src/webui/
 │   ├── components/
-│   │   └── layout.py          # topbar(), template(), three_column_layout()
+│   │   └── layout.py          # Navbar, two_column_layout container
 │   ├── pages/
-│   │   ├── annotate.py        # Main 3-column page components
-│   │   ├── index.py           # Home page (uses annotate components)
-│   │   ├── analysis.py        # Analysis page (placeholder)
-│   │   └── dashboard.py       # Old dashboard (not used)
-│   ├── state.py               # UploadState, AuthState, Dagster API calls
-│   └── app.py                 # Reflex app setup
-└── rxconfig.py                # Fomantic UI CSS/JS via CDN
+│   │   ├── annotate.py        # 2-panel run-centric layout
+│   │   ├── index.py           # Main landing page (aliases annotate)
+│   │   └── analysis.py        # Analysis page (placeholder)
+│   ├── state.py               # Main UploadState: Uploads, Dagster API, Run state, Output files
+│   └── app.py                 # Reflex app setup, routing & download API endpoint
+└── rxconfig.py                # Configuration & Fomantic UI CDN
 ```
+
+### UI-Dagster Integration Architecture
+
+The Web UI connects to Dagster directly via the Python API (not HTTP). Both run in the same process when using `uv run start`.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           User Browser                                   │
+│                        http://localhost:3000                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Reflex Web UI (Python)                              │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  state.py - UploadState                                          │    │
+│  │  ├── get_dagster_instance() → DagsterInstance                    │    │
+│  │  ├── Files: upload, delete, list                                 │    │
+│  │  ├── Runs: submit, poll status, fetch logs                       │    │
+│  │  ├── Run History: last_run_for_file, filtered_runs               │    │
+│  │  └── Outputs: scan parquet files from filesystem                 │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+┌──────────────────────────────┐    ┌──────────────────────────────────────┐
+│   Dagster Instance (Python)  │    │         Filesystem                    │
+│   DAGSTER_HOME/              │    │  data/                                │
+│   ├── storage/ (run history) │    │  ├── input/users/{user}/ (VCF files) │
+│   ├── schedules/             │    │  └── output/users/{user}/{sample}/   │
+│   └── event_log.db           │    │      └── modules/*.parquet           │
+└──────────────────────────────┘    └──────────────────────────────────────┘
+```
+
+**What the UI loads FROM Dagster:**
+
+| Data | Dagster API | When Loaded |
+|------|-------------|-------------|
+| Run history | `instance.get_run_records(filters=RunsFilter(job_name=...))` | On page load (`on_load`) |
+| Run status | `instance.get_run_by_id(run_id)` | Every 3s while running (`poll_run_status`) |
+| Run logs | `instance.all_logs(run_id)` | Every 3s while running, or on timeline expand |
+| Asset materializations | `instance.fetch_materializations(records_filter=...)` | On page load (to check file status) |
+| Dynamic partitions | `instance.get_dynamic_partitions(partition_def.name)` | Before run submission |
+
+**What the UI sends TO Dagster:**
+
+| Action | Dagster API | Triggered By |
+|--------|-------------|--------------|
+| Register partition | `instance.add_dynamic_partitions(name, [keys])` | File upload |
+| Report asset event | `instance.report_runless_asset_event(AssetMaterialization(...))` | File upload |
+| Create run | `instance.create_run_for_job(job_def, run_config, tags)` | Start Analysis button |
+| Submit run | `instance.submit_run(run_id)` | Start Analysis button |
+| Execute in-process | `job_def.execute_in_process(run_config, instance, tags)` | Fallback if daemon unavailable |
+
+**Connection flow:**
+
+1. **Initialization**: `get_dagster_instance()` in `state.py` creates a `DagsterInstance` using `DAGSTER_HOME` environment variable
+2. **Shared storage**: Both UI and Dagster daemon read/write to the same SQLite database in `DAGSTER_HOME`
+3. **No HTTP needed**: The UI imports Dagster Python API directly, avoiding REST/GraphQL complexity
+4. **File-based outputs**: Output parquet files are written to filesystem by Dagster jobs, UI reads them directly
+
+### Run-Centric UI Components
+
+The right panel uses a run-centric design with three collapsible sections:
+
+**State variables in `UploadState`:**
+- `filtered_runs` - Computed var returning all runs for the selected file (sorted by date, newest first)
+- `latest_run_id` - Computed var returning the run_id of the most recent run
+- `output_files` - List of output file metadata for the selected sample
+- `outputs_expanded` - Boolean controlling the outputs section collapse state
+- `run_history_expanded` - Boolean controlling the run history section collapse state
+- `new_analysis_expanded` - Boolean controlling the new analysis section collapse state
+- `expanded_run_id` - Which run in the timeline is expanded to show details
+
+**Component functions in `annotate.py`:**
+- `outputs_section()` - Collapsible section showing output files with download buttons
+- `output_file_card()` - Individual output file card with type icon, labels, and download
+- `run_timeline_card()` - Individual run card with expand/collapse (latest run highlighted)
+- `run_timeline()` - Unified scrollable list of all runs
+- `new_analysis_section()` - Collapsible module selection and run button
+- `right_panel_run_view()` - Main right panel combining all three sections
+- `_collapsible_header()` - Reusable header component for foldable sections
+
+**Layout Order (top to bottom):**
+```
+┌─────────────────────────────────────┐
+│  Outputs (teal segment)             │  ← Results first - what users want
+│  - File list with download buttons  │
+│  - Empty state: "No outputs yet"    │
+├─────────────────────────────────────┤
+│  Run History (green segment)        │  ← Context - how results were made
+│  - Latest run highlighted (blue)    │
+│  - Re-run/Modify buttons on latest  │
+│  - All runs in unified timeline     │
+├─────────────────────────────────────┤
+│  New Analysis (blue segment)        │  ← Action - start new work
+│  - Module selection grid            │
+│  - Start Analysis button            │
+└─────────────────────────────────────┘
+```
+
+### Download API
+
+File downloads are served via FastAPI endpoint at `/api/download/{user_id}/{sample_name}/{filename}`:
+- Only parquet files are allowed
+- Path traversal is prevented via input validation
+- Uses `api_transformer` parameter in `rx.App()` to mount custom FastAPI routes
+- Returns `FileResponse` for browser download
 
 ### Key Design Decisions
 
-1. **Flexbox instead of Fomantic Grid** - Fomantic UI grid doesn't work reliably in Reflex (columns stack vertically)
-2. **Fomantic checkbox structure** - Must use `rx.el.div(rx.el.input(type="checkbox"), rx.el.label(), class_name="ui checkbox")` not `rx.checkbox()`
-3. **Dynamic icons via rx.match()** - `rx.icon()` requires static string names, use `rx.match()` for dynamic selection
+1. **Run-Centric vs Tab-Based**: Replaced tab-based layout with run-centric view that shows the relationship between input files, runs, and outputs.
+2. **Results First**: Outputs section at the top of the right panel - users care most about results, then context (runs), then actions (new analysis).
+3. **Unified Run History**: Merged "Last Run" and "Run History" into a single timeline. The latest run is visually highlighted with a blue segment and "latest" badge.
+4. **Inline Outputs vs Modal**: Outputs are displayed inline in a collapsible section rather than a modal dialog - no disruptive popups, always visible when expanded.
+5. **In-Process Execution vs Daemon**: Prefers `instance.submit_run` for immediate Run ID feedback, with `execute_in_process` logic for robust execution without daemon dependency in local dev.
+6. **Fomantic Checkboxes**: Uses raw HTML structure with `ui checkbox` classes to avoid `rx.checkbox` styling conflicts.
+7. **Reactive Styling**: Uses `rx.cond` and `rx.match` for all state-dependent UI changes (colors, icons, visibility).
+8. **Collapsible Sections**: All three right panel sections use the same `_collapsible_header()` pattern with chevron icons and right-aligned badges.
 
-### Dagster API Gotchas (Discovered)
+### Dagster API Patterns Used
 
-```python
-# Timestamps on RunRecord, not DagsterRun
-records = instance.get_run_records(limit=10)
-started = datetime.fromtimestamp(record.start_time)
+- **Run Records**: Uses `instance.get_run_records` to access `start_time` and `end_time`.
+- **Event Logs**: Uses `instance.all_logs(run_id)` for log retrieval.
+- **Dynamic Partitions**: Registers user/sample combinations as dynamic partitions in Dagster.
+- **Run Config**: Uses the `"ops"` key for asset job configuration.
 
-# Partition key via tags
-run = instance.create_run_for_job(job_def=job, tags={"dagster/partition": pk})
+### Known Issues & Fixed Items
 
-# submit_run without workspace_snapshot (removed in newer Dagster)
-instance.submit_run(run.run_id)  # NOT: workspace_snapshot=None
-
-# Run logs via all_logs
-events = instance.all_logs(run_id)
-```
-
-### Files Modified in This Session
-
-| File | Changes |
-|------|---------|
-| `webui/src/webui/components/layout.py` | Flexbox topbar, 3-column layout with scroll |
-| `webui/src/webui/pages/annotate.py` | Module cards with icons, Fomantic checkboxes |
-| `webui/src/webui/pages/index.py` | Uses new annotate components |
-| `webui/src/webui/state.py` | Removed `workspace_snapshot=None`, added `running` flag |
-| `docs/DESIGN.md` | Fomantic UI + Reflex patterns (flexbox, checkbox structure) |
-| `AGENTS.md` | Fomantic UI gotchas, Dagster API updates |
+- ~~**Job config error**~~: Fixed by using `"ops"` instead of `"assets"` in run config.
+- ~~**Selected file persists after deletion**~~: Fixed in `UploadState.delete_file`.
+- ~~**Download Link**~~: Now integrated with `/api/download/` endpoint for parquet file downloads.
+- ~~**Run history showing unknown filename**~~: Fixed by reading config from `"ops"` key instead of `"assets"`.
+- **Log Scrolling**: Log container doesn't always auto-scroll to bottom on new entries.
+- **ASGI "Connection already upgraded"**: When using Granian (`REFLEX_USE_GRANIAN=true` or `uv run start --granian`), the backend may log `RuntimeError: ASGI flow error: Connection already upgraded` during WebSocket handshake. This is a known Reflex+Granian interaction: the server tries to send an HTTP response after the connection was already upgraded to WebSocket. The app usually continues to work; if it causes problems, run without Granian (default `uv run start` uses the built-in server).
 
 ### How to Run
 
 ```bash
-cd /home/antonkulaga/sources/just-dna-lite
-REFLEX_USE_GRANIAN=false uv run start
+# Start both Web UI and Dagster
+uv run start
 ```
 
 - Web UI: http://localhost:3000
@@ -85,8 +203,7 @@ REFLEX_USE_GRANIAN=false uv run start
 
 ### Next Steps
 
-1. ~~**Fix job config**~~ - **DONE**: Changed `"assets"` to `"ops"` in `start_annotation_run`
-2. **Clear selected_file on delete** - In `delete_file`, set `self.selected_file = ""` if matching
-3. **Add run history display** - Show actual run history for selected file in Results column
-4. **Console output** - Populate console with real-time logs during run
-5. **Test full annotation flow** - Verify HF module annotation completes successfully
+1. **Implement Auto-scroll for Logs**: Ensure the log window follows the latest output.
+2. **Advanced Filtering**: Add ability to filter files by upload date or status.
+3. **Analysis Page**: Implement the `analysis` page to visualize annotation results (plots, stats).
+4. **Output File Preview**: Add ability to preview parquet file contents (first N rows) in the UI.

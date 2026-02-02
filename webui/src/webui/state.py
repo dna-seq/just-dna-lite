@@ -415,21 +415,103 @@ class UploadState(rx.State):
     
     # Tracking for the UI button state
     last_run_success: bool = False
+    
+    # Tab management for two-panel layout (legacy, kept for backwards compatibility)
+    active_tab: str = "params"  # "params", "history", "outputs"
+    
+    # Output files for the selected sample
+    output_files: List[Dict[str, Any]] = []
+    
+    # Run-centric UI state
+    outputs_expanded: bool = True  # Whether the outputs section is expanded
+    run_history_expanded: bool = True  # Whether the run history section is expanded
+    new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
+    expanded_run_id: str = ""  # Which run in the timeline is expanded to show logs
+    show_outputs_modal: bool = False  # Whether to show the outputs modal (legacy, kept for compatibility)
 
     def select_file(self, filename: str):
         """Select a file and pre-select modules from its latest run if available."""
         self.selected_file = filename
         # Reset success state on selection change
         self.last_run_success = False
+        # Reset expanded run
+        self.expanded_run_id = ""
         
         # Find the latest run for this file to pre-select modules
         file_runs = [r for r in self.runs if r.get("filename") == filename]
         if file_runs:
-            # Sort by started_at (ISO format strings) descending
-            file_runs.sort(key=lambda x: x.get("started_at", ""), reverse=True)
+            # Sort by started_at (ISO format strings) descending, handle None values
+            file_runs.sort(key=lambda x: x.get("started_at") or "", reverse=True)
             latest_run = file_runs[0]
             if latest_run.get("modules"):
                 self.selected_modules = latest_run["modules"].copy()
+        
+        # Expand all sections by default when selecting a file
+        self.outputs_expanded = True
+        self.run_history_expanded = True
+        self.new_analysis_expanded = True
+        
+        # Load output files for the selected sample
+        self._load_output_files_sync()
+
+    def switch_tab(self, tab_name: str):
+        """Switch to a different tab in the right panel."""
+        self.active_tab = tab_name
+        # Reload output files when switching to outputs tab
+        if tab_name == "outputs":
+            self._load_output_files_sync()
+
+    def _load_output_files_sync(self):
+        """Load output files for the selected sample (synchronous version)."""
+        if not self.selected_file or not self.safe_user_id:
+            self.output_files = []
+            return
+        
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        root = Path(__file__).resolve().parents[3]
+        output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+        
+        if not output_dir.exists():
+            self.output_files = []
+            return
+        
+        files = []
+        for f in output_dir.glob("*.parquet"):
+            # Determine file type from name
+            if "_weights" in f.name:
+                file_type = "weights"
+            elif "_annotations" in f.name:
+                file_type = "annotations"
+            elif "_studies" in f.name:
+                file_type = "studies"
+            else:
+                file_type = "data"
+            
+            # Extract module name
+            module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
+            
+            files.append({
+                "name": f.name,
+                "path": str(f),
+                "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                "module": module,
+                "type": file_type,
+                "sample_name": sample_name,
+            })
+        
+        # Sort by module name, then type
+        files.sort(key=lambda x: (x["module"], x["type"]))
+        self.output_files = files
+
+    @rx.var
+    def has_output_files(self) -> bool:
+        """Check if there are any output files for the selected sample."""
+        return len(self.output_files) > 0
+
+    @rx.var
+    def output_file_count(self) -> int:
+        """Get the number of output files."""
+        return len(self.output_files)
 
     async def delete_file(self, filename: str):
         """Delete an uploaded file from the filesystem and state."""
@@ -465,6 +547,41 @@ class UploadState(rx.State):
     def has_filtered_runs(self) -> bool:
         """Check if there are any runs for the selected file."""
         return len(self.filtered_runs) > 0
+
+    @rx.var
+    def last_run_for_file(self) -> Dict[str, Any]:
+        """Get the most recent run for the selected file."""
+        runs = self.filtered_runs
+        if not runs:
+            return {}
+        # Already sorted by started_at descending in filtered_runs
+        return runs[0]
+
+    @rx.var
+    def has_last_run(self) -> bool:
+        """Check if there's a previous run for the selected file."""
+        return bool(self.last_run_for_file)
+
+    @rx.var
+    def other_runs_for_file(self) -> List[Dict[str, Any]]:
+        """Get all runs except the most recent one for timeline display."""
+        runs = self.filtered_runs
+        if len(runs) <= 1:
+            return []
+        return runs[1:]
+
+    @rx.var
+    def has_other_runs(self) -> bool:
+        """Check if there are other runs besides the last one."""
+        return len(self.other_runs_for_file) > 0
+
+    @rx.var
+    def latest_run_id(self) -> str:
+        """Get the run_id of the most recent run for the selected file."""
+        runs = self.filtered_runs
+        if runs:
+            return runs[0].get("run_id", "")
+        return ""
 
     @rx.var
     def has_selected_file(self) -> bool:
@@ -748,6 +865,66 @@ class UploadState(rx.State):
         """No-op event handler."""
         pass
 
+    def toggle_outputs(self):
+        """Toggle the outputs section expanded/collapsed."""
+        self.outputs_expanded = not self.outputs_expanded
+
+    def toggle_run_history(self):
+        """Toggle the run history section expanded/collapsed."""
+        self.run_history_expanded = not self.run_history_expanded
+
+    def toggle_new_analysis(self):
+        """Toggle the new analysis section expanded/collapsed."""
+        self.new_analysis_expanded = not self.new_analysis_expanded
+
+    def expand_new_analysis(self):
+        """Expand the new analysis section."""
+        self.new_analysis_expanded = True
+
+    def collapse_new_analysis(self):
+        """Collapse the new analysis section."""
+        self.new_analysis_expanded = False
+
+    def toggle_run_expansion(self, run_id: str):
+        """Toggle a run's expanded state in the timeline."""
+        if self.expanded_run_id == run_id:
+            self.expanded_run_id = ""
+        else:
+            self.expanded_run_id = run_id
+            # Fetch logs for this run
+            return UploadState.fetch_run_logs(run_id)
+
+    def open_outputs_modal(self):
+        """Open the outputs modal."""
+        self.show_outputs_modal = True
+        self._load_output_files_sync()
+
+    def close_outputs_modal(self):
+        """Close the outputs modal."""
+        self.show_outputs_modal = False
+
+    def set_show_outputs_modal(self, value: bool):
+        """Set the outputs modal visibility (explicit setter for Reflex 0.8.9+)."""
+        self.show_outputs_modal = value
+        if value:
+            self._load_output_files_sync()
+
+    async def rerun_with_same_modules(self):
+        """Re-run annotation with the same modules as the last run."""
+        last_run = self.last_run_for_file
+        if last_run and last_run.get("modules"):
+            self.selected_modules = last_run["modules"].copy()
+        # Start the annotation
+        async for event in self.start_annotation_run():
+            yield event
+
+    def modify_and_run(self):
+        """Pre-select modules from last run and expand the analysis section."""
+        last_run = self.last_run_for_file
+        if last_run and last_run.get("modules"):
+            self.selected_modules = last_run["modules"].copy()
+        self.new_analysis_expanded = True
+
     async def on_load(self):
         """Discover existing files and their statuses when the dashboard loads."""
         auth_state = await self.get_state(AuthState)
@@ -808,14 +985,14 @@ class UploadState(rx.State):
         run_list = []
         for record in run_records:
             run = record.dagster_run
-            # Extract info from run config
+            # Extract info from run config - use "ops" key (not "assets")
             config = run.run_config or {}
-            assets_config = config.get("assets", {}).get("user_hf_module_annotations", {}).get("config", {})
+            ops_config = config.get("ops", {}).get("user_hf_module_annotations", {}).get("config", {})
             
-            vcf_path = assets_config.get("vcf_path", "")
+            vcf_path = ops_config.get("vcf_path", "")
             filename = Path(vcf_path).name if vcf_path else "unknown"
-            sample_name = assets_config.get("sample_name", "")
-            modules = assets_config.get("modules", [])
+            sample_name = ops_config.get("sample_name", "")
+            modules = ops_config.get("modules", [])
             
             # Timestamps are on RunRecord as Unix timestamps (floats) or create_timestamp as datetime
             started_at = None
@@ -839,7 +1016,7 @@ class UploadState(rx.State):
             # Check for output if successful
             if run.status == DagsterRunStatus.SUCCESS and sample_name:
                 root = Path(__file__).resolve().parents[3]
-                user_name = assets_config.get("user_name", self.safe_user_id)
+                user_name = ops_config.get("user_name", self.safe_user_id)
                 output_dir = root / "data" / "output" / "users" / user_name / sample_name / "modules"
                 if output_dir.exists():
                     run_info["output_path"] = str(output_dir)

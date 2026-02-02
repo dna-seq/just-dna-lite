@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import template
+from webui.components.layout import template, fomantic_icon
 from webui.state import AuthState, UploadState
 
 
@@ -11,7 +11,7 @@ def upload_zone() -> rx.Component:
     return rx.el.div(
         rx.upload(
             rx.el.div(
-                rx.icon("cloud-upload", size=80, style={"color": "#2185d0", "marginBottom": "20px"}),
+                fomantic_icon("cloud-upload", size=80, style={"color": "#2185d0", "marginBottom": "20px"}),
                 rx.el.button(
                     "Select VCF Files",
                     class_name="ui primary massive button",
@@ -51,7 +51,7 @@ def upload_zone() -> rx.Component:
             id="selected-files-list",
         ),
         rx.el.button(
-            rx.icon("upload", size=32),
+            fomantic_icon("upload", size=32),
             " Upload & Register",
             on_click=UploadState.handle_upload(rx.upload_files(upload_id="vcf_upload")),
             loading=UploadState.uploading,
@@ -70,7 +70,7 @@ def module_selector() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.h3(
-                rx.icon("boxes", size=24),
+                fomantic_icon("boxes", size=24),
                 " Annotation Modules",
                 class_name="ui header",
                 style={"flex": "1"},
@@ -125,13 +125,13 @@ def sample_catalog() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.h2(
-                rx.icon("files", size=32),
+                fomantic_icon("files", size=32),
                 " Sample Catalog",
                 class_name="ui header",
                 style={"flex": "1"},
             ),
             rx.el.button(
-                rx.icon("refresh-cw", size=24),
+                fomantic_icon("refresh-cw", size=24),
                 on_click=UploadState.on_load,
                 class_name="ui massive icon button",
                 id="dashboard-refresh-samples-button",
@@ -144,7 +144,7 @@ def sample_catalog() -> rx.Component:
                 UploadState.files,
                 lambda f: rx.el.div(
                     rx.el.div(
-                        rx.icon("file-text", size=40, style={"color": "#2185d0"}),
+                        fomantic_icon("file-text", size=40, style={"color": "#2185d0"}),
                         rx.el.div(
                             rx.el.div(f, class_name="header", style={"fontSize": "1.5rem", "fontWeight": "bold"}),
                             rx.el.div(
@@ -163,7 +163,7 @@ def sample_catalog() -> rx.Component:
                         ),
                         rx.el.div(
                             rx.el.button(
-                                rx.icon("database", size=20),
+                                fomantic_icon("database", size=20),
                                 " Ensembl",
                                 on_click=lambda: UploadState.run_annotation(f),
                                 disabled=UploadState.file_statuses[f] == "running",
@@ -172,7 +172,7 @@ def sample_catalog() -> rx.Component:
                                 id=rx.Var.create("ensembl-button-") + f.to(str),
                             ),
                             rx.el.button(
-                                rx.icon("boxes", size=20),
+                                fomantic_icon("boxes", size=20),
                                 " HF Modules",
                                 on_click=lambda: UploadState.run_hf_annotation(f),
                                 class_name="ui blue button",
@@ -194,7 +194,7 @@ def sample_catalog() -> rx.Component:
         rx.cond(
             UploadState.files.length() == 0,
             rx.el.div(
-                rx.icon("inbox", size=100, style={"color": "#eee"}),
+                fomantic_icon("inbox", size=100, style={"color": "#eee"}),
                 rx.el.h2("No files uploaded yet.", style={"color": "#ccc", "fontStyle": "italic"}),
                 class_name="ui placeholder segment",
                 style={"textAlign": "center", "padding": "60px"},
@@ -210,7 +210,7 @@ def dagster_section() -> rx.Component:
     """External link to Dagster UI using Fomantic UI."""
     return rx.el.div(
         rx.el.h2(
-            rx.icon("activity", size=32),
+            fomantic_icon("activity", size=32),
             " Pipeline Engine",
             class_name="ui header",
         ),
@@ -221,7 +221,7 @@ def dagster_section() -> rx.Component:
         rx.el.div(
             rx.el.a(
                 rx.el.button(
-                    rx.icon("external-link", size=24),
+                    fomantic_icon("external-link", size=24),
                     " Open Dagster UI",
                     class_name="ui positive massive button",
                 ),
@@ -246,7 +246,7 @@ def dashboard_page() -> rx.Component:
     return template(
         rx.el.div(
             rx.el.div(
-                rx.icon("dna", size=64, style={"color": "#2185d0"}),
+                fomantic_icon("dna", size=64, style={"color": "#2185d0"}),
                 rx.el.div(
                     rx.el.h1("Genomic Dashboard", class_name="ui header", style={"fontSize": "3rem", "margin": "0"}),
                     rx.el.p(
@@ -263,7 +263,7 @@ def dashboard_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.h2(
-                            rx.icon("cloud-upload", size=32),
+                            fomantic_icon("cloud-upload", size=32),
                             " Upload VCF",
                             class_name="ui header",
                         ),

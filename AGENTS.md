@@ -307,38 +307,70 @@ assert valid_states == {"active", "inactive", "pending"}  # from API spec
 
 The webui uses **Reflex** (Python-based React framework). See **[docs/DESIGN.md](docs/DESIGN.md)** for visual design.
 
-- **Check terminal for frontend errors**: Reflex often displays frontend/compilation errors and warnings directly in the terminal where `uv run start` or `reflex run` is running. Always monitor the terminal for these issues when working on the UI.
+### UI Change Verification Workflow (MANDATORY)
+
+When making significant UI changes, follow this workflow:
+
+1. **Make changes** to UI code (state.py, annotate.py, layout.py, etc.)
+2. **Check terminal for compile errors**: Run `uv run start` and monitor the terminal output for:
+   - `ImportError` - Missing or renamed imports
+   - `AttributeError` - Wrong API usage (e.g., `App.api_route` doesn't exist)
+   - `Warning: Invalid icon tag` - Wrong icon names (use hyphenated Lucide names)
+   - Traceback errors during "Compiling" phase
+3. **Verify app starts successfully**: Look for "App running at: http://localhost:3000"
+4. **Check browser**: Navigate to http://localhost:3000 and verify:
+   - Page loads without blank screen
+   - Key UI elements are visible (tabs, buttons, panels)
+   - Interactive elements work (tab switching, file selection, etc.)
+5. **Fix any issues** before considering the task complete
+
+**Common compile-time errors:**
+- `ModuleNotFoundError` - Add missing dependency with `uv add <package>`
+- `ImportError: cannot import name 'X'` - Function was renamed/removed, update imports
+- `AttributeError: 'App' object has no attribute 'Y'` - Wrong Reflex API, check docs
+
+**Terminal monitoring tip**: Reflex hot-reloads on file changes. After editing, wait for "Compiling: 100%" message before checking the browser.
 
 ### Critical Reflex Patterns
 
-**1. Icons require STATIC strings:**
+**1. Use `fomantic_icon()` instead of `rx.icon()`:**
+
+Lucide icons (via `rx.icon()`) often fail to load or trigger terminal warnings in this environment. Use the `fomantic_icon()` helper from `webui.components.layout` instead. It maps common Lucide names to Fomantic UI equivalents.
 
 ```python
-# CRASHES - rx.icon() cannot accept rx.Var
-rx.icon(module["icon_name"], size=24)
+from webui.components.layout import fomantic_icon
 
-# WORKS - use rx.match for dynamic icons
+# GOOD - consistent and reliable
+fomantic_icon("dna", size=24, color="#2185d0")
+
+# BAD - triggers "Invalid icon tag" warnings
+fomantic_icon("dna", size=24)
+```
+
+**2. Icons require STATIC strings:**
+
+Even with `fomantic_icon()`, you cannot pass a dynamic `rx.Var` as the name. Use `rx.match` for dynamic selection.
+
+```python
+# CRASHES
+fomantic_icon(module["icon_name"], size=24)
+
+# WORKS
 rx.match(
     module["name"],
-    ("heart", rx.icon("heart", size=24)),
-    ("star", rx.icon("star", size=24)),
-    rx.icon("database", size=24),  # default
+    ("heart", fomantic_icon("heart", size=24)),
+    ("star", fomantic_icon("star", size=24)),
+    fomantic_icon("database", size=24),  # default
 )
 ```
 
-**2. Icon naming - use HYPHENATED Lucide names:**
+**3. Icon naming:**
 
-| Wrong | Correct |
-| :--- | :--- |
-| `check-circle` | `circle-check` |
-| `check_circle` | `circle-check` |
-| `upload_cloud` | `cloud-upload` |
-| `alert-circle` | `circle-alert` |
-| `play-circle` | `circle-play` |
+`fomantic_icon()` handles mapping for common names, but generally use Fomantic UI icon names (space-separated) or common hyphenated names which the helper will map.
 
-Verified icons: `circle-check`, `circle-x`, `circle-alert`, `circle-play`, `cloud-upload`, `upload`, `download`, `file-text`, `files`, `dna`, `heart`, `heart-pulse`, `activity`, `zap`, `droplets`, `pill`, `loader-circle`, `refresh-cw`, `external-link`, `terminal`, `database`, `boxes`, `inbox`, `history`, `chart-bar`, `play`.
+Verified icons (mapped by helper): `circle-check`, `circle-x`, `circle-alert`, `circle-play`, `cloud-upload`, `upload`, `download`, `file-text`, `files`, `dna`, `heart`, `heart-pulse`, `activity`, `zap`, `droplets`, `pill`, `loader-circle`, `refresh-cw`, `external-link`, `terminal`, `database`, `boxes`, `inbox`, `history`, `chart-bar`, `play`.
 
-**3. Use `rx.cond()` for reactive styling:**
+**4. Use `rx.cond()` for reactive styling:**
 
 ```python
 # GOOD - reactive
@@ -426,12 +458,64 @@ rx.el.div(
 - `ui label`, `ui mini label`, `ui green label` - work well
 - `ui divider` - works well
 - `ui message` - works well
+- `ui top attached tabular menu` + `ui bottom attached segment` - works well for tabs (with state-based class toggling)
 
 **5. What does NOT work reliably:**
 - `ui grid` with column widths - use flexbox instead
 - `ui fixed menu` - use flexbox instead
 - `ui accordion` - may need JS initialization
 - Native `rx.checkbox()` styling - use Fomantic structure instead
+
+**6. Fomantic UI Tabs (state-based, no jQuery):**
+
+```python
+# Tab menu - use state-based class toggling
+def tab_menu() -> rx.Component:
+    return rx.el.div(
+        rx.el.a(
+            "Tab 1",
+            class_name=rx.cond(MyState.active_tab == "tab1", "active item", "item"),
+            on_click=lambda: MyState.switch_tab("tab1"),
+        ),
+        rx.el.a(
+            "Tab 2",
+            class_name=rx.cond(MyState.active_tab == "tab2", "active item", "item"),
+            on_click=lambda: MyState.switch_tab("tab2"),
+        ),
+        class_name="ui top attached tabular menu",
+    )
+
+# Tab content - use rx.match for dynamic content
+rx.el.div(
+    rx.match(
+        MyState.active_tab,
+        ("tab1", tab1_content()),
+        ("tab2", tab2_content()),
+        tab1_content(),  # default
+    ),
+    class_name="ui bottom attached segment",
+)
+```
+
+**7. Custom API endpoints with api_transformer:**
+
+```python
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+
+# Create FastAPI app for custom routes
+api = FastAPI()
+
+@api.get("/api/download/{filename}")
+async def download_file(filename: str) -> FileResponse:
+    return FileResponse(path=file_path, filename=filename)
+
+# Pass to Reflex app
+app = rx.App(
+    theme=None,
+    api_transformer=api,  # Mounts custom routes
+)
+```
 
 ---
 

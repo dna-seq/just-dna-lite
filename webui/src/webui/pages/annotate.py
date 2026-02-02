@@ -1,15 +1,18 @@
 """
-Genomic Annotation Page - Three-column layout for VCF annotation workflow.
+Genomic Annotation Page - Two-panel layout with run-centric workflow.
 
-Column 1: File Management (upload and selection)
-Column 2: Module Selection (HF annotation modules)
-Column 3: Results (run history, logs, downloads)
+Left Panel: File Management (upload and selection)
+Right Panel (Run-Centric View):
+  - Last Run Summary: Shows most recent run with status, modules, and quick actions
+  - Run Timeline: Expandable list of past runs with details
+  - New Analysis Section: Collapsible module selection and run button
+  - Outputs Modal: View and download output files
 """
 from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import template, three_column_layout
+from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.state import UploadState, AuthState
 
 
@@ -21,7 +24,7 @@ def upload_zone() -> rx.Component:
     """Drag-and-drop upload zone for VCF files."""
     return rx.upload(
         rx.el.div(
-            rx.icon("cloud-upload", size=40, color="#2185d0"),
+            fomantic_icon("cloud-upload", size=40, color="#2185d0"),
             rx.el.div("Drop VCF files here", style={"fontWeight": "600", "marginTop": "10px", "fontSize": "1rem"}),
             rx.el.div("or click to browse", style={"fontSize": "0.85rem", "color": "#888", "marginTop": "4px"}),
             style={"textAlign": "center", "padding": "20px 10px"},
@@ -62,7 +65,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
         rx.el.div(
             # File icon
             rx.el.div(
-                rx.icon(
+                fomantic_icon(
                     "file-text", 
                     size=22, 
                     color=rx.cond(is_selected, "#fff", "#5a5a5a")
@@ -99,7 +102,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
             # Action buttons
             rx.el.div(
                 rx.el.button(
-                    rx.icon("trash-2", size=14),
+                    fomantic_icon("trash-2", size=14),
                     on_click=lambda: UploadState.delete_file(filename),
                     class_name=rx.cond(is_selected, "ui mini icon inverted button", "ui mini icon button"),
                     title="Delete",
@@ -137,7 +140,7 @@ def file_column_content() -> rx.Component:
     return rx.el.div(
         # Header with icon
         rx.el.div(
-            rx.icon("files", size=24, color="#2185d0"),
+            fomantic_icon("files", size=24, color="#2185d0"),
             rx.el.span(" Files", style={"fontSize": "1.2rem", "fontWeight": "600", "marginLeft": "8px"}),
             style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
         ),
@@ -189,7 +192,7 @@ def file_column_content() -> rx.Component:
         rx.el.div(
             rx.el.span("Library", style={"fontSize": "1rem", "fontWeight": "600"}),
             rx.el.button(
-                rx.icon("refresh-cw", size=14),
+                fomantic_icon("refresh-cw", size=14),
                 " Refresh",
                 on_click=UploadState.on_load,
                 class_name="ui mini button",
@@ -206,7 +209,7 @@ def file_column_content() -> rx.Component:
                 id="file-list",
             ),
             rx.el.div(
-                rx.icon("inbox", size=40, color="#ccc"),
+                fomantic_icon("inbox", size=40, color="#ccc"),
                 rx.el.div("No files yet", style={"color": "#888", "marginTop": "8px"}),
                 style={"textAlign": "center", "padding": "30px 10px"},
                 id="empty-file-list",
@@ -217,7 +220,7 @@ def file_column_content() -> rx.Component:
 
 
 # ============================================================================
-# COLUMN 2: MODULE SELECTION
+# MODULE SELECTION COMPONENTS
 # ============================================================================
 
 def module_icon(name: rx.Var[str]) -> rx.Component:
@@ -227,13 +230,13 @@ def module_icon(name: rx.Var[str]) -> rx.Component:
     """
     return rx.match(
         name,
-        ("coronary", rx.icon("heart", size=24, color="#fff")),
-        ("lipidmetabolism", rx.icon("droplets", size=24, color="#fff")),
-        ("longevitymap", rx.icon("heart-pulse", size=24, color="#fff")),
-        ("superhuman", rx.icon("zap", size=24, color="#fff")),
-        ("vo2max", rx.icon("activity", size=24, color="#fff")),
-        ("drugs", rx.icon("pill", size=24, color="#fff")),
-        rx.icon("database", size=24, color="#fff"),  # default
+        ("coronary", fomantic_icon("heart", size=24, color="#fff")),
+        ("lipidmetabolism", fomantic_icon("droplets", size=24, color="#fff")),
+        ("longevitymap", fomantic_icon("heart-pulse", size=24, color="#fff")),
+        ("superhuman", fomantic_icon("zap", size=24, color="#fff")),
+        ("vo2max", fomantic_icon("activity", size=24, color="#fff")),
+        ("drugs", fomantic_icon("pill", size=24, color="#fff")),
+        fomantic_icon("database", size=24, color="#fff"),  # default
     )
 
 
@@ -328,338 +331,518 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
     )
 
 
-def module_column_content() -> rx.Component:
-    """Column 2 content: Module selection."""
-    return rx.el.div(
-        # Header
-        rx.el.div(
-            rx.icon("boxes", size=24, color="#2185d0"),
-            rx.el.span(" Modules", style={"fontSize": "1.2rem", "fontWeight": "600", "marginLeft": "8px"}),
-            rx.el.span(
-                UploadState.selected_modules.length(),
-                " selected",
-                class_name="ui blue label",
-                style={"marginLeft": "auto"},
-            ),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
-        ),
-        
-        rx.el.div(class_name="ui divider", style={"margin": "0 0 12px 0"}),
-        
-        # Selection controls
-        rx.el.div(
-            rx.el.button(
-                "All",
-                on_click=UploadState.select_all_modules,
-                class_name="ui mini button",
-                id="select-all-modules-button",
-                disabled=~UploadState.has_selected_file,
-            ),
-            rx.el.button(
-                "None",
-                on_click=UploadState.deselect_all_modules,
-                class_name="ui mini button",
-                id="deselect-all-modules-button",
-                style={"marginLeft": "6px"},
-                disabled=~UploadState.has_selected_file,
-            ),
-            style={"marginBottom": "16px", "display": "flex", "gap": "6px"},
-        ),
-        
-        # Module cards (scrollable)
-        rx.el.div(
-            rx.foreach(UploadState.module_metadata_list, module_card),
-            id="module-list",
-        ),
-        
-        # ---- Action Section (visually separated) ----
-        rx.el.div(class_name="ui horizontal divider", style={"margin": "20px 0 16px 0"}),
-        
-        rx.el.div(
-            rx.icon("zap", size=18, color="#2185d0"),
-            rx.el.span(" Run Analysis", style={"fontSize": "1rem", "fontWeight": "600", "marginLeft": "6px"}),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "12px"},
-        ),
-        
-        # Run button - Fomantic UI right labeled icon button
-        rx.el.button(
-            UploadState.analysis_button_text,
-            rx.el.i(
-                # Empty string to force element to render
-                "",
-                class_name=rx.cond(
-                    UploadState.running,
-                    "spinner loading icon",
-                    rx.cond(
-                        UploadState.last_run_success,
-                        "check circle icon",
-                        "play icon",
-                    ),
-                ),
-            ),
-            on_click=UploadState.start_annotation_run,
-            disabled=~UploadState.can_run_annotation,
-            class_name=UploadState.analysis_button_color,
-            id="start-analysis-button",
-        ),
-        
-        # Show selected file below button as helper text
-        rx.cond(
-            ~UploadState.has_selected_file,
-            rx.el.div(
-                "Select a file from the library to start",
-                style={"color": "#888", "fontSize": "0.85rem", "marginTop": "10px", "textAlign": "center"},
-                id="no-file-selected-warning",
-            ),
-            rx.box(),
-        ),
-        id="module-column-content",
+# ============================================================================
+# RUN-CENTRIC UI COMPONENTS
+# ============================================================================
+
+def run_status_badge(status: rx.Var[str]) -> rx.Component:
+    """Return a colored badge based on run status."""
+    return rx.match(
+        status,
+        ("SUCCESS", rx.el.span("SUCCESS", class_name="ui green label")),
+        ("FAILURE", rx.el.span("FAILURE", class_name="ui red label")),
+        ("RUNNING", rx.el.span("RUNNING", class_name="ui blue label")),
+        ("QUEUED", rx.el.span("QUEUED", class_name="ui grey label")),
+        ("CANCELED", rx.el.span("CANCELED", class_name="ui orange label")),
+        rx.el.span(status, class_name="ui grey label"),
     )
 
 
-# ============================================================================
-# COLUMN 3: RESULTS
-# ============================================================================
+def file_type_icon(file_type: rx.Var[str]) -> rx.Component:
+    """Return an icon for file type."""
+    return rx.match(
+        file_type,
+        ("weights", fomantic_icon("scale", size=18, color="#2185d0")),
+        ("annotations", fomantic_icon("file-text", size=18, color="#21ba45")),
+        ("studies", fomantic_icon("book-open", size=18, color="#f2711c")),
+        fomantic_icon("file", size=18, color="#767676"),
+    )
 
-def run_card(run: rx.Var[dict]) -> rx.Component:
-    """Run history card with status badge, timing, and Dagster link."""
-    run_id_str = run["run_id"].to(str)
-    dagster_url = UploadState.dagster_web_url + "/runs/" + run_id_str
-    
+
+def file_type_label(file_type: rx.Var[str]) -> rx.Component:
+    """Return a colored label for file type."""
+    return rx.match(
+        file_type,
+        ("weights", rx.el.span("weights", class_name="ui mini blue label")),
+        ("annotations", rx.el.span("annotations", class_name="ui mini green label")),
+        ("studies", rx.el.span("studies", class_name="ui mini orange label")),
+        rx.el.span(file_type, class_name="ui mini grey label"),
+    )
+
+
+def _collapsible_header(
+    expanded: rx.Var[bool],
+    icon_name: str,
+    title: str,
+    right_badge: rx.Component,
+    on_toggle: rx.EventSpec,
+) -> rx.Component:
+    """
+    Reusable foldable section header matching New Analysis style.
+    Chevron + icon + title on left; optional badge on right.
+    """
     return rx.el.div(
-        # Header row: Status + Timestamp
         rx.el.div(
-            # Status badge
-            rx.el.div(
-                run["status"].to(str),
-                class_name=rx.cond(
-                    run["status"] == "SUCCESS",
-                    "ui green label",
-                    rx.cond(
-                        run["status"] == "FAILURE",
-                        "ui red label",
-                        rx.cond(
-                            run["status"] == "RUNNING",
-                            "ui blue label",
-                            "ui grey label",
-                        ),
-                    ),
-                ),
-            ),
-            # Timestamp
-            rx.el.div(
-                run["started_at"].to(str),
-                style={"fontSize": "0.85rem", "color": "#666", "marginLeft": "10px"},
-            ),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
-        ),
-        
-        # Run ID with clickable Dagster link
-        rx.el.div(
-            rx.el.a(
-                rx.icon("external-link", size=12),
-                rx.el.span(
-                    " ",
-                    run_id_str,
-                    style={"fontFamily": "monospace", "fontSize": "0.75rem"},
-                ),
-                href=dagster_url,
-                target="_blank",
-                style={
-                    "display": "inline-flex",
-                    "alignItems": "center",
-                    "color": "#2185d0",
-                    "textDecoration": "none",
-                    "gap": "4px",
-                },
-                title="Open in Dagster UI",
-            ),
-            style={"marginBottom": "8px"},
-        ),
-        
-        # Modules used
-        rx.el.div(
-            rx.el.span("Modules: ", style={"color": "#888", "fontSize": "0.85rem"}),
-            rx.foreach(
-                run["modules"].to(list),
-                lambda m: rx.el.span(m.to(str), class_name="ui mini label", style={"marginRight": "3px"}),
-            ),
-            style={"marginBottom": "8px"},
-        ),
-        
-        # Action buttons row
-        rx.el.div(
-            # Dagster UI button
-            rx.el.a(
-                rx.icon("external-link", size=14),
-                " Dagster",
-                href=dagster_url,
-                target="_blank",
-                class_name="ui mini button",
-                style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
-            ),
-            # Download button if output available
             rx.cond(
-                run["output_path"],
-                rx.el.div(
-                    rx.icon("download", size=14),
-                    " Results",
-                    class_name="ui mini primary button",
-                    style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
-                ),
-                rx.box(),
+                expanded,
+                fomantic_icon("chevron-down", size=20, color="#2185d0"),
+                fomantic_icon("chevron-right", size=20, color="#2185d0"),
             ),
-            style={"display": "flex", "alignItems": "center", "marginTop": "4px"},
+            fomantic_icon(icon_name, size=20, color="#2185d0", style={"marginLeft": "6px"}),
+            rx.el.span(title, style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "8px"}),
+            style={"display": "flex", "alignItems": "center"},
         ),
-        id=rx.Var.create("run-card-") + run_id_str,
-        class_name="ui segment",
+        right_badge,
+        on_click=on_toggle,
         style={
-            "margin": "0 0 10px 0",
+            "display": "flex",
+            "justifyContent": "space-between",
+            "alignItems": "center",
+            "cursor": "pointer",
             "padding": "12px",
-            "border": "1px solid #e0e0e0",
+            "backgroundColor": "#f9fafb",
             "borderRadius": "6px",
+            "marginBottom": rx.cond(expanded, "16px", "0"),
         },
     )
 
 
-def results_column_content() -> rx.Component:
-    """Column 3 content: Results and run history."""
+def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
+    """Compact card for a single output file with download button."""
+    download_url = rx.Var.create("/api/download/") + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str)
+    
     return rx.el.div(
-        # Header
         rx.el.div(
-            rx.icon("chart-bar", size=24, color="#2185d0"),
-            rx.el.span(" Results", style={"fontSize": "1.2rem", "fontWeight": "600", "marginLeft": "8px"}),
-            rx.el.button(
-                rx.icon("refresh-cw", size=14),
-                on_click=UploadState.on_load,
-                class_name="ui mini icon button",
-                id="refresh-results-button",
+            # File type icon
+            file_type_icon(file_info["type"]),
+            # File info
+            rx.el.div(
+                rx.el.strong(file_info["name"].to(str), style={"fontSize": "0.85rem"}),
+                rx.el.div(
+                    file_type_label(file_info["type"]),
+                    rx.el.span(
+                        file_info["module"].to(str),
+                        class_name="ui mini label",
+                        style={"marginLeft": "4px"},
+                    ),
+                    rx.el.span(
+                        file_info["size_mb"].to(str),
+                        " MB",
+                        style={"color": "#888", "fontSize": "0.75rem", "marginLeft": "8px"},
+                    ),
+                    style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
+                ),
+                style={"flex": "1", "marginLeft": "10px"},
+            ),
+            # Download button
+            rx.el.a(
+                fomantic_icon("download", size=14),
+                href=download_url,
+                download=file_info["name"].to(str),
+                class_name="ui mini icon primary button",
                 style={"marginLeft": "auto"},
             ),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
+            style={"display": "flex", "alignItems": "center", "width": "100%"},
+        ),
+        style={
+            "padding": "8px 10px",
+            "borderBottom": "1px solid #eee",
+        },
+    )
+
+
+def outputs_section() -> rx.Component:
+    """
+    Collapsible section showing output files for the selected sample.
+    Positioned at the top of the right panel for easy access.
+    """
+    return rx.el.div(
+        # Foldable header
+        _collapsible_header(
+            expanded=UploadState.outputs_expanded,
+            icon_name="folder-output",
+            title="Outputs",
+            right_badge=rx.el.span(
+                UploadState.output_file_count,
+                " files",
+                class_name="ui mini teal label",
+            ),
+            on_toggle=UploadState.toggle_outputs,
         ),
         
-        rx.el.div(class_name="ui divider", style={"margin": "0 0 16px 0"}),
-        
-        # Run history section
-        rx.el.div(
-            rx.el.span("Run History", style={"fontSize": "1rem", "fontWeight": "600"}),
-            style={"marginBottom": "12px"},
-        ),
-        
+        # Expanded content
         rx.cond(
-            UploadState.has_selected_file,
+            UploadState.outputs_expanded,
+            rx.cond(
+                UploadState.has_output_files,
+                # File list
+                rx.el.div(
+                    rx.foreach(UploadState.output_files, output_file_card),
+                    style={
+                        "maxHeight": "280px",
+                        "overflowY": "auto",
+                        "border": "1px solid #e0e0e0",
+                        "borderRadius": "6px",
+                        "backgroundColor": "#fff",
+                    },
+                ),
+                # Empty state - prompt to analyze
+                rx.el.div(
+                    fomantic_icon("inbox", size=36, color="#ccc"),
+                    rx.el.div(
+                        "No outputs yet",
+                        style={"color": "#888", "marginTop": "10px", "fontSize": "1rem", "fontWeight": "500"},
+                    ),
+                    rx.el.div(
+                        "Run an analysis to generate output files",
+                        style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.85rem"},
+                    ),
+                    style={"textAlign": "center", "padding": "24px 16px"},
+                ),
+            ),
+            rx.box(),
+        ),
+        
+        style={"padding": "0", "overflow": "hidden"},
+        id="outputs-section",
+    )
+
+
+def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
+    """
+    Card for a run in the timeline.
+    
+    Shows status, date, module count. Expands on click to show details.
+    The first run (latest) shows additional action buttons and is highlighted.
+    """
+    run_id = run["run_id"].to(str)
+    is_expanded = UploadState.expanded_run_id == run_id
+    is_latest = UploadState.latest_run_id == run_id
+    dagster_url = UploadState.dagster_web_url + "/runs/" + run_id
+    
+    return rx.el.div(
+        # Main row (always visible)
+        rx.el.div(
+            # Status badge
+            run_status_badge(run["status"].to(str)),
+            # Latest badge for first run
+            rx.cond(
+                is_latest,
+                rx.el.span("latest", class_name="ui mini teal label", style={"marginLeft": "6px"}),
+                rx.box(),
+            ),
+            # Timestamp
+            rx.el.span(
+                run["started_at"].to(str),
+                style={"marginLeft": "12px", "color": "#666", "fontSize": "0.85rem", "flex": "1"},
+            ),
+            # Module count
+            rx.el.span(
+                run["modules"].to(list).length(),
+                " modules",
+                class_name="ui mini label",
+                style={"marginRight": "8px"},
+            ),
+            # Expand/collapse button
+            rx.el.button(
+                rx.cond(
+                    is_expanded,
+                    fomantic_icon("chevron-up", size=16),
+                    fomantic_icon("chevron-down", size=16),
+                ),
+                on_click=lambda: UploadState.toggle_run_expansion(run_id),
+                class_name="ui mini icon button",
+                style={"padding": "6px"},
+            ),
+            style={"display": "flex", "alignItems": "center", "cursor": "pointer"},
+            on_click=lambda: UploadState.toggle_run_expansion(run_id),
+        ),
+        
+        # Expanded details (conditionally shown)
+        rx.cond(
+            is_expanded,
+            rx.el.div(
+                # Modules list
+                rx.el.div(
+                    rx.el.span("Modules: ", style={"color": "#666", "fontSize": "0.85rem"}),
+                    rx.foreach(
+                        run["modules"].to(list),
+                        lambda m: rx.el.span(m.to(str), class_name="ui mini label", style={"marginRight": "3px"}),
+                    ),
+                    style={"marginBottom": "10px"},
+                ),
+                # Action buttons (only for latest run)
+                rx.cond(
+                    is_latest,
+                    rx.el.div(
+                        rx.el.button(
+                            fomantic_icon("refresh-cw", size=14),
+                            " Re-run",
+                            on_click=UploadState.rerun_with_same_modules,
+                            disabled=UploadState.running,
+                            class_name="ui mini primary button",
+                            style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
+                        ),
+                        rx.el.button(
+                            fomantic_icon("sliders-horizontal", size=14),
+                            " Modify",
+                            on_click=UploadState.modify_and_run,
+                            class_name="ui mini button",
+                            style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
+                        ),
+                        style={"marginBottom": "10px"},
+                    ),
+                    rx.box(),
+                ),
+                # Run ID
+                rx.el.div(
+                    rx.el.span("Run ID: ", style={"color": "#666", "fontSize": "0.85rem"}),
+                    rx.el.code(run_id, style={"fontSize": "0.75rem"}),
+                    style={"marginBottom": "10px"},
+                ),
+                # Dagster link
+                rx.el.a(
+                    fomantic_icon("external-link", size=12),
+                    " Open in Dagster",
+                    href=dagster_url,
+                    target="_blank",
+                    class_name="ui mini button",
+                    style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
+                ),
+                style={"marginTop": "12px", "paddingTop": "12px", "borderTop": "1px solid #eee"},
+            ),
+            rx.box(),
+        ),
+        
+        class_name=rx.cond(is_latest, "ui blue segment", "ui segment"),
+        style={"margin": "0 0 8px 0", "padding": "10px 12px"},
+        id=rx.Var.create("timeline-run-") + run_id,
+    )
+
+
+def run_timeline() -> rx.Component:
+    """
+    Collapsible scrollable list of all runs for the selected file.
+    The most recent run is highlighted and has action buttons.
+    """
+    run_count_badge = rx.el.span(
+        UploadState.filtered_runs.length(),
+        " runs",
+        class_name="ui mini blue label",
+    )
+    return rx.el.div(
+        # Foldable header
+        _collapsible_header(
+            expanded=UploadState.run_history_expanded,
+            icon_name="history",
+            title="Run History",
+            right_badge=run_count_badge,
+            on_toggle=UploadState.toggle_run_history,
+        ),
+        
+        # Expanded content
+        rx.cond(
+            UploadState.run_history_expanded,
             rx.cond(
                 UploadState.has_filtered_runs,
                 rx.el.div(
-                    rx.foreach(UploadState.filtered_runs, run_card),
-                    id="run-history-list",
+                    rx.foreach(
+                        UploadState.filtered_runs,
+                        run_timeline_card,
+                    ),
+                    style={"maxHeight": "300px", "overflowY": "auto"},
+                    id="run-timeline-list",
                 ),
                 rx.el.div(
-                    rx.icon("history", size=40, color="#ccc"),
-                    rx.el.div("No runs for this file", style={"color": "#888", "marginTop": "8px"}),
-                    style={"textAlign": "center", "padding": "30px 10px"},
-                    id="empty-run-history",
-                    class_name="ui disabled segment",
+                    fomantic_icon("inbox", size=32, color="#ccc"),
+                    rx.el.div(
+                        "No runs yet",
+                        style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+                    ),
+                    rx.el.div(
+                        "Start an analysis to see run history",
+                        style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.85rem"},
+                    ),
+                    style={"textAlign": "center", "padding": "20px 16px"},
                 ),
             ),
-            rx.el.div(
-                rx.icon("file-text", size=40, color="#ccc"),
-                rx.el.div("Select a file to see history", style={"color": "#888", "marginTop": "8px"}),
-                style={"textAlign": "center", "padding": "30px 10px"},
-                id="no-file-selected-history",
-                class_name="ui disabled segment",
+            rx.box(),
+        ),
+        id="run-timeline-section",
+        style={"padding": "0", "overflow": "hidden"},
+    )
+
+
+def new_analysis_section() -> rx.Component:
+    """
+    Collapsible section for starting a new analysis.
+    
+    Contains module selection grid and start button.
+    Uses shared _collapsible_header for uniform design.
+    """
+    return rx.el.div(
+        # Foldable header (same style as Last Run and Run History)
+        _collapsible_header(
+            expanded=UploadState.new_analysis_expanded,
+            icon_name="plus-circle",
+            title="New Analysis",
+            right_badge=rx.el.span(
+                UploadState.selected_modules.length(),
+                " modules selected",
+                class_name="ui mini blue label",
             ),
+            on_toggle=UploadState.toggle_new_analysis,
         ),
         
-        rx.el.div(class_name="ui divider", style={"margin": "20px 0 16px 0"}),
-        
-        # Logs section - scrollable frame
-        rx.el.div(
+        # Expanded content
+        rx.cond(
+            UploadState.new_analysis_expanded,
             rx.el.div(
-                rx.icon("terminal", size=18, color="#2185d0"),
-                rx.el.span(" Logs", style={"fontSize": "1rem", "fontWeight": "600", "marginLeft": "6px"}),
-                # Status indicator
-                rx.cond(
-                    UploadState.running,
-                    rx.el.span(
-                        rx.icon("loader-circle", size=14),
-                        " Running",
-                        class_name="ui mini blue label",
-                        style={"marginLeft": "auto", "display": "inline-flex", "alignItems": "center", "gap": "4px"},
+                # Selection controls
+                rx.el.div(
+                    rx.el.button(
+                        "Select All",
+                        on_click=UploadState.select_all_modules,
+                        class_name="ui mini button",
                     ),
-                    rx.cond(
-                        UploadState.has_logs,
-                        rx.el.span(
-                            UploadState.log_count,
-                            " entries",
-                            class_name="ui mini label",
-                            style={"marginLeft": "auto"},
-                        ),
-                        rx.box(),
+                    rx.el.button(
+                        "Select None",
+                        on_click=UploadState.deselect_all_modules,
+                        class_name="ui mini button",
+                        style={"marginLeft": "6px"},
                     ),
+                    style={"marginBottom": "16px"},
                 ),
-                style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
-            ),
-            
-            # Scrollable log container
-            rx.el.div(
-                rx.cond(
-                    UploadState.has_logs,
-                    rx.el.div(
-                        rx.foreach(
-                            UploadState.run_logs,
-                            lambda log_line: rx.el.div(
-                                log_line,
-                                style={
-                                    "padding": "4px 8px",
-                                    "borderBottom": "1px solid #333",
-                                    "fontSize": "0.8rem",
-                                    "fontFamily": "monospace",
-                                    "whiteSpace": "pre-wrap",
-                                    "wordBreak": "break-word",
-                                },
+                
+                # Module cards grid – scroll after ~2 rows
+                rx.el.div(
+                    rx.foreach(UploadState.module_metadata_list, module_card),
+                    style={
+                        "display": "grid",
+                        "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
+                        "gap": "10px",
+                        "marginBottom": "16px",
+                        "maxHeight": "320px",
+                        "overflowY": "auto",
+                    },
+                    id="module-cards-grid",
+                ),
+                
+                # Start button
+                rx.el.button(
+                    UploadState.analysis_button_text,
+                    rx.el.i(
+                        "",
+                        class_name=rx.cond(
+                            UploadState.running,
+                            "spinner loading icon",
+                            rx.cond(
+                                UploadState.last_run_success,
+                                "check circle icon",
+                                "play icon",
                             ),
                         ),
-                        id="log-entries",
                     ),
-                    rx.el.div(
-                        rx.icon("terminal", size=32, color="#555"),
-                        rx.el.div("No logs yet", style={"color": "#888", "marginTop": "8px", "fontSize": "0.85rem"}),
-                        rx.el.div("Run an analysis to see logs here", style={"color": "#666", "marginTop": "4px", "fontSize": "0.75rem"}),
-                        style={"textAlign": "center", "padding": "30px 10px"},
-                    ),
+                    on_click=UploadState.start_annotation_run,
+                    disabled=~UploadState.can_run_annotation,
+                    class_name=UploadState.analysis_button_color,
+                    style={"maxWidth": "400px"},
                 ),
-                style={
-                    "backgroundColor": "#1e1e1e",
-                    "color": "#d4d4d4",
-                    "borderRadius": "6px",
-                    "maxHeight": "250px",
-                    "minHeight": "100px",
-                    "overflowY": "auto",
-                    "overflowX": "hidden",
-                },
-                id="logs-container",
             ),
-            id="logs-section",
+            rx.box(),
         ),
         
-        rx.el.div(class_name="ui divider", style={"margin": "16px 0"}),
-        
-        # External links
-        rx.el.div(
-            rx.el.a(
-                rx.icon("external-link", size=14),
-                " Open Dagster UI",
-                href=UploadState.dagster_web_url,
-                target="_blank",
-                class_name="ui button",
-                id="dagster-ui-link",
-                style={"display": "inline-flex", "alignItems": "center", "gap": "6px"},
-            ),
-        ),
-        id="results-column-content",
+        style={"padding": "0", "overflow": "hidden"},
+        id="new-analysis-section",
     )
+
+
+def no_file_selected_message() -> rx.Component:
+    """Message shown when no file is selected."""
+    return rx.el.div(
+        fomantic_icon("file-text", size=48, color="#ccc"),
+        rx.el.div(
+            "Select a file to view run history",
+            style={"color": "#888", "marginTop": "16px", "fontSize": "1rem"},
+        ),
+        rx.el.div(
+            "Choose a VCF file from the Files panel to see previous runs and start new analyses",
+            style={"color": "#aaa", "marginTop": "8px", "fontSize": "0.9rem", "maxWidth": "300px"},
+        ),
+        style={"textAlign": "center", "padding": "60px 20px"},
+        id="no-file-selected-message",
+    )
+
+
+
+
+def right_panel_run_view() -> rx.Component:
+    """
+    Run-centric right panel with three sections:
+    1. Outputs (top) - results the user wants to see first
+    2. Run History (middle) - unified timeline of all runs
+    3. New Analysis (bottom) - start new work
+    """
+    return rx.el.div(
+        # Header – inverted bar (dark bg, light text) for emphasis
+        rx.el.div(
+            fomantic_icon("file-text", size=22, color="#fff"),
+            rx.cond(
+                UploadState.has_selected_file,
+                rx.el.span(
+                    " Results for ",
+                    rx.el.strong(UploadState.selected_file, style={"fontWeight": "600"}),
+                    style={"fontSize": "1.1rem", "marginLeft": "8px", "color": "#fff"},
+                ),
+                rx.el.span(
+                    " Select a file to view results and start analysis",
+                    style={"fontSize": "1.1rem", "marginLeft": "8px", "color": "rgba(255,255,255,0.9)"},
+                ),
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "padding": "14px 16px",
+                "marginBottom": "16px",
+                "backgroundColor": "#2185d0",
+                "color": "#fff",
+                "borderRadius": "6px",
+            },
+            id="right-column-header",
+        ),
+        # Content: three sections or empty state
+        rx.cond(
+            UploadState.has_selected_file,
+            rx.fragment(
+                # Section 1: Outputs (top) - teal segment
+                rx.el.div(
+                    outputs_section(),
+                    class_name="ui teal segment",
+                    style={"padding": "16px", "marginBottom": "16px"},
+                    id="segment-outputs",
+                ),
+                # Section 2: Run History (middle) - green segment
+                rx.el.div(
+                    run_timeline(),
+                    class_name="ui green segment",
+                    style={"padding": "16px", "marginBottom": "16px"},
+                    id="segment-run-history",
+                ),
+                # Section 3: New Analysis (bottom) - blue segment
+                rx.el.div(
+                    new_analysis_section(),
+                    class_name="ui blue segment",
+                    style={"padding": "16px"},
+                    id="segment-new-analysis",
+                ),
+            ),
+            no_file_selected_message(),
+        ),
+        id="right-panel-run-view",
+        style={"padding": "0"},
+    )
+
+
 
 
 # ============================================================================
@@ -684,27 +867,12 @@ def polling_interval() -> rx.Component:
 
 @rx.page(route="/annotate", on_load=UploadState.on_load)
 def annotate_page() -> rx.Component:
-    """Annotation page with three-column layout."""
+    """Annotation page with two-panel run-centric layout."""
     return template(
-        # Page header
-        rx.el.div(
-            rx.el.h2(
-                rx.icon("dna", size=32, color="#2185d0"),
-                " Genomic Annotation",
-                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "0"},
-            ),
-            rx.el.div(
-                "Analyze your VCF files with specialized annotation modules",
-                style={"color": "#666", "marginTop": "6px"},
-            ),
-            style={"marginBottom": "20px"},
-        ),
-        
-        # Three-column layout
-        three_column_layout(
+        # Two-column layout with run-centric right panel
+        two_column_layout(
             left=file_column_content(),
-            center=module_column_content(),
-            right=results_column_content(),
+            right=right_panel_run_view(),
         ),
         
         # Polling component (hidden)

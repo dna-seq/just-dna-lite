@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import template
+from webui.components.layout import template, fomantic_icon
 
 
 @rx.page(route="/analysis")
@@ -11,7 +11,7 @@ def analysis_page() -> rx.Component:
     return template(
         rx.el.div(
             rx.el.h1(
-                rx.icon("chart-bar", size=40),
+                fomantic_icon("chart-bar", size=40),
                 " Interpretation & Discovery", 
                 class_name="ui header",
                 style={"color": "#2185d0"}
@@ -25,7 +25,7 @@ def analysis_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.div(
-                            rx.icon("file-text", size=48, style={"color": "#f2711c"}),
+                            fomantic_icon("file-text", size=48, style={"color": "#f2711c"}),
                             rx.el.h3("Genetic Reports", class_name="ui header"),
                             rx.el.p(
                                 "Static, genetic-grade longevity reports for easy reading and sharing.", 
@@ -38,7 +38,7 @@ def analysis_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.div(
-                            rx.icon("search", size=48, style={"color": "#2185d0"}),
+                            fomantic_icon("search", size=48, style={"color": "#2185d0"}),
                             rx.el.h3("Interactive Explore", class_name="ui header"),
                             rx.el.p(
                                 "Deep dive into variants, filter by consequence and genetic significance.", 

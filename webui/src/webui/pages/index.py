@@ -1,5 +1,5 @@
 """
-Index page - Main annotation interface with 3-column layout.
+Index page - Main annotation interface with 2-panel run-centric layout.
 
 This is the primary page where users upload VCF files, select modules, and run annotation jobs.
 """
@@ -7,39 +7,23 @@ from __future__ import annotations
 
 import reflex as rx
 
-from webui.components.layout import template, three_column_layout
+from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.state import UploadState
 from webui.pages.annotate import (
     file_column_content,
-    module_column_content,
-    results_column_content,
+    right_panel_run_view,
     polling_interval,
 )
 
 
 @rx.page(route="/", on_load=UploadState.on_load)
 def index_page() -> rx.Component:
-    """Main annotation page with three-column layout."""
+    """Main annotation page with two-panel run-centric layout."""
     return template(
-        # Page header
-        rx.el.div(
-            rx.el.h2(
-                rx.icon("dna", size=32, color="#2185d0"),
-                " Genomic Annotation",
-                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "0"},
-            ),
-            rx.el.div(
-                "Analyze your VCF files with specialized annotation modules",
-                style={"color": "#666", "marginTop": "6px"},
-            ),
-            style={"marginBottom": "20px"},
-        ),
-        
-        # Three-column layout
-        three_column_layout(
+        # Two-column layout with run-centric right panel
+        two_column_layout(
             left=file_column_content(),
-            center=module_column_content(),
-            right=results_column_content(),
+            right=right_panel_run_view(),
         ),
         
         # Polling component (hidden)
