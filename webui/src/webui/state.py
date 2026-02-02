@@ -17,6 +17,30 @@ from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_
 
 # Module metadata with titles, descriptions, and icons
 # This maps module names to human-readable information
+# Species options for VCF metadata (Latin/scientific names)
+SPECIES_OPTIONS: List[str] = [
+    "Homo sapiens",       # Human
+    "Mus musculus",       # Mouse
+    "Rattus norvegicus",  # Rat
+    "Canis lupus familiaris",  # Dog
+    "Felis catus",        # Cat
+    "Danio rerio",        # Zebrafish
+    "Other",
+]
+
+# Reference genome options by species (Latin names)
+# For humans: GRCh38 and T2T-CHM13 are the main modern assemblies
+REFERENCE_GENOMES: Dict[str, List[str]] = {
+    "Homo sapiens": ["GRCh38", "T2T-CHM13v2.0", "GRCh37"],
+    "Mus musculus": ["GRCm39", "GRCm38"],
+    "Rattus norvegicus": ["mRatBN7.2", "Rnor_6.0"],
+    "Canis lupus familiaris": ["ROS_Cfam_1.0", "CanFam3.1"],
+    "Felis catus": ["Felis_catus_9.0", "Felis_catus_8.0"],
+    "Danio rerio": ["GRCz11", "GRCz10"],
+    "Other": ["custom"],
+}
+
+
 MODULE_METADATA: Dict[str, Dict[str, str]] = {
     "longevitymap": {
         "title": "Longevity Map",
@@ -407,6 +431,9 @@ class UploadState(rx.State):
     # Currently selected file for annotation
     selected_file: str = ""
     
+    # File metadata cache: filename -> {size_mb, upload_date, reference_genome, sample_name}
+    file_metadata: Dict[str, Dict[str, Any]] = {}
+    
     # Run history tracking
     runs: List[Dict[str, Any]] = []
     active_run_id: str = ""
@@ -429,6 +456,208 @@ class UploadState(rx.State):
     expanded_run_id: str = ""  # Which run in the timeline is expanded to show logs
     show_outputs_modal: bool = False  # Whether to show the outputs modal (legacy, kept for compatibility)
 
+    def _load_file_metadata(self, filename: str):
+        """Load metadata for a single VCF file."""
+        if not self.safe_user_id:
+            return
+            
+        root = Path(__file__).resolve().parents[3]
+        file_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        
+        if not file_path.exists():
+            return
+        
+        # Get file stats
+        stat = file_path.stat()
+        size_mb = round(stat.st_size / (1024 * 1024), 2)
+        upload_date = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+        
+        # Derive sample name
+        sample_name = filename.replace(".vcf.gz", "").replace(".vcf", "")
+        
+        # Default species and reference genome (Latin names)
+        species = "Homo sapiens"
+        reference_genome = "GRCh38"
+        
+        self.file_metadata[filename] = {
+            "filename": filename,
+            "sample_name": sample_name,
+            "size_mb": size_mb,
+            "upload_date": upload_date,
+            "species": species,
+            "reference_genome": reference_genome,
+            "path": str(file_path),
+            # User-editable fields
+            "subject_id": "",
+            "study_name": "",
+            "notes": "",
+            # Custom key-value fields (user can add their own)
+            "custom_fields": {},  # Dict[str, str] for user-defined fields
+        }
+
+    def update_file_species(self, species: str):
+        """Update species for the selected file and reset reference genome to default."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        
+        # Get default reference genome for this species
+        default_ref = REFERENCE_GENOMES.get(species, ["custom"])[0]
+        
+        # Update metadata - need to create new dict for reactivity
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["species"] = species
+        updated[self.selected_file]["reference_genome"] = default_ref
+        self.file_metadata = updated
+
+    def update_file_reference_genome(self, ref_genome: str):
+        """Update reference genome for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        # Create new dict for reactivity
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["reference_genome"] = ref_genome
+        self.file_metadata = updated
+
+    def update_file_subject_id(self, subject_id: str):
+        """Update subject/patient ID for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["subject_id"] = subject_id
+        self.file_metadata = updated
+
+    def update_file_study_name(self, study_name: str):
+        """Update study/project name for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["study_name"] = study_name
+        self.file_metadata = updated
+
+    def update_file_notes(self, notes: str):
+        """Update notes for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["notes"] = notes
+        self.file_metadata = updated
+
+    def add_custom_field(self, field_name: str, field_value: str):
+        """Add or update a custom field for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        custom_fields = dict(updated[self.selected_file].get("custom_fields", {}))
+        custom_fields[field_name] = field_value
+        updated[self.selected_file]["custom_fields"] = custom_fields
+        self.file_metadata = updated
+
+    def remove_custom_field(self, field_name: str):
+        """Remove a custom field from the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        custom_fields = dict(updated[self.selected_file].get("custom_fields", {}))
+        if field_name in custom_fields:
+            del custom_fields[field_name]
+        updated[self.selected_file]["custom_fields"] = custom_fields
+        self.file_metadata = updated
+
+    # State for adding new custom field
+    new_custom_field_name: str = ""
+    new_custom_field_value: str = ""
+
+    def set_new_field_name(self, name: str):
+        """Set the name for a new custom field."""
+        self.new_custom_field_name = name
+
+    def set_new_field_value(self, value: str):
+        """Set the value for a new custom field."""
+        self.new_custom_field_value = value
+
+    def save_new_custom_field(self):
+        """Save the new custom field to the file metadata."""
+        if self.new_custom_field_name.strip():
+            self.add_custom_field(self.new_custom_field_name.strip(), self.new_custom_field_value)
+            self.new_custom_field_name = ""
+            self.new_custom_field_value = ""
+
+    @rx.var
+    def current_custom_fields(self) -> Dict[str, str]:
+        """Get custom fields for the currently selected file."""
+        if not self.selected_file:
+            return {}
+        return self.file_metadata.get(self.selected_file, {}).get("custom_fields", {})
+
+    @rx.var
+    def custom_fields_list(self) -> List[Dict[str, str]]:
+        """Get custom fields as a list for rx.foreach."""
+        fields = self.current_custom_fields
+        return [{"name": k, "value": v} for k, v in fields.items()]
+
+    @rx.var
+    def has_custom_fields(self) -> bool:
+        """Check if there are any custom fields."""
+        return len(self.current_custom_fields) > 0
+
+    @rx.var
+    def backend_api_url(self) -> str:
+        """Get the backend API URL for downloads."""
+        return os.getenv("API_URL", "http://localhost:8000")
+
+    @rx.var
+    def current_subject_id(self) -> str:
+        """Get subject ID for the currently selected file."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("subject_id", "")
+
+    @rx.var
+    def current_study_name(self) -> str:
+        """Get study name for the currently selected file."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("study_name", "")
+
+    @rx.var
+    def current_notes(self) -> str:
+        """Get notes for the currently selected file."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("notes", "")
+
+    @rx.var
+    def current_species(self) -> str:
+        """Get species for the currently selected file."""
+        if not self.selected_file:
+            return "Homo sapiens"
+        return self.file_metadata.get(self.selected_file, {}).get("species", "Homo sapiens")
+
+    @rx.var
+    def current_reference_genome(self) -> str:
+        """Get reference genome for the currently selected file."""
+        if not self.selected_file:
+            return "GRCh38"
+        return self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
+
+    @rx.var
+    def species_options(self) -> List[str]:
+        """Get available species options."""
+        return SPECIES_OPTIONS
+
+    @rx.var
+    def available_reference_genomes(self) -> List[str]:
+        """Get available reference genomes for the current species."""
+        species = self.current_species
+        return REFERENCE_GENOMES.get(species, ["custom"])
+
     def select_file(self, filename: str):
         """Select a file and pre-select modules from its latest run if available."""
         self.selected_file = filename
@@ -436,6 +665,10 @@ class UploadState(rx.State):
         self.last_run_success = False
         # Reset expanded run
         self.expanded_run_id = ""
+        
+        # Load file metadata if not already loaded
+        if filename not in self.file_metadata:
+            self._load_file_metadata(filename)
         
         # Find the latest run for this file to pre-select modules
         file_runs = [r for r in self.runs if r.get("filename") == filename]
@@ -587,6 +820,18 @@ class UploadState(rx.State):
     def has_selected_file(self) -> bool:
         """Check if a file is selected."""
         return bool(self.selected_file)
+
+    @rx.var
+    def selected_file_info(self) -> Dict[str, Any]:
+        """Get metadata for the currently selected file."""
+        if not self.selected_file:
+            return {}
+        return self.file_metadata.get(self.selected_file, {})
+
+    @rx.var
+    def has_file_metadata(self) -> bool:
+        """Check if we have metadata for the selected file."""
+        return bool(self.selected_file_info)
 
     @rx.var
     def has_selected_modules(self) -> bool:
@@ -939,6 +1184,10 @@ class UploadState(rx.State):
         # Find VCF files
         vcf_files = list(user_dir.glob("*.vcf")) + list(user_dir.glob("*.vcf.gz"))
         self.files = [f.name for f in vcf_files]
+        
+        # Load metadata for all files
+        for filename in self.files:
+            self._load_file_metadata(filename)
         
         # Sync statuses with Dagster
         instance = get_dagster_instance()

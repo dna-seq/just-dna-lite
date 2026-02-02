@@ -40,10 +40,16 @@ def fomantic_icon(name: str, size: int | str | None = None, color: str | None = 
         "chevron-up": "chevron up",
         "chevron-down": "chevron down",
         "chevron-right": "chevron right",
-        "trash-2": "trash alternate",
-        "folder-output": "folder open",
-        "plus-circle": "plus circle",
+        "paw-print": "paw",
         "x": "times",
+        "hard-drive": "hdd",
+        "clipboard": "clipboard",
+        "edit": "edit",
+        "folder": "folder",
+        "tags": "tags",
+        "plus": "plus",
+        "user": "user",
+        "scale": "balance scale",
     }
     
     fomantic_name = mapping.get(name, name)
@@ -240,10 +246,10 @@ def two_column_layout(
     }
     
     return rx.el.div(
-        # Left Column (width: ~28%)
+        # Left Column (width: ~30%) - slightly wider for metadata fields
         rx.el.div(
             left,
-            style={**column_base, "flex": "0 0 28%", "minWidth": "280px", "maxWidth": "350px"},
+            style={**column_base, "flex": "0 0 30%", "minWidth": "320px", "maxWidth": "420px"},
             id="layout-left-column",
         ),
         # Divider
