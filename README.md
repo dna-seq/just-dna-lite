@@ -53,10 +53,22 @@ uv run pipelines sync-vcf-partitions
 
 ## Features
 
+### Pipeline Features
 - VCF ingestion from `data/input/users/{user}/` and annotation outputs under `data/output/users/{user}/`.
 - Two join engines: Polars (default) and DuckDB (streaming, low memory).
 - Reference data assets cached under a per-user cache directory (see `JUST_DNA_PIPELINES_CACHE_DIR`).
 - Resource tracking (time / CPU / peak memory) surfaced in Dagster materializations.
+
+### Web UI Features
+- **File Management**: Upload VCF files with drag-and-drop, view file library with status badges.
+- **Sample Metadata**: 
+  - Species selection using Latin scientific names (Homo sapiens, Mus musculus, Rattus norvegicus, etc.)
+  - Reference genome selection (GRCh38, T2T-CHM13v2.0, GRCh37 for humans)
+  - Editable fields: Subject ID, Study Name, Notes
+  - **Custom Fields**: Add any metadata field with custom name (e.g., Batch ID, Sequencer, Library Prep)
+- **Run-Centric Layout**: View outputs, run history, and start new analyses in a unified interface.
+- **Real-time Monitoring**: Live status updates and log streaming from Dagster jobs.
+- **Output Downloads**: Download annotated parquet files directly from the browser.
 
 ## Configuration
 
@@ -101,6 +113,8 @@ uv run pytest just-dna-pipelines/tests/
 - [Performance & Engines](docs/DAGSTER_GUIDE.md#performance--engine-optimization)
 - [Hugging Face Integration](docs/DAGSTER_GUIDE.md#hugging-face-integration--authentication)
 - [Hugging Face Modules](docs/HF_MODULES.md)
+- [Web UI Status](docs/WEBUI_STATUS.md) - Current implementation status and architecture
+- [Design System](docs/DESIGN.md) - Fomantic UI patterns and component styling
 - [Agent Guidelines](AGENTS.md)
 
 ## Connected Repositories

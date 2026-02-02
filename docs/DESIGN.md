@@ -13,7 +13,7 @@ This document defines the visual design language for **just-dna-lite** UI compon
 - **Inputs:** `ui input`, `ui fluid input`.
 - **Icons:** Oversized (min 2rem). Pair with every major label.
 - **Icon Implementation:** Use `fomantic_icon()` from `webui.components.layout`. Do NOT use `rx.icon()` directly as Lucide icons often fail to load or trigger terminal warnings.
-    - Verified icons (mapped by helper): `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`.
+    - Verified icons (mapped by helper): `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`, `tags`, `plus`, `x`, `user`, `scale`, `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`.
 
 ## 2. Layout & Spacing
 
@@ -358,7 +358,8 @@ Always use **hyphenated** names. Common mistakes:
 - `inbox`, `history`, `chart-bar`, `play`, `list`
 - `sliders-horizontal`, `folder-output`, `folder-x`, `scale`, `book-open`, `trash-2`
 - `chevron-down`, `chevron-right`, `chevron-up` (for collapsible sections)
-- `clock`, `plus-circle`
+- `clock`, `plus-circle`, `plus`, `tags`, `user`, `x`
+- `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`
 
 Full list: https://reflex.dev/docs/library/data-display/icon/#icons-list
 
@@ -388,7 +389,85 @@ class_name=rx.cond(is_active, "ui primary button", "ui button")
 class_name="ui primary button" if is_active else "ui button"
 ```
 
-## 7. Anti-Patterns
+## 7. Metadata Form Pattern
+
+For editable metadata with dropdowns, text inputs, and custom key-value fields:
+
+```python
+def metadata_row(label: str, value: rx.Var[str], icon: str) -> rx.Component:
+    """Single metadata row with icon, label, and value (read-only)."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon(icon, size=14, color="#888"),
+            rx.el.span(label, style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
+            style={"display": "flex", "alignItems": "center", "minWidth": "80px"},
+        ),
+        rx.el.span(value, style={"fontSize": "0.85rem", "fontWeight": "500"}),
+        style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "padding": "3px 0"},
+    )
+
+def dropdown_row(label: str, icon: str, options: rx.Var[list], value: rx.Var[str], on_change: rx.EventHandler) -> rx.Component:
+    """Dropdown row for selectable metadata."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon(icon, size=14, color="#888"),
+            rx.el.span(label, style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
+            style={"display": "flex", "alignItems": "center", "minWidth": "80px"},
+        ),
+        rx.el.select(
+            rx.foreach(options, lambda opt: rx.el.option(opt, value=opt)),
+            value=value,
+            on_change=on_change,
+            style={"fontSize": "0.8rem", "padding": "2px 6px", "borderRadius": "4px", "border": "1px solid #ddd"},
+        ),
+        style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "padding": "3px 0"},
+    )
+```
+
+### Custom Key-Value Fields
+
+For user-defined metadata fields with add/remove functionality:
+
+```python
+# State for custom fields
+class MyState(rx.State):
+    custom_fields: Dict[str, str] = {}
+    new_field_name: str = ""
+    new_field_value: str = ""
+    
+    def add_custom_field(self, name: str, value: str):
+        self.custom_fields = {**self.custom_fields, name: value}
+    
+    def remove_custom_field(self, name: str):
+        self.custom_fields = {k: v for k, v in self.custom_fields.items() if k != name}
+
+# UI for custom fields
+rx.el.div(
+    # Existing fields with delete buttons
+    rx.foreach(
+        MyState.custom_fields_list,  # [{name: str, value: str}, ...]
+        lambda field: rx.el.div(
+            rx.el.span(field["name"].to(str), style={"fontWeight": "500"}),
+            rx.el.span(field["value"].to(str)),
+            rx.el.button(
+                fomantic_icon("x", size=12),
+                on_click=lambda f=field: MyState.remove_custom_field(f["name"].to(str)),
+                class_name="ui mini icon button",
+            ),
+            style={"display": "flex", "alignItems": "center", "gap": "8px"},
+        ),
+    ),
+    # Add new field inputs
+    rx.el.div(
+        rx.el.input(value=MyState.new_field_name, on_change=MyState.set_new_field_name, placeholder="Field name"),
+        rx.el.input(value=MyState.new_field_value, on_change=MyState.set_new_field_value, placeholder="Value"),
+        rx.el.button(fomantic_icon("plus", size=12), on_click=MyState.save_new_custom_field, class_name="ui mini icon positive button"),
+        style={"display": "flex", "gap": "4px"},
+    ),
+)
+```
+
+## 8. Anti-Patterns
 
 Avoid these patterns:
 

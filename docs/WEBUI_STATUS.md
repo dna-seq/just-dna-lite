@@ -29,6 +29,11 @@
    - Files are saved to `data/input/users/{user_id}/`.
    - Automatic registration of uploaded files as Dagster assets (`user_vcf_source`).
    - Cleanup of state and filesystem on file deletion.
+   - **Sample Metadata**:
+     - Species selection using Latin scientific names (Homo sapiens, Mus musculus, etc.)
+     - Reference genome selection (GRCh38, T2T-CHM13v2.0, GRCh37 for humans)
+     - Editable fields: Subject ID, Study Name, Notes
+     - **Custom Fields**: User-defined key-value metadata (add any field with custom name)
 
 5. **Output Files**:
    - Annotation outputs are stored at `data/output/users/{user_id}/{sample_name}/modules/`.
@@ -128,6 +133,9 @@ The right panel uses a run-centric design with three collapsible sections:
 - `run_history_expanded` - Boolean controlling the run history section collapse state
 - `new_analysis_expanded` - Boolean controlling the new analysis section collapse state
 - `expanded_run_id` - Which run in the timeline is expanded to show details
+- `file_metadata` - Dict mapping filenames to metadata (species, reference_genome, subject_id, study_name, notes, custom_fields)
+- `current_custom_fields` - Computed var returning custom fields for the selected file
+- `backend_api_url` - Computed var returning the backend API URL for downloads
 
 **Component functions in `annotate.py`:**
 - `outputs_section()` - Collapsible section showing output files with download buttons
@@ -158,11 +166,33 @@ The right panel uses a run-centric design with three collapsible sections:
 
 ### Download API
 
-File downloads are served via FastAPI endpoint at `/api/download/{user_id}/{sample_name}/{filename}`:
+File downloads are served via FastAPI endpoint at `{backend_api_url}/api/download/{user_id}/{sample_name}/{filename}`:
+- **Backend URL**: Downloads use the full backend URL (default `http://localhost:8000`) since the frontend runs on port 3000 but the API is on port 8000
 - Only parquet files are allowed
 - Path traversal is prevented via input validation
 - Uses `api_transformer` parameter in `rx.App()` to mount custom FastAPI routes
 - Returns `FileResponse` for browser download
+
+### Sample Metadata System
+
+Each uploaded VCF file has associated metadata stored in `UploadState.file_metadata`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `species` | Dropdown | Latin scientific name (Homo sapiens, Mus musculus, etc.) |
+| `reference_genome` | Dropdown | Assembly name based on species (GRCh38, T2T-CHM13v2.0, GRCh37) |
+| `subject_id` | Text input | Patient/sample identifier |
+| `study_name` | Text input | Project or study name |
+| `notes` | Textarea | Free-form notes |
+| `custom_fields` | Dict[str, str] | User-defined key-value pairs |
+
+**Reference Genomes by Species:**
+- **Homo sapiens**: GRCh38, T2T-CHM13v2.0, GRCh37
+- **Mus musculus**: GRCm39, GRCm38
+- **Rattus norvegicus**: mRatBN7.2, Rnor_6.0
+- **Canis lupus familiaris**: ROS_Cfam_1.0, CanFam3.1
+- **Felis catus**: Felis_catus_9.0, Felis_catus_8.0
+- **Danio rerio**: GRCz11, GRCz10
 
 ### Key Design Decisions
 
@@ -186,7 +216,7 @@ File downloads are served via FastAPI endpoint at `/api/download/{user_id}/{samp
 
 - ~~**Job config error**~~: Fixed by using `"ops"` instead of `"assets"` in run config.
 - ~~**Selected file persists after deletion**~~: Fixed in `UploadState.delete_file`.
-- ~~**Download Link**~~: Now integrated with `/api/download/` endpoint for parquet file downloads.
+- ~~**Download Link not working**~~: Fixed by using full backend URL (`http://localhost:8000/api/download/...`) instead of relative paths, since frontend (port 3000) and backend API (port 8000) are on different ports.
 - ~~**Run history showing unknown filename**~~: Fixed by reading config from `"ops"` key instead of `"assets"`.
 - **Log Scrolling**: Log container doesn't always auto-scroll to bottom on new entries.
 - **ASGI "Connection already upgraded"**: When using Granian (`REFLEX_USE_GRANIAN=true` or `uv run start --granian`), the backend may log `RuntimeError: ASGI flow error: Connection already upgraded` during WebSocket handshake. This is a known Reflex+Granian interaction: the server tries to send an HTTP response after the connection was already upgraded to WebSocket. The app usually continues to work; if it causes problems, run without Granian (default `uv run start` uses the built-in server).
