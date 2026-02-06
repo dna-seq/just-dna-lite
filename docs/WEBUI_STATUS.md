@@ -11,7 +11,7 @@
    - **Right Panel (Three Collapsible Sections)**:
      - **Outputs Section** (teal segment, top): Inline display of output files for the selected sample with type icons, module labels, file sizes, and download buttons. Shows "No outputs yet" with a prompt to run analysis when empty.
      - **Run History** (green segment, middle): Unified timeline of all runs for the selected file. The most recent run is highlighted with a "latest" badge and includes Re-run/Modify action buttons. Each run expands to show modules, run ID, and Dagster link.
-     - **New Analysis Section** (blue segment, bottom): Collapsible module selection grid with "Select All/None" controls and Start Analysis button.
+     - **New Analysis Section** (blue segment, bottom): Shows HF repository sources with clickable links, collapsible module selection grid with logos from HuggingFace, "Select All/None" controls, and Start Analysis button.
 
 2. **Dagster Integration**:
    - **Real-time Status Polling**: Uses `rx.moment` to poll Dagster for run status updates every 3 seconds.
@@ -23,6 +23,8 @@
 3. **Design System**:
    - **Fomantic UI**: Uses segments, buttons, labels, and messages for a "chunky & tactile" look.
    - **Lucide Icons**: Dynamic icon rendering via `rx.match` (Lucide names like `heart`, `droplets`, `dna`).
+   - **HF Module Logos**: Module cards show logo images loaded directly from HuggingFace (`.jpg`/`.png`), with colored icon fallback when no logo exists.
+   - **Module Sources**: New Analysis section displays linked HF repository sources above the module grid.
    - **Responsive Flexbox**: Column layout and top menu implemented with flexbox for reliability (avoiding Fomantic Grid issues).
 
 4. **File Management**:
@@ -136,13 +138,16 @@ The right panel uses a run-centric design with three collapsible sections:
 - `file_metadata` - Dict mapping filenames to metadata (species, reference_genome, subject_id, study_name, notes, custom_fields)
 - `current_custom_fields` - Computed var returning custom fields for the selected file
 - `backend_api_url` - Computed var returning the backend API URL for downloads
+- `repo_info_list` - Computed var returning HF repository sources grouped by repo_id with browsable URLs
 
 **Component functions in `annotate.py`:**
 - `outputs_section()` - Collapsible section showing output files with download buttons
 - `output_file_card()` - Individual output file card with type icon, labels, and download
 - `run_timeline_card()` - Individual run card with expand/collapse (latest run highlighted)
 - `run_timeline()` - Unified scrollable list of all runs
-- `new_analysis_section()` - Collapsible module selection and run button
+- `repo_source_card()` - Compact card for an HF repository source with link and module count
+- `module_logo_or_icon()` - Shows HF logo image if available, falls back to static icon
+- `new_analysis_section()` - Collapsible module selection with HF sources and run button
 - `right_panel_run_view()` - Main right panel combining all three sections
 - `_collapsible_header()` - Reusable header component for foldable sections
 

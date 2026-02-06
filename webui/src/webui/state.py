@@ -10,9 +10,9 @@ from typing import Any, List, Dict, Optional
 import reflex as rx
 from reflex.event import EventSpec
 from pydantic import BaseModel
-from dagster import DagsterInstance, AssetKey, Output, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter
+from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
 from just_dna_pipelines.annotation.definitions import defs
-from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
 
 
 # Module metadata with titles, descriptions, and icons
@@ -40,43 +40,74 @@ REFERENCE_GENOMES: Dict[str, List[str]] = {
     "Other": ["custom"],
 }
 
+# Sex options (biological sex for genomic analysis)
+SEX_OPTIONS: List[str] = [
+    "N/A",      # Not specified/applicable
+    "Male",
+    "Female",
+    "Other",
+]
 
+# Tissue source options (common sample sources)
+TISSUE_OPTIONS: List[str] = [
+    "Not specified",
+    "Saliva",
+    "Blood",
+    "Buccal swab",
+    "Skin",
+    "Hair follicle",
+    "Muscle",
+    "Liver",
+    "Brain",
+    "Tumor",
+    "Cell line",
+    "Other",
+]
+
+
+# Module colors map to Fomantic UI named colors derived from the DNA logo palette:
+#   red (#db2828)    = heart/clinical urgency  (Coronary)
+#   yellow (#fbbd08) = metabolic energy        (Lipid Metabolism)
+#   green (#21ba45)  = life/longevity          (Longevity Map)
+#   teal (#00b5ad)   = performance/vitality    (Sportshuman)
+#   blue (#2185d0)   = oxygen/respiration      (VO2 Max)
+#   purple (#a333c8) = drug/chemistry          (Pharmacogenomics)
 MODULE_METADATA: Dict[str, Dict[str, str]] = {
     "longevitymap": {
         "title": "Longevity Map",
         "description": "Longevity-associated genetic variants from LongevityMap database",
         "icon": "heart-pulse",
-        "color": "success",
+        "color": "#21ba45",
     },
     "lipidmetabolism": {
         "title": "Lipid Metabolism",
         "description": "Lipid metabolism and cardiovascular risk variants",
         "icon": "droplets",
-        "color": "warning",
+        "color": "#fbbd08",
     },
     "vo2max": {
         "title": "VO2 Max",
         "description": "Athletic performance and oxygen uptake capacity variants",
         "icon": "activity",
-        "color": "info",
+        "color": "#2185d0",
     },
     "superhuman": {
         "title": "Superhuman",
         "description": "Elite performance and rare beneficial variants",
         "icon": "zap",
-        "color": "primary",
+        "color": "#00b5ad",
     },
     "coronary": {
         "title": "Coronary",
         "description": "Coronary artery disease risk associations",
         "icon": "heart",
-        "color": "error",
+        "color": "#db2828",
     },
     "drugs": {
         "title": "Pharmacogenomics",
         "description": "Drug response and metabolism (PharmGKB)",
         "icon": "pill",
-        "color": "secondary",
+        "color": "#a333c8",
     },
 }
 
@@ -183,6 +214,17 @@ class UploadState(rx.State):
     available_modules: list[str] = DISCOVERED_MODULES.copy()
     selected_modules: list[str] = DISCOVERED_MODULES.copy()
 
+    # ============================================================
+    # NEW SAMPLE FORM STATE - for adding samples with metadata
+    # ============================================================
+    new_sample_subject_id: str = ""
+    new_sample_sex: str = "N/A"
+    new_sample_tissue: str = "Not specified"
+    new_sample_species: str = "Homo sapiens"
+    new_sample_reference_genome: str = "GRCh38"
+    new_sample_study_name: str = ""
+    new_sample_notes: str = ""
+
     @rx.var
     def dagster_web_url(self) -> str:
         """Get the Dagster web UI URL."""
@@ -192,6 +234,80 @@ class UploadState(rx.State):
     def module_details(self) -> Dict[str, Dict[str, Any]]:
         """Return details (logo, repo, etc.) for each available module."""
         return {name: info.model_dump() for name, info in MODULE_INFOS.items()}
+
+    @rx.var
+    def repo_info_list(self) -> List[Dict[str, Any]]:
+        """
+        Return info about each HF repository used as a module source.
+        
+        Groups modules by their repo_id and provides browsable HF URLs.
+        """
+        repos: Dict[str, Dict[str, Any]] = {}
+        for name, info in MODULE_INFOS.items():
+            repo_id = info.repo_id
+            if repo_id not in repos:
+                repos[repo_id] = {
+                    "repo_id": repo_id,
+                    "url": f"https://huggingface.co/datasets/{repo_id}",
+                    "modules": [],
+                    "module_count": 0,
+                }
+            repos[repo_id]["modules"].append(name)
+            repos[repo_id]["module_count"] = len(repos[repo_id]["modules"])
+        return list(repos.values())
+
+    # ============================================================
+    # NEW SAMPLE FORM: Computed properties for dropdowns
+    # ============================================================
+    @rx.var
+    def new_sample_available_genomes(self) -> List[str]:
+        """Get available reference genomes for the new sample's species."""
+        return REFERENCE_GENOMES.get(self.new_sample_species, ["custom"])
+
+    # Note: species_options, sex_options, tissue_options are defined below
+    # (shared with file metadata editing)
+
+    # ============================================================
+    # NEW SAMPLE FORM: Setters
+    # ============================================================
+    def set_new_sample_subject_id(self, value: str):
+        """Set subject ID for new sample."""
+        self.new_sample_subject_id = value
+
+    def set_new_sample_sex(self, value: str):
+        """Set sex for new sample."""
+        self.new_sample_sex = value
+
+    def set_new_sample_tissue(self, value: str):
+        """Set tissue for new sample."""
+        self.new_sample_tissue = value
+
+    def set_new_sample_species(self, value: str):
+        """Set species for new sample and reset reference genome."""
+        self.new_sample_species = value
+        self.new_sample_reference_genome = REFERENCE_GENOMES.get(value, ["custom"])[0]
+
+    def set_new_sample_reference_genome(self, value: str):
+        """Set reference genome for new sample."""
+        self.new_sample_reference_genome = value
+
+    def set_new_sample_study_name(self, value: str):
+        """Set study name for new sample."""
+        self.new_sample_study_name = value
+
+    def set_new_sample_notes(self, value: str):
+        """Set notes for new sample."""
+        self.new_sample_notes = value
+
+    def _reset_new_sample_form(self):
+        """Reset new sample form to defaults."""
+        self.new_sample_subject_id = ""
+        self.new_sample_sex = "N/A"
+        self.new_sample_tissue = "Not specified"
+        self.new_sample_species = "Homo sapiens"
+        self.new_sample_reference_genome = "GRCh38"
+        self.new_sample_study_name = ""
+        self.new_sample_notes = ""
 
     def _get_safe_user_id(self, auth_email: str) -> str:
         """Sanitize user_id for path and partition key."""
@@ -255,7 +371,7 @@ class UploadState(rx.State):
             # Update status
             self.asset_statuses[partition_key] = {
                 "source": "materialized",
-                "annotated": "ready"
+                "annotated": "uploaded"
             }
         
         self.uploading = False
@@ -263,6 +379,114 @@ class UploadState(rx.State):
             # Automatically select the last uploaded file
             self.selected_file = new_files[-1]
             yield rx.toast.success(f"Uploaded and registered {len(new_files)} files.")
+        else:
+            yield rx.toast.warning("No files were uploaded")
+
+    async def handle_upload_with_metadata(self, files: list[rx.UploadFile]):
+        """
+        Handle upload of VCF files with metadata from the new sample form.
+        
+        This combines file upload and metadata registration in a single operation.
+        The metadata from the form (subject_id, sex, tissue, species, etc.) is 
+        stored in the Dagster asset materialization.
+        """
+        if not files:
+            yield rx.toast.warning("No files selected for upload")
+            return
+            
+        self.uploading = True
+        
+        auth_state = await self.get_state(AuthState)
+        self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
+        
+        root = Path(__file__).resolve().parents[3]
+        upload_dir = root / "data" / "input" / "users" / self.safe_user_id
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        new_files = []
+        instance = get_dagster_instance()
+        
+        for file in files:
+            if not file.filename:
+                continue
+                
+            content = await file.read()
+            if not content:
+                continue
+                
+            file_path = upload_dir / file.filename
+            file_path.write_bytes(content)
+            
+            sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+            partition_key = f"{self.safe_user_id}/{sample_name}"
+            
+            # Add partition if missing
+            from just_dna_pipelines.annotation.assets import user_vcf_partitions
+            existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
+            if partition_key not in existing:
+                instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+            
+            # Build complete metadata dict with form values
+            metadata: Dict[str, Any] = {
+                "path": MetadataValue.path(str(file_path.absolute())),
+                "size_bytes": MetadataValue.int(len(content)),
+                "uploaded_via": MetadataValue.text("webui"),
+                "species": MetadataValue.text(self.new_sample_species),
+                "reference_genome": MetadataValue.text(self.new_sample_reference_genome),
+                "sex": MetadataValue.text(self.new_sample_sex),
+                "tissue": MetadataValue.text(self.new_sample_tissue),
+            }
+            
+            # Add optional fields only if provided
+            if self.new_sample_subject_id.strip():
+                metadata["subject_id"] = MetadataValue.text(self.new_sample_subject_id.strip())
+            if self.new_sample_study_name.strip():
+                metadata["study_name"] = MetadataValue.text(self.new_sample_study_name.strip())
+            if self.new_sample_notes.strip():
+                metadata["notes"] = MetadataValue.text(self.new_sample_notes.strip())
+            
+            # Materialize user_vcf_source with all metadata
+            instance.report_runless_asset_event(
+                AssetMaterialization(
+                    asset_key="user_vcf_source",
+                    partition=partition_key,
+                    metadata=metadata,
+                )
+            )
+            
+            if file.filename not in self.files:
+                self.files.append(file.filename)
+            new_files.append(file.filename)
+            
+            # Also store in local file_metadata for immediate UI access
+            self.file_metadata[file.filename] = {
+                "filename": file.filename,
+                "sample_name": sample_name,
+                "species": self.new_sample_species,
+                "reference_genome": self.new_sample_reference_genome,
+                "sex": self.new_sample_sex,
+                "tissue": self.new_sample_tissue,
+                "subject_id": self.new_sample_subject_id.strip() if self.new_sample_subject_id else "",
+                "study_name": self.new_sample_study_name.strip() if self.new_sample_study_name else "",
+                "notes": self.new_sample_notes.strip() if self.new_sample_notes else "",
+                "size_mb": round(len(content) / (1024 * 1024), 2),
+                "path": str(file_path),
+                "custom_fields": {},
+            }
+            
+            # Update status
+            self.asset_statuses[partition_key] = {
+                "source": "materialized",
+                "annotated": "uploaded"
+            }
+        
+        self.uploading = False
+        
+        if new_files:
+            # Reset the form and select the new file
+            self._reset_new_sample_form()
+            self.selected_file = new_files[-1]
+            yield rx.toast.success(f"Added {len(new_files)} sample(s) with metadata")
         else:
             yield rx.toast.warning("No files were uploaded")
 
@@ -392,6 +616,10 @@ class UploadState(rx.State):
         # Use selected modules, or None for all if none selected
         modules_to_use = self.selected_modules if self.selected_modules else None
         
+        # Get file metadata for the selected file
+        file_info = self.file_metadata.get(filename, {})
+        custom_metadata = file_info.get("custom_fields", {}) or {}
+        
         # Use "ops" config key for asset jobs
         run_config = {
             "ops": {
@@ -401,6 +629,16 @@ class UploadState(rx.State):
                         "user_name": self.safe_user_id,
                         "sample_name": sample_name,
                         "modules": modules_to_use,
+                        # Sample/subject metadata from file info
+                        "species": file_info.get("species", "Homo sapiens"),
+                        "reference_genome": file_info.get("reference_genome", "GRCh38"),
+                        "subject_id": file_info.get("subject_id") or None,
+                        "sex": file_info.get("sex") or None,
+                        "tissue": file_info.get("tissue") or None,
+                        "study_name": file_info.get("study_name") or None,
+                        "description": file_info.get("notes") or None,
+                        # Arbitrary user-defined fields
+                        "custom_metadata": custom_metadata if custom_metadata else None,
                     }
                 }
             }
@@ -424,7 +662,7 @@ class UploadState(rx.State):
         for f in self.files:
             sample_name = f.replace(".vcf.gz", "").replace(".vcf", "")
             pk = f"{self.safe_user_id}/{sample_name}"
-            status = self.asset_statuses.get(pk, {}).get("annotated", "ready")
+            status = self.asset_statuses.get(pk, {}).get("annotated", "uploaded")
             res[f] = status
         return res
 
@@ -455,6 +693,38 @@ class UploadState(rx.State):
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
     expanded_run_id: str = ""  # Which run in the timeline is expanded to show logs
     show_outputs_modal: bool = False  # Whether to show the outputs modal (legacy, kept for compatibility)
+    
+    # Metadata editing mode - when False, shows read-only view
+    metadata_edit_mode: bool = False
+
+    def toggle_metadata_edit_mode(self):
+        """Toggle between read-only and edit mode for metadata."""
+        self.metadata_edit_mode = not self.metadata_edit_mode
+
+    def enable_metadata_edit_mode(self):
+        """Enable edit mode for metadata."""
+        self.metadata_edit_mode = True
+
+    def disable_metadata_edit_mode(self):
+        """Disable edit mode (back to read-only)."""
+        self.metadata_edit_mode = False
+
+    @rx.var
+    def sample_display_names(self) -> Dict[str, str]:
+        """
+        Map filenames to display names.
+        Shows Subject ID if available, otherwise filename.
+        """
+        result = {}
+        for filename in self.files:
+            meta = self.file_metadata.get(filename, {})
+            subject_id = meta.get("subject_id", "")
+            if subject_id and subject_id.strip():
+                result[filename] = subject_id.strip()
+            else:
+                # Use sample name (filename without extension)
+                result[filename] = filename.replace(".vcf.gz", "").replace(".vcf", "")
+        return result
 
     def _load_file_metadata(self, filename: str):
         """Load metadata for a single VCF file."""
@@ -487,8 +757,11 @@ class UploadState(rx.State):
             "species": species,
             "reference_genome": reference_genome,
             "path": str(file_path),
-            # User-editable fields
-            "subject_id": "",
+            # User-editable fields (required fields have defaults)
+            "subject_id": "",  # Required - subject/patient identifier
+            "sex": "N/A",  # Required - biological sex
+            "tissue": "Not specified",  # Required - sample tissue source
+            # Optional fields
             "study_name": "",
             "notes": "",
             # Custom key-value fields (user can add their own)
@@ -509,6 +782,9 @@ class UploadState(rx.State):
         updated[self.selected_file]["species"] = species
         updated[self.selected_file]["reference_genome"] = default_ref
         self.file_metadata = updated
+        
+        # Auto-save to Dagster
+        self.save_metadata_to_dagster()
 
     def update_file_reference_genome(self, ref_genome: str):
         """Update reference genome for the selected file."""
@@ -519,6 +795,9 @@ class UploadState(rx.State):
         updated[self.selected_file] = dict(updated[self.selected_file])
         updated[self.selected_file]["reference_genome"] = ref_genome
         self.file_metadata = updated
+        
+        # Auto-save to Dagster
+        self.save_metadata_to_dagster()
 
     def update_file_subject_id(self, subject_id: str):
         """Update subject/patient ID for the selected file."""
@@ -527,6 +806,24 @@ class UploadState(rx.State):
         updated = dict(self.file_metadata)
         updated[self.selected_file] = dict(updated[self.selected_file])
         updated[self.selected_file]["subject_id"] = subject_id
+        self.file_metadata = updated
+
+    def update_file_sex(self, sex: str):
+        """Update biological sex for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["sex"] = sex
+        self.file_metadata = updated
+
+    def update_file_tissue(self, tissue: str):
+        """Update tissue source for the selected file."""
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        updated = dict(self.file_metadata)
+        updated[self.selected_file] = dict(updated[self.selected_file])
+        updated[self.selected_file]["tissue"] = tissue
         self.file_metadata = updated
 
     def update_file_study_name(self, study_name: str):
@@ -557,6 +854,9 @@ class UploadState(rx.State):
         custom_fields[field_name] = field_value
         updated[self.selected_file]["custom_fields"] = custom_fields
         self.file_metadata = updated
+        
+        # Auto-save to Dagster when custom fields change
+        self.save_metadata_to_dagster()
 
     def remove_custom_field(self, field_name: str):
         """Remove a custom field from the selected file."""
@@ -569,6 +869,9 @@ class UploadState(rx.State):
             del custom_fields[field_name]
         updated[self.selected_file]["custom_fields"] = custom_fields
         self.file_metadata = updated
+        
+        # Auto-save to Dagster when custom fields change
+        self.save_metadata_to_dagster()
 
     # State for adding new custom field
     new_custom_field_name: str = ""
@@ -588,6 +891,198 @@ class UploadState(rx.State):
             self.add_custom_field(self.new_custom_field_name.strip(), self.new_custom_field_value)
             self.new_custom_field_name = ""
             self.new_custom_field_value = ""
+
+    def _build_dagster_metadata(self, file_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Build Dagster metadata dict from file_info.
+        
+        Returns a dict suitable for AssetMaterialization.metadata.
+        All values are wrapped in MetadataValue types.
+        """
+        metadata: Dict[str, Any] = {}
+        
+        # Well-known fields
+        if file_info.get("filename"):
+            metadata["filename"] = MetadataValue.text(file_info["filename"])
+        if file_info.get("sample_name"):
+            metadata["sample_name"] = MetadataValue.text(file_info["sample_name"])
+        if file_info.get("species"):
+            metadata["species"] = MetadataValue.text(file_info["species"])
+        if file_info.get("reference_genome"):
+            metadata["reference_genome"] = MetadataValue.text(file_info["reference_genome"])
+        if file_info.get("subject_id"):
+            metadata["subject_id"] = MetadataValue.text(file_info["subject_id"])
+        if file_info.get("sex"):
+            metadata["sex"] = MetadataValue.text(file_info["sex"])
+        if file_info.get("tissue"):
+            metadata["tissue"] = MetadataValue.text(file_info["tissue"])
+        if file_info.get("study_name"):
+            metadata["study_name"] = MetadataValue.text(file_info["study_name"])
+        if file_info.get("notes"):
+            metadata["description"] = MetadataValue.text(file_info["notes"])
+        if file_info.get("path"):
+            metadata["path"] = MetadataValue.path(file_info["path"])
+        if file_info.get("size_mb"):
+            metadata["size_mb"] = MetadataValue.float(file_info["size_mb"])
+        if file_info.get("upload_date"):
+            metadata["upload_date"] = MetadataValue.text(file_info["upload_date"])
+        
+        # Custom fields - store as JSON and also individually
+        custom_fields = file_info.get("custom_fields", {})
+        if custom_fields:
+            metadata["custom_metadata"] = MetadataValue.json(custom_fields)
+            for key, value in custom_fields.items():
+                safe_key = "".join(c if c.isalnum() or c == "_" else "_" for c in key)
+                metadata[f"custom/{safe_key}"] = MetadataValue.text(str(value))
+        
+        # Mark as saved from UI
+        metadata["saved_from"] = MetadataValue.text("webui")
+        
+        return metadata
+
+    def _extract_metadata_from_materialization(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract file_info dict from Dagster materialization metadata.
+        
+        Converts MetadataValue objects back to plain Python values.
+        """
+        file_info: Dict[str, Any] = {}
+        
+        def get_value(mv: Any) -> Any:
+            """Extract value from MetadataValue or return as-is."""
+            if hasattr(mv, 'value'):
+                return mv.value
+            return mv
+        
+        # Well-known fields
+        if "filename" in metadata:
+            file_info["filename"] = get_value(metadata["filename"])
+        if "sample_name" in metadata:
+            file_info["sample_name"] = get_value(metadata["sample_name"])
+        if "species" in metadata:
+            file_info["species"] = get_value(metadata["species"])
+        if "reference_genome" in metadata:
+            file_info["reference_genome"] = get_value(metadata["reference_genome"])
+        if "subject_id" in metadata:
+            file_info["subject_id"] = get_value(metadata["subject_id"])
+        if "sex" in metadata:
+            file_info["sex"] = get_value(metadata["sex"])
+        if "tissue" in metadata:
+            file_info["tissue"] = get_value(metadata["tissue"])
+        if "study_name" in metadata:
+            file_info["study_name"] = get_value(metadata["study_name"])
+        if "description" in metadata:
+            file_info["notes"] = get_value(metadata["description"])
+        if "path" in metadata:
+            file_info["path"] = get_value(metadata["path"])
+        if "size_mb" in metadata:
+            file_info["size_mb"] = get_value(metadata["size_mb"])
+        if "upload_date" in metadata:
+            file_info["upload_date"] = get_value(metadata["upload_date"])
+        
+        # Custom fields - prefer the JSON blob if available
+        if "custom_metadata" in metadata:
+            custom = get_value(metadata["custom_metadata"])
+            if isinstance(custom, dict):
+                file_info["custom_fields"] = custom
+        else:
+            # Fallback: extract from individual custom/* keys
+            custom_fields = {}
+            for key, value in metadata.items():
+                if key.startswith("custom/"):
+                    field_name = key[7:]  # Remove "custom/" prefix
+                    custom_fields[field_name] = get_value(value)
+            if custom_fields:
+                file_info["custom_fields"] = custom_fields
+        
+        return file_info
+
+    def save_metadata_to_dagster(self):
+        """
+        Persist current file metadata to Dagster as an AssetMaterialization.
+        
+        This creates a new materialization event for user_vcf_source with the
+        current metadata. The metadata is then visible in the Dagster UI and
+        survives UI restarts.
+        """
+        if not self.selected_file or self.selected_file not in self.file_metadata:
+            return
+        
+        file_info = self.file_metadata[self.selected_file]
+        sample_name = file_info.get("sample_name", self.selected_file.replace(".vcf.gz", "").replace(".vcf", ""))
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+        
+        instance = get_dagster_instance()
+        metadata = self._build_dagster_metadata(file_info)
+        
+        instance.report_runless_asset_event(
+            AssetMaterialization(
+                asset_key="user_vcf_source",
+                partition=partition_key,
+                metadata=metadata,
+            )
+        )
+        
+        return rx.toast.success(f"Metadata saved for {sample_name}")
+
+    def _load_metadata_from_dagster(self):
+        """
+        Load file metadata from Dagster materializations.
+        
+        Queries all user_vcf_source partitions for the current user and
+        extracts metadata from the latest materialization of each.
+        """
+        if not self.safe_user_id:
+            return
+        
+        instance = get_dagster_instance()
+        
+        # Get all partitions for this user
+        from just_dna_pipelines.annotation.assets import user_vcf_partitions
+        all_partitions = instance.get_dynamic_partitions(user_vcf_partitions.name)
+        user_partitions = [p for p in all_partitions if p.startswith(f"{self.safe_user_id}/")]
+        
+        for partition_key in user_partitions:
+            # Fetch latest materialization for this partition
+            result = instance.fetch_materializations(
+                records_filter=AssetRecordsFilter(
+                    asset_key=AssetKey("user_vcf_source"),
+                    asset_partitions=[partition_key],
+                ),
+                limit=1,
+            )
+            
+            if not result.records:
+                continue
+            
+            record = result.records[0]
+            mat = record.asset_materialization
+            if not mat or not mat.metadata:
+                continue
+            
+            # Extract metadata
+            dagster_info = self._extract_metadata_from_materialization(mat.metadata)
+            
+            # Get filename from partition key or metadata
+            filename = dagster_info.get("filename")
+            if not filename:
+                # Derive from partition key
+                sample_name = partition_key.split("/", 1)[1] if "/" in partition_key else partition_key
+                # Try to find matching file
+                for f in self.files:
+                    if f.startswith(sample_name):
+                        filename = f
+                        break
+            
+            if filename and filename in self.files:
+                # Merge Dagster metadata with existing file metadata
+                existing = self.file_metadata.get(filename, {})
+                # Dagster metadata takes precedence for fields it has
+                merged = {**existing, **dagster_info}
+                # Ensure custom_fields is properly merged
+                if "custom_fields" in existing and "custom_fields" in dagster_info:
+                    merged["custom_fields"] = {**existing.get("custom_fields", {}), **dagster_info.get("custom_fields", {})}
+                self.file_metadata[filename] = merged
 
     @rx.var
     def current_custom_fields(self) -> Dict[str, str]:
@@ -648,9 +1143,33 @@ class UploadState(rx.State):
         return self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
 
     @rx.var
+    def current_sex(self) -> str:
+        """Get sex for the currently selected file."""
+        if not self.selected_file:
+            return "N/A"
+        return self.file_metadata.get(self.selected_file, {}).get("sex", "N/A")
+
+    @rx.var
+    def current_tissue(self) -> str:
+        """Get tissue source for the currently selected file."""
+        if not self.selected_file:
+            return "Not specified"
+        return self.file_metadata.get(self.selected_file, {}).get("tissue", "Not specified")
+
+    @rx.var
     def species_options(self) -> List[str]:
         """Get available species options."""
         return SPECIES_OPTIONS
+
+    @rx.var
+    def sex_options(self) -> List[str]:
+        """Get available sex options."""
+        return SEX_OPTIONS
+
+    @rx.var
+    def tissue_options(self) -> List[str]:
+        """Get available tissue options."""
+        return TISSUE_OPTIONS
 
     @rx.var
     def available_reference_genomes(self) -> List[str]:
@@ -863,9 +1382,9 @@ class UploadState(rx.State):
 
     @rx.var
     def analysis_button_color(self) -> str:
-        """Get the color class for the analysis button (Fomantic UI right labeled icon)."""
+        """Get the color class for the analysis button (DNA palette: yellow=running, green=success, blue=default)."""
         if self.running:
-            return "ui blue right labeled icon large button fluid"
+            return "ui yellow right labeled icon large button fluid"
         if self.last_run_success:
             return "ui green right labeled icon large button fluid"
         return "ui primary right labeled icon large button fluid"
@@ -882,13 +1401,21 @@ class UploadState(rx.State):
                 "color": "neutral",
             })
             info = MODULE_INFOS.get(module_name)
+            # Convert hf:// logo URL to browsable HTTPS URL for display
+            browsable_logo_url = ""
+            if info and info.logo_url:
+                # hf://datasets/just-dna-seq/annotators/data/module/logo.png
+                # -> https://huggingface.co/datasets/just-dna-seq/annotators/resolve/main/data/module/logo.png
+                hf_path = info.logo_url.replace("hf://", "")
+                browsable_logo_url = f"https://huggingface.co/{hf_path.replace(info.repo_id, info.repo_id + '/resolve/main', 1)}"
             result.append({
                 "name": module_name,
                 "title": meta.get("title", module_name),
                 "description": meta.get("description", ""),
                 "icon": meta.get("icon", "database"),
                 "color": meta.get("color", "neutral"),
-                "logo_url": info.logo_url if info else None,
+                "logo_url": browsable_logo_url,
+                "repo_id": info.repo_id if info else "",
                 "selected": module_name in self.selected_modules,
             })
         return result
@@ -935,6 +1462,10 @@ class UploadState(rx.State):
         instance = get_dagster_instance()
         job_name = "annotate_with_hf_modules_job"
         modules_to_use = self.selected_modules.copy()
+        
+        # Get file metadata for the selected file
+        file_info = self.file_metadata.get(self.selected_file, {})
+        custom_metadata = file_info.get("custom_fields", {}) or {}
 
         run_config = {
             "ops": {
@@ -944,6 +1475,16 @@ class UploadState(rx.State):
                         "user_name": self.safe_user_id,
                         "sample_name": sample_name,
                         "modules": modules_to_use,
+                        # Sample/subject metadata from file info
+                        "species": file_info.get("species", "Homo sapiens"),
+                        "reference_genome": file_info.get("reference_genome", "GRCh38"),
+                        "subject_id": file_info.get("subject_id") or None,
+                        "sex": file_info.get("sex") or None,
+                        "tissue": file_info.get("tissue") or None,
+                        "study_name": file_info.get("study_name") or None,
+                        "description": file_info.get("notes") or None,
+                        # Arbitrary user-defined fields
+                        "custom_metadata": custom_metadata if custom_metadata else None,
                     }
                 }
             }
@@ -1185,9 +1726,12 @@ class UploadState(rx.State):
         vcf_files = list(user_dir.glob("*.vcf")) + list(user_dir.glob("*.vcf.gz"))
         self.files = [f.name for f in vcf_files]
         
-        # Load metadata for all files
+        # Load basic metadata for all files (from filesystem)
         for filename in self.files:
             self._load_file_metadata(filename)
+        
+        # Load persisted metadata from Dagster (overwrites/merges with filesystem metadata)
+        self._load_metadata_from_dagster()
         
         # Sync statuses with Dagster
         instance = get_dagster_instance()
@@ -1206,7 +1750,7 @@ class UploadState(rx.State):
             )
             records = result.records
             
-            status = "ready"
+            status = "uploaded"
             if records:
                 status = "completed"
                 

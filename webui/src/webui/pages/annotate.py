@@ -20,260 +20,362 @@ from webui.state import UploadState, AuthState
 # COLUMN 1: FILE MANAGEMENT
 # ============================================================================
 
-def upload_zone() -> rx.Component:
-    """Minimal upload zone - single line."""
-    return rx.upload(
+def add_sample_form() -> rx.Component:
+    """
+    Compact Add Sample form - minimal file picker + metadata fields.
+    Single "Add Sample" button submits both file and metadata together.
+    """
+    return rx.el.div(
+        # Form header with inline file picker
         rx.el.div(
-            fomantic_icon("cloud-upload", size=16, color="#2185d0"),
-            rx.el.span("Drop VCF files here", style={"fontWeight": "500", "fontSize": "0.85rem", "marginLeft": "6px"}),
-            rx.el.span(" or click", style={"fontSize": "0.8rem", "color": "#888"}),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "center", "padding": "8px"},
+            fomantic_icon("plus-circle", size=16, color="#2185d0"),  # primary blue
+            rx.el.span(" Add Sample", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px"}),
+            # Inline file picker - compact button style
+            rx.upload(
+                rx.el.div(
+                    fomantic_icon("file-text", size=12, color="#666"),
+                    rx.cond(
+                        rx.selected_files("vcf_upload").length() > 0,
+                        rx.foreach(
+                            rx.selected_files("vcf_upload"),
+                            lambda f: rx.el.span(f, style={"marginLeft": "4px", "color": "#00b5ad", "fontSize": "0.8rem", "maxWidth": "120px", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}),
+                        ),
+                        rx.el.span("Select VCF...", style={"marginLeft": "4px", "color": "#888", "fontSize": "0.8rem"}),
+                    ),
+                    style={"display": "flex", "alignItems": "center"},
+                ),
+                id="vcf_upload",
+                style={
+                    "padding": "4px 8px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "4px",
+                    "backgroundColor": "#fff",
+                    "cursor": "pointer",
+                    "marginLeft": "auto",
+                },
+                multiple=False,
+                accept={
+                    "application/vcf": [".vcf", ".vcf.gz"],
+                    "text/vcf": [".vcf", ".vcf.gz"],
+                    "application/gzip": [".vcf.gz"],
+                },
+            ),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
         ),
-        id="vcf_upload",
-        style={
-            "border": "1px dashed #ccc",
-            "borderRadius": "4px",
-            "backgroundColor": "#fafafa",
-            "cursor": "pointer",
-            "width": "100%",
-        },
-        multiple=True,
-        accept={
-            "application/vcf": [".vcf", ".vcf.gz"],
-            "text/vcf": [".vcf", ".vcf.gz"],
-            "application/gzip": [".vcf.gz"],
-        },
+        
+        # Compact form - 2 columns
+        rx.el.div(
+            # Row 1: Subject ID + Sex
+            rx.el.div(
+                rx.el.input(
+                    value=UploadState.new_sample_subject_id,
+                    on_change=UploadState.set_new_sample_subject_id,
+                    placeholder="Subject ID",
+                    style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
+                ),
+                rx.el.select(
+                    rx.foreach(UploadState.sex_options, lambda opt: rx.el.option(opt, value=opt)),
+                    value=UploadState.new_sample_sex,
+                    on_change=UploadState.set_new_sample_sex,
+                    style={"width": "80px", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                ),
+                style={"display": "flex", "gap": "6px", "marginBottom": "6px"},
+            ),
+            # Row 2: Species + Reference Genome
+            rx.el.div(
+                rx.el.select(
+                    rx.foreach(UploadState.species_options, lambda opt: rx.el.option(opt, value=opt)),
+                    value=UploadState.new_sample_species,
+                    on_change=UploadState.set_new_sample_species,
+                    style={"flex": "1", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                ),
+                rx.el.select(
+                    rx.foreach(UploadState.new_sample_available_genomes, lambda opt: rx.el.option(opt, value=opt)),
+                    value=UploadState.new_sample_reference_genome,
+                    on_change=UploadState.set_new_sample_reference_genome,
+                    style={"width": "100px", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                ),
+                style={"display": "flex", "gap": "6px", "marginBottom": "6px"},
+            ),
+            # Row 3: Tissue + Study Name
+            rx.el.div(
+                rx.el.select(
+                    rx.foreach(UploadState.tissue_options, lambda opt: rx.el.option(opt, value=opt)),
+                    value=UploadState.new_sample_tissue,
+                    on_change=UploadState.set_new_sample_tissue,
+                    style={"flex": "1", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                ),
+                rx.el.input(
+                    value=UploadState.new_sample_study_name,
+                    on_change=UploadState.set_new_sample_study_name,
+                    placeholder="Study name",
+                    style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
+                ),
+                style={"display": "flex", "gap": "6px", "marginBottom": "8px"},
+            ),
+            # Add button
+            rx.el.button(
+                rx.cond(
+                    UploadState.uploading,
+                    rx.el.i("", class_name="spinner loading icon"),
+                    rx.el.i("", class_name="plus icon"),
+                ),
+                " Add",
+                on_click=UploadState.handle_upload_with_metadata(rx.upload_files(upload_id="vcf_upload")),
+                disabled=rx.selected_files("vcf_upload").length() == 0,
+                class_name="ui primary small button",
+                style={"width": "100%"},
+            ),
+        ),
+        
+        class_name="ui blue segment",
+        style={"padding": "10px 12px", "marginBottom": "12px"},
     )
 
 
 def file_status_label(status: rx.Var[str]) -> rx.Component:
-    """Return a colored label based on file status."""
+    """Return a colored label based on file status (DNA palette: green/yellow/red/grey)."""
     return rx.match(
         status,
         ("completed", rx.el.span("completed", class_name="ui mini green label")),
-        ("running", rx.el.span("running", class_name="ui mini blue label")),
-        ("ready", rx.el.span("ready", class_name="ui mini label")),
+        ("running", rx.el.span("running", class_name="ui mini yellow label")),
+        ("uploaded", rx.el.span("uploaded", class_name="ui mini label")),
         ("error", rx.el.span("error", class_name="ui mini red label")),
         rx.el.span(status, class_name="ui mini grey label"),
     )
 
 
 def file_metadata_section() -> rx.Component:
-    """Display metadata for the currently selected file with editable fields."""
+    """
+    Display metadata for the currently selected file using Fomantic UI form.
+    
+    Uses proper form structure with:
+    - Required fields marked with asterisk
+    - Two-column layout for compact display
+    - Grouped related fields
+    """
     info = UploadState.selected_file_info
     
-    def metadata_row(label: str, value: rx.Var[str], icon: str) -> rx.Component:
-        """Single metadata row with icon, label, and value (read-only)."""
-        return rx.el.div(
-            rx.el.div(
-                fomantic_icon(icon, size=14, color="#888"),
-                rx.el.span(label, style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
-                style={"display": "flex", "alignItems": "center", "minWidth": "80px"},
-            ),
-            rx.el.span(value, style={"fontSize": "0.85rem", "fontWeight": "500"}),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "padding": "3px 0"},
+    def required_field(label: str) -> rx.Component:
+        """Label with required asterisk."""
+        return rx.el.label(
+            label,
+            rx.el.span(" *", style={"color": "#db2828"}),  # Fomantic red
         )
     
-    def dropdown_row(label: str, icon: str, options: rx.Var[list], value: rx.Var[str], on_change: rx.EventHandler) -> rx.Component:
-        """Dropdown row for editable metadata fields."""
-        return rx.el.div(
-            rx.el.div(
-                fomantic_icon(icon, size=14, color="#888"),
-                rx.el.span(label, style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
-                style={"display": "flex", "alignItems": "center", "minWidth": "80px"},
-            ),
-            rx.el.select(
-                rx.foreach(
-                    options,
-                    lambda opt: rx.el.option(opt, value=opt),
-                ),
-                value=value,
-                on_change=on_change,
-                style={
-                    "fontSize": "0.8rem",
-                    "padding": "2px 6px",
-                    "borderRadius": "4px",
-                    "border": "1px solid #ddd",
-                    "backgroundColor": "#fff",
-                    "cursor": "pointer",
-                    "minWidth": "100px",
-                },
-            ),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "padding": "3px 0"},
-        )
-    
-    def input_row(label: str, icon: str, value: rx.Var[str], on_change: rx.EventHandler, placeholder: str = "") -> rx.Component:
-        """Text input row for user-editable metadata."""
-        return rx.el.div(
-            rx.el.div(
-                fomantic_icon(icon, size=14, color="#888"),
-                rx.el.span(label, style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
-                style={"display": "flex", "alignItems": "center", "minWidth": "80px"},
-            ),
-            rx.el.input(
-                value=value,
-                on_change=on_change,
-                placeholder=placeholder,
-                style={
-                    "fontSize": "0.8rem",
-                    "padding": "4px 8px",
-                    "borderRadius": "4px",
-                    "border": "1px solid #ddd",
-                    "backgroundColor": "#fff",
-                    "flex": "1",
-                    "minWidth": "120px",
-                },
-            ),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "padding": "3px 0", "gap": "8px"},
-        )
+    def optional_field(label: str) -> rx.Component:
+        """Label for optional field."""
+        return rx.el.label(label)
     
     return rx.cond(
         UploadState.has_file_metadata,
         rx.el.div(
-            # Header
+            # Form header
             rx.el.div(
-                fomantic_icon("edit", size=14, color="#2185d0"),
-                rx.el.span(" Sample Info", style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px"}),
-                style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+                fomantic_icon("file-text", size=18, color="#21ba45"),
+                rx.el.span(
+                    " Sample: ",
+                    rx.el.strong(info["sample_name"].to(str)),
+                    style={"fontSize": "1rem", "marginLeft": "6px"},
+                ),
+                rx.el.span(
+                    " (",
+                    info["size_mb"].to(str),
+                    " MB)",
+                    style={"fontSize": "0.85rem", "color": "#888", "marginLeft": "4px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "marginBottom": "12px"},
             ),
-            rx.el.div(
-                # Auto-detected fields (read-only)
-                metadata_row("File", info["sample_name"].to(str), "file-text"),
-                metadata_row("Size", rx.Var.create("") + info["size_mb"].to(str) + " MB", "hard-drive"),
-                # Editable dropdowns
-                dropdown_row(
-                    "Species",
-                    "paw-print",
-                    UploadState.species_options,
-                    UploadState.current_species,
-                    UploadState.update_file_species,
-                ),
-                dropdown_row(
-                    "Reference",
-                    "dna",
-                    UploadState.available_reference_genomes,
-                    UploadState.current_reference_genome,
-                    UploadState.update_file_reference_genome,
-                ),
-                # User-editable text fields
-                input_row(
-                    "Subject ID",
-                    "user",
-                    UploadState.current_subject_id,
-                    UploadState.update_file_subject_id,
-                    "e.g. Patient-001",
-                ),
-                input_row(
-                    "Study",
-                    "folder",
-                    UploadState.current_study_name,
-                    UploadState.update_file_study_name,
-                    "e.g. Longevity Study 2026",
-                ),
-                # Notes field (multiline)
+            
+            # Fomantic UI Form
+            rx.el.form(
+                # === REQUIRED FIELDS SECTION ===
+                rx.el.h5("Required Fields", class_name="ui dividing header", style={"marginTop": "0"}),
+                
+                # Row 1: Subject ID and Sex (two fields inline)
                 rx.el.div(
                     rx.el.div(
-                        fomantic_icon("clipboard", size=14, color="#888"),
-                        rx.el.span("Notes", style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
-                        style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
+                        required_field("Subject ID"),
+                        rx.el.input(
+                            type="text",
+                            value=UploadState.current_subject_id,
+                            on_change=UploadState.update_file_subject_id,
+                            placeholder="e.g. Patient-001",
+                        ),
+                        class_name="required field",
                     ),
+                    rx.el.div(
+                        required_field("Sex"),
+                        rx.el.select(
+                            rx.foreach(
+                                UploadState.sex_options,
+                                lambda opt: rx.el.option(opt, value=opt),
+                            ),
+                            value=UploadState.current_sex,
+                            on_change=UploadState.update_file_sex,
+                            class_name="ui dropdown",
+                        ),
+                        class_name="required field",
+                    ),
+                    class_name="two fields",
+                ),
+                
+                # Row 2: Species and Reference Genome
+                rx.el.div(
+                    rx.el.div(
+                        required_field("Species"),
+                        rx.el.select(
+                            rx.foreach(
+                                UploadState.species_options,
+                                lambda opt: rx.el.option(opt, value=opt),
+                            ),
+                            value=UploadState.current_species,
+                            on_change=UploadState.update_file_species,
+                            class_name="ui dropdown",
+                        ),
+                        class_name="required field",
+                    ),
+                    rx.el.div(
+                        required_field("Reference Genome"),
+                        rx.el.select(
+                            rx.foreach(
+                                UploadState.available_reference_genomes,
+                                lambda opt: rx.el.option(opt, value=opt),
+                            ),
+                            value=UploadState.current_reference_genome,
+                            on_change=UploadState.update_file_reference_genome,
+                            class_name="ui dropdown",
+                        ),
+                        class_name="required field",
+                    ),
+                    class_name="two fields",
+                ),
+                
+                # Row 3: Tissue
+                rx.el.div(
+                    required_field("Tissue Source"),
+                    rx.el.select(
+                        rx.foreach(
+                            UploadState.tissue_options,
+                            lambda opt: rx.el.option(opt, value=opt),
+                        ),
+                        value=UploadState.current_tissue,
+                        on_change=UploadState.update_file_tissue,
+                        class_name="ui dropdown",
+                    ),
+                    class_name="required field",
+                ),
+                
+                # === OPTIONAL FIELDS SECTION ===
+                rx.el.h5("Optional Fields", class_name="ui dividing header"),
+                
+                # Study Name
+                rx.el.div(
+                    optional_field("Study / Project"),
+                    rx.el.input(
+                        type="text",
+                        value=UploadState.current_study_name,
+                        on_change=UploadState.update_file_study_name,
+                        placeholder="e.g. Longevity Study 2026",
+                    ),
+                    class_name="field",
+                ),
+                
+                # Notes
+                rx.el.div(
+                    optional_field("Notes"),
                     rx.el.textarea(
                         value=UploadState.current_notes,
                         on_change=UploadState.update_file_notes,
-                        placeholder="Add notes about this sample...",
-                        style={
-                            "fontSize": "0.8rem",
-                            "padding": "6px 8px",
-                            "borderRadius": "4px",
-                            "border": "1px solid #ddd",
-                            "backgroundColor": "#fff",
-                            "width": "100%",
-                            "minHeight": "50px",
-                            "resize": "vertical",
-                        },
+                        placeholder="Additional notes about this sample...",
+                        rows=2,
                     ),
-                    style={"padding": "3px 0"},
+                    class_name="field",
                 ),
-                # Custom fields section
+                
+                # === CUSTOM FIELDS SECTION ===
+                rx.el.h5("Custom Fields", class_name="ui dividing header"),
+                
+                # Existing custom fields
+                rx.cond(
+                    UploadState.has_custom_fields,
+                    rx.el.div(
+                        rx.foreach(
+                            UploadState.custom_fields_list,
+                            lambda field: rx.el.div(
+                                rx.el.span(
+                                    field["name"].to(str),
+                                    class_name="ui label",
+                                    style={"marginRight": "8px"},
+                                ),
+                                rx.el.span(field["value"].to(str), style={"flex": "1"}),
+                                rx.el.button(
+                                    fomantic_icon("x", size=12),
+                                    on_click=lambda f=field: UploadState.remove_custom_field(f["name"].to(str)),
+                                    class_name="ui mini icon button",
+                                    type="button",
+                                    style={"marginLeft": "8px"},
+                                ),
+                                style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+                            ),
+                        ),
+                        style={"marginBottom": "10px"},
+                    ),
+                    rx.box(),
+                ),
+                
+                # Add new custom field
                 rx.el.div(
                     rx.el.div(
-                        fomantic_icon("tags", size=14, color="#888"),
-                        rx.el.span("Custom Fields", style={"color": "#666", "fontSize": "0.8rem", "marginLeft": "6px"}),
-                        style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
-                    ),
-                    # Existing custom fields
-                    rx.cond(
-                        UploadState.has_custom_fields,
-                        rx.el.div(
-                            rx.foreach(
-                                UploadState.custom_fields_list,
-                                lambda field: rx.el.div(
-                                    rx.el.span(
-                                        field["name"].to(str),
-                                        style={"fontWeight": "500", "color": "#444", "fontSize": "0.8rem", "minWidth": "80px"},
-                                    ),
-                                    rx.el.span(
-                                        field["value"].to(str),
-                                        style={"fontSize": "0.8rem", "color": "#666", "flex": "1"},
-                                    ),
-                                    rx.el.button(
-                                        fomantic_icon("x", size=12),
-                                        on_click=lambda f=field: UploadState.remove_custom_field(f["name"].to(str)),
-                                        class_name="ui mini icon button",
-                                        title="Remove field",
-                                        style={"padding": "2px 4px", "marginLeft": "4px"},
-                                    ),
-                                    style={"display": "flex", "alignItems": "center", "gap": "8px", "padding": "2px 0"},
-                                ),
-                            ),
-                            style={"marginBottom": "8px"},
-                        ),
-                        rx.box(),
-                    ),
-                    # Add new custom field
-                    rx.el.div(
                         rx.el.input(
+                            type="text",
                             value=UploadState.new_custom_field_name,
                             on_change=UploadState.set_new_field_name,
                             placeholder="Field name",
-                            style={
-                                "fontSize": "0.75rem",
-                                "padding": "3px 6px",
-                                "borderRadius": "4px",
-                                "border": "1px solid #ddd",
-                                "width": "80px",
-                            },
                         ),
+                        class_name="field",
+                        style={"flex": "1"},
+                    ),
+                    rx.el.div(
                         rx.el.input(
+                            type="text",
                             value=UploadState.new_custom_field_value,
                             on_change=UploadState.set_new_field_value,
                             placeholder="Value",
-                            style={
-                                "fontSize": "0.75rem",
-                                "padding": "3px 6px",
-                                "borderRadius": "4px",
-                                "border": "1px solid #ddd",
-                                "flex": "1",
-                            },
                         ),
-                        rx.el.button(
-                            fomantic_icon("plus", size=12),
-                            on_click=UploadState.save_new_custom_field,
-                            class_name="ui mini icon positive button",
-                            title="Add field",
-                            style={"padding": "4px 6px"},
-                        ),
-                        style={"display": "flex", "gap": "4px", "alignItems": "center"},
+                        class_name="field",
+                        style={"flex": "2"},
                     ),
-                    style={"padding": "6px 0", "marginTop": "4px", "borderTop": "1px dashed #ddd"},
+                    rx.el.button(
+                        fomantic_icon("plus", size=14),
+                        " Add",
+                        on_click=UploadState.save_new_custom_field,
+                        class_name="ui mini positive button",
+                        type="button",
+                    ),
+                    class_name="inline fields",
+                    style={"alignItems": "flex-end"},
                 ),
-                style={
-                    "backgroundColor": "#f8f9fa",
-                    "borderRadius": "6px",
-                    "padding": "10px 12px",
-                    "border": "1px solid #e9ecef",
-                },
+                
+                rx.el.div(class_name="ui divider"),
+                
+                # Save button
+                rx.el.button(
+                    fomantic_icon("save", size=16),
+                    " Save Metadata",
+                    on_click=UploadState.save_metadata_to_dagster,
+                    class_name="ui green button",
+                    type="button",
+                ),
+                rx.el.span(
+                    " Persists to Dagster asset catalog",
+                    style={"fontSize": "0.8rem", "color": "#888", "marginLeft": "10px"},
+                ),
+                
+                class_name="ui form",
             ),
+            
+            class_name="ui green segment",
             style={"marginBottom": "16px"},
             id="file-metadata-section",
         ),
@@ -281,125 +383,257 @@ def file_metadata_section() -> rx.Component:
     )
 
 
-def file_item(filename: rx.Var[str]) -> rx.Component:
-    """Compact file item for the library list."""
-    is_selected = UploadState.selected_file == filename
+def file_item_expanded_content() -> rx.Component:
+    """
+    Expanded accordion content showing metadata preview for the selected file.
+    Uses the selected_file_info computed var for safe access.
+    """
+    info = UploadState.selected_file_info
+    
+    def metadata_preview_row(label: str, value: rx.Var[str], fallback: str = "—") -> rx.Component:
+        """Compact metadata row for accordion content."""
+        return rx.el.div(
+            rx.el.span(label + ": ", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.75rem", "minWidth": "60px"}),
+            rx.el.span(
+                rx.cond(value != "", value, fallback),
+                style={"fontSize": "0.75rem", "fontWeight": "500"},
+            ),
+            style={"display": "flex", "alignItems": "center", "padding": "1px 0"},
+        )
+    
     return rx.el.div(
-        # File icon (small)
-        fomantic_icon(
-            "file-text", 
-            size=16, 
-            color=rx.cond(is_selected, "#fff", "#666"),
-            style={"marginRight": "8px"},
+        # Metadata grid (2 columns)
+        rx.el.div(
+            metadata_preview_row("Subject", info["subject_id"].to(str)),
+            metadata_preview_row("Sex", info["sex"].to(str)),
+            metadata_preview_row("Tissue", info["tissue"].to(str)),
+            metadata_preview_row("Species", info["species"].to(str)),
+            metadata_preview_row("Genome", info["reference_genome"].to(str)),
+            metadata_preview_row("Size", info["size_mb"].to(str) + " MB"),
+            style={
+                "display": "grid",
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": "2px 12px",
+                "padding": "8px 12px 8px 28px",
+                "backgroundColor": "rgba(0,0,0,0.1)",
+                "borderTop": "1px solid rgba(255,255,255,0.15)",
+            },
         ),
-        # Filename
-        rx.el.span(
-            filename,
-            style={"fontSize": "0.85rem", "flex": "1", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"},
+        # Hint text
+        rx.el.div(
+            fomantic_icon("edit", size=10, color="rgba(255,255,255,0.5)", style={"marginRight": "4px"}),
+            rx.el.span(
+                "Edit in form above",
+                style={"fontSize": "0.7rem", "color": "rgba(255,255,255,0.6)"},
+            ),
+            style={"display": "flex", "alignItems": "center", "padding": "4px 12px 8px 28px"},
         ),
-        # Status label
-        file_status_label(UploadState.file_statuses[filename]),
-        # Delete button
-        rx.el.button(
-            fomantic_icon("trash-2", size=12),
-            on_click=lambda: UploadState.delete_file(filename),
-            class_name=rx.cond(is_selected, "ui mini icon inverted button", "ui mini icon button"),
-            title="Delete",
-            style={"padding": "4px 6px", "marginLeft": "4px"},
+    )
+
+
+def file_item(filename: rx.Var[str]) -> rx.Component:
+    """
+    Accordion-style file item for the library list.
+    
+    - Header shows Subject ID (if available) or sample name
+    - VCF filename shown inside when expanded
+    - Read-only metadata by default, Edit button to enable editing
+    """
+    is_selected = UploadState.selected_file == filename
+    display_name = UploadState.sample_display_names[filename]
+    
+    return rx.el.div(
+        # === HEADER ROW (always visible) ===
+        rx.el.div(
+            # Expand/collapse chevron
+            rx.cond(
+                is_selected,
+                fomantic_icon("chevron-down", size=12, color="#fff", style={"marginRight": "4px", "flexShrink": "0"}),
+                fomantic_icon("chevron-right", size=12, color="#888", style={"marginRight": "4px", "flexShrink": "0"}),
+            ),
+            # Display name (Subject ID or sample name)
+            rx.el.span(
+                display_name,
+                style={
+                    "fontSize": "0.85rem", 
+                    "flex": "1", 
+                    "overflow": "hidden", 
+                    "textOverflow": "ellipsis", 
+                    "whiteSpace": "nowrap",
+                    "fontWeight": "500",
+                },
+            ),
+            # Status label
+            file_status_label(UploadState.file_statuses[filename]),
+            # Delete button
+            rx.el.button(
+                fomantic_icon("trash-2", size=10),
+                on_click=lambda: UploadState.delete_file(filename),
+                class_name=rx.cond(is_selected, "ui mini icon inverted button", "ui mini icon button"),
+                title="Delete sample",
+                style={"padding": "3px 5px", "marginLeft": "4px", "flexShrink": "0"},
+            ),
+            on_click=lambda: UploadState.select_file(filename),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "cursor": "pointer",
+                "padding": "6px 8px",
+            },
         ),
+        
+        # === EXPANDED CONTENT (read-only metadata) ===
+        rx.cond(
+            is_selected & UploadState.has_file_metadata,
+            file_item_readonly_content(filename),
+            rx.fragment(),
+        ),
+        
         id=rx.Var.create("file-item-") + filename.to(str),
-        on_click=lambda: UploadState.select_file(filename),
         style={
-            "display": "flex",
-            "alignItems": "center",
-            "cursor": "pointer",
-            "padding": "6px 10px",
             "marginBottom": "4px",
-            "backgroundColor": rx.cond(is_selected, "#2185d0", "#fff"),
+            "backgroundColor": rx.cond(is_selected, "#00b5ad", "#fff"),
             "color": rx.cond(is_selected, "#fff", "inherit"),
-            "border": rx.cond(is_selected, "1px solid #1678c2", "1px solid #e0e0e0"),
+            "border": rx.cond(is_selected, "1px solid #009c95", "1px solid #e0e0e0"),
             "borderRadius": "4px",
             "transition": "all 0.15s ease",
+            "overflow": "hidden",
         },
     )
 
 
-def file_column_content() -> rx.Component:
-    """Column 1 content: File upload and selection."""
+def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
+    """
+    Read-only metadata display for expanded accordion item.
+    Shows key info in a compact format with an Edit button.
+    """
+    info = UploadState.selected_file_info
+    
+    def meta_row(label: str, value: rx.Var[str]) -> rx.Component:
+        """Compact read-only metadata row."""
+        return rx.el.div(
+            rx.el.span(label + ":", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.75rem", "minWidth": "60px"}),
+            rx.el.span(value, style={"fontSize": "0.75rem", "fontWeight": "500"}),
+            style={"display": "flex", "gap": "4px", "alignItems": "center"},
+        )
+    
     return rx.el.div(
-        # Header with icon
+        # VCF filename (always show since header may show Subject ID)
         rx.el.div(
-            fomantic_icon("files", size=18, color="#2185d0"),
-            rx.el.span(" Files", style={"fontSize": "1rem", "fontWeight": "600", "marginLeft": "6px"}),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
+            fomantic_icon("file-text", size=10, color="rgba(255,255,255,0.6)", style={"marginRight": "4px"}),
+            rx.el.span(filename, style={"fontSize": "0.7rem", "color": "rgba(255,255,255,0.8)"}),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
         ),
+        # Metadata in compact grid
+        rx.el.div(
+            meta_row("Species", info["species"].to(str)),
+            meta_row("Genome", info["reference_genome"].to(str)),
+            meta_row("Sex", UploadState.current_sex),
+            meta_row("Tissue", UploadState.current_tissue),
+            rx.cond(
+                UploadState.current_study_name != "",
+                meta_row("Study", UploadState.current_study_name),
+                rx.fragment(),
+            ),
+            style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "2px 8px", "marginBottom": "6px"},
+        ),
+        # Action buttons
+        rx.el.div(
+            rx.el.button(
+                fomantic_icon("edit", size=10),
+                " Edit",
+                on_click=UploadState.enable_metadata_edit_mode,
+                class_name="ui mini inverted button",
+                style={"padding": "3px 8px", "fontSize": "0.7rem"},
+            ),
+            style={"display": "flex", "justifyContent": "flex-end"},
+        ),
+        style={"padding": "6px 10px", "backgroundColor": "rgba(0,0,0,0.1)"},
+    )
+
+
+def file_column_content() -> rx.Component:
+    """Column 1 content: Unified add sample form and library."""
+    return rx.el.div(
+        # ============================================================
+        # ADD SAMPLE FORM - Compact file + metadata form
+        # ============================================================
+        add_sample_form(),
         
-        # File metadata section (shown when file is selected)
-        file_metadata_section(),
-        
-        # Instruction message when no file is selected (compact)
+        # ============================================================
+        # METADATA EDIT SECTION - Only shown when edit mode is enabled
+        # ============================================================
         rx.cond(
-            ~UploadState.has_selected_file,
+            UploadState.has_selected_file & UploadState.metadata_edit_mode,
             rx.el.div(
-                fomantic_icon("info", size=14, color="#2185d0", style={"marginRight": "6px"}),
-                rx.el.span("Upload or select a VCF file to begin", style={"fontSize": "0.85rem"}),
-                style={"display": "flex", "alignItems": "center", "padding": "8px 10px", "backgroundColor": "#e8f4fd", "borderRadius": "4px", "marginBottom": "10px"},
+                # Header with close button
+                rx.el.div(
+                    fomantic_icon("edit", size=16, color="#21ba45"),  # green for edit/save
+                    rx.el.span(" Edit Metadata", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "6px", "flex": "1"}),
+                    rx.el.button(
+                        fomantic_icon("x", size=12),
+                        " Done",
+                        on_click=UploadState.disable_metadata_edit_mode,
+                        class_name="ui mini button",
+                        style={"padding": "4px 8px"},
+                    ),
+                    style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
+                ),
+                file_metadata_section(),
+                class_name="ui green segment",
+                style={"padding": "10px 12px", "marginBottom": "12px"},
             ),
             rx.fragment(),
         ),
         
-        # Upload Section (no divider above)
-        upload_zone(),
-        
-        # Selected files preview + Upload button on same row
+        # ============================================================
+        # LIBRARY SECTION - List of uploaded samples
+        # ============================================================
         rx.el.div(
+            # Library header with count and refresh
             rx.el.div(
-                rx.foreach(
-                    rx.selected_files("vcf_upload"),
-                    lambda f: rx.el.span(f, class_name="ui mini blue label", style={"margin": "1px"}),
+                rx.el.div(
+                    fomantic_icon("database", size=16, color="#767676"),
+                    rx.el.span(" Samples", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px"}),
+                    rx.el.span(
+                        UploadState.files.length(),
+                        class_name="ui mini circular label",
+                        style={"marginLeft": "6px"},
+                    ),
+                    style={"display": "flex", "alignItems": "center"},
                 ),
-                style={"flex": "1", "display": "flex", "flexWrap": "wrap", "alignItems": "center"},
+                rx.el.button(
+                    fomantic_icon("refresh-cw", size=12),
+                    on_click=UploadState.on_load,
+                    class_name="ui mini icon button",
+                    id="refresh-files-button",
+                    title="Refresh library",
+                ),
+                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "10px"},
             ),
-            rx.el.button(
-                rx.el.i("", class_name="upload icon"),
-                " Upload",
-                on_click=UploadState.handle_upload(rx.upload_files(upload_id="vcf_upload")),
-                loading=UploadState.uploading,
-                disabled=rx.selected_files("vcf_upload").length() == 0,
-                class_name="ui positive small button",
-                id="upload-button",
+            
+            # File list (scrollable accordion area)
+            rx.cond(
+                UploadState.files.length() > 0,
+                rx.el.div(
+                    rx.foreach(UploadState.files, file_item),
+                    id="file-list",
+                    style={
+                        "maxHeight": "400px", 
+                        "overflowY": "auto",
+                        "paddingRight": "4px",  # Space for scrollbar
+                    },
+                ),
+                rx.el.div(
+                    fomantic_icon("inbox", size=40, color="#ccc"),
+                    rx.el.div("No samples yet", style={"color": "#888", "marginTop": "8px"}),
+                    rx.el.div("Upload a VCF file to get started", style={"color": "#aaa", "fontSize": "0.85rem", "marginTop": "4px"}),
+                    style={"textAlign": "center", "padding": "30px 10px"},
+                    id="empty-file-list",
+                ),
             ),
-            style={"display": "flex", "alignItems": "center", "gap": "8px", "marginTop": "6px"},
-        ),
-        
-        rx.el.div(class_name="ui divider", style={"margin": "8px 0"}),
-        
-        # Library header with refresh (compact)
-        rx.el.div(
-            rx.el.span("Library", style={"fontSize": "0.9rem", "fontWeight": "600", "color": "#555"}),
-            rx.el.button(
-                fomantic_icon("refresh-cw", size=12),
-                on_click=UploadState.on_load,
-                class_name="ui mini icon button",
-                id="refresh-files-button",
-                title="Refresh",
-            ),
-            style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "6px"},
-        ),
-        
-        # File list (scrollable area)
-        rx.cond(
-            UploadState.files.length() > 0,
-            rx.el.div(
-                rx.foreach(UploadState.files, file_item),
-                id="file-list",
-            ),
-            rx.el.div(
-                fomantic_icon("inbox", size=40, color="#ccc"),
-                rx.el.div("No files yet", style={"color": "#888", "marginTop": "8px"}),
-                style={"textAlign": "center", "padding": "30px 10px"},
-                id="empty-file-list",
-            ),
+            
+            class_name="ui segment",
         ),
         id="file-column-content",
     )
@@ -447,10 +681,33 @@ def fomantic_checkbox(checked: rx.Var[bool]) -> rx.Component:
     )
 
 
+def module_logo_or_icon(module: rx.Var[dict]) -> rx.Component:
+    """
+    Show the module's HF logo image if available, otherwise fall back to the static icon.
+    Logo images are served directly from HuggingFace.
+    """
+    return rx.cond(
+        module["logo_url"].to(str) != "",
+        # Logo image from HuggingFace
+        rx.el.img(
+            src=module["logo_url"].to(str),
+            alt=module["name"].to(str),
+            style={
+                "width": "100%",
+                "height": "100%",
+                "objectFit": "cover",
+                "borderRadius": "4px",
+            },
+        ),
+        # Fallback to static icon
+        module_icon(module["name"]),
+    )
+
+
 def module_card(module: rx.Var[dict]) -> rx.Component:
     """
     Module card styled like the reference screenshot.
-    Shows: Fomantic checkbox, icon, title, description, badges.
+    Shows: Fomantic checkbox, logo/icon, title, description, repo source badge.
     """
     is_selected = module["selected"].to(bool)
     has_file = UploadState.has_selected_file
@@ -459,16 +716,20 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
         rx.el.div(
             # Left: Fomantic UI Checkbox (display only, card handles click)
             fomantic_checkbox(checked=rx.cond(has_file, is_selected, False)),
-            # Module icon (colored box with Lucide icon)
+            # Module logo or icon (colored box using per-module color from DNA palette)
             rx.el.div(
-                module_icon(module["name"]),
+                module_logo_or_icon(module),
                 style={
                     "width": "48px",
                     "height": "48px",
                     "backgroundColor": rx.cond(
-                        has_file,
-                        rx.cond(is_selected, "#2185d0", "#888"),
-                        "#ccc"
+                        module["logo_url"].to(str) != "",
+                        "transparent",
+                        rx.cond(
+                            has_file,
+                            rx.cond(is_selected, module["color"].to(str), "#bbb"),
+                            "#ccc"
+                        ),
                     ),
                     "borderRadius": "6px",
                     "display": "flex",
@@ -476,6 +737,7 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                     "justifyContent": "center",
                     "marginRight": "12px",
                     "flexShrink": "0",
+                    "overflow": "hidden",
                 },
             ),
             # Content
@@ -488,7 +750,16 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                     module["description"],
                     style={"fontSize": "0.85rem", "color": "#666", "lineHeight": "1.3", "marginBottom": "6px"},
                 ),
-                # No confusing labels - selection state is shown by checkbox and background color
+                # Source repo badge (compact, muted)
+                rx.cond(
+                    module["repo_id"].to(str) != "",
+                    rx.el.span(
+                        module["repo_id"].to(str),
+                        class_name="ui mini label",
+                        style={"fontSize": "0.7rem", "fontWeight": "400", "color": "#888"},
+                    ),
+                    rx.fragment(),
+                ),
                 style={"flex": "1"},
             ),
             style={
@@ -522,36 +793,36 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
 # ============================================================================
 
 def run_status_badge(status: rx.Var[str]) -> rx.Component:
-    """Return a colored badge based on run status."""
+    """Return a colored badge based on run status (DNA palette: green/yellow/red/grey)."""
     return rx.match(
         status,
         ("SUCCESS", rx.el.span("SUCCESS", class_name="ui green label")),
         ("FAILURE", rx.el.span("FAILURE", class_name="ui red label")),
-        ("RUNNING", rx.el.span("RUNNING", class_name="ui blue label")),
+        ("RUNNING", rx.el.span("RUNNING", class_name="ui yellow label")),
         ("QUEUED", rx.el.span("QUEUED", class_name="ui grey label")),
-        ("CANCELED", rx.el.span("CANCELED", class_name="ui orange label")),
+        ("CANCELED", rx.el.span("CANCELED", class_name="ui grey label")),
         rx.el.span(status, class_name="ui grey label"),
     )
 
 
 def file_type_icon(file_type: rx.Var[str]) -> rx.Component:
-    """Return an icon for file type."""
+    """Return an icon for file type (DNA palette)."""
     return rx.match(
         file_type,
         ("weights", fomantic_icon("scale", size=18, color="#2185d0")),
         ("annotations", fomantic_icon("file-text", size=18, color="#21ba45")),
-        ("studies", fomantic_icon("book-open", size=18, color="#f2711c")),
+        ("studies", fomantic_icon("book-open", size=18, color="#00b5ad")),
         fomantic_icon("file", size=18, color="#767676"),
     )
 
 
 def file_type_label(file_type: rx.Var[str]) -> rx.Component:
-    """Return a colored label for file type."""
+    """Return a colored label for file type (DNA palette: blue/green/teal)."""
     return rx.match(
         file_type,
         ("weights", rx.el.span("weights", class_name="ui mini blue label")),
         ("annotations", rx.el.span("annotations", class_name="ui mini green label")),
-        ("studies", rx.el.span("studies", class_name="ui mini orange label")),
+        ("studies", rx.el.span("studies", class_name="ui mini teal label")),
         rx.el.span(file_type, class_name="ui mini grey label"),
     )
 
@@ -562,19 +833,21 @@ def _collapsible_header(
     title: str,
     right_badge: rx.Component,
     on_toggle: rx.EventSpec,
+    accent_color: str = "#2185d0",
 ) -> rx.Component:
     """
     Reusable foldable section header matching New Analysis style.
     Chevron + icon + title on left; optional badge on right.
+    accent_color should match the parent segment color (teal/green/blue).
     """
     return rx.el.div(
         rx.el.div(
             rx.cond(
                 expanded,
-                fomantic_icon("chevron-down", size=20, color="#2185d0"),
-                fomantic_icon("chevron-right", size=20, color="#2185d0"),
+                fomantic_icon("chevron-down", size=20, color=accent_color),
+                fomantic_icon("chevron-right", size=20, color=accent_color),
             ),
-            fomantic_icon(icon_name, size=20, color="#2185d0", style={"marginLeft": "6px"}),
+            fomantic_icon(icon_name, size=20, color=accent_color, style={"marginLeft": "6px"}),
             rx.el.span(title, style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "8px"}),
             style={"display": "flex", "alignItems": "center"},
         ),
@@ -644,7 +917,7 @@ def outputs_section() -> rx.Component:
     Positioned at the top of the right panel for easy access.
     """
     return rx.el.div(
-        # Foldable header
+        # Foldable header (teal accent to match ui teal segment)
         _collapsible_header(
             expanded=UploadState.outputs_expanded,
             icon_name="folder-output",
@@ -655,6 +928,7 @@ def outputs_section() -> rx.Component:
                 class_name="ui mini teal label",
             ),
             on_toggle=UploadState.toggle_outputs,
+            accent_color="#00b5ad",
         ),
         
         # Expanded content
@@ -801,7 +1075,7 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
             rx.box(),
         ),
         
-        class_name=rx.cond(is_latest, "ui blue segment", "ui segment"),
+        class_name=rx.cond(is_latest, "ui teal segment", "ui segment"),
         style={"margin": "0 0 8px 0", "padding": "10px 12px"},
         id=rx.Var.create("timeline-run-") + run_id,
     )
@@ -815,16 +1089,17 @@ def run_timeline() -> rx.Component:
     run_count_badge = rx.el.span(
         UploadState.filtered_runs.length(),
         " runs",
-        class_name="ui mini blue label",
+        class_name="ui mini green label",
     )
     return rx.el.div(
-        # Foldable header
+        # Foldable header (green accent to match ui green segment)
         _collapsible_header(
             expanded=UploadState.run_history_expanded,
             icon_name="history",
             title="Run History",
             right_badge=run_count_badge,
             on_toggle=UploadState.toggle_run_history,
+            accent_color="#21ba45",
         ),
         
         # Expanded content
@@ -860,15 +1135,66 @@ def run_timeline() -> rx.Component:
     )
 
 
+def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
+    """
+    Compact card showing a HuggingFace repository used as a module source.
+    Displays repo name, link, and module count.
+    """
+    return rx.el.div(
+        rx.el.div(
+            # HF icon (using database as closest match)
+            fomantic_icon("database", size=18, color="#2185d0"),
+            # Repo name (linked to HF)
+            rx.el.a(
+                repo["repo_id"].to(str),
+                href=repo["url"].to(str),
+                target="_blank",
+                style={
+                    "fontSize": "0.9rem",
+                    "fontWeight": "600",
+                    "marginLeft": "8px",
+                    "color": "#2185d0",
+                    "textDecoration": "none",
+                },
+            ),
+            # External link icon
+            fomantic_icon("external-link", size=12, color="#888", style={"marginLeft": "4px"}),
+            # Module count badge
+            rx.el.span(
+                repo["module_count"].to(int),
+                " modules",
+                class_name="ui mini label",
+                style={"marginLeft": "auto"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "width": "100%",
+            },
+        ),
+        style={
+            "padding": "8px 12px",
+            "border": "1px solid #e0e0e0",
+            "borderRadius": "4px",
+            "backgroundColor": "#f8f9fa",
+            "marginBottom": "6px",
+        },
+    )
+
+
 def new_analysis_section() -> rx.Component:
     """
     Collapsible section for starting a new analysis.
     
-    Contains module selection grid and start button.
+    Contains:
+    - HF repository sources (where modules come from)
+    - Module selection grid with logos
+    - Start button
+    
     Uses shared _collapsible_header for uniform design.
     """
     return rx.el.div(
-        # Foldable header (same style as Last Run and Run History)
+        # Foldable header (blue accent to match ui blue segment)
         _collapsible_header(
             expanded=UploadState.new_analysis_expanded,
             icon_name="plus-circle",
@@ -879,12 +1205,27 @@ def new_analysis_section() -> rx.Component:
                 class_name="ui mini blue label",
             ),
             on_toggle=UploadState.toggle_new_analysis,
+            accent_color="#2185d0",
         ),
         
         # Expanded content
         rx.cond(
             UploadState.new_analysis_expanded,
             rx.el.div(
+                # === HF REPOSITORY SOURCES ===
+                rx.el.div(
+                    rx.el.div(
+                        fomantic_icon("boxes", size=16, color="#767676"),
+                        rx.el.span(
+                            " Module Sources",
+                            style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
+                        ),
+                        style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+                    ),
+                    rx.foreach(UploadState.repo_info_list, repo_source_card),
+                    style={"marginBottom": "16px"},
+                ),
+                
                 # Selection controls
                 rx.el.div(
                     rx.el.button(
@@ -945,18 +1286,137 @@ def new_analysis_section() -> rx.Component:
 
 
 def no_file_selected_message() -> rx.Component:
-    """Message shown when no file is selected."""
+    """
+    Welcome/onboarding message when no sample is selected.
+    Explains the workflow instead of duplicating the left panel.
+    """
+    step_style = {
+        "display": "flex",
+        "alignItems": "flex-start",
+        "gap": "14px",
+        "marginBottom": "20px",
+    }
+    number_style = {
+        "width": "32px",
+        "height": "32px",
+        "borderRadius": "50%",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "fontWeight": "700",
+        "fontSize": "0.9rem",
+        "color": "#fff",
+        "flexShrink": "0",
+    }
+
+    def workflow_step(
+        number: str, bg_color: str, icon: str, title: str, desc: str,
+    ) -> rx.Component:
+        return rx.el.div(
+            rx.el.div(number, style={**number_style, "backgroundColor": bg_color}),
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon(icon, size=16, color=bg_color, style={"marginRight": "6px"}),
+                    rx.el.strong(title, style={"fontSize": "0.95rem"}),
+                    style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
+                ),
+                rx.el.div(desc, style={"fontSize": "0.85rem", "color": "#666", "lineHeight": "1.4"}),
+            ),
+            style=step_style,
+        )
+
     return rx.el.div(
-        fomantic_icon("file-text", size=48, color="#ccc"),
-        rx.el.div(
-            "Select a file to view run history",
-            style={"color": "#888", "marginTop": "16px", "fontSize": "1rem"},
+        # DNA icon + project title
+        fomantic_icon("dna", size=80, color="#00b5ad"),
+        rx.el.h1(
+            "Just-DNA-Lite",
+            class_name="ui huge header",
+            style={"marginTop": "10px", "marginBottom": "0"},
         ),
-        rx.el.div(
-            "Choose a VCF file from the Files panel to see previous runs and start new analyses",
-            style={"color": "#aaa", "marginTop": "8px", "fontSize": "0.9rem", "maxWidth": "300px"},
+        rx.el.p(
+            "Next-generation personal genomics platform — lite, fast, and OakVar-free.",
+            style={"fontSize": "1.2rem", "color": "#555", "fontStyle": "italic", "marginBottom": "40px"},
         ),
-        style={"textAlign": "center", "padding": "60px 20px"},
+        
+        # Two-column layout for Info vs Workflow
+        rx.el.div(
+            # Left: Core Philosophy
+            rx.el.div(
+                rx.el.h3("Core Philosophy", class_name="ui large header", style={"textAlign": "left", "marginBottom": "20px"}),
+                rx.el.div(
+                    rx.el.div(
+                        fomantic_icon("database", size=20, color="#2185d0", style={"marginRight": "12px"}),
+                        rx.el.div(
+                            rx.el.strong("Data as first-class citizen"),
+                            rx.el.div("Software-Defined Assets with Dagster for automatic lineage tracking", style={"fontSize": "0.9rem", "color": "#666"}),
+                            style={"flex": "1"}
+                        ),
+                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
+                    ),
+                    rx.el.div(
+                        fomantic_icon("zap", size=20, color="#fbbd08", style={"marginRight": "12px"}),
+                        rx.el.div(
+                            rx.el.strong("Fast Engines"),
+                            rx.el.div("Polars (default) or DuckDB (streaming, low memory)", style={"fontSize": "0.9rem", "color": "#666"}),
+                            style={"flex": "1"}
+                        ),
+                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
+                    ),
+                    rx.el.div(
+                        fomantic_icon("terminal", size=20, color="#21ba45", style={"marginRight": "12px"}),
+                        rx.el.div(
+                            rx.el.strong("Pure Python Stack"),
+                            rx.el.div("Reflex for Web UI, no React/JS needed", style={"fontSize": "0.9rem", "color": "#666"}),
+                            style={"flex": "1"}
+                        ),
+                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
+                    ),
+                    rx.el.div(
+                        fomantic_icon("file-text", size=20, color="#767676", style={"marginRight": "12px"}),
+                        rx.el.div(
+                            rx.el.strong("Parquet-native"),
+                            rx.el.div("VCF → annotated Parquet outputs", style={"fontSize": "0.9rem", "color": "#666"}),
+                            style={"flex": "1"}
+                        ),
+                        style={"display": "flex", "alignItems": "start"}
+                    ),
+                ),
+                style={"flex": "1", "paddingRight": "40px", "borderRight": "1px solid #eee"}
+            ),
+            
+            # Right: Workflow
+            rx.el.div(
+                rx.el.h3("How to use", class_name="ui large header", style={"textAlign": "left", "marginBottom": "20px"}),
+                workflow_step(
+                    "1", "#21ba45", "cloud-upload",
+                    "Upload a VCF sample",
+                    "Use the \"Add Sample\" form in the left column to upload a VCF file.",
+                ),
+                workflow_step(
+                    "2", "#00b5ad", "dna",
+                    "Select and choose modules",
+                    "Click a sample on the left. Then pick annotation modules that will appear here.",
+                ),
+                workflow_step(
+                    "3", "#2185d0", "play",
+                    "Run and get results",
+                    "Start the pipeline. Outputs and history will appear in this panel.",
+                ),
+                style={"flex": "1", "paddingLeft": "40px"}
+            ),
+            style={"display": "flex", "maxWidth": "900px", "margin": "0 auto", "textAlign": "left"}
+        ),
+        
+        rx.el.div(class_name="ui divider", style={"margin": "40px 0"}),
+        
+        # Final CTA
+        rx.el.div(
+            fomantic_icon("chevron-left", size=18, color="#aaa", style={"marginRight": "8px"}),
+            rx.el.span("Upload or select a sample in the left column to begin", style={"fontSize": "1.1rem", "color": "#888"}),
+            style={"display": "flex", "alignItems": "center", "justifyContent": "center"},
+        ),
+        
+        style={"textAlign": "center", "padding": "60px 40px"},
         id="no-file-selected-message",
     )
 
@@ -971,9 +1431,9 @@ def right_panel_run_view() -> rx.Component:
     3. New Analysis (bottom) - start new work
     """
     return rx.el.div(
-        # Header – inverted bar (dark bg, light text) for emphasis
+        # Header – DNA gradient banner (green -> teal -> blue from logo)
         rx.el.div(
-            fomantic_icon("file-text", size=22, color="#fff"),
+            fomantic_icon("dna", size=22, color="#fff"),
             rx.cond(
                 UploadState.has_selected_file,
                 rx.el.span(
@@ -991,31 +1451,39 @@ def right_panel_run_view() -> rx.Component:
                 "alignItems": "center",
                 "padding": "14px 16px",
                 "marginBottom": "16px",
-                "backgroundColor": "#2185d0",
+                "background": "linear-gradient(135deg, #21ba45, #00b5ad, #2185d0)",
                 "color": "#fff",
                 "borderRadius": "6px",
             },
             id="right-column-header",
         ),
-        # Content: three sections or empty state
+        # Content: show sections based on whether sample has been analyzed
         rx.cond(
             UploadState.has_selected_file,
             rx.fragment(
-                # Section 1: Outputs (top) - teal segment
-                rx.el.div(
-                    outputs_section(),
-                    class_name="ui teal segment",
-                    style={"padding": "16px", "marginBottom": "16px"},
-                    id="segment-outputs",
+                # Section 1: Outputs (top) - only shown when there are output files
+                rx.cond(
+                    UploadState.has_output_files,
+                    rx.el.div(
+                        outputs_section(),
+                        class_name="ui teal segment",
+                        style={"padding": "16px", "marginBottom": "16px"},
+                        id="segment-outputs",
+                    ),
+                    rx.fragment(),
                 ),
-                # Section 2: Run History (middle) - green segment
-                rx.el.div(
-                    run_timeline(),
-                    class_name="ui green segment",
-                    style={"padding": "16px", "marginBottom": "16px"},
-                    id="segment-run-history",
+                # Section 2: Run History (middle) - only shown when there are runs
+                rx.cond(
+                    UploadState.has_filtered_runs,
+                    rx.el.div(
+                        run_timeline(),
+                        class_name="ui green segment",
+                        style={"padding": "16px", "marginBottom": "16px"},
+                        id="segment-run-history",
+                    ),
+                    rx.fragment(),
                 ),
-                # Section 3: New Analysis (bottom) - blue segment
+                # Section 3: New Analysis (always shown)
                 rx.el.div(
                     new_analysis_section(),
                     class_name="ui blue segment",

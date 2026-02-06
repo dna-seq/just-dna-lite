@@ -39,6 +39,7 @@ def fomantic_icon(name: str, size: int | str | None = None, color: str | None = 
         "book-open": "book open",
         "chevron-up": "chevron up",
         "chevron-down": "chevron down",
+        "chevron-left": "chevron left",
         "chevron-right": "chevron right",
         "paw-print": "paw",
         "x": "times",
@@ -140,7 +141,7 @@ def topbar() -> rx.Component:
         ),
         # Center: Page title and subtitle
         rx.el.div(
-            fomantic_icon("dna", size=28, color="#2185d0"),
+            fomantic_icon("dna", size=28, color="#00b5ad"),
             rx.el.div(
                 rx.el.span(
                     "Genomic Annotation",

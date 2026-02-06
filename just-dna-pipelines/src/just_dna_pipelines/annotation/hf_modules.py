@@ -82,8 +82,23 @@ def discover_hf_modules(repo_ids: Optional[list[str]] = None) -> dict[str, Modul
                         # Check for optional files
                         annotations_path = f"{entry['name']}/annotations.parquet"
                         studies_path = f"{entry['name']}/studies.parquet"
-                        logo_path = f"{entry['name']}/logo.png"
                         metadata_path = f"{entry['name']}/metadata.json"
+                        metadata_yaml_path = f"{entry['name']}/metadata.yaml"
+                        
+                        # Logo can be .png, .jpg, or .jpeg
+                        logo_url = None
+                        for ext in ("png", "jpg", "jpeg"):
+                            logo_candidate = f"{entry['name']}/logo.{ext}"
+                            if fs.exists(logo_candidate):
+                                logo_url = f"hf://{logo_candidate}"
+                                break
+                        
+                        # Metadata can be .json or .yaml
+                        resolved_metadata_url = None
+                        if fs.exists(metadata_path):
+                            resolved_metadata_url = f"hf://{metadata_path}"
+                        elif fs.exists(metadata_yaml_path):
+                            resolved_metadata_url = f"hf://{metadata_yaml_path}"
                         
                         info = ModuleInfo(
                             name=folder_name,
@@ -92,8 +107,8 @@ def discover_hf_modules(repo_ids: Optional[list[str]] = None) -> dict[str, Modul
                             weights_url=f"hf://{entry['name']}/weights.parquet",
                             annotations_url=f"hf://{annotations_path}" if fs.exists(annotations_path) else None,
                             studies_url=f"hf://{studies_path}" if fs.exists(studies_path) else None,
-                            logo_url=f"hf://{logo_path}" if fs.exists(logo_path) else None,
-                            metadata_url=f"hf://{metadata_path}" if fs.exists(metadata_path) else None,
+                            logo_url=logo_url,
+                            metadata_url=resolved_metadata_url,
                         )
                         module_infos[folder_name] = info
                         

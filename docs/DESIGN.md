@@ -154,7 +154,7 @@ def tab_content() -> rx.Component:
 
 ### Collapsible Sections Pattern
 
-For accordion-style collapsible sections with consistent styling:
+For accordion-style collapsible sections with consistent styling. Each section uses an `accent_color` that matches its parent Fomantic segment color:
 
 ```python
 def _collapsible_header(
@@ -163,20 +163,21 @@ def _collapsible_header(
     title: str,
     right_badge: rx.Component,
     on_toggle: rx.EventSpec,
+    accent_color: str = "#2185d0",  # Match to parent segment color
 ) -> rx.Component:
     """Reusable foldable section header."""
     return rx.el.div(
         rx.el.div(
             rx.cond(
                 expanded,
-                fomantic_icon("chevron-down", size=20, color="#2185d0"),
-                fomantic_icon("chevron-right", size=20, color="#2185d0"),
+                fomantic_icon("chevron-down", size=20, color=accent_color),
+                fomantic_icon("chevron-right", size=20, color=accent_color),
             ),
-            fomantic_icon(icon_name, size=20, color="#2185d0", style={"marginLeft": "6px"}),
+            fomantic_icon(icon_name, size=20, color=accent_color, style={"marginLeft": "6px"}),
             rx.el.span(title, style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "8px"}),
             style={"display": "flex", "alignItems": "center"},
         ),
-        right_badge,  # e.g., rx.el.span("5 files", class_name="ui mini teal label")
+        right_badge,
         on_click=on_toggle,
         style={
             "display": "flex",
@@ -190,7 +191,8 @@ def _collapsible_header(
         },
     )
 
-# Usage: wrap in colored segment
+# Usage: accent_color must match the segment color
+# Outputs = teal (#00b5ad), Run History = green (#21ba45), New Analysis = blue (#2185d0)
 rx.el.div(
     _collapsible_header(
         expanded=MyState.section_expanded,
@@ -198,33 +200,112 @@ rx.el.div(
         title="Outputs",
         right_badge=rx.el.span("5 files", class_name="ui mini teal label"),
         on_toggle=MyState.toggle_section,
+        accent_color="#00b5ad",  # Matches ui teal segment
     ),
-    rx.cond(
-        MyState.section_expanded,
-        section_content(),
-        rx.box(),
-    ),
-    class_name="ui teal segment",  # or green, blue, etc.
+    rx.cond(MyState.section_expanded, section_content(), rx.box()),
+    class_name="ui teal segment",
     style={"padding": "16px"},
 )
 ```
 
 **Key points:**
 - Chevron icon indicates expand/collapse state (`chevron-right` → `chevron-down`)
+- `accent_color` parameter matches the parent segment's Fomantic color hex
 - Right badge shows count or status
-- Background color and margin animate on toggle
 - Wrap in colored Fomantic segment (`ui teal segment`, `ui green segment`, etc.)
 
-## 3. Color & Feedback
+## 3. Color Palette (DNA Logo-Derived, Fomantic-Native)
 
-- **Semantic Colors (Fomantic Classes):**
-  - `success` / `positive` / `green` - Safe/Benign variants
-  - `error` / `negative` / `red` - Pathogenic variants
-  - `info` / `blue` - VUS (Variant of Uncertain Significance) / Info
+The color palette is derived from the DNA double-helix logo and maps directly to Fomantic UI built-in colors. This gives us free hover/active/focus states, backgrounds, labels, buttons, and segments with **zero custom CSS**.
 
-- **Tactile Feedback:**
-  - Fomantic UI provides built-in hover and active states for most elements.
-  - For custom effects, use inline styles: `hover: shadow-lg`, `active: scale-95`.
+### 5-Color Palette
+
+| Role | Fomantic Class | Hex | Logo Source | UI Usage |
+|------|---------------|-----|-------------|----------|
+| **Primary** | `blue` | `#2185d0` | Central helix (cyan-blue range) | Navbar, primary buttons, active tabs, links, selected items |
+| **Success** | `green` | `#21ba45` | Left backbone (green strands) | Completed runs, benign variants, success messages, save buttons |
+| **Info / Data** | `teal` | `#00b5ad` | Central helix curve | Info badges, data displays, VUS variants, outputs section |
+| **Warning** | `yellow` | `#fbbd08` | Upper-right rungs (gold/amber) | In-progress, pending review, running status, attention needed |
+| **Danger** | `red` | `#db2828` | Phosphate atoms (red dots) | Pathogenic variants, errors, destructive actions, required markers |
+
+### Brand Gradient (decorative header banner only)
+
+```css
+linear-gradient(135deg, #21ba45, #00b5ad, #2185d0)
+```
+
+This echoes the DNA helix flow: green (left backbone) -> teal (center) -> blue (right backbone).
+
+### Semantic Color Mapping
+
+- **Variant Classification:**
+  - `ui green label` - Benign
+  - `ui red label` - Pathogenic
+  - `ui teal label` - VUS (Variant of Uncertain Significance)
+
+- **Run Status Badges:**
+  - `ui green label` - SUCCESS / completed
+  - `ui yellow label` - RUNNING / in-progress
+  - `ui red label` - FAILURE / error
+  - `ui grey label` - QUEUED / ready
+
+- **File Status Badges:**
+  - `ui mini green label` - completed
+  - `ui mini yellow label` - running
+  - `ui mini label` - ready (default grey)
+  - `ui mini red label` - error
+
+- **Section Accent Segments:**
+  - `ui teal segment` - Outputs section (data/results)
+  - `ui green segment` - Run History section (success/timeline)
+  - `ui blue segment` - New Analysis section (primary action)
+
+### Module Cards
+
+Each annotation module is displayed as a card with:
+- **Logo from HuggingFace**: If the module has a `logo.jpg`/`logo.png` in the HF repository, it is displayed as the card image. Falls back to a colored Fomantic icon if no logo exists.
+- **Source repo badge**: A small label showing which HF repository the module comes from (e.g. `just-dna-seq/annotators`).
+- **Module Sources section**: Above the module cards, a "Module Sources" section lists all HF repositories with clickable links and module counts.
+
+Logo URLs are converted from `hf://` protocol to browsable HTTPS URLs:
+```
+hf://datasets/repo/data/module/logo.jpg
+→ https://huggingface.co/datasets/repo/resolve/main/data/module/logo.jpg
+```
+
+**Fallback colors** (used when no logo is available):
+
+| Module | Fomantic Color | Class | Rationale |
+|--------|---------------|-------|-----------|
+| Coronary | `red` | `#db2828` | Heart, clinical urgency |
+| Lipid Metabolism | `yellow` | `#fbbd08` | Metabolic energy |
+| Longevity Map | `green` | `#21ba45` | Life, longevity |
+| Sportshuman | `teal` | `#00b5ad` | Performance, vitality |
+| VO2 Max | `blue` | `#2185d0` | Oxygen, respiration |
+| Pharmacogenomics | `purple` | `#a333c8` | Drug/chemistry |
+
+### Icon Colors
+
+When using `fomantic_icon()` with explicit `color=` parameter, use the Fomantic hex value matching the semantic context:
+
+| Context | Color Hex | When |
+|---------|-----------|------|
+| Primary / interactive | `#2185d0` | Primary buttons, blue section headers, nav icons |
+| Success / completed | `#21ba45` | Check marks, save actions, green section headers |
+| Info / data | `#00b5ad` | DNA icon, teal section headers, file type icons, selected items |
+| Warning / attention | `#fbbd08` | In-progress indicators, running status |
+| Danger / error | `#db2828` | Required field markers, delete buttons, error badges |
+| Muted / secondary | `#767676` | Library icons, secondary info |
+
+**Section header icons must use the matching segment color:**
+- Outputs header (`ui teal segment`) → `accent_color="#00b5ad"`
+- Run History header (`ui green segment`) → `accent_color="#21ba45"`
+- New Analysis header (`ui blue segment`) → `accent_color="#2185d0"`
+
+### Tactile Feedback
+
+- Fomantic UI provides built-in hover and active states for all colored elements.
+- For custom effects, use inline styles: `hover: shadow-lg`, `active: scale-95`.
 
 ## 4. Component Mapping (Fomantic)
 
@@ -357,7 +438,7 @@ Always use **hyphenated** names. Common mistakes:
 - `external-link`, `terminal`, `database`, `boxes`
 - `inbox`, `history`, `chart-bar`, `play`, `list`
 - `sliders-horizontal`, `folder-output`, `folder-x`, `scale`, `book-open`, `trash-2`
-- `chevron-down`, `chevron-right`, `chevron-up` (for collapsible sections)
+- `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up` (for collapsible sections / hints)
 - `clock`, `plus-circle`, `plus`, `tags`, `user`, `x`
 - `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`
 
@@ -467,7 +548,53 @@ rx.el.div(
 )
 ```
 
-## 8. Anti-Patterns
+## 8. Empty State / Onboarding Pattern
+
+When a panel has no content to display (e.g. no file selected, no results yet), show a **workflow onboarding** instead of a redundant prompt. Do NOT duplicate controls that already exist elsewhere (e.g. don't show "upload a file" when the left panel already has that form).
+
+```python
+def no_file_selected_message() -> rx.Component:
+    """Welcome/onboarding when no sample is selected."""
+    def workflow_step(number: str, bg_color: str, icon: str, title: str, desc: str) -> rx.Component:
+        return rx.el.div(
+            rx.el.div(number, style={..., "backgroundColor": bg_color}),  # numbered circle
+            rx.el.div(
+                rx.el.div(fomantic_icon(icon, size=16, color=bg_color), rx.el.strong(title), ...),
+                rx.el.div(desc, ...),
+            ),
+            ...
+        )
+
+    return rx.el.div(
+        fomantic_icon("dna", size=56, color="#00b5ad"),
+        rx.el.h3("Welcome to Genomic Annotation"),
+        rx.el.p("Annotate your VCF files with specialized modules"),
+        workflow_step("1", "#21ba45", "cloud-upload", "Add a sample", "..."),
+        workflow_step("2", "#00b5ad", "dna", "Choose modules", "..."),
+        workflow_step("3", "#2185d0", "play", "Run analysis", "..."),
+        rx.el.div(fomantic_icon("chevron-left", ...), "Select a sample from the left panel to begin"),
+    )
+```
+
+**Key principles:**
+- Use the DNA palette colors for step numbers (green → teal → blue, matching the gradient)
+- Explain the workflow, don't duplicate UI controls
+- Point the user to where they should act (e.g. "left panel") with a directional hint
+- Show a branded icon (DNA) to reinforce identity
+
+### Selected Item Highlighting
+
+File list items use **teal** (`#00b5ad`) for the selected state, differentiating from the primary blue used for buttons/actions:
+
+```python
+style={
+    "backgroundColor": rx.cond(is_selected, "#00b5ad", "#fff"),
+    "color": rx.cond(is_selected, "#fff", "inherit"),
+    "border": rx.cond(is_selected, "1px solid #009c95", "1px solid #e0e0e0"),
+}
+```
+
+## 9. Anti-Patterns
 
 Avoid these patterns:
 
@@ -479,3 +606,8 @@ Avoid these patterns:
 - **Dynamic values in `fomantic_icon()` or `rx.icon()` name parameter**
 - **Underscore or wrong-order icon names**
 - **Python conditionals for reactive styling** (use `rx.cond`)
+- **Duplicating controls across panels** (e.g. file upload in both left and right panels)
+- **Vague empty states** ("Select a file") — show workflow onboarding instead
+- **Hardcoded colors that don't match a Fomantic named color** — always use the 5-color DNA palette
+- **Using `#2185d0` for all accent colors** — match `accent_color` to the parent segment's Fomantic color
+- **Using orange** (`#f2711c`) — not in our palette; use `yellow` for warnings or `red` for errors

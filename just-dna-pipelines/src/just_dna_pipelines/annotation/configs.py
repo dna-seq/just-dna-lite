@@ -117,6 +117,12 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     VCF Source Options (use ONE of these):
     - vcf_path: Local path to VCF file
     - zenodo_url: Zenodo record URL (e.g., https://zenodo.org/records/18370498)
+    
+    User Metadata:
+    - subject_id: Optional subject/patient identifier
+    - study_name: Optional study or project name  
+    - description: Optional human-readable description
+    - custom_metadata: Arbitrary key-value pairs provided by the user
     """
     vcf_path: Optional[str] = None
     zenodo_url: Optional[str] = None  # Zenodo record or file URL
@@ -135,6 +141,14 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     # VCF parsing options
     info_fields: Optional[list[str]] = None
     format_fields: Optional[list[str]] = None  # Default: ["GT", "GQ", "DP", "AD", "VAF", "PL"]
+    
+    # User-provided metadata (optional, flexible)
+    subject_id: Optional[str] = None  # Subject/patient identifier
+    sex: Optional[str] = None  # Biological sex (Male/Female/N/A/Other)
+    tissue: Optional[str] = None  # Sample tissue source
+    study_name: Optional[str] = None  # Study or project name
+    description: Optional[str] = None  # Human-readable description/notes
+    custom_metadata: Optional[dict[str, str]] = None  # Arbitrary user-defined key-value pairs
     
     def get_modules(self) -> list[str]:
         """

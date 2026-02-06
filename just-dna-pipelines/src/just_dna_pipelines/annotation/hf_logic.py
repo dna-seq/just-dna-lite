@@ -479,4 +479,36 @@ def annotate_vcf_with_all_modules(
             "peak_memory_mb": MetadataValue.float(peak_memory_mb),
         })
     
+    # Add sample/subject metadata from SampleInfo base class
+    if config.species:
+        metadata_dict["species"] = MetadataValue.text(config.species)
+    if config.reference_genome:
+        metadata_dict["reference_genome"] = MetadataValue.text(config.reference_genome)
+    if config.sample_description:
+        metadata_dict["sample_description"] = MetadataValue.text(config.sample_description)
+    if config.sequencing_type:
+        metadata_dict["sequencing_type"] = MetadataValue.text(config.sequencing_type)
+    
+    # Add user-provided metadata (well-known optional fields)
+    if config.subject_id:
+        metadata_dict["subject_id"] = MetadataValue.text(config.subject_id)
+    if config.sex:
+        metadata_dict["sex"] = MetadataValue.text(config.sex)
+    if config.tissue:
+        metadata_dict["tissue"] = MetadataValue.text(config.tissue)
+    if config.study_name:
+        metadata_dict["study_name"] = MetadataValue.text(config.study_name)
+    if config.description:
+        metadata_dict["description"] = MetadataValue.text(config.description)
+    
+    # Add arbitrary custom metadata fields (user-defined key-value pairs)
+    if config.custom_metadata:
+        # Store the full dict as JSON for complete access
+        metadata_dict["custom_metadata"] = MetadataValue.json(config.custom_metadata)
+        # Also add each field individually with a "custom/" prefix for visibility in Dagster UI
+        for key, value in config.custom_metadata.items():
+            # Sanitize key to be a valid metadata key (alphanumeric + underscore)
+            safe_key = "".join(c if c.isalnum() or c == "_" else "_" for c in key)
+            metadata_dict[f"custom/{safe_key}"] = MetadataValue.text(str(value))
+    
     return manifest, metadata_dict
