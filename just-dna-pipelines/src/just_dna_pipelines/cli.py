@@ -163,10 +163,15 @@ def annotate_modules(
         repo_id = f"{all_parts[0]}/{all_parts[1]}"
         filename = "/".join(all_parts[2:])
         
+        # Import get_token for authentication
+        from huggingface_hub import get_token
+        token = get_token()
+        
         resolved_vcf_path = Path(hf_hub_download(
             repo_id=repo_id,
             filename=filename,
             repo_type="dataset",
+            token=token,
         ))
         console.print(f"[green]Downloaded to: {resolved_vcf_path}[/green]")
     else:

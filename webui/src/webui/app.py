@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import reflex as rx
@@ -14,6 +15,76 @@ from webui.pages.annotate import annotate_page
 
 # Load environment variables from .env file (searching up to root)
 load_env()
+
+# Note: Shutdown cleanup of STARTED runs is handled by the parent `uv run start` command,
+# which catches Ctrl+C and cleans up before killing subprocesses.
+
+
+# ============================================================================
+# HUGGINGFACE AUTHENTICATION CHECK
+# ============================================================================
+
+def check_hf_authentication() -> None:
+    """
+    Verify HuggingFace authentication before app starts.
+    Exits with error code 1 if not authenticated or authentication fails.
+    """
+    try:
+        from huggingface_hub import HfApi, get_token
+        
+        # Check if token exists
+        token = get_token()
+        if token is None:
+            print("=" * 80, file=sys.stderr)
+            print("ERROR: HuggingFace authentication not found!", file=sys.stderr)
+            print("=" * 80, file=sys.stderr)
+            print("", file=sys.stderr)
+            print("You must log in to HuggingFace to use this application.", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("To authenticate, run:", file=sys.stderr)
+            print("  huggingface-cli login", file=sys.stderr)
+            print("  # or", file=sys.stderr)
+            print("  uv run huggingface-cli login", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("You can get your token from: https://huggingface.co/settings/tokens", file=sys.stderr)
+            print("=" * 80, file=sys.stderr)
+            sys.exit(1)
+        
+        # Verify token is valid by calling whoami
+        api = HfApi(token=token)
+        user_info = api.whoami()
+        
+        print(f"✓ HuggingFace authentication verified: {user_info.get('name', 'Unknown user')}")
+        
+    except ImportError as e:
+        print("=" * 80, file=sys.stderr)
+        print(f"ERROR: Failed to import huggingface_hub: {e}", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        print("", file=sys.stderr)
+        print("To install huggingface_hub, run:", file=sys.stderr)
+        print("  uv add huggingface_hub", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print("=" * 80, file=sys.stderr)
+        print(f"ERROR: HuggingFace authentication check failed: {e}", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        print("", file=sys.stderr)
+        print("This could mean:", file=sys.stderr)
+        print("  1. Your token is invalid or expired", file=sys.stderr)
+        print("  2. You don't have network connectivity", file=sys.stderr)
+        print("  3. HuggingFace API is unavailable", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("To re-authenticate, run:", file=sys.stderr)
+        print("  huggingface-cli login", file=sys.stderr)
+        print("  # or", file=sys.stderr)
+        print("  uv run huggingface-cli login", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        sys.exit(1)
+
+
+# Run authentication check before anything else
+# check_hf_authentication()
 
 # Get workspace root for file paths
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]

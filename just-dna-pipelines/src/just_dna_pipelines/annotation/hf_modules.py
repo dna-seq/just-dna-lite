@@ -56,8 +56,11 @@ def discover_hf_modules(repo_ids: Optional[list[str]] = None) -> dict[str, Modul
     module_infos = {}
     
     try:
-        from huggingface_hub import HfFileSystem
-        fs = HfFileSystem()
+        from huggingface_hub import HfFileSystem, get_token
+        
+        # Get token to access private repos (if logged in)
+        token = get_token()
+        fs = HfFileSystem(token=token)
         
         for repo_id in repos:
             base_path = f"datasets/{repo_id}/data"

@@ -9,6 +9,7 @@ dependencies = [
   "just-dna-pipelines",
   "webui",
   "pyyaml>=6.0.3",
+  "dagster-dg-cli>=1.12.14",
 ]
 
 [tool.uv.sources]

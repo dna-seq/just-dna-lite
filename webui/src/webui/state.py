@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
+from just_dna_pipelines.annotation.assets import user_vcf_partitions
 
 
 # Module metadata with titles, descriptions, and icons
@@ -200,6 +201,8 @@ class UploadState(rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
     uploading: bool = False
+    # Note: `running` is maintained for internal state tracking, but UI should use
+    # `selected_file_is_running` computed var for per-file logic (allows concurrent jobs)
     running: bool = False
     console_output: str = ""
     files: list[str] = []
@@ -213,6 +216,10 @@ class UploadState(rx.State):
     # HF Module selection - all modules selected by default
     available_modules: list[str] = DISCOVERED_MODULES.copy()
     selected_modules: list[str] = DISCOVERED_MODULES.copy()
+    
+    # Class variable to track active in-process runs (for SIGTERM cleanup)
+    # Maps run_id -> partition_key for runs executing via execute_in_process
+    _active_inproc_runs: Dict[str, str] = {}
 
     # ============================================================
     # NEW SAMPLE FORM STATE - for adding samples with metadata
@@ -496,19 +503,27 @@ class UploadState(rx.State):
         
         This avoids all the daemon/workspace mismatch issues that submit_run has.
         The job runs synchronously in the current process.
+        
+        Note: We cannot track the run_id before execution because execute_in_process
+        creates the run internally. For orphaned STARTED runs from crashes,
+        use the CLI cleanup command: `uv run pipelines cleanup-runs --status STARTED`
         """
         job_def = defs.resolve_job_def(job_name)
         
         # Ensure the partition exists before running
-        from just_dna_pipelines.annotation.assets import user_vcf_partitions
         existing_partitions = instance.get_dynamic_partitions(user_vcf_partitions.name)
         if partition_key not in existing_partitions:
             instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
         
+        # Execute in-process - this creates and runs the job atomically
+        # Tag with source=webui so shutdown handler only cancels our runs
         result = job_def.execute_in_process(
             run_config=run_config,
             instance=instance,
-            tags={"dagster/partition": partition_key},
+            tags={
+                "dagster/partition": partition_key,
+                "source": "webui",
+            },
         )
         return result
 
@@ -1288,12 +1303,16 @@ class UploadState(rx.State):
 
     @rx.var
     def filtered_runs(self) -> List[Dict[str, Any]]:
-        """Filter runs for the currently selected file."""
+        """Filter runs for the currently selected file, excluding CANCELED runs."""
         if not self.selected_file:
             return []
         
-        # Match by filename
-        return [r for r in self.runs if r.get("filename") == self.selected_file]
+        # Match by filename and exclude CANCELED runs (they're preserved in DB but hidden from UI)
+        return [
+            r for r in self.runs 
+            if r.get("filename") == self.selected_file 
+            and r.get("status") != "CANCELED"
+        ]
 
     @rx.var
     def has_filtered_runs(self) -> bool:
@@ -1359,13 +1378,37 @@ class UploadState(rx.State):
 
     @rx.var
     def can_run_annotation(self) -> bool:
-        """Check if annotation can be run (file and modules selected)."""
-        return bool(self.selected_file) and len(self.selected_modules) > 0
+        """Check if annotation can be run (file and modules selected, and selected file not already running)."""
+        if not self.selected_file or not self.selected_modules:
+            return False
+        
+        # Check if the SELECTED file has a running job
+        for run in self.runs:
+            if run.get("filename") == self.selected_file:
+                status = run.get("status", "")
+                if status in ("RUNNING", "QUEUED", "STARTING"):
+                    return False
+        
+        return True
+
+    @rx.var
+    def selected_file_is_running(self) -> bool:
+        """Check if the currently selected file has a running job."""
+        if not self.selected_file:
+            return False
+        
+        for run in self.runs:
+            if run.get("filename") == self.selected_file:
+                status = run.get("status", "")
+                if status in ("RUNNING", "QUEUED", "STARTING"):
+                    return True
+        
+        return False
 
     @rx.var
     def analysis_button_text(self) -> str:
         """Get the text for the analysis button based on state."""
-        if self.running:
+        if self.selected_file_is_running:
             return "Analysis Running..."
         if self.last_run_success:
             return "Analysis Complete"
@@ -1374,7 +1417,7 @@ class UploadState(rx.State):
     @rx.var
     def analysis_button_icon(self) -> str:
         """Get the icon for the analysis button based on state."""
-        if self.running:
+        if self.selected_file_is_running:
             return "loader-circle"
         if self.last_run_success:
             return "circle-check"
@@ -1383,7 +1426,7 @@ class UploadState(rx.State):
     @rx.var
     def analysis_button_color(self) -> str:
         """Get the color class for the analysis button (DNA palette: yellow=running, green=success, blue=default)."""
-        if self.running:
+        if self.selected_file_is_running:
             return "ui yellow right labeled icon large button fluid"
         if self.last_run_success:
             return "ui green right labeled icon large button fluid"
@@ -1433,6 +1476,97 @@ class UploadState(rx.State):
             DagsterRunStatus.CANCELING: "CANCELING",
         }
         return status_map.get(status, "UNKNOWN")
+
+    def _try_submit_to_daemon(self, instance: DagsterInstance, run_id: str) -> tuple[bool, str]:
+        """
+        Attempt to submit run to Dagster daemon.
+        
+        Returns:
+            (success: bool, error_message: str)
+        """
+        try:
+            instance.submit_run(run_id, workspace=None)
+            return (True, "")
+        except Exception as e:
+            return (False, str(e))
+
+    def _execute_inproc_with_state_update(
+        self, 
+        instance: DagsterInstance, 
+        job_name: str, 
+        run_config: dict, 
+        partition_key: str,
+        original_run_id: str,
+        sample_name: str
+    ) -> None:
+        """
+        Execute job in-process and update UI state with result.
+        
+        This method runs synchronously but is called from a background thread/executor
+        to avoid blocking the UI. DO NOT use asyncio.to_thread() here - causes
+        Python/Rust interop panics with Dagster objects.
+        """
+        actual_run_id = None
+        try:
+            # Execute synchronously (caller handles threading)
+            result = self._execute_job_in_process(
+                instance, job_name, run_config, partition_key
+            )
+            
+            # Get actual run ID from execute_in_process result
+            actual_run_id = result.run_id
+            
+            # Track this as an active in-process run (for SIGTERM cleanup)
+            UploadState._active_inproc_runs[actual_run_id] = partition_key
+            
+            self._add_log(f"Job completed via in-process execution with run ID: {actual_run_id}")
+            
+            # Update the run info with actual run ID and final status
+            updated_runs = []
+            for r in self.runs:
+                if r["run_id"] == original_run_id:
+                    r["run_id"] = actual_run_id
+                    r["status"] = "SUCCESS" if result.success else "FAILURE"
+                    r["ended_at"] = datetime.now().isoformat()
+                    r["dagster_url"] = f"{get_dagster_web_url()}/runs/{actual_run_id}"
+                    if not result.success:
+                        r["error"] = "Job failed - check Dagster UI for details"
+                    # Find output path if successful
+                    if result.success:
+                        root = Path(__file__).resolve().parents[3]
+                        output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+                        if output_dir.exists():
+                            r["output_path"] = str(output_dir)
+                updated_runs.append(r)
+            self.runs = updated_runs
+            
+            # Reset state - this will trigger UI reactivity
+            self.running = False
+            self.polling_active = False
+            self.last_run_success = result.success
+            
+        except Exception as e:
+            error_message = str(e)
+            self._add_log(f"In-process execution failed: {error_message}")
+            
+            # Reset state and mark as failure
+            self.running = False
+            self.polling_active = False
+            self.last_run_success = False
+            
+            # Update run status in history to FAILURE
+            updated_runs = []
+            for r in self.runs:
+                if r["run_id"] == original_run_id:
+                    r["status"] = "FAILURE"
+                    r["ended_at"] = datetime.now().isoformat()
+                    r["error"] = f"Execution failed: {error_message}"
+                updated_runs.append(r)
+            self.runs = updated_runs
+        finally:
+            # Clean up tracker
+            if actual_run_id and actual_run_id in UploadState._active_inproc_runs:
+                del UploadState._active_inproc_runs[actual_run_id]
 
     async def start_annotation_run(self):
         """Start annotation for the selected file with selected modules."""
@@ -1491,18 +1625,23 @@ class UploadState(rx.State):
         }
 
         # Create the run in Dagster immediately to get a REAL Run ID
+        # Tag with source=webui so shutdown handler only cancels our runs
         try:
             job_def = defs.resolve_job_def(job_name)
             run = instance.create_run_for_job(
                 job_def=job_def,
                 run_config=run_config,
-                tags={"dagster/partition": partition_key},
+                tags={
+                    "dagster/partition": partition_key,
+                    "source": "webui",
+                },
             )
             run_id = run.run_id
             self._add_log(f"Created Dagster run: {run_id}")
         except Exception as e:
             self._add_log(f"Failed to create run: {str(e)}")
             self.running = False
+            self.last_run_success = False
             yield rx.toast.error(f"Failed to start job: {str(e)}")
             return
 
@@ -1512,7 +1651,7 @@ class UploadState(rx.State):
             "filename": self.selected_file,
             "sample_name": sample_name,
             "modules": modules_to_use,
-            "status": "RUNNING",
+            "status": "QUEUED",
             "started_at": datetime.now().isoformat(),
             "ended_at": None,
             "output_path": None,
@@ -1525,29 +1664,44 @@ class UploadState(rx.State):
         self._add_log("Submitting run to Dagster daemon...")
         yield
 
-        # Execute the run. We use submit_run so it handled by the daemon and we have the ID immediately.
-        # This requires the dagster-daemon to be running (which it is via `uv run start`)
-        try:
-            instance.submit_run(run_id, workspace_process_context=None)
-            self._add_log(f"Run {run_id} submitted successfully.")
-        except Exception as e:
-            error_message = str(e)
-            self._add_log(f"Submission failed: {error_message}")
-            # Fallback to in-process execution if submission fails (e.g. no daemon)
-            self._add_log("Attempting in-process execution fallback...")
-            try:
-                # We can't easily reuse the run_id with execute_in_process as it creates its own,
-                # but we can try to run it anyway.
-                await asyncio.to_thread(
-                    self._execute_job_in_process, 
-                    instance, job_name, run_config, partition_key
-                )
-            except Exception as fallback_err:
-                self._add_log(f"Fallback failed: {str(fallback_err)}")
-
-        # The actual status monitoring is handled by poll_run_status which is triggered by rx.moment
-        # We don't block here anymore.
-        yield rx.toast.info(f"Annotation started for {sample_name}")
+        # Try daemon submission first
+        daemon_success, daemon_error = self._try_submit_to_daemon(instance, run_id)
+        
+        if daemon_success:
+            # Daemon accepted the run - poll status asynchronously via poll_run_status()
+            self._add_log(f"Run {run_id} submitted successfully to daemon.")
+            yield rx.toast.info(f"Annotation started for {sample_name}")
+        else:
+            # Daemon submission failed - fall back to in-process execution
+            # Launch as background task to keep UI responsive
+            self._add_log(f"Daemon submission failed: {daemon_error}")
+            self._add_log("Starting in-process execution (this will take a few minutes)...")
+            yield rx.toast.info(f"Running in-process for {sample_name} - please wait...")
+            
+            # Delete the dummy run since execute_in_process will create a new one
+            # This prevents the poller from checking a stale NOT_STARTED run
+            instance.delete_run(run_id)
+            self._add_log(f"Deleted dummy run {run_id}, execute_in_process will create a new run")
+            
+            # Disable polling - execute_in_process creates a new run ID that we'll track manually
+            self.polling_active = False
+            
+            # Update status to RUNNING
+            updated_runs = []
+            for r in self.runs:
+                if r["run_id"] == run_id:
+                    r["status"] = "RUNNING"
+                updated_runs.append(r)
+            self.runs = updated_runs
+            
+            # Execute in thread pool to avoid blocking UI and Python GIL issues
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                None,  # Use default executor
+                self._execute_inproc_with_state_update,
+                instance, job_name, run_config, partition_key, run_id, sample_name
+            )
+            # Don't await - let it run in background and update state when done
     
     def _add_log(self, message: str):
         """Add a timestamped log entry."""
@@ -1711,10 +1865,42 @@ class UploadState(rx.State):
             self.selected_modules = last_run["modules"].copy()
         self.new_analysis_expanded = True
 
+    def _cleanup_orphaned_runs(self) -> int:
+        """
+        Clean up orphaned runs on startup by deleting them from Dagster's database.
+        
+        Removes only NOT_STARTED runs (daemon submission failures that never executed).
+        CANCELED runs are preserved as part of run history.
+        
+        Returns the number of runs deleted.
+        """
+        instance = get_dagster_instance()
+        
+        # Get all NOT_STARTED runs (daemon submission failures)
+        from dagster import RunsFilter
+        orphaned_records = instance.get_run_records(
+            filters=RunsFilter(statuses=[DagsterRunStatus.NOT_STARTED]),
+            limit=100,
+        )
+        
+        cleaned_count = 0
+        for record in orphaned_records:
+            run = record.dagster_run
+            # Delete run from Dagster's database
+            instance.delete_run(run.run_id)
+            cleaned_count += 1
+        
+        return cleaned_count
+
     async def on_load(self):
         """Discover existing files and their statuses when the dashboard loads."""
         auth_state = await self.get_state(AuthState)
         self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
+        
+        # Clean up orphaned runs on startup (NOT_STARTED only)
+        cleaned = self._cleanup_orphaned_runs()
+        if cleaned > 0:
+            self._add_log(f"🧹 Deleted {cleaned} orphaned NOT_STARTED run(s) from Dagster database")
         
         root = Path(__file__).resolve().parents[3]
         user_dir = root / "data" / "input" / "users" / self.safe_user_id

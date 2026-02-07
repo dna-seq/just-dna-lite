@@ -100,7 +100,7 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 - **IO Managers**: Reference assets (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`.
 - **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`.
 - **Lazy materialization**: Assets check if cache exists before downloading.
-- **Start UI**: `uv run dagster-ui` or `uv run start`.
+- **Start UI**: `uv run start` (full stack) or `uv run dagster` (pipelines only).
 
 ### Asset Return Types
 
@@ -129,7 +129,7 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 ### Execution
 
 - **Python API only**: `defs.resolve_job_def(name)` + `job.execute_in_process(instance=instance)`
-- **Same DAGSTER_HOME** for UI and execution: `dagster dev -m module.definitions`
+- **Same DAGSTER_HOME** for UI and execution: `dg dev -m module.definitions`
 - **All assets in `Definitions(assets=[...])`** for lineage visibility in UI
 
 ### API Gotchas
@@ -165,12 +165,245 @@ run = instance.create_run_for_job(
 )
 ```
 
-**Prefer `execute_in_process` over `submit_run` for CLI/UI:**
+**Web UI Job Execution Pattern (TRY-DAEMON-WITH-FALLBACK):**
 
-Using `submit_run` requires a daemon running with matching workspace context, which is fragile (location name mismatches, daemon coordination). For CLI tools and web UIs, use `execute_in_process` instead:
+For the Reflex Web UI, we use a hybrid approach: try daemon-based execution first, but fall back to `execute_in_process` if submission fails. **Critical: Keep business logic outside exception handlers.**
 
 ```python
-# RECOMMENDED - execute_in_process (no daemon required, runs synchronously)
+# RECOMMENDED PATTERN - Separate business logic from exception handling
+
+# 1. Create run
+job_def = defs.resolve_job_def(job_name)
+run = instance.create_run_for_job(
+    job_def=job_def,
+    run_config=run_config,
+    tags={"dagster/partition": partition_key},
+)
+run_id = run.run_id
+
+# 2. Try daemon submission (register failure, don't process it)
+daemon_success, daemon_error = self._try_submit_to_daemon(instance, run_id)
+
+# 3. Handle success/failure outside exception handler
+if daemon_success:
+    # Poll status asynchronously via poll_run_status()
+    yield rx.toast.info("Job started")
+else:
+    # Fall back to execute_in_process as background task (non-blocking)
+    self._add_log(f"Daemon failed: {daemon_error}")
+    yield rx.toast.info("Running in-process - please wait...")
+    
+    # Launch in thread pool without awaiting (keeps UI responsive)
+    # CRITICAL: Use run_in_executor, NOT asyncio.create_task or asyncio.to_thread
+    # Those cause pyo3 panics with Dagster objects
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(
+        None,  # Use default executor
+        self._execute_inproc_with_state_update,
+        instance, job_name, run_config, partition_key, run_id, sample_name
+    )
+    # Background task will update state when complete
+
+# Helper methods (separate concerns):
+def _try_submit_to_daemon(self, instance, run_id) -> tuple[bool, str]:
+    """Try daemon submission. Returns (success, error_message)."""
+    try:
+        instance.submit_run(run_id, workspace=None)
+        return (True, "")
+    except Exception as e:
+        return (False, str(e))
+
+def _execute_inproc_with_state_update(self, ...) -> None:
+    """Execute in-process and update state. Called from thread pool via run_in_executor."""
+    try:
+        # Execute synchronously (caller handles threading via run_in_executor)
+        result = self._execute_job_in_process(...)
+        # Update UI state with result (self.running = False, etc.)
+        self.running = False
+        self.last_run_success = result.success
+    except Exception as e:
+        # Update UI state for failure
+        self.running = False
+        self.last_run_success = False
+```
+
+**Why this pattern is better:**
+- ✅ Business logic outside exception handlers (cleaner separation of concerns)
+- ✅ Exception handlers only register failures, don't process them
+- ✅ Control flow is linear and easy to follow
+- ✅ Each method has single responsibility
+- ✅ **UI stays responsive** - Background task doesn't block event handler
+
+**Critical: UI Responsiveness and Python/Rust Thread Safety**
+
+NEVER await long-running operations in Reflex event handlers - it blocks the entire UI. Also, be careful with threading when using Dagster (which has Rust/pyo3 internals):
+
+```python
+# BAD - Blocks UI until job completes (minutes!)
+fallback_result = await self._execute_inproc_with_state_update(...)
+if fallback_result["success"]:
+    yield rx.toast.success("Done")
+
+# BAD - asyncio.to_thread() with Dagster objects causes pyo3 panic:
+# "Cannot drop pointer into Python heap without the thread being attached"
+result = await asyncio.to_thread(self._execute_job_in_process, ...)
+
+# BAD - asyncio.create_task() on sync function
+asyncio.create_task(self._execute_inproc_with_state_update(...))  # Not async!
+
+# GOOD - Use run_in_executor for thread-safe background execution
+loop = asyncio.get_event_loop()
+loop.run_in_executor(None, self._execute_inproc_with_state_update, ...)
+# UI remains responsive, thread-safe, no pyo3 panics
+```
+
+**Why run_in_executor works:** It properly manages the Python GIL when moving objects between threads, unlike `asyncio.to_thread()` which can cause pyo3 (Python/Rust bridge) panics with Dagster objects.
+
+**Why `submit_run(workspace=None)` fails in web UIs:**
+
+Daemon-based execution requires `ExternalPipelineOrigin` which needs workspace context. Web UI state doesn't have easy access to workspace context, so `submit_run(run_id, workspace=None)` fails with "Expected non-None value: External pipeline origin must be set for submitted runs". The fallback to `execute_in_process` handles this reliably.
+
+**Critical: Per-file running state (not global)**
+
+Button enable logic must check if the **selected file** is running, not if **any** job is running globally. This allows concurrent jobs on different files:
+
+```python
+# BAD - blocks ALL files when ANY file is running
+@rx.var
+def can_run_annotation(self) -> bool:
+ return bool(self.selected_file) and len(self.selected_modules) > 0 and not self.running
+
+# GOOD - only blocks the selected file if it's running
+@rx.var
+def can_run_annotation(self) -> bool:
+ if not self.selected_file or not self.selected_modules:
+ return False
+ 
+ # Check if SELECTED file has a running job
+ for run in self.runs:
+ if run.get("filename") == self.selected_file:
+ if run.get("status") in ("RUNNING", "QUEUED", "STARTING"):
+ return False
+ 
+ return True
+
+# Helper computed var for UI elements
+@rx.var
+def selected_file_is_running(self) -> bool:
+ """Check if the currently selected file has a running job."""
+ if not self.selected_file:
+ return False
+ for run in self.runs:
+ if run.get("filename") == self.selected_file:
+ if run.get("status") in ("RUNNING", "QUEUED", "STARTING"):
+ return True
+ return False
+```
+
+Use `selected_file_is_running` for UI elements (button text, icons, spinners) instead of global `self.running` flag.
+
+**Critical: Orphaned Run Cleanup (execute_in_process survival)**
+
+When using `execute_in_process` in web UIs, runs are abandoned (stuck in STARTED status) on server restart. Implement these safeguards:
+
+1. **Startup cleanup** - Clean up NOT_STARTED runs (daemon submission failures):
+
+```python
+def _cleanup_orphaned_runs(self) -> int:
+ """Clean up NOT_STARTED runs on startup (daemon submission failures)."""
+ instance = get_dagster_instance()
+ not_started_records = instance.get_run_records(
+ filters=RunsFilter(statuses=[DagsterRunStatus.NOT_STARTED]),
+ limit=100,
+ )
+ cleaned_count = 0
+ for record in not_started_records:
+ run = record.dagster_run
+ instance.report_run_canceled(run, message="Orphaned run from daemon submission failure")
+ cleaned_count += 1
+ return cleaned_count
+
+async def on_load(self):
+ """Load state and clean up orphaned runs."""
+ cleaned = self._cleanup_orphaned_runs()
+ if cleaned > 0:
+ self._add_log(f"🧹 Cleaned up {cleaned} orphaned run(s) from previous session")
+ # ... rest of on_load logic
+```
+
+2. **Track active in-process runs** - Use class variable to track which runs are executing in-process:
+
+```python
+class MyState(rx.State):
+ # Class variable shared across all instances
+ _active_inproc_runs: Dict[str, str] = {} # {run_id: partition_key}
+ 
+ def _execute_inproc_with_state_update(self, ...):
+ actual_run_id = None
+ try:
+ result = self._execute_job_in_process(...)
+ actual_run_id = result.run_id
+ # Track this run
+ MyState._active_inproc_runs[actual_run_id] = partition_key
+ # ... process result
+ finally:
+ # Clean up tracker
+ if actual_run_id and actual_run_id in MyState._active_inproc_runs:
+ del MyState._active_inproc_runs[actual_run_id]
+```
+
+3. **SIGTERM handler** - Mark STARTED runs as CANCELED on shutdown (in app.py):
+
+```python
+import signal
+import atexit
+
+def cleanup_active_runs():
+ """Mark all active in-process runs as CANCELED on shutdown."""
+ try:
+ from my_app.state import MyState
+ from dagster import DagsterInstance
+ 
+ active_runs = MyState._active_inproc_runs.copy()
+ if not active_runs:
+ return
+ 
+ instance = DagsterInstance.get()
+ for run_id in active_runs:
+ run = instance.get_run_by_id(run_id)
+ if run:
+ instance.report_run_canceled(
+ run,
+ message="Web server shutdown - in-process execution terminated"
+ )
+ except Exception as e:
+ print(f"Warning: Failed to cleanup active runs: {e}")
+
+# Register cleanup handlers
+signal.signal(signal.SIGTERM, lambda sig, frame: (cleanup_active_runs(), sys.exit(0)))
+signal.signal(signal.SIGINT, lambda sig, frame: (cleanup_active_runs(), sys.exit(0)))
+atexit.register(cleanup_active_runs)
+```
+
+4. **CLI cleanup command** - Manual cleanup for orphaned runs:
+
+```bash
+# Clean up NOT_STARTED runs (daemon failures)
+uv run pipelines cleanup-runs
+
+# Clean up STARTED runs (abandoned in-process executions)
+uv run pipelines cleanup-runs --status STARTED
+
+# Dry-run to see what would be cleaned
+uv run pipelines cleanup-runs --status STARTED --dry-run
+```
+
+**For CLI Tools: Direct `execute_in_process`**
+
+CLI tools can use `execute_in_process` directly (no fallback needed):
+
+```python
+# For CLI tools - execute_in_process (no daemon required, runs synchronously)
 job_def = defs.resolve_job_def(job_name)
 
 # Ensure partition exists (for dynamic partitions)
@@ -189,9 +422,16 @@ else:
     print(f"Job failed: {result.all_events}")
 ```
 
-**Avoid `submit_run` unless running via Dagster UI daemon:**
+**Trade-offs of try-daemon-with-fallback pattern:**
 
-`submit_run` requires matching workspace context between the caller and the daemon. This is error-prone when the UI/CLI creates runs with a different location name than what the daemon loads. If you must use `submit_run`, see the Dagster 1.12+ API notes above about `WorkspaceProcessContext`.
+✅ **Benefits:**
+- UI responsive when daemon works (job runs in daemon, not blocking web server)
+- Reliable when daemon fails (falls back to execute_in_process)
+- Background threading keeps execute_in_process from blocking UI
+
+❌ **Limitations:**
+- Runs created via execute_in_process fallback cannot be re-executed from Dagster UI (missing `remote_job_origin`)
+- Execute_in_process runs in web server process (mitigated by background threading via `asyncio.to_thread`)
 
 **Asset job config uses "ops" key, not "assets":**
 
@@ -217,6 +457,25 @@ records = instance.get_event_records(EventRecordsFilter(run_ids=[run_id]))
 events = instance.all_logs(run_id)
 ```
 
+**`submit_run()` with workspace context - use try/fallback pattern:**
+
+```python
+# Web UI pattern: Try daemon submission, fall back to execute_in_process
+try:
+    instance.submit_run(run_id, workspace=None)
+    # Success: daemon will run the job, poll status via poll_run_status()
+except Exception as e:
+    # Daemon rejected run (needs ExternalPipelineOrigin/workspace context)
+    # Fall back to execute_in_process which runs reliably without workspace context
+    result = await asyncio.to_thread(
+        self._execute_job_in_process,
+        instance, job_name, run_config, partition_key
+    )
+    # Update UI state with result immediately (no polling needed)
+```
+
+**Critical discovery:** Wrong parameter `workspace_process_context=None` caused TypeError → triggered fallback → job ran successfully via `execute_in_process`. The "correct" `workspace=None` is worse because it doesn't error immediately - daemon accepts submission but then rejects run with "External pipeline origin must be set", leaving run stuck in NOT_STARTED.
+
 ### Anti-Patterns
 
 - `dagster job execute` CLI (deprecated)
@@ -224,6 +483,9 @@ events = instance.all_logs(run_id)
 - Config for unselected assets (validation errors)
 - Suspended jobs holding DuckDB file locks
 - **Accessing `run.start_time` on DagsterRun** - use RunRecord instead
+- **Using `submit_run(run_id, workspace=None)` without fallback in web UIs** - daemon rejects run, leaves it stuck in NOT_STARTED; always implement fallback to `execute_in_process`
+- **Using global `self.running` flag for button enable logic** - blocks ALL files when ANY file is running; use per-file running state instead
+- **Expecting Dagster UI re-execution to work for `execute_in_process` runs** - not supported, but acceptable trade-off
 
 ---
 
@@ -331,6 +593,8 @@ When making significant UI changes, follow this workflow:
 
 **Terminal monitoring tip**: Reflex hot-reloads on file changes. After editing, wait for "Compiling: 100%" message before checking the browser.
 
+**Note on worker warnings**: During hot reload, Reflex may show `[WARNING] Killing worker-0 after it refused to gracefully stop`. This is normal behavior when the worker is busy processing a request during reload. It does not indicate a Dagster issue or data corruption.
+
 ### Critical Reflex Patterns
 
 **1. Use `fomantic_icon()` instead of `rx.icon()`:**
@@ -411,6 +675,9 @@ rx.box(class="ui segment")
 - **Wrong icon order** - It's `circle-check` not `check-circle`
 - **Python conditionals for state** - Use `rx.cond()` instead
 - **Missing `.to()` casts in foreach** - Can cause type errors
+- **Awaiting long-running tasks in event handlers** - Blocks entire UI; use `loop.run_in_executor()` for background execution
+- **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap"; use `run_in_executor()` instead
+- **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
 
 ### Fomantic UI + Reflex Gotchas
 

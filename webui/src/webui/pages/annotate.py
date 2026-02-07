@@ -1011,9 +1011,8 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                     fomantic_icon("chevron-up", size=16),
                     fomantic_icon("chevron-down", size=16),
                 ),
-                on_click=lambda: UploadState.toggle_run_expansion(run_id),
                 class_name="ui mini icon button",
-                style={"padding": "6px"},
+                style={"padding": "6px", "pointerEvents": "none"},  # Let parent handle click
             ),
             style={"display": "flex", "alignItems": "center", "cursor": "pointer"},
             on_click=lambda: UploadState.toggle_run_expansion(run_id),
@@ -1040,7 +1039,7 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                             fomantic_icon("refresh-cw", size=14),
                             " Re-run",
                             on_click=UploadState.rerun_with_same_modules,
-                            disabled=UploadState.running,
+                            disabled=UploadState.selected_file_is_running,
                             class_name="ui mini primary button",
                             style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
                         ),
@@ -1262,7 +1261,7 @@ def new_analysis_section() -> rx.Component:
                     rx.el.i(
                         "",
                         class_name=rx.cond(
-                            UploadState.running,
+                            UploadState.selected_file_is_running,
                             "spinner loading icon",
                             rx.cond(
                                 UploadState.last_run_success,
@@ -1507,7 +1506,7 @@ def right_panel_run_view() -> rx.Component:
 def polling_interval() -> rx.Component:
     """Hidden interval component for polling run status."""
     return rx.cond(
-        UploadState.running,
+        UploadState.selected_file_is_running,
         rx.moment(
             interval=3000,
             on_change=UploadState.poll_run_status,

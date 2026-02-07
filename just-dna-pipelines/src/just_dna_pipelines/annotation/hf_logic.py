@@ -295,17 +295,27 @@ def download_file(url: str, output_path: Path) -> Path:
     
     # hf:// protocol handling
     if url.startswith("hf://"):
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download, get_token
         
-        # hf://datasets/repo/data/module/file -> repo, data/module/file
-        parts = url.replace("hf://datasets/", "").split("/", 1)
-        repo_id = parts[0]
-        subpath = parts[1]
+        # hf://datasets/owner/repo/data/module/file -> owner/repo, data/module/file
+        # HuggingFace repo IDs are "owner/repo", so we need BOTH parts
+        remainder = url.replace("hf://datasets/", "")
+        parts = remainder.split("/")
+        
+        # Take first TWO parts for repo_id (owner/repo format)
+        repo_id = f"{parts[0]}/{parts[1]}"
+        
+        # Everything after owner/repo is the file path
+        subpath = "/".join(parts[2:])
+        
+        # Get token to access private repos (if logged in)
+        token = get_token()
         
         downloaded_path = hf_hub_download(
             repo_id=repo_id,
             filename=subpath,
-            repo_type="dataset"
+            repo_type="dataset",
+            token=token,
         )
         import shutil
         output_path.parent.mkdir(parents=True, exist_ok=True)

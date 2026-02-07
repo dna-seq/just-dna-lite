@@ -199,12 +199,16 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
         
         logger.info(f"Downloading {config.repo_id} from HuggingFace Hub...")
         
+        # Get token from config or from HF login (for private repos)
+        from huggingface_hub import get_token
+        token = config.token or get_token()
+        
         downloaded_path = snapshot_download(
             repo_id=config.repo_id,
             repo_type="dataset",
             local_dir=cache_dir,
             local_dir_use_symlinks=False,
-            token=config.token,
+            token=token,
             allow_patterns=config.allow_patterns or ["data/**/*.parquet"],
         )
         

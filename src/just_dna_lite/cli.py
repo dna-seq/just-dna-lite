@@ -231,11 +231,13 @@ def start_dagster(
     
     typer.secho(f"\n💡 Dagster UI will be available at: http://localhost:{port}\n", fg=typer.colors.GREEN, bold=True)
     
-    # Use os.execvp to replace the current process with dagster dev
+    # Use os.execvp to replace the current process with dg dev
     # This ensures all output is properly forwarded and the process behaves correctly
+    # Use absolute path to dg in venv since execvp PATH behavior can be unreliable
+    dg_path = Path(sys.executable).parent / "dg"
     os.execvp(
-        sys.executable,
-        [sys.executable, "-m", "dagster", "dev", "-f", str(dagster_file), "-p", str(port)]
+        str(dg_path),
+        ["dg", "dev", "-f", str(dagster_file), "-p", str(port)]
     )
 
 
@@ -284,7 +286,7 @@ def start_all(
     # 1. Start the UI in the background
     webui_dir = root / "webui"
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
-    # Reflex will run in the background but share the same process group
+    # UI runs in background as orphaned process (will be cleaned up by port owner on next start)
     subprocess.Popen(
         [sys.executable, "-m", "reflex", "run"],
         cwd=str(webui_dir)
@@ -294,8 +296,7 @@ def start_all(
     time.sleep(2)
 
     # 2. Start Dagster by REPLACING this process (exec)
-    # This ensures Dagster has full control of stdout/stderr and terminal signals,
-    # making it behave exactly like the `uv run dagster-ui` command.
+    # This ensures Dagster has full control of stdout/stderr and terminal signals.
     typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
     typer.echo(f"📁 Dagster home: {dagster_home}")
     dagster_file_path = root / dagster_file
@@ -308,10 +309,32 @@ def start_all(
     typer.echo(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
     typer.echo("═" * 65 + "\n")
 
-    # This replaces the current process with dagster dev
+    # Clean up orphaned STARTED runs from previous session
+    try:
+        from dagster import DagsterInstance, DagsterRunStatus, RunsFilter
+        instance = DagsterInstance.get()
+        started_records = instance.get_run_records(
+            filters=RunsFilter(statuses=[DagsterRunStatus.STARTED]),
+            limit=100,
+        )
+        webui_started = [r for r in started_records if r.dagster_run.tags.get("source") == "webui"]
+        if webui_started:
+            typer.echo(f"🧹 Cleaning up {len(webui_started)} orphaned webui run(s) from previous session...")
+            for record in webui_started:
+                run = record.dagster_run
+                instance.report_run_canceled(run, message="Orphaned run from previous session")
+                typer.echo(f"  ✓ Canceled {run.run_id[:8]}...")
+    except Exception:
+        pass
+    
+    # This replaces the current process with dg dev
+    # Use absolute path to dg in venv since execvp PATH behavior can be unreliable
+    # Note: KeyboardInterrupt tracebacks from Dagster's internal watch_orphans.py scripts
+    # are normal behavior - those scripts don't have signal handlers and just exit via KeyboardInterrupt
+    dg_path = Path(sys.executable).parent / "dg"
     os.execvp(
-        sys.executable,
-        [sys.executable, "-m", "dagster", "dev", "-f", str(dagster_file_path), "-p", str(dagster_port)]
+        str(dg_path),
+        ["dg", "dev", "-f", str(dagster_file_path), "-p", str(dagster_port)]
     )
 
 
@@ -380,6 +403,96 @@ def list_vcf_partitions_cmd() -> None:
         typer.secho(f"📋 Found {len(partitions)} VCF partition(s):\n", fg=typer.colors.CYAN, bold=True)
         for p in sorted(partitions):
             typer.echo(f"   • {p}")
+
+
+@app.command("cleanup-runs")
+def cleanup_orphaned_runs(
+    status: Annotated[
+        str,
+        typer.Option("--status", help="Run status to clean up (NOT_STARTED, STARTED, STARTING, QUEUED)")
+    ] = "NOT_STARTED",
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would be cleaned up without actually doing it")
+    ] = False,
+) -> None:
+    """
+    Clean up orphaned Dagster runs.
+    
+    By default, cleans up NOT_STARTED runs (daemon submission failures).
+    Use --status STARTED to clean up abandoned in-process runs from web server restarts.
+    """
+    from dagster import DagsterInstance, DagsterRunStatus, RunsFilter
+    
+    root = _find_workspace_root(Path.cwd())
+    if root is None:
+        raise typer.BadParameter("Could not find workspace root. Run this from the repo root.")
+    
+    dagster_home = root / "data" / "interim" / "dagster"
+    if not dagster_home.exists():
+        typer.secho("No Dagster instance found. Nothing to clean up.", fg=typer.colors.YELLOW)
+        return
+    
+    # Set DAGSTER_HOME for DagsterInstance.get()
+    os.environ["DAGSTER_HOME"] = str(dagster_home.resolve())
+    
+    # Map string status to DagsterRunStatus enum
+    status_map = {
+        "NOT_STARTED": DagsterRunStatus.NOT_STARTED,
+        "STARTED": DagsterRunStatus.STARTED,
+        "STARTING": DagsterRunStatus.STARTING,
+        "QUEUED": DagsterRunStatus.QUEUED,
+    }
+    
+    if status not in status_map:
+        typer.secho(
+            f"Invalid status: {status}. Must be one of: {', '.join(status_map.keys())}",
+            fg=typer.colors.RED,
+            err=True
+        )
+        raise typer.Exit(1)
+    
+    status_enum = status_map[status]
+    
+    instance = DagsterInstance.get()
+    run_records = instance.get_run_records(
+        filters=RunsFilter(statuses=[status_enum]),
+        limit=100,
+    )
+    
+    if not run_records:
+        typer.secho(f"✓ No {status} runs found. Nothing to clean up.", fg=typer.colors.GREEN)
+        return
+    
+    typer.echo(f"Found {len(run_records)} {status} run(s):")
+    typer.echo()
+    
+    for record in run_records:
+        run = record.dagster_run
+        partition = run.tags.get("dagster/partition", "N/A")
+        typer.echo(f"  • Run {run.run_id[:8]}... (Job: {run.job_name}, Partition: {partition})")
+    
+    typer.echo()
+    
+    if dry_run:
+        typer.secho("🔍 DRY RUN: No changes made.", fg=typer.colors.YELLOW)
+        return
+    
+    # Confirm with user
+    if not typer.confirm(f"Mark these {len(run_records)} run(s) as CANCELED?"):
+        typer.secho("Aborted.", fg=typer.colors.YELLOW)
+        return
+    
+    # Clean up runs
+    for record in run_records:
+        run = record.dagster_run
+        instance.report_run_canceled(
+            run,
+            message=f"Orphaned {status} run cleaned up by CLI"
+        )
+        typer.echo(f"  ✓ Canceled run {run.run_id[:8]}...")
+    
+    typer.secho(f"\n✅ Cleaned up {len(run_records)} orphaned run(s).", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
