@@ -73,6 +73,43 @@ def resolve_just_dna_pipelines_subfolder(subdir_name: str, base: Optional[Union[
     return cache_path.resolve()
 
 
+def _parse_vcf_header_fields(vcf_path: str) -> tuple[list[str], list[str]]:
+    """
+    Extract INFO and FORMAT field names from a VCF file header.
+    
+    Parses ``##INFO=<ID=...>`` and ``##FORMAT=<ID=...>`` header lines.
+
+    Args:
+        vcf_path: Path to the VCF file
+
+    Returns:
+        Tuple of (info_fields, format_fields) lists.
+    """
+    import gzip
+
+    open_func = gzip.open if vcf_path.endswith('.gz') else open
+    mode = 'rt' if vcf_path.endswith('.gz') else 'r'
+
+    info_fields: list[str] = []
+    format_fields: list[str] = []
+
+    with open_func(vcf_path, mode) as f:
+        for line in f:
+            line = line.strip()
+            if not line.startswith('#'):
+                break
+            for prefix, target_list in (('##INFO=<ID=', info_fields), ('##FORMAT=<ID=', format_fields)):
+                if line.startswith(prefix):
+                    start_idx = line.find('ID=') + 3
+                    end_idx = line.find(',', start_idx)
+                    if end_idx == -1:
+                        end_idx = line.find('>', start_idx)
+                    if end_idx > start_idx:
+                        target_list.append(line[start_idx:end_idx])
+
+    return info_fields, format_fields
+
+
 def get_info_fields(vcf_path: str) -> list[str]:
     """
     Extract INFO field names from a VCF file header by parsing the header directly.
@@ -85,29 +122,7 @@ def get_info_fields(vcf_path: str) -> list[str]:
     """
     with start_action(action_type="get_info_fields", vcf_path=vcf_path) as action:
         try:
-            import gzip
-            info_fields = []
-            
-            # Determine if file is gzipped
-            open_func = gzip.open if vcf_path.endswith('.gz') else open
-            mode = 'rt' if vcf_path.endswith('.gz') else 'r'
-            
-            with open_func(vcf_path, mode) as f:
-                for line in f:
-                    line = line.strip()
-                    # Stop when we reach the data (non-header lines)
-                    if not line.startswith('#'):
-                        break
-                    # Look for INFO field definitions
-                    if line.startswith('##INFO=<ID='):
-                        # Extract the ID from ##INFO=<ID=FIELD_NAME,...>
-                        start_idx = line.find('ID=') + 3
-                        end_idx = line.find(',', start_idx)
-                        if end_idx == -1:  # In case there's no comma after ID
-                            end_idx = line.find('>', start_idx)
-                        if end_idx > start_idx:
-                            field_name = line[start_idx:end_idx]
-                            info_fields.append(field_name)
+            info_fields, _ = _parse_vcf_header_fields(vcf_path)
             
             action.log(
                 message_type="info",
@@ -253,6 +268,35 @@ def read_vcf_file(
             actual_format_fields = format_fields  # None means auto-detect all, [] means none
         else:
             actual_format_fields = []  # Explicitly disable format fields
+
+        # ── Deduplicate: fields present in both INFO and FORMAT cause
+        #    DuplicateQualifiedField errors in polars-bio.  When a field
+        #    name (e.g. "AF") appears in both sections we keep it in INFO
+        #    and remove it from FORMAT to avoid the schema collision.
+        if with_formats and actual_info_fields:
+            info_set = set(actual_info_fields)
+            if actual_format_fields is None:
+                # Auto-detect is requested → parse FORMAT fields from
+                # the header so we can strip collisions before calling
+                # polars-bio.
+                _, header_format_fields = _parse_vcf_header_fields(str(file_path))
+                duplicates = info_set & set(header_format_fields)
+                if duplicates:
+                    actual_format_fields = [f for f in header_format_fields if f not in info_set]
+                    action.log(
+                        message_type="info",
+                        step="dedup_info_format_fields",
+                        removed_from_format=sorted(duplicates),
+                    )
+            elif actual_format_fields:
+                duplicates = info_set & set(actual_format_fields)
+                if duplicates:
+                    actual_format_fields = [f for f in actual_format_fields if f not in info_set]
+                    action.log(
+                        message_type="info",
+                        step="dedup_info_format_fields",
+                        removed_from_format=sorted(duplicates),
+                    )
 
         # Use polars-bio scan_vcf with native format_fields support
         result = pb.scan_vcf(

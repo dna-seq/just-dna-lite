@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Longevity Report{% if user_name %} — {{ user_name }}{% endif %}</title>
+<style>
+/* ========== General ========== */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+    background: linear-gradient(135deg, #f9f6f0, #f2f7e6, #d9f9f2, #e7f1ff, #f0eefd);
+    background-attachment: fixed;
+    color: #42584e;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0; padding: 0;
+    line-height: 1.6;
+}
+a { color: #3a9e8f; text-decoration: none; }
+a:hover { color: #56c3bd; text-decoration: underline; }
+
+/* ========== Layout ========== */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.report-header {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+}
+.report-header h1 {
+    color: #269292;
+    font-size: 2.8rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+.report-header .subtitle {
+    color: #5a7a72;
+    font-size: 1.1rem;
+}
+
+/* ========== Intro ========== */
+.intro {
+    max-width: 800px;
+    margin: 0 auto 3rem;
+    text-align: center;
+    color: #545570;
+    font-size: 1.05rem;
+}
+.intro p { line-height: 1.8; }
+.attention {
+    margin: 2rem auto;
+    padding: 1.2rem 1.8rem;
+    border: 3px solid #7abdb7;
+    border-radius: 16px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(74, 136, 124, 0.15);
+    text-align: left;
+}
+.attention strong { color: #479b94; font-size: 1.1rem; }
+.attention p { color: #3a6e65; margin: 0.5rem 0; }
+.toc { list-style: none; padding: 0; margin: 2rem 0 0; }
+.toc li { margin: 0.5rem 0; }
+.toc a { font-size: 1.15rem; font-weight: 500; }
+
+/* ========== Summary Card ========== */
+.summary-card {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 2rem 0 3rem;
+}
+.stat-box {
+    background: white;
+    border-radius: 12px;
+    padding: 1.2rem 2rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    min-width: 150px;
+}
+.stat-box .number {
+    font-size: 2rem;
+    font-weight: 700;
+}
+.stat-box .label {
+    font-size: 0.85rem;
+    color: #777;
+    margin-top: 0.3rem;
+}
+.stat-positive .number { color: #2e8b57; }
+.stat-negative .number { color: #c0392b; }
+.stat-total .number { color: #269292; }
+.stat-weight .number { color: #5a7a72; }
+
+/* ========== Section headings ========== */
+.section-heading {
+    color: #39917b;
+    font-size: 1.8rem;
+    font-weight: 500;
+    text-align: center;
+    margin: 3rem 0 1.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid rgba(101, 189, 162, 0.3);
+}
+
+/* ========== Accordion / Pathway cards ========== */
+.pathway-card {
+    margin: 1.5rem 0;
+    border: 2px solid rgba(101, 189, 162, 0.5);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.6);
+}
+.pathway-header {
+    background: rgba(255,255,255,0.8);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #2f746a;
+    transition: background 0.2s;
+}
+.pathway-header:hover { background: rgba(255,255,255,0.95); }
+.pathway-header .arrow {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-right: 3px solid #3d8077;
+    border-top: 3px solid #3d8077;
+    transform: rotate(45deg);
+    transition: transform 0.3s;
+    flex-shrink: 0;
+}
+.pathway-card.open .pathway-header .arrow {
+    transform: rotate(135deg);
+}
+.pathway-header .badge {
+    margin-left: auto;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+    font-weight: 600;
+}
+.badge-positive { background: #e8f5e9; color: #2e7d32; }
+.badge-negative { background: #fce4ec; color: #c62828; }
+
+.pathway-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease;
+}
+.pathway-card.open .pathway-body {
+    max-height: none;
+}
+.pathway-description {
+    padding: 1rem 1.5rem;
+    color: #545570;
+    border-bottom: 1px solid rgba(101,189,162,0.2);
+    font-size: 0.95rem;
+    line-height: 1.7;
+}
+
+/* ========== Variant table ========== */
+.variants-table-wrap {
+    overflow-x: auto;
+    padding: 0.5rem 1rem 1rem;
+}
+table.variants {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    background: white;
+    border: 1px solid rgba(34,36,38,0.12);
+    border-radius: 6px;
+    overflow: hidden;
+}
+table.variants th {
+    background: #f5f8f7;
+    color: rgba(0,0,0,0.8);
+    padding: 0.7rem 0.6rem;
+    font-weight: 600;
+    text-align: left;
+    border-bottom: 2px solid rgba(101,189,162,0.4);
+    white-space: nowrap;
+}
+table.variants td {
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid rgba(34,36,38,0.06);
+    vertical-align: top;
+}
+table.variants tbody tr:hover {
+    background: #f0f7f5;
+}
+table.variants .weight-cell {
+    font-weight: 700;
+    text-align: center;
+    border-radius: 4px;
+    min-width: 50px;
+}
+
+/* ========== Expandable detail row ========== */
+.detail-toggle {
+    cursor: pointer;
+    color: #3a9e8f;
+    font-weight: 600;
+    text-align: center;
+    width: 30px;
+}
+.detail-toggle:hover { color: #269292; }
+.variant-detail {
+    display: none;
+    background: #fafcfb;
+}
+.variant-detail td {
+    padding: 1rem;
+}
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+    margin: 0.5rem 0;
+}
+.detail-table th {
+    background: #f0f4f3;
+    padding: 0.4rem 0.5rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid #ddd;
+}
+.detail-table td {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+/* ========== Module section ========== */
+.module-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.7);
+    border-radius: 12px;
+    border: 2px solid rgba(101,189,162,0.3);
+}
+.module-section h3 {
+    color: #2f746a;
+    font-size: 1.3rem;
+    margin: 0 0 1rem;
+}
+
+/* ========== Back to top ========== */
+#toTop {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 50px; height: 50px;
+    background: #308499;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(30,77,88,0.4);
+    z-index: 100;
+    transition: background 0.2s;
+}
+#toTop:hover { background: #56c3bd; }
+#toTop::after {
+    content: '';
+    display: block;
+    width: 12px; height: 12px;
+    border-top: 3px solid white;
+    border-left: 3px solid white;
+    transform: rotate(45deg);
+    margin-top: 4px;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+    .report-header h1 { font-size: 2rem; }
+    .summary-card { gap: 0.8rem; }
+    .stat-box { min-width: 120px; padding: 0.8rem 1rem; }
+    .stat-box .number { font-size: 1.5rem; }
+    .pathway-header { font-size: 1rem; }
+    table.variants { font-size: 0.78rem; }
+    table.variants th, table.variants td { padding: 0.4rem; }
+}
+</style>
+</head>
+<body>
+
+<div id="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})"></div>
+
+<div class="container">
+
+<!-- ===== HEADER ===== -->
+<div class="report-header">
+    <h1>Longevity Report</h1>
+    {% if user_name or sample_name %}
+    <div class="subtitle">
+        {% if user_name %}{{ user_name }}{% endif %}
+        {% if sample_name %} &mdash; {{ sample_name }}{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ===== INTRO ===== -->
+<div class="intro">
+    <p>This report provides data about your longevity genetics. Longevity and healthy lifespan are among the most complex phenotypes, with heritability of age at death in adulthood being approximately 25%. The other 75% is highly dependent on lifestyle.</p>
+    <p>This report is based on your genome data cross-referenced against available genetic databases. Annotation modules used: <a href="https://huggingface.co/datasets/just-dna-seq/annotators">just-dna-seq/annotators</a> (LongevityMap and other modules).</p>
+
+    <div class="attention">
+        <p><strong>Attention!</strong> The information provided is for informational purposes only. Its clinical implementation is possible only after consulting your healthcare practitioner. All drugs, vitamins and lifestyle changes may be prescribed only by your healthcare practitioner, based on clinical blood test results, family history, etc.</p>
+    </div>
+
+    <ul class="toc">
+        {% if longevity %}
+        <li><a href="#longevity-variants">Longevity Variants</a></li>
+        {% endif %}
+        {% for mod in other_modules %}
+        <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- ===== LONGEVITY VARIANTS SECTION ===== -->
+{% if longevity %}
+<h2 id="longevity-variants" class="section-heading">Longevity Variants</h2>
+
+<p style="text-align:center; color:#545570; max-width:800px; margin:0 auto 1rem;">
+    This section estimates how many significant longevity variations you have. The data is obtained mainly by studying centenarians' genomes and is based on variants from <a href="https://genomics.senescence.info/longevity/">LongevityMap</a> and other data sources.
+</p>
+
+<!-- Summary -->
+<div class="summary-card">
+    <div class="stat-box stat-total">
+        <div class="number">{{ longevity.summary.total_variants }}</div>
+        <div class="label">Total variants</div>
+    </div>
+    <div class="stat-box stat-positive">
+        <div class="number">{{ longevity.summary.total_positive }}</div>
+        <div class="label">Positive</div>
+    </div>
+    <div class="stat-box stat-negative">
+        <div class="number">{{ longevity.summary.total_negative }}</div>
+        <div class="label">Negative</div>
+    </div>
+    <div class="stat-box stat-weight">
+        <div class="number">{{ longevity.summary.total_weight }}</div>
+        <div class="label">Net weight</div>
+    </div>
+</div>
+
+<!-- Pathway categories -->
+{% for cat_key, cat in longevity.categories.items() %}
+{% if cat.total_count > 0 %}
+<div class="pathway-card" id="pathway-{{ cat_key }}">
+    <div class="pathway-header" onclick="togglePathway(this)">
+        <span class="arrow"></span>
+        <span>{{ cat.title }}</span>
+        {% if cat.positive_count > 0 %}
+        <span class="badge badge-positive">+{{ cat.positive_count }}</span>
+        {% endif %}
+        {% if cat.negative_count > 0 %}
+        <span class="badge badge-negative">&minus;{{ cat.negative_count }}</span>
+        {% endif %}
+    </div>
+    <div class="pathway-body">
+        <div class="pathway-description">{{ cat.description }}</div>
+        <div class="variants-table-wrap">
+            <table class="variants">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>RSID</th>
+                        <th>Gene</th>
+                        <th>Your genotype</th>
+                        <th>Ref</th>
+                        <th>Alt</th>
+                        <th>Zygosity</th>
+                        <th>Weight</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for v in cat.variants %}
+                    <tr class="variant-row" onclick="toggleDetail(this)">
+                        <td class="detail-toggle">+</td>
+                        <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}" onclick="event.stopPropagation()">{{ v.rsid }}</a></td>
+                        <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}" onclick="event.stopPropagation()">{{ v.gene }}</a>{% endif %}</td>
+                        <td>{{ v.genotype_str }}</td>
+                        <td>{{ v.ref }}</td>
+                        <td>{{ v.alt }}</td>
+                        <td>{{ v.zygosity }}</td>
+                        <td class="weight-cell" style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+                    </tr>
+                    <tr class="variant-detail">
+                        <td colspan="8">
+                            <table class="detail-table">
+                                {% if v.conclusion %}
+                                <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
+                                {% endif %}
+                                {% if v.method %}
+                                <tr><th>Method</th><td>{{ v.method }}</td></tr>
+                                {% endif %}
+                                {% if v.state %}
+                                <tr><th>State</th><td>{{ v.state }}</td></tr>
+                                {% endif %}
+                                {% if v.clinvar %}
+                                <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                                {% endif %}
+                            </table>
+                            {% if v.studies %}
+                            <table class="detail-table" style="margin-top:0.5rem">
+                                <thead>
+                                    <tr>
+                                        <th>PubMed ID</th>
+                                        <th>Population</th>
+                                        <th>P-value</th>
+                                        <th>Conclusion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for s in v.studies %}
+                                    <tr>
+                                        <td>{{ s.pmid }}</td>
+                                        <td>{{ s.population }}</td>
+                                        <td>{{ s.p_value }}</td>
+                                        <td>{{ s.conclusion }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- Categories with no variants -->
+{% for cat_key, cat in longevity.categories.items() %}
+{% if cat.total_count == 0 %}
+<div class="pathway-card">
+    <div class="pathway-header" onclick="togglePathway(this)">
+        <span class="arrow"></span>
+        <span>{{ cat.title }}</span>
+        <span class="badge" style="background:#f5f5f5; color:#999;">0 variants</span>
+    </div>
+    <div class="pathway-body">
+        <div class="pathway-description">{{ cat.description }}<br><br><em>No annotated variants found for this pathway in your genome.</em></div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+
+<!-- ===== OTHER MODULES ===== -->
+{% for mod in other_modules %}
+<h2 id="module-{{ mod.module_name }}" class="section-heading">{{ mod.display_name }}</h2>
+
+{% if mod.variants %}
+<div class="summary-card">
+    <div class="stat-box stat-total">
+        <div class="number">{{ mod.summary.total_variants }}</div>
+        <div class="label">Total variants</div>
+    </div>
+    <div class="stat-box stat-positive">
+        <div class="number">{{ mod.summary.total_positive }}</div>
+        <div class="label">Positive</div>
+    </div>
+    <div class="stat-box stat-negative">
+        <div class="number">{{ mod.summary.total_negative }}</div>
+        <div class="label">Negative</div>
+    </div>
+    <div class="stat-box stat-weight">
+        <div class="number">{{ mod.summary.total_weight }}</div>
+        <div class="label">Net weight</div>
+    </div>
+</div>
+
+<div class="module-section">
+    <div class="variants-table-wrap">
+        <table class="variants">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>RSID</th>
+                    <th>Gene</th>
+                    <th>Your genotype</th>
+                    <th>Ref</th>
+                    <th>Alt</th>
+                    <th>Zygosity</th>
+                    <th>Weight</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for v in mod.variants %}
+                <tr class="variant-row" onclick="toggleDetail(this)">
+                    <td class="detail-toggle">+</td>
+                    <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}" onclick="event.stopPropagation()">{{ v.rsid }}</a></td>
+                    <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}" onclick="event.stopPropagation()">{{ v.gene }}</a>{% endif %}</td>
+                    <td>{{ v.genotype_str }}</td>
+                    <td>{{ v.ref }}</td>
+                    <td>{{ v.alt }}</td>
+                    <td>{{ v.zygosity }}</td>
+                    <td class="weight-cell" style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+                </tr>
+                <tr class="variant-detail">
+                    <td colspan="8">
+                        <table class="detail-table">
+                            {% if v.conclusion %}
+                            <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
+                            {% endif %}
+                            {% if v.method %}
+                            <tr><th>Method</th><td>{{ v.method }}</td></tr>
+                            {% endif %}
+                            {% if v.state %}
+                            <tr><th>State</th><td>{{ v.state }}</td></tr>
+                            {% endif %}
+                            {% if v.clinvar %}
+                            <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                            {% endif %}
+                        </table>
+                        {% if v.studies %}
+                        <table class="detail-table" style="margin-top:0.5rem">
+                            <thead>
+                                <tr>
+                                    <th>PubMed ID</th>
+                                    <th>Population</th>
+                                    <th>P-value</th>
+                                    <th>Conclusion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for s in v.studies %}
+                                <tr>
+                                    <td>{{ s.pmid }}</td>
+                                    <td>{{ s.population }}</td>
+                                    <td>{{ s.p_value }}</td>
+                                    <td>{{ s.conclusion }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<p style="text-align:center; color:#888;">No annotated variants found for this module.</p>
+{% endif %}
+{% endfor %}
+
+</div><!-- .container -->
+
+<div style="height:80px"></div>
+
+<script>
+/* Toggle pathway accordion */
+function togglePathway(header) {
+    var card = header.parentElement;
+    card.classList.toggle('open');
+}
+
+/* Toggle variant detail row */
+function toggleDetail(row) {
+    var detail = row.nextElementSibling;
+    var toggle = row.querySelector('.detail-toggle');
+    if (detail && detail.classList.contains('variant-detail')) {
+        if (detail.style.display === 'table-row') {
+            detail.style.display = 'none';
+            toggle.textContent = '+';
+        } else {
+            detail.style.display = 'table-row';
+            toggle.textContent = '\u2212';
+        }
+    }
+}
+
+/* Back to top button */
+window.addEventListener('scroll', function() {
+    var btn = document.getElementById('toTop');
+    if (window.pageYOffset > 300) {
+        btn.style.display = 'flex';
+    } else {
+        btn.style.display = 'none';
+    }
+});
+</script>
+
+</body>
+</html>

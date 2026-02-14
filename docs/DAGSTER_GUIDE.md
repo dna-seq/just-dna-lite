@@ -75,6 +75,7 @@ Self-contained annotation modules from [just-dna-seq/annotators](https://hugging
 **Asset Graph:**
 1. `hf_annotators_dataset`: External HuggingFace modules source
 2. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
+3. `user_longevity_report`: HTML report generated from annotated parquets (depends on `user_hf_module_annotations`)
 
 **Key Features:**
 - No Ensembl join required (modules are self-contained)
@@ -82,8 +83,36 @@ Self-contained annotation modules from [just-dna-seq/annotators](https://hugging
 - Genotype-aware scoring (matches on sorted allele lists)
 - Memory-efficient streaming with lazy Polars
 - Supports local VCF files or Zenodo URLs as input source
+- **Report generation**: HTML reports from annotated parquets with expandable variant details
 
 See [HF_MODULES.md](HF_MODULES.md) for detailed documentation.
+
+### 3. Report Generation
+
+Report assets depend on annotation outputs and produce self-contained HTML reports.
+
+**Asset Graph:**
+1. `user_hf_module_annotations` → `user_longevity_report`
+
+**Implementation:**
+- `report_logic.py`: Reads annotated parquets, enriches with HF annotations/studies tables, builds data structures
+- `report_assets.py`: Dagster asset definition with partition support
+- `templates/longevity_report.html.j2`: Jinja2 template for the HTML report
+
+**Report structure:**
+- **Longevity variants** grouped by 12 pathway categories (lipids, insulin, antioxidant, mitochondria, sirtuin, mTOR, tumor-suppressor, renin-angiotensin, heat-shock, inflammation, genome maintenance, other)
+- **Other modules** (lipidmetabolism, coronary, vo2max, superhuman) as flat variant tables
+- Summary statistics (total/positive/negative variants, net weight)
+- Expandable detail rows with study evidence from PubMed
+
+**Output:**
+```
+data/output/users/{user}/{sample}/reports/longevity_report.html
+```
+
+**Jobs:**
+- `generate_longevity_report_job`: Generate report only (requires prior annotation materialization)
+- `annotate_and_report_job`: Full pipeline — annotate VCF + generate report in one run
 
 ### Why both assets and jobs?
 

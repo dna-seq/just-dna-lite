@@ -14,6 +14,8 @@ from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecord
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
+from just_dna_pipelines.io import read_vcf_file
+from reflex_mui_datagrid import lazyframe_to_datagrid
 
 
 # Module metadata with titles, descriptions, and icons
@@ -701,8 +703,18 @@ class UploadState(rx.State):
     
     # Output files for the selected sample
     output_files: List[Dict[str, Any]] = []
+    report_files: List[Dict[str, Any]] = []  # HTML report files
+    outputs_active_tab: str = "data"  # "data" or "reports" sub-tab in outputs section
+
+    # VCF input preview state (shown via reflex-mui-datagrid)
+    vcf_preview_rows: List[Dict[str, Any]] = []
+    vcf_preview_columns: List[Dict[str, Any]] = []
+    vcf_preview_limit: int = 2000
+    vcf_preview_loading: bool = False
+    vcf_preview_error: str = ""
     
     # Run-centric UI state
+    vcf_preview_expanded: bool = True  # Whether the VCF preview section is expanded
     outputs_expanded: bool = True  # Whether the outputs section is expanded
     run_history_expanded: bool = True  # Whether the run history section is expanded
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
@@ -723,6 +735,21 @@ class UploadState(rx.State):
     def disable_metadata_edit_mode(self):
         """Disable edit mode (back to read-only)."""
         self.metadata_edit_mode = False
+
+    @rx.var
+    def has_vcf_preview(self) -> bool:
+        """Check if VCF preview rows are loaded."""
+        return len(self.vcf_preview_rows) > 0
+
+    @rx.var
+    def vcf_preview_row_count(self) -> int:
+        """Get number of loaded rows in the VCF preview."""
+        return len(self.vcf_preview_rows)
+
+    @rx.var
+    def has_vcf_preview_error(self) -> bool:
+        """Check if VCF preview failed to load."""
+        return bool(self.vcf_preview_error)
 
     @rx.var
     def sample_display_names(self) -> Dict[str, str]:
@@ -782,6 +809,46 @@ class UploadState(rx.State):
             # Custom key-value fields (user can add their own)
             "custom_fields": {},  # Dict[str, str] for user-defined fields
         }
+
+    def _clear_vcf_preview(self):
+        """Clear loaded VCF preview data."""
+        self.vcf_preview_rows = []
+        self.vcf_preview_columns = []
+        self.vcf_preview_error = ""
+        self.vcf_preview_loading = False
+
+    def _load_vcf_preview_sync(self):
+        """Load selected VCF into rows/columns for reflex-mui-datagrid."""
+        if not self.selected_file or not self.safe_user_id:
+            self._clear_vcf_preview()
+            return
+
+        root = Path(__file__).resolve().parents[3]
+        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+        if not vcf_path.exists():
+            self._clear_vcf_preview()
+            self.vcf_preview_error = f"VCF file not found: {vcf_path.name}"
+            return
+
+        self.vcf_preview_loading = True
+        self.vcf_preview_error = ""
+        try:
+            # Keep preview responsive by capping loaded rows.
+            lazy_vcf = read_vcf_file(vcf_path, save_parquet=None, with_formats=True)
+            rows, col_defs = lazyframe_to_datagrid(
+                lazy_vcf,
+                limit=self.vcf_preview_limit,
+                show_id_field=False,
+                single_select_threshold=0,  # Disable dropdown filters — preview subset doesn't represent all values
+            )
+            self.vcf_preview_rows = rows
+            self.vcf_preview_columns = [col.dict() for col in col_defs]
+        except Exception as e:
+            self.vcf_preview_rows = []
+            self.vcf_preview_columns = []
+            self.vcf_preview_error = str(e)
+        finally:
+            self.vcf_preview_loading = False
 
     def update_file_species(self, species: str):
         """Update species for the selected file and reset reference genome to default."""
@@ -1214,10 +1281,14 @@ class UploadState(rx.State):
                 self.selected_modules = latest_run["modules"].copy()
         
         # Expand all sections by default when selecting a file
+        self.vcf_preview_expanded = True
         self.outputs_expanded = True
         self.run_history_expanded = True
         self.new_analysis_expanded = True
         
+        # Load VCF preview for the selected sample
+        self._load_vcf_preview_sync()
+
         # Load output files for the selected sample
         self._load_output_files_sync()
 
@@ -1232,53 +1303,84 @@ class UploadState(rx.State):
         """Load output files for the selected sample (synchronous version)."""
         if not self.selected_file or not self.safe_user_id:
             self.output_files = []
+            self.report_files = []
             return
         
         sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
         root = Path(__file__).resolve().parents[3]
+        
+        # Load parquet data files from modules/ directory
         output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
         
-        if not output_dir.exists():
-            self.output_files = []
-            return
-        
-        files = []
-        for f in output_dir.glob("*.parquet"):
-            # Determine file type from name
-            if "_weights" in f.name:
-                file_type = "weights"
-            elif "_annotations" in f.name:
-                file_type = "annotations"
-            elif "_studies" in f.name:
-                file_type = "studies"
-            else:
-                file_type = "data"
-            
-            # Extract module name
-            module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
-            
-            files.append({
-                "name": f.name,
-                "path": str(f),
-                "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
-                "module": module,
-                "type": file_type,
-                "sample_name": sample_name,
-            })
+        files: list[dict] = []
+        if output_dir.exists():
+            for f in output_dir.glob("*.parquet"):
+                # Determine file type from name
+                if "_weights" in f.name:
+                    file_type = "weights"
+                elif "_annotations" in f.name:
+                    file_type = "annotations"
+                elif "_studies" in f.name:
+                    file_type = "studies"
+                else:
+                    file_type = "data"
+                
+                # Extract module name
+                module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
+                
+                files.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    "module": module,
+                    "type": file_type,
+                    "sample_name": sample_name,
+                })
         
         # Sort by module name, then type
         files.sort(key=lambda x: (x["module"], x["type"]))
         self.output_files = files
+        
+        # Load HTML report files from reports/ directory
+        reports_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "reports"
+        
+        reports: list[dict] = []
+        if reports_dir.exists():
+            for f in reports_dir.glob("*.html"):
+                reports.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size_kb": round(f.stat().st_size / 1024, 1),
+                    "sample_name": sample_name,
+                })
+        
+        reports.sort(key=lambda x: x["name"])
+        self.report_files = reports
 
     @rx.var
     def has_output_files(self) -> bool:
-        """Check if there are any output files for the selected sample."""
-        return len(self.output_files) > 0
+        """Check if there are any output files (data or reports) for the selected sample."""
+        return len(self.output_files) > 0 or len(self.report_files) > 0
 
     @rx.var
     def output_file_count(self) -> int:
-        """Get the number of output files."""
+        """Get the number of data output files."""
         return len(self.output_files)
+
+    @rx.var
+    def report_file_count(self) -> int:
+        """Get the number of report files."""
+        return len(self.report_files)
+
+    @rx.var
+    def has_report_files(self) -> bool:
+        """Check if there are any report files."""
+        return len(self.report_files) > 0
+
+    @rx.var
+    def total_output_count(self) -> int:
+        """Total count of all output files (data + reports)."""
+        return len(self.output_files) + len(self.report_files)
 
     async def delete_file(self, filename: str):
         """Delete an uploaded file from the filesystem and state."""
@@ -1295,6 +1397,7 @@ class UploadState(rx.State):
                 self.files = [f for f in self.files if f != filename]
                 if self.selected_file == filename:
                     self.selected_file = ""
+                    self._clear_vcf_preview()
                 yield rx.toast.success(f"Deleted {filename}")
             except Exception as e:
                 yield rx.toast.error(f"Failed to delete {filename}: {str(e)}")
@@ -1708,8 +1811,14 @@ class UploadState(rx.State):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.run_logs = self.run_logs + [f"[{timestamp}] {message}"]
 
-    async def poll_run_status(self):
-        """Poll Dagster for run status updates."""
+    async def poll_run_status(self, _value: str = ""):
+        """Poll Dagster for run status updates.
+        
+        Note: this handler is called by rx.moment's on_change which passes a
+        timestamp string. We accept it as ``_value`` but don't use it.
+        Must return (not yield) EventSpec so Reflex's frontend dispatcher
+        can handle the result correctly.
+        """
         if not self.active_run_id or not self.polling_active:
             return
 
@@ -1751,10 +1860,12 @@ class UploadState(rx.State):
             self.polling_active = False
             self.running = False
             self.last_run_success = (run.status == DagsterRunStatus.SUCCESS)
+            # Reload output files so the UI shows them immediately
+            self._load_output_files_sync()
             if run.status == DagsterRunStatus.SUCCESS:
-                yield rx.toast.success("Annotation completed successfully!")
+                return rx.toast.success("Annotation completed successfully!")
             elif run.status == DagsterRunStatus.FAILURE:
-                yield rx.toast.error("Annotation failed. Check logs for details.")
+                return rx.toast.error("Annotation failed. Check logs for details.")
 
     async def fetch_run_logs(self, run_id: str):
         """Fetch log events from Dagster for a run."""
@@ -1808,6 +1919,14 @@ class UploadState(rx.State):
     def toggle_outputs(self):
         """Toggle the outputs section expanded/collapsed."""
         self.outputs_expanded = not self.outputs_expanded
+
+    def toggle_vcf_preview(self):
+        """Toggle the VCF preview section expanded/collapsed."""
+        self.vcf_preview_expanded = not self.vcf_preview_expanded
+
+    def switch_outputs_tab(self, tab_name: str):
+        """Switch between 'data' and 'reports' sub-tabs in outputs section."""
+        self.outputs_active_tab = tab_name
 
     def toggle_run_history(self):
         """Toggle the run history section expanded/collapsed."""

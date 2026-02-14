@@ -24,6 +24,7 @@ from just_dna_pipelines.annotation.hf_assets import (
     user_hf_module_annotations,
     hf_module_source_assets,
 )
+from just_dna_pipelines.annotation.report_assets import user_longevity_report
 from just_dna_pipelines.annotation.jobs import (
     annotate_vcf_job, 
     annotate_vcf_duckdb_job,
@@ -44,6 +45,24 @@ annotate_with_hf_modules_job = define_asset_job(
     selection=AssetSelection.assets("user_hf_module_annotations"),
     description="Annotate user VCF with HuggingFace modules (longevitymap, lipidmetabolism, vo2max, etc.)",
     tags={"annotation": "hf_modules", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
+# Job for generating longevity report (depends on module annotations)
+generate_longevity_report_job = define_asset_job(
+    name="generate_longevity_report_job",
+    selection=AssetSelection.assets("user_longevity_report"),
+    description="Generate HTML longevity report from annotated module parquets.",
+    tags={"report": "longevity", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
+# Job for full pipeline: annotate + report
+annotate_and_report_job = define_asset_job(
+    name="annotate_and_report_job",
+    selection=AssetSelection.assets("user_hf_module_annotations", "user_longevity_report"),
+    description="Full pipeline: annotate user VCF with HF modules and generate longevity report.",
+    tags={"annotation": "hf_modules", "report": "longevity", "multi-user": "true"},
     hooks={resource_summary_hook},
 )
 
@@ -83,12 +102,18 @@ def _build_definitions() -> Definitions:
         jobs=[annotate_with_hf_modules_job],
     )
     
-    # 4. Discover and merge module definitions from data/modules/
+    # 4. Report generation assets (depend on module annotation outputs)
+    _reports = Definitions(
+        assets=[user_longevity_report],
+        jobs=[generate_longevity_report_job, annotate_and_report_job],
+    )
+    
+    # 5. Discover and merge module definitions from data/modules/
     modules_dir = Path("data") / "modules"
     module_defs_list = load_module_definitions(modules_dir)
     
-    # 5. Merge everything
-    all_defs = [_core, _duckdb, _hf_modules]
+    # 6. Merge everything
+    all_defs = [_core, _duckdb, _hf_modules, _reports]
     if module_defs_list:
         all_defs.extend(module_defs_list)
     

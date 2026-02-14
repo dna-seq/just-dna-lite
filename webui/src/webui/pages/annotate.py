@@ -13,7 +13,8 @@ from __future__ import annotations
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
-from webui.state import UploadState, AuthState
+from webui.state import UploadState
+from reflex_mui_datagrid import data_grid
 
 
 # ============================================================================
@@ -911,9 +912,160 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
     )
 
 
+def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
+    """Card for a single report file with view and download buttons."""
+    # Build URL for viewing in browser (serves HTML)
+    view_url = (
+        UploadState.backend_api_url + "/api/report/"
+        + UploadState.safe_user_id + "/"
+        + file_info["sample_name"].to(str) + "/"
+        + file_info["name"].to(str)
+    )
+
+    return rx.el.div(
+        rx.el.div(
+            # Report icon
+            fomantic_icon("file-text", size=20, color="#e03997"),
+            # File info
+            rx.el.div(
+                rx.el.strong(file_info["name"].to(str), style={"fontSize": "0.85rem"}),
+                rx.el.div(
+                    rx.el.span("report", class_name="ui mini pink label"),
+                    rx.el.span(
+                        file_info["size_kb"].to(str),
+                        " KB",
+                        style={"color": "#888", "fontSize": "0.75rem", "marginLeft": "8px"},
+                    ),
+                    style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
+                ),
+                style={"flex": "1", "marginLeft": "10px"},
+            ),
+            # View button (opens in new tab)
+            rx.el.a(
+                fomantic_icon("external-link", size=14),
+                " View",
+                href=view_url,
+                target="_blank",
+                class_name="ui mini pink button",
+                style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "4px"},
+            ),
+            # Download button
+            rx.el.a(
+                fomantic_icon("download", size=14),
+                href=view_url,
+                download=file_info["name"].to(str),
+                class_name="ui mini icon button",
+                style={"marginLeft": "6px"},
+            ),
+            style={"display": "flex", "alignItems": "center", "width": "100%"},
+        ),
+        style={
+            "padding": "10px 12px",
+            "borderBottom": "1px solid #eee",
+        },
+    )
+
+
+def _outputs_tab_menu() -> rx.Component:
+    """Sub-tab menu for switching between Data Files and Reports."""
+    return rx.el.div(
+        rx.el.a(
+            fomantic_icon("database", size=14, color=rx.cond(UploadState.outputs_active_tab == "data", "#00b5ad", "#888")),
+            " Data Files",
+            rx.el.span(
+                UploadState.output_file_count,
+                class_name="ui mini circular label",
+                style={"marginLeft": "6px"},
+            ),
+            class_name=rx.cond(
+                UploadState.outputs_active_tab == "data",
+                "active item",
+                "item",
+            ),
+            on_click=lambda: UploadState.switch_outputs_tab("data"),
+            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
+        ),
+        rx.el.a(
+            fomantic_icon("file-text", size=14, color=rx.cond(UploadState.outputs_active_tab == "reports", "#e03997", "#888")),
+            " Reports",
+            rx.cond(
+                UploadState.has_report_files,
+                rx.el.span(
+                    UploadState.report_file_count,
+                    class_name="ui mini circular pink label",
+                    style={"marginLeft": "6px"},
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.outputs_active_tab == "reports",
+                "active item",
+                "item",
+            ),
+            on_click=lambda: UploadState.switch_outputs_tab("reports"),
+            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
+        ),
+        class_name="ui top attached tabular menu",
+        style={"marginBottom": "0"},
+    )
+
+
+def _data_files_content() -> rx.Component:
+    """Content for the Data Files sub-tab."""
+    return rx.cond(
+        UploadState.output_file_count > 0,
+        rx.el.div(
+            rx.foreach(UploadState.output_files, output_file_card),
+            style={
+                "maxHeight": "260px",
+                "overflowY": "auto",
+            },
+        ),
+        rx.el.div(
+            fomantic_icon("inbox", size=30, color="#ccc"),
+            rx.el.div(
+                "No data files yet",
+                style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+            ),
+            rx.el.div(
+                "Run an analysis to generate parquet output files",
+                style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.82rem"},
+            ),
+            style={"textAlign": "center", "padding": "20px 16px"},
+        ),
+    )
+
+
+def _reports_content() -> rx.Component:
+    """Content for the Reports sub-tab."""
+    return rx.cond(
+        UploadState.has_report_files,
+        rx.el.div(
+            rx.foreach(UploadState.report_files, report_file_card),
+            style={
+                "maxHeight": "260px",
+                "overflowY": "auto",
+            },
+        ),
+        rx.el.div(
+            fomantic_icon("file-text", size=30, color="#ccc"),
+            rx.el.div(
+                "No reports yet",
+                style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+            ),
+            rx.el.div(
+                "Generate a report after running the annotation pipeline",
+                style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.82rem"},
+            ),
+            style={"textAlign": "center", "padding": "20px 16px"},
+        ),
+    )
+
+
 def outputs_section() -> rx.Component:
     """
     Collapsible section showing output files for the selected sample.
+    Contains two sub-tabs: Data Files (parquets) and Reports (HTML).
     Positioned at the top of the right panel for easy access.
     """
     return rx.el.div(
@@ -923,7 +1075,7 @@ def outputs_section() -> rx.Component:
             icon_name="folder-output",
             title="Outputs",
             right_badge=rx.el.span(
-                UploadState.output_file_count,
+                UploadState.total_output_count,
                 " files",
                 class_name="ui mini teal label",
             ),
@@ -936,16 +1088,19 @@ def outputs_section() -> rx.Component:
             UploadState.outputs_expanded,
             rx.cond(
                 UploadState.has_output_files,
-                # File list
+                # Tabbed content
                 rx.el.div(
-                    rx.foreach(UploadState.output_files, output_file_card),
-                    style={
-                        "maxHeight": "280px",
-                        "overflowY": "auto",
-                        "border": "1px solid #e0e0e0",
-                        "borderRadius": "6px",
-                        "backgroundColor": "#fff",
-                    },
+                    _outputs_tab_menu(),
+                    rx.el.div(
+                        rx.match(
+                            UploadState.outputs_active_tab,
+                            ("data", _data_files_content()),
+                            ("reports", _reports_content()),
+                            _data_files_content(),  # default
+                        ),
+                        class_name="ui bottom attached segment",
+                        style={"padding": "0", "border": "1px solid #e0e0e0", "borderTop": "none"},
+                    ),
                 ),
                 # Empty state - prompt to analyze
                 rx.el.div(
@@ -966,6 +1121,86 @@ def outputs_section() -> rx.Component:
         
         style={"padding": "0", "overflow": "hidden"},
         id="outputs-section",
+    )
+
+
+def input_vcf_preview_section() -> rx.Component:
+    """Collapsible section showing selected input VCF as an interactive grid."""
+    return rx.el.div(
+        _collapsible_header(
+            expanded=UploadState.vcf_preview_expanded,
+            icon_name="database",
+            title="Input VCF Preview",
+            right_badge=rx.el.span(
+                UploadState.vcf_preview_row_count,
+                " rows",
+                class_name="ui mini violet label",
+            ),
+            on_toggle=UploadState.toggle_vcf_preview,
+            accent_color="#6435c9",
+        ),
+        rx.cond(
+            UploadState.vcf_preview_expanded,
+            rx.el.div(
+                rx.cond(
+                    UploadState.vcf_preview_loading,
+                    rx.el.div(
+                        rx.el.i("", class_name="spinner loading icon"),
+                        rx.el.span(" Loading VCF preview...", style={"marginLeft": "8px"}),
+                        style={"padding": "16px", "color": "#666"},
+                    ),
+                    rx.cond(
+                        UploadState.has_vcf_preview_error,
+                        rx.el.div(
+                            rx.el.div(
+                                rx.el.strong("Failed to load VCF preview"),
+                                rx.el.div(
+                                    UploadState.vcf_preview_error,
+                                    style={"fontSize": "0.85rem", "marginTop": "6px"},
+                                ),
+                                class_name="content",
+                            ),
+                            class_name="ui negative message",
+                            style={"margin": "0"},
+                        ),
+                        rx.cond(
+                            UploadState.has_vcf_preview,
+                            rx.el.div(
+                                rx.el.div(
+                                    rx.el.span(
+                                        "Showing first ",
+                                        UploadState.vcf_preview_limit,
+                                        " rows",
+                                        style={"fontSize": "0.8rem", "color": "#666"},
+                                    ),
+                                    style={"padding": "8px 4px 10px 4px"},
+                                ),
+                                data_grid(
+                                    rows=UploadState.vcf_preview_rows,
+                                    columns=UploadState.vcf_preview_columns,
+                                    row_id_field="__row_id__",
+                                    show_toolbar=True,
+                                    density="compact",
+                                    height="420px",
+                                    width="100%",
+                                ),
+                            ),
+                            rx.el.div(
+                                fomantic_icon("inbox", size=30, color="#ccc"),
+                                rx.el.div(
+                                    "No rows to preview",
+                                    style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+                                ),
+                                style={"textAlign": "center", "padding": "20px 16px"},
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            rx.box(),
+        ),
+        style={"padding": "0", "overflow": "hidden"},
+        id="input-vcf-preview-section",
     )
 
 
@@ -1460,6 +1695,13 @@ def right_panel_run_view() -> rx.Component:
         rx.cond(
             UploadState.has_selected_file,
             rx.fragment(
+                # Section 0: Input VCF Preview (top) - inspect user input directly
+                rx.el.div(
+                    input_vcf_preview_section(),
+                    class_name="ui violet segment",
+                    style={"padding": "16px", "marginBottom": "16px"},
+                    id="segment-vcf-preview",
+                ),
                 # Section 1: Outputs (top) - only shown when there are output files
                 rx.cond(
                     UploadState.has_output_files,

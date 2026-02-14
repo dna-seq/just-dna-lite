@@ -203,3 +203,12 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
         raise ValueError("Must provide either vcf_path or zenodo_url")
 
 
+class ReportConfig(Config):
+    """
+    Configuration for generating HTML reports from annotated parquet files.    The report asset depends on module annotation outputs and produces
+    a self-contained HTML report.
+    """
+    user_name: Optional[str] = None  # Override partition-derived user name
+    sample_name: Optional[str] = None  # Override partition-derived sample name
+    modules: Optional[list[str]] = None  # Specific modules to include (None = all available)
+    output_path: Optional[str] = None  # Custom output path (default: data/output/users/{partition}/reports/)

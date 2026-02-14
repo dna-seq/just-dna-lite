@@ -131,6 +131,39 @@ async def download_output_file(user_id: str, sample_name: str, filename: str) ->
     )
 
 
+@api.get("/api/report/{user_id}/{sample_name}/{filename}")
+async def view_report_file(user_id: str, sample_name: str, filename: str) -> FileResponse:
+    """
+    Serve an HTML report file for viewing in the browser.
+    
+    Path: /api/report/{user_id}/{sample_name}/{filename}
+    Example: /api/report/anonymous/antku_small/longevity_report.html
+    """
+    # Validate inputs to prevent path traversal
+    if ".." in user_id or ".." in sample_name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid path components")
+    
+    # Only allow HTML files
+    if not filename.endswith(".html"):
+        raise HTTPException(status_code=400, detail="Only HTML files can be viewed")
+    
+    # Build the file path (reports are in reports/ subdirectory)
+    file_path = WORKSPACE_ROOT / "data" / "output" / "users" / user_id / sample_name / "reports" / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename}")
+    
+    if not file_path.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+    
+    # Return the HTML file for browser rendering
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="text/html",
+    )
+
+
 # ============================================================================
 # REFLEX APP
 # ============================================================================
