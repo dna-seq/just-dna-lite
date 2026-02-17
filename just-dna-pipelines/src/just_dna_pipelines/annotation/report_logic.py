@@ -413,14 +413,11 @@ def build_module_report_data(
         }
 
 
-# Display names for modules
-MODULE_DISPLAY_NAMES: dict[str, str] = {
-    "longevitymap": "Longevity Variants",
-    "lipidmetabolism": "Lipid Metabolism",
-    "vo2max": "VO2max / Athletic Performance",
-    "superhuman": "Superhuman / Elite Performance",
-    "coronary": "Coronary Artery Disease",
-}
+# Display names for modules (loaded from modules.yaml via module_config)
+from just_dna_pipelines.module_config import build_display_names_dict
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES as _DISCOVERED
+
+MODULE_DISPLAY_NAMES: dict[str, str] = build_display_names_dict(_DISCOVERED)
 
 
 def generate_longevity_report(

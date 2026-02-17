@@ -46,6 +46,49 @@ The recommended way to start the application is from the repo root:
 
 ---
 
+## Module Configuration (`modules.yaml`)
+
+Annotation module sources and display metadata are configured in **`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`**. This is the single source of truth for:
+
+1. **Sources** to scan for modules (any fsspec-compatible URL: HuggingFace, GitHub, HTTP, S3, etc.)
+2. **Display metadata** overrides (title, description, icon, color, report_title) for known modules
+
+**Modules are always auto-discovered** from the configured sources. The YAML only provides optional display overrides. Modules not listed in `module_metadata` get auto-generated defaults (titlecased name, generic icon, default color).
+
+### Key files
+
+- **`modules.yaml`**: Declares sources and optional metadata overrides
+- **`module_config.py`**: Pydantic models (`Source`, `ModuleMetadata`, `ModulesConfig`), YAML loader, helper functions (`get_module_meta()`, `build_module_metadata_dict()`, etc.)
+- **`annotation/hf_modules.py`**: Discovery logic — scans sources via fsspec, builds `MODULE_INFOS` and `DISCOVERED_MODULES`
+
+### Adding a new module source
+
+1. Upload data to any fsspec-accessible location (HF repo, GitHub, HTTP server, S3, etc.)
+2. Add the source URL to `modules.yaml` under `sources:`
+3. Optionally add display metadata under `module_metadata:`
+4. Modules are auto-discovered on next startup
+
+### Source types (auto-detected from URL)
+
+- `org/repo` (shorthand) or `hf://datasets/org/repo` → HuggingFace
+- `github://org/repo` → GitHub via fsspec
+- `https://...` → HTTP/HTTPS via fsspec
+- `s3://...`, `gcs://...` → cloud storage via fsspec
+
+### Module vs Collection
+
+Each source can be a single module or a collection:
+- **Auto-detect** (default): `weights.parquet` at root = single module; subfolders with `weights.parquet` = collection
+- **Override**: `kind: module` or `kind: collection` in the YAML source entry
+
+### Important patterns
+
+- **Never hardcode module lists or metadata in Python files** — always use `get_module_meta()` or `build_module_metadata_dict()` from `module_config`
+- **Never hardcode HF repo URLs** — use `DEFAULT_REPOS` or `MODULES_CONFIG.sources` from `module_config`
+- `HF_DEFAULT_REPOS`, `HF_REPO_ID` in `hf_modules.py` are backward-compatible aliases sourced from the YAML
+
+---
+
 ## Dagster Pipeline
 
 For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)**.
@@ -133,6 +176,12 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 - **All assets in `Definitions(assets=[...])`** for lineage visibility in UI
 
 ### API Gotchas
+
+**polars-bio `scan_vcf` API changed (0.23+):**
+
+- `IOOperations.scan_vcf()` no longer accepts `thread_num`.
+- Use `concurrent_fetches` instead.
+- In `just_dna_pipelines.io.read_vcf_file()`, keep `thread_num` only as backward-compatible API and map it to `concurrent_fetches`.
 
 **Timestamps are on `RunRecord`, not `DagsterRun`:**
 

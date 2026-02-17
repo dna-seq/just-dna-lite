@@ -51,6 +51,12 @@ Just DNA Pipelines' architecture is built around three core concepts:
 
 ## Configuration
 
+### Module Sources
+
+Annotation module sources are configured in `src/just_dna_pipelines/modules.yaml`. Modules are auto-discovered from configured sources (HuggingFace, GitHub, HTTP, S3, or any fsspec URL). See `src/just_dna_pipelines/module_config.py` for the Pydantic models and loader.
+
+### Environment Variables
+
 Configure Just DNA Pipelines using environment variables:
 
 - `JUST_DNA_PIPELINES_CACHE_DIR`: base cache directory (reference data)

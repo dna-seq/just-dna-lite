@@ -13,7 +13,7 @@ This document defines the visual design language for **just-dna-lite** UI compon
 - **Inputs:** `ui input`, `ui fluid input`.
 - **Icons:** Oversized (min 2rem). Pair with every major label.
 - **Icon Implementation:** Use `fomantic_icon()` from `webui.components.layout`. Do NOT use `rx.icon()` directly as Lucide icons often fail to load or trigger terminal warnings.
-    - Verified icons (mapped by helper): `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`, `tags`, `plus`, `x`, `user`, `scale`, `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`.
+    - Verified icons (mapped by helper): `cloud-upload`, `circle-play`, `circle-alert`, `dna`, `activity`, `files`, `refresh-cw`, `file-text`, `loader-circle`, `external-link`, `tags`, `plus`, `x`, `user`, `scale`, `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`, `eye`, `arrow-left`.
 
 ## 2. Layout & Spacing
 
@@ -214,6 +214,42 @@ rx.el.div(
 - Right badge shows count or status
 - Wrap in colored Fomantic segment (`ui teal segment`, `ui green segment`, etc.)
 
+### Two Independent Data Grids Pattern
+
+The app uses two separate `LazyFrameGridMixin` state classes to power two independent data grids that never interfere:
+
+```python
+# state.py — each class gets its own LazyFrame cache (keyed by class name)
+class UploadState(LazyFrameGridMixin):
+    """VCF input grid — always shows the uploaded VCF file."""
+    ...
+
+class OutputPreviewState(LazyFrameGridMixin):
+    """Output preview grid — shows parquet/CSV on demand inside Outputs section."""
+    output_preview_expanded: bool = False
+    output_preview_label: str = ""
+
+    def view_output_file(self, file_path: str):
+        """Generator — called directly from on_click, no bridge needed."""
+        self.output_preview_expanded = True
+        yield
+        lf, descriptions = scan_file(Path(file_path))
+        yield from self.set_lazyframe(lf, descriptions, chunk_size=300)
+        self.output_preview_label = Path(file_path).name
+```
+
+```python
+# annotate.py — each grid renders with its own state class
+lazyframe_grid(UploadState, ...)          # VCF grid in violet segment
+lazyframe_grid(OutputPreviewState, ...)   # Output grid inside teal Outputs segment
+```
+
+**Key points:**
+- Each `LazyFrameGridMixin` subclass gets its own cache (keyed by `type(self).__name__`)
+- The output grid's `on_click` calls `OutputPreviewState.view_output_file` **directly** — no bridge through `UploadState`
+- The output grid is hidden until the user clicks the eye icon; dismissed with a close (X) button
+- Generator event handlers must use `yield` and `yield from self.set_lazyframe(...)` to propagate loading state
+
 ## 3. Color Palette (DNA Logo-Derived, Fomantic-Native)
 
 The color palette is derived from the DNA double-helix logo and maps directly to Fomantic UI built-in colors. This gives us free hover/active/focus states, backgrounds, labels, buttons, and segments with **zero custom CSS**.
@@ -256,7 +292,8 @@ This echoes the DNA helix flow: green (left backbone) -> teal (center) -> blue (
   - `ui mini red label` - error
 
 - **Section Accent Segments:**
-  - `ui teal segment` - Outputs section (data/results)
+  - `ui violet segment` - Input VCF Preview (data inspection)
+  - `ui teal segment` - Outputs section (data/results + output preview grid)
   - `ui green segment` - Run History section (success/timeline)
   - `ui blue segment` - New Analysis section (primary action)
 
@@ -298,6 +335,7 @@ When using `fomantic_icon()` with explicit `color=` parameter, use the Fomantic 
 | Muted / secondary | `#767676` | Library icons, secondary info |
 
 **Section header icons must use the matching segment color:**
+- Input VCF Preview header (`ui violet segment`) → `accent_color="#6435c9"`
 - Outputs header (`ui teal segment`) → `accent_color="#00b5ad"`
 - Run History header (`ui green segment`) → `accent_color="#21ba45"`
 - New Analysis header (`ui blue segment`) → `accent_color="#2185d0"`
@@ -441,6 +479,7 @@ Always use **hyphenated** names. Common mistakes:
 - `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up` (for collapsible sections / hints)
 - `clock`, `plus-circle`, `plus`, `tags`, `user`, `x`
 - `edit`, `folder`, `clipboard`, `paw-print`, `hard-drive`
+- `eye`, `arrow-left` (for output preview and navigation)
 
 Full list: https://reflex.dev/docs/library/data-display/icon/#icons-list
 

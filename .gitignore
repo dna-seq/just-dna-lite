@@ -209,6 +209,13 @@ __marimo__/
 
 # Repo-local runtime state / caches
 data/interim/
+data/input/
+data/output/
+
+# Reflex runtime artifacts (should only exist under webui/, but guard globally)
+.web/
+.states/
+uploaded_files/
 
 # Dagster orphan directories (if DAGSTER_HOME not set correctly)
 /storage/
@@ -217,5 +224,5 @@ data/interim/
 
 # Temporary files
 .tmp*
-tmp*
+tmp/
 .tmp_dagster_home_5uss_aeq/

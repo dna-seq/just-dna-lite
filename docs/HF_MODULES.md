@@ -1,19 +1,30 @@
-# HuggingFace Annotation Modules
+# Annotation Modules
 
-This document describes the annotation pipeline and data schema for VCF files using modules from the [just-dna-seq/annotators](https://huggingface.co/datasets/just-dna-seq/annotators) HuggingFace repository.
+This document describes the annotation pipeline and data schema for VCF files using modules auto-discovered from configured sources.
 
 ---
 
 ## Overview
 
-The HF module annotation pipeline provides a high-performance way to annotate genomic variants with curated evidence:
+The module annotation pipeline provides a high-performance way to annotate genomic variants with curated evidence:
 
-1.  **Reads** a user's VCF file (local or from HuggingFace).
+1.  **Reads** a user's VCF file (local, from HuggingFace, or from Zenodo).
 2.  **Computes** genotypes from the GT field as sorted `List[String]`.
 3.  **Joins** with each annotation module on position + genotype (or rsid).
 4.  **Outputs** standardized Parquet files with annotation scores and evidence.
 
 The modules are **self-contained**—they include all annotation data (gene symbols, phenotypes, conclusions) and don't require external Ensembl joins.
+
+## Module Sources Configuration
+
+Module sources are configured in `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`. Sources can be any fsspec-compatible URL:
+
+- **HuggingFace** (default): `just-dna-seq/annotators`
+- **GitHub**: `github://org/repo`
+- **HTTP/HTTPS**: `https://example.com/data`
+- **S3/GCS**: `s3://bucket/path`, `gcs://bucket/path`
+
+Modules are **auto-discovered** by scanning each source for `weights.parquet` files. Display metadata (titles, icons, colors) can be optionally overridden in the YAML under `module_metadata:`.
 
 ## Data Provenance
 
@@ -22,6 +33,8 @@ The annotation modules and Ensembl reference data are prepared and uploaded usin
 ---
 
 ## Available Modules
+
+Modules are auto-discovered from configured sources. Run `uv run pipelines list-modules` to see the current list. The default source ([just-dna-seq/annotators](https://huggingface.co/datasets/just-dna-seq/annotators)) currently provides:
 
 | Module | Description |
 | :--- | :--- |

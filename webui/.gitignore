@@ -1,10 +1,17 @@
 *.db
 *.py[cod]
 __pycache__/
-.states
-.web
+
+# Reflex runtime artifacts
+.web/
+.states/
+uploaded_files/
+tmp/
+
+# External assets fetched at build time
 assets/external/
 
-# User data - input VCF files and output results
-data/input/users/
-data/output/users/
+# Data directories should NEVER appear here.
+# All data lives at the workspace root: data/input/, data/output/
+# If these exist under webui/ it means a CWD bug wrote to the wrong place.
+data/

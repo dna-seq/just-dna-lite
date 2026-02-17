@@ -9,9 +9,9 @@ auto_materialize:
   enabled: true
   minimum_interval_seconds: 60
 
-# Optional: Configure telemetry (default is enabled)
-# telemetry:
-#   enabled: false
+# Disable telemetry to avoid RotatingFileHandler errors with logs/event.log
+telemetry:
+  enabled: false
 
 # Optional: Configure run launcher
 # run_launcher:

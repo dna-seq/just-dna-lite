@@ -51,8 +51,8 @@ def annotate_modules(
         None,
         "--modules", "-m",
         help="Comma-separated list of modules to use. "
-             "Options: longevitymap,lipidmetabolism,vo2max,superhuman,coronary. "
-             "If not specified, uses all modules.",
+             "Run 'pipelines list-modules' to see available modules. "
+             "If not specified, uses all discovered modules.",
     ),
     output_dir: Optional[str] = typer.Option(
         None,
@@ -254,27 +254,25 @@ def annotate_modules(
 @app.command()
 def list_modules() -> None:
     """
-    List all available annotation modules.
+    List all available annotation modules (auto-discovered from configured sources).
     """
-    from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES
+    from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS
+    from just_dna_pipelines.module_config import get_module_meta, MODULES_CONFIG
 
     table = Table(title="Available Annotation Modules")
     table.add_column("Module", style="cyan")
     table.add_column("Description", style="green")
-
-    descriptions = {
-        "longevitymap": "Longevity-associated variants from LongevityMap database",
-        "lipidmetabolism": "Lipid metabolism and cardiovascular risk variants",
-        "vo2max": "Athletic performance and VO2max-associated variants",
-        "superhuman": "Elite performance and rare beneficial variants",
-        "coronary": "Coronary artery disease associations",
-    }
+    table.add_column("Source", style="dim")
 
     for module in DISCOVERED_MODULES:
-        table.add_row(module, descriptions.get(module, ""))
+        meta = get_module_meta(module)
+        info = MODULE_INFOS.get(module)
+        source = info.source_url if info else ""
+        table.add_row(module, meta.description or "", source)
 
     console.print(table)
-    console.print("\n[dim]Use --modules with comma-separated values to select specific modules.[/dim]")
+    console.print(f"\n[dim]Sources: {', '.join(s.url for s in MODULES_CONFIG.sources)}[/dim]")
+    console.print("[dim]Use --modules with comma-separated values to select specific modules.[/dim]")
 
 
 @app.command()

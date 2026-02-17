@@ -156,10 +156,9 @@ async def view_report_file(user_id: str, sample_name: str, filename: str) -> Fil
     if not file_path.is_file():
         raise HTTPException(status_code=400, detail="Path is not a file")
     
-    # Return the HTML file for browser rendering
+    # Return the HTML file for inline browser rendering (no Content-Disposition attachment)
     return FileResponse(
         path=str(file_path),
-        filename=filename,
         media_type="text/html",
     )
 

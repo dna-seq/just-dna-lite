@@ -7,11 +7,40 @@ determining cache, input, and output directories.
 
 import os
 import shutil
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
 import requests
 from platformdirs import user_cache_dir
+
+
+@lru_cache(maxsize=1)
+def get_workspace_root() -> Path:
+    """Return the absolute path to the uv workspace root.
+
+    Resolution order:
+    1. ``JUST_DNA_PIPELINES_ROOT`` environment variable (explicit override)
+    2. Walk up from this file until we find the workspace-level
+       ``pyproject.toml`` that contains ``[tool.uv.workspace]``.
+
+    The result is cached so the filesystem walk only happens once.
+    """
+    env_root = os.getenv("JUST_DNA_PIPELINES_ROOT")
+    if env_root:
+        return Path(env_root).resolve()
+
+    # Walk upward from this file (annotation/resources.py)
+    current = Path(__file__).resolve().parent
+    for parent in [current] + list(current.parents):
+        candidate = parent / "pyproject.toml"
+        if candidate.exists():
+            text = candidate.read_text(encoding="utf-8")
+            if "[tool.uv.workspace]" in text:
+                return parent
+    # Fallback: 5 levels up from annotation/resources.py
+    # just-dna-pipelines/src/just_dna_pipelines/annotation/resources.py
+    return Path(__file__).resolve().parents[4]
 
 
 def get_default_ensembl_cache_dir() -> Path:
@@ -73,23 +102,28 @@ def get_cache_dir() -> Path:
 
 
 def get_user_output_dir() -> Path:
-    """Get the root output directory for user-specific assets."""
+    """Get the root output directory for user-specific assets.
+
+    Always returns an absolute path so the result is CWD-independent.
+    """
     env_output = os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR")
     if env_output:
-        return Path(env_output)
-    return Path("data") / "output" / "users"
+        return Path(env_output).resolve()
+    return get_workspace_root() / "data" / "output" / "users"
 
 
 def get_user_input_dir() -> Path:
     """Get the root input directory for user-uploaded VCF files.
+
+    Always returns an absolute path so the result is CWD-independent.
     
     Expected structure:
     data/input/users/{user_name}/*.vcf
     """
     env_input = os.getenv("JUST_DNA_PIPELINES_INPUT_DIR")
     if env_input:
-        return Path(env_input)
-    return Path("data") / "input" / "users"
+        return Path(env_input).resolve()
+    return get_workspace_root() / "data" / "input" / "users"
 
 
 def download_vcf_from_zenodo(

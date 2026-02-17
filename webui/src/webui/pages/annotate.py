@@ -13,8 +13,8 @@ from __future__ import annotations
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
-from webui.state import UploadState
-from reflex_mui_datagrid import data_grid
+from webui.state import UploadState, OutputPreviewState
+from reflex_mui_datagrid import lazyframe_grid
 
 
 # ============================================================================
@@ -831,10 +831,10 @@ def file_type_label(file_type: rx.Var[str]) -> rx.Component:
 def _collapsible_header(
     expanded: rx.Var[bool],
     icon_name: str,
-    title: str,
+    title: str | rx.Var[str],
     right_badge: rx.Component,
     on_toggle: rx.EventSpec,
-    accent_color: str = "#2185d0",
+    accent_color: str | rx.Var[str] = "#2185d0",
 ) -> rx.Component:
     """
     Reusable foldable section header matching New Analysis style.
@@ -868,10 +868,9 @@ def _collapsible_header(
 
 
 def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
-    """Compact card for a single output file with download button."""
-    # Use the backend API URL (port 8000) for downloads since frontend is on port 3000
+    """Compact card for a single output file with view and download buttons."""
     download_url = UploadState.backend_api_url + "/api/download/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str)
-    
+
     return rx.el.div(
         rx.el.div(
             # File type icon
@@ -895,13 +894,23 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
                 ),
                 style={"flex": "1", "marginLeft": "10px"},
             ),
-            # Download button
-            rx.el.a(
-                fomantic_icon("download", size=14),
-                href=download_url,
-                download=file_info["name"].to(str),
-                class_name="ui mini icon primary button",
-                style={"marginLeft": "auto"},
+            # Action buttons
+            rx.el.div(
+                # View in grid button
+                rx.el.button(
+                    fomantic_icon("eye", size=14),
+                    on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
+                    class_name="ui mini icon button",
+                    title="Preview in data grid",
+                ),
+                # Download button
+                rx.el.a(
+                    fomantic_icon("download", size=14),
+                    href=download_url,
+                    download=file_info["name"].to(str),
+                    class_name="ui mini icon primary button",
+                ),
+                style={"display": "flex", "gap": "4px", "marginLeft": "auto"},
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
@@ -1062,11 +1071,121 @@ def _reports_content() -> rx.Component:
     )
 
 
+def _output_preview_grid() -> rx.Component:
+    """Inline output preview grid inside the Outputs section.
+
+    Uses ``OutputPreviewState`` which has its own ``LazyFrameGridMixin``,
+    completely independent from the VCF input grid.  Hidden until the
+    user clicks the eye icon on a data file.
+    """
+    return rx.cond(
+        OutputPreviewState.output_preview_expanded,
+        rx.el.div(
+            # Header bar with file name, row count, and close button
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("eye", size=16, color="#00b5ad"),
+                    rx.el.strong(
+                        "Output Preview",
+                        style={"marginLeft": "6px"},
+                    ),
+                    rx.cond(
+                        OutputPreviewState.output_preview_label != "",
+                        rx.el.span(
+                            OutputPreviewState.output_preview_label,
+                            class_name="ui mini teal label",
+                            style={"marginLeft": "8px"},
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        OutputPreviewState.has_output_preview,
+                        rx.el.span(
+                            OutputPreviewState.output_preview_row_count,
+                            " rows",
+                            class_name="ui mini teal label",
+                            style={"marginLeft": "4px"},
+                        ),
+                        rx.fragment(),
+                    ),
+                    style={"display": "flex", "alignItems": "center"},
+                ),
+                rx.el.button(
+                    fomantic_icon("x", size=14, color="#888"),
+                    on_click=OutputPreviewState.clear_output_preview,
+                    class_name="ui mini icon basic button",
+                    title="Close preview",
+                ),
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "padding": "8px 0",
+                    "marginBottom": "8px",
+                    "borderBottom": "1px solid #e0e0e0",
+                },
+            ),
+            # Loading spinner
+            rx.cond(
+                OutputPreviewState.output_preview_loading,
+                rx.el.div(
+                    rx.el.i("", class_name="spinner loading icon"),
+                    rx.el.span(" Loading output preview...", style={"marginLeft": "8px"}),
+                    style={"padding": "16px", "color": "#666"},
+                ),
+                rx.fragment(),
+            ),
+            # Error overlay
+            rx.cond(
+                OutputPreviewState.has_output_preview_error,
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.strong("Failed to load output preview"),
+                        rx.el.div(
+                            OutputPreviewState.output_preview_error,
+                            style={"fontSize": "0.85rem", "marginTop": "6px"},
+                        ),
+                        class_name="content",
+                    ),
+                    class_name="ui negative message",
+                    style={"margin": "0 0 8px 0"},
+                ),
+                rx.fragment(),
+            ),
+            # Grid – hidden via CSS when no data loaded yet
+            rx.el.div(
+                lazyframe_grid(
+                    OutputPreviewState,
+                    show_toolbar=True,
+                    show_description_in_header=True,
+                    density="compact",
+                    column_header_height=70,
+                    height="420px",
+                    width="100%",
+                    debug_log=False,
+                ),
+                style={
+                    "display": rx.cond(OutputPreviewState.has_output_preview, "block", "none"),
+                },
+            ),
+            style={
+                "marginTop": "12px",
+                "padding": "12px",
+                "background": "#f8fffe",
+                "borderRadius": "4px",
+                "border": "1px solid #d4edda",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def outputs_section() -> rx.Component:
     """
     Collapsible section showing output files for the selected sample.
     Contains two sub-tabs: Data Files (parquets) and Reports (HTML).
-    Positioned at the top of the right panel for easy access.
+    When the user clicks the eye icon on a data file, an inline preview
+    grid appears below the file list within this same section.
     """
     return rx.el.div(
         # Foldable header (teal accent to match ui teal segment)
@@ -1088,7 +1207,7 @@ def outputs_section() -> rx.Component:
             UploadState.outputs_expanded,
             rx.cond(
                 UploadState.has_output_files,
-                # Tabbed content
+                # Tabbed content + inline preview
                 rx.el.div(
                     _outputs_tab_menu(),
                     rx.el.div(
@@ -1101,6 +1220,8 @@ def outputs_section() -> rx.Component:
                         class_name="ui bottom attached segment",
                         style={"padding": "0", "border": "1px solid #e0e0e0", "borderTop": "none"},
                     ),
+                    # Output preview grid (appears when user clicks eye icon)
+                    _output_preview_grid(),
                 ),
                 # Empty state - prompt to analyze
                 rx.el.div(
@@ -1125,16 +1246,35 @@ def outputs_section() -> rx.Component:
 
 
 def input_vcf_preview_section() -> rx.Component:
-    """Collapsible section showing selected input VCF as an interactive grid."""
+    """Collapsible section showing the selected input VCF file.
+
+    The grid is rendered once and kept mounted to avoid DOM destruction on
+    state changes (which causes blinking).  Only the initial loading spinner
+    and error overlay are conditionally shown on top.
+    """
     return rx.el.div(
         _collapsible_header(
             expanded=UploadState.vcf_preview_expanded,
             icon_name="database",
             title="Input VCF Preview",
-            right_badge=rx.el.span(
-                UploadState.vcf_preview_row_count,
-                " rows",
-                class_name="ui mini violet label",
+            right_badge=rx.el.div(
+                # File name label
+                rx.cond(
+                    UploadState.preview_source_label != "",
+                    rx.el.span(
+                        UploadState.preview_source_label,
+                        class_name="ui mini violet label",
+                        style={"marginRight": "6px"},
+                    ),
+                    rx.fragment(),
+                ),
+                # Row count badge
+                rx.el.span(
+                    UploadState.vcf_preview_row_count,
+                    " rows",
+                    class_name="ui mini violet label",
+                ),
+                style={"display": "flex", "alignItems": "center"},
             ),
             on_toggle=UploadState.toggle_vcf_preview,
             accent_color="#6435c9",
@@ -1142,6 +1282,7 @@ def input_vcf_preview_section() -> rx.Component:
         rx.cond(
             UploadState.vcf_preview_expanded,
             rx.el.div(
+                # Initial-load spinner (only during first VCF scan, NOT scroll loads)
                 rx.cond(
                     UploadState.vcf_preview_loading,
                     rx.el.div(
@@ -1149,52 +1290,54 @@ def input_vcf_preview_section() -> rx.Component:
                         rx.el.span(" Loading VCF preview...", style={"marginLeft": "8px"}),
                         style={"padding": "16px", "color": "#666"},
                     ),
-                    rx.cond(
-                        UploadState.has_vcf_preview_error,
+                    rx.fragment(),
+                ),
+                # Error overlay
+                rx.cond(
+                    UploadState.has_vcf_preview_error,
+                    rx.el.div(
                         rx.el.div(
+                            rx.el.strong("Failed to load VCF preview"),
                             rx.el.div(
-                                rx.el.strong("Failed to load VCF preview"),
-                                rx.el.div(
-                                    UploadState.vcf_preview_error,
-                                    style={"fontSize": "0.85rem", "marginTop": "6px"},
-                                ),
-                                class_name="content",
+                                UploadState.vcf_preview_error,
+                                style={"fontSize": "0.85rem", "marginTop": "6px"},
                             ),
-                            class_name="ui negative message",
-                            style={"margin": "0"},
+                            class_name="content",
                         ),
-                        rx.cond(
-                            UploadState.has_vcf_preview,
-                            rx.el.div(
-                                rx.el.div(
-                                    rx.el.span(
-                                        "Showing first ",
-                                        UploadState.vcf_preview_limit,
-                                        " rows",
-                                        style={"fontSize": "0.8rem", "color": "#666"},
-                                    ),
-                                    style={"padding": "8px 4px 10px 4px"},
-                                ),
-                                data_grid(
-                                    rows=UploadState.vcf_preview_rows,
-                                    columns=UploadState.vcf_preview_columns,
-                                    row_id_field="__row_id__",
-                                    show_toolbar=True,
-                                    density="compact",
-                                    height="420px",
-                                    width="100%",
-                                ),
-                            ),
-                            rx.el.div(
-                                fomantic_icon("inbox", size=30, color="#ccc"),
-                                rx.el.div(
-                                    "No rows to preview",
-                                    style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
-                                ),
-                                style={"textAlign": "center", "padding": "20px 16px"},
-                            ),
-                        ),
+                        class_name="ui negative message",
+                        style={"margin": "0"},
                     ),
+                    rx.fragment(),
+                ),
+                # Grid – always mounted once UploadState inherits from the mixin.
+                # Hidden via CSS when no data loaded yet (avoids DOM destroy/recreate).
+                rx.el.div(
+                    lazyframe_grid(
+                        UploadState,
+                        show_toolbar=True,
+                        show_description_in_header=True,
+                        density="compact",
+                        column_header_height=70,
+                        height="420px",
+                        width="100%",
+                        debug_log=False,
+                    ),
+                    style={
+                        "display": rx.cond(UploadState.has_vcf_preview, "block", "none"),
+                    },
+                ),
+                # Empty state placeholder (only when nothing loaded and no error)
+                rx.cond(
+                    ~UploadState.has_vcf_preview & ~UploadState.has_vcf_preview_error & ~UploadState.vcf_preview_loading,
+                    rx.el.div(
+                        fomantic_icon("inbox", size=30, color="#ccc"),
+                        rx.el.div(
+                            "No rows to preview",
+                            style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+                        ),
+                        style={"textAlign": "center", "padding": "20px 16px"},
+                    ),
+                    rx.fragment(),
                 ),
             ),
             rx.box(),

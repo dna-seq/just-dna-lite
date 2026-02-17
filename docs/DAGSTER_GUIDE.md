@@ -63,14 +63,16 @@ Position-based annotation using Ensembl variation database.
 
 ### 2. HuggingFace Module Annotations (Recommended)
 
-Self-contained annotation modules from [just-dna-seq/annotators](https://huggingface.co/datasets/just-dna-seq/annotators).
+Self-contained annotation modules auto-discovered from configured sources (see `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`). The default source is [just-dna-seq/annotators](https://huggingface.co/datasets/just-dna-seq/annotators), but any fsspec-compatible URL (GitHub, HTTP, S3, etc.) can be added.
 
-**Available Modules:**
+**Available Modules** (auto-discovered, run `uv run pipelines list-modules` for current list):
 - `longevitymap`: Longevity-associated variants
 - `lipidmetabolism`: Lipid metabolism and cardiovascular risk
 - `vo2max`: Athletic performance variants
 - `superhuman`: Elite performance variants
 - `coronary`: Coronary artery disease associations
+
+Module display metadata (titles, icons, colors) is configured in `modules.yaml`. New modules added to any configured source are auto-discovered without code changes.
 
 **Asset Graph:**
 1. `hf_annotators_dataset`: External HuggingFace modules source

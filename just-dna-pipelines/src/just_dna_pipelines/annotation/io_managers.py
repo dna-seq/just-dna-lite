@@ -83,18 +83,31 @@ class UserAssetIOManager(IOManager):
     IO Manager for user-specific assets stored in the output folder.
     
     User data is organized as:
-    data/output/users/{partition_key}/{asset_name}.parquet
+    data/output/users/{partition_key}/{asset_name}.parquet  (single-file assets)
+    data/output/users/{partition_key}/modules/              (directory assets like hf_module_annotations)
+    data/output/users/{partition_key}/reports/               (report assets)
     
     This allows:
     - Clear separation of user data from reference data
     - Partitioning by username
     - Easy backup/export of user results
     """
+
+    # Assets whose output is a directory rather than a single .parquet file.
+    # Maps asset name -> subdirectory name under the partition folder.
+    _DIRECTORY_ASSETS: dict[str, str] = {
+        "user_hf_module_annotations": "modules",
+    }
     
     def _get_user_path(self, partition_key: str, asset_name: str) -> Path:
         """Get the output path for a user's asset."""
         user_dir = get_user_output_dir() / partition_key
         user_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Some assets store output as a directory, not a single parquet file
+        if asset_name in self._DIRECTORY_ASSETS:
+            return user_dir / self._DIRECTORY_ASSETS[asset_name]
+        
         return user_dir / f"{asset_name}.parquet"
     
     def handle_output(self, context: OutputContext, obj: Path) -> None:

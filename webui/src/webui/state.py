@@ -13,9 +13,10 @@ from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
+from just_dna_pipelines.module_config import build_module_metadata_dict
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.io import read_vcf_file
-from reflex_mui_datagrid import lazyframe_to_datagrid
+from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 
 
 # Module metadata with titles, descriptions, and icons
@@ -68,51 +69,10 @@ TISSUE_OPTIONS: List[str] = [
 ]
 
 
-# Module colors map to Fomantic UI named colors derived from the DNA logo palette:
-#   red (#db2828)    = heart/clinical urgency  (Coronary)
-#   yellow (#fbbd08) = metabolic energy        (Lipid Metabolism)
-#   green (#21ba45)  = life/longevity          (Longevity Map)
-#   teal (#00b5ad)   = performance/vitality    (Sportshuman)
-#   blue (#2185d0)   = oxygen/respiration      (VO2 Max)
-#   purple (#a333c8) = drug/chemistry          (Pharmacogenomics)
-MODULE_METADATA: Dict[str, Dict[str, str]] = {
-    "longevitymap": {
-        "title": "Longevity Map",
-        "description": "Longevity-associated genetic variants from LongevityMap database",
-        "icon": "heart-pulse",
-        "color": "#21ba45",
-    },
-    "lipidmetabolism": {
-        "title": "Lipid Metabolism",
-        "description": "Lipid metabolism and cardiovascular risk variants",
-        "icon": "droplets",
-        "color": "#fbbd08",
-    },
-    "vo2max": {
-        "title": "VO2 Max",
-        "description": "Athletic performance and oxygen uptake capacity variants",
-        "icon": "activity",
-        "color": "#2185d0",
-    },
-    "superhuman": {
-        "title": "Superhuman",
-        "description": "Elite performance and rare beneficial variants",
-        "icon": "zap",
-        "color": "#00b5ad",
-    },
-    "coronary": {
-        "title": "Coronary",
-        "description": "Coronary artery disease risk associations",
-        "icon": "heart",
-        "color": "#db2828",
-    },
-    "drugs": {
-        "title": "Pharmacogenomics",
-        "description": "Drug response and metabolism (PharmGKB)",
-        "icon": "pill",
-        "color": "#a333c8",
-    },
-}
+# Module metadata is loaded from modules.yaml via module_config.
+# Colors map to Fomantic UI named colors derived from the DNA logo palette.
+# Modules not listed in modules.yaml get auto-generated defaults.
+MODULE_METADATA: Dict[str, Dict[str, str]] = build_module_metadata_dict(DISCOVERED_MODULES)
 
 
 def _ensure_dagster_config(dagster_home: Path) -> None:
@@ -199,7 +159,7 @@ class AuthState(rx.State):
         return rx.toast.info("Logged out")
 
 
-class UploadState(rx.State):
+class UploadState(LazyFrameGridMixin):
     """Handle VCF uploads and Dagster lineage."""
 
     uploading: bool = False
@@ -628,7 +588,7 @@ class UploadState(rx.State):
         self.asset_statuses[partition_key]["hf_annotated"] = "running"
         yield
         
-        job_name = "annotate_with_hf_modules_job"
+        job_name = "annotate_and_report_job"
         
         # Use selected modules, or None for all if none selected
         modules_to_use = self.selected_modules if self.selected_modules else None
@@ -657,7 +617,14 @@ class UploadState(rx.State):
                         # Arbitrary user-defined fields
                         "custom_metadata": custom_metadata if custom_metadata else None,
                     }
-                }
+                },
+                "user_longevity_report": {
+                    "config": {
+                        "user_name": self.safe_user_id,
+                        "sample_name": sample_name,
+                        "modules": modules_to_use,
+                    }
+                },
             }
         }
 
@@ -706,12 +673,10 @@ class UploadState(rx.State):
     report_files: List[Dict[str, Any]] = []  # HTML report files
     outputs_active_tab: str = "data"  # "data" or "reports" sub-tab in outputs section
 
-    # VCF input preview state (shown via reflex-mui-datagrid)
-    vcf_preview_rows: List[Dict[str, Any]] = []
-    vcf_preview_columns: List[Dict[str, Any]] = []
-    vcf_preview_limit: int = 2000
+    # Data preview state (server-side grid state is managed by LazyFrameGridMixin)
     vcf_preview_loading: bool = False
     vcf_preview_error: str = ""
+    preview_source_label: str = ""  # e.g. "input.vcf.gz"
     
     # Run-centric UI state
     vcf_preview_expanded: bool = True  # Whether the VCF preview section is expanded
@@ -738,17 +703,17 @@ class UploadState(rx.State):
 
     @rx.var
     def has_vcf_preview(self) -> bool:
-        """Check if VCF preview rows are loaded."""
-        return len(self.vcf_preview_rows) > 0
+        """Check if data grid has been loaded (VCF or output file)."""
+        return bool(self.lf_grid_loaded)
 
     @rx.var
     def vcf_preview_row_count(self) -> int:
-        """Get number of loaded rows in the VCF preview."""
-        return len(self.vcf_preview_rows)
+        """Get total filtered row count in the data grid."""
+        return int(self.lf_grid_row_count)
 
     @rx.var
     def has_vcf_preview_error(self) -> bool:
-        """Check if VCF preview failed to load."""
+        """Check if data preview failed to load."""
         return bool(self.vcf_preview_error)
 
     @rx.var
@@ -811,14 +776,22 @@ class UploadState(rx.State):
         }
 
     def _clear_vcf_preview(self):
-        """Clear loaded VCF preview data."""
-        self.vcf_preview_rows = []
-        self.vcf_preview_columns = []
+        """Clear data preview and reset server-side grid state."""
+        self.lf_grid_rows = []
+        self.lf_grid_columns = []
+        self.lf_grid_row_count = 0
+        self.lf_grid_loading = False
+        self.lf_grid_loaded = False
+        self.lf_grid_stats = ""
+        self.lf_grid_selected_info = "Click a row to see details."
+        self._lf_grid_filter = {}
+        self._lf_grid_sort = []
         self.vcf_preview_error = ""
         self.vcf_preview_loading = False
+        self.preview_source_label = ""
 
     def _load_vcf_preview_sync(self):
-        """Load selected VCF into rows/columns for reflex-mui-datagrid."""
+        """Prepare selected VCF for server-side DataGrid browsing."""
         if not self.selected_file or not self.safe_user_id:
             self._clear_vcf_preview()
             return
@@ -833,19 +806,13 @@ class UploadState(rx.State):
         self.vcf_preview_loading = True
         self.vcf_preview_error = ""
         try:
-            # Keep preview responsive by capping loaded rows.
             lazy_vcf = read_vcf_file(vcf_path, save_parquet=None, with_formats=True)
-            rows, col_defs = lazyframe_to_datagrid(
-                lazy_vcf,
-                limit=self.vcf_preview_limit,
-                show_id_field=False,
-                single_select_threshold=0,  # Disable dropdown filters — preview subset doesn't represent all values
-            )
-            self.vcf_preview_rows = rows
-            self.vcf_preview_columns = [col.dict() for col in col_defs]
+            descriptions = extract_vcf_descriptions(lazy_vcf)
+            for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
+                pass
+            self.preview_source_label = vcf_path.name
         except Exception as e:
-            self.vcf_preview_rows = []
-            self.vcf_preview_columns = []
+            self._clear_vcf_preview()
             self.vcf_preview_error = str(e)
         finally:
             self.vcf_preview_loading = False
@@ -1648,6 +1615,9 @@ class UploadState(rx.State):
             self.polling_active = False
             self.last_run_success = result.success
             
+            # Refresh output files so UI shows them immediately
+            self._load_output_files_sync()
+            
         except Exception as e:
             error_message = str(e)
             self._add_log(f"In-process execution failed: {error_message}")
@@ -1697,7 +1667,7 @@ class UploadState(rx.State):
         self._add_log(f"User: {self.safe_user_id}")
 
         instance = get_dagster_instance()
-        job_name = "annotate_with_hf_modules_job"
+        job_name = "annotate_and_report_job"
         modules_to_use = self.selected_modules.copy()
         
         # Get file metadata for the selected file
@@ -1723,7 +1693,14 @@ class UploadState(rx.State):
                         # Arbitrary user-defined fields
                         "custom_metadata": custom_metadata if custom_metadata else None,
                     }
-                }
+                },
+                "user_longevity_report": {
+                    "config": {
+                        "user_name": self.safe_user_id,
+                        "sample_name": sample_name,
+                        "modules": modules_to_use,
+                    }
+                },
             }
         }
 
@@ -2072,13 +2049,23 @@ class UploadState(rx.State):
         """Load recent annotation runs from Dagster."""
         instance = get_dagster_instance()
         
-        # Get recent runs for the HF annotation job
+        # Get recent runs for annotation jobs (both old and new job names)
         # Use get_run_records to get timestamps (start_time, end_time are on RunRecord, not DagsterRun)
         from dagster import RunsFilter
-        run_records = instance.get_run_records(
+        run_records_new = instance.get_run_records(
+            filters=RunsFilter(job_name="annotate_and_report_job"),
+            limit=20,
+        )
+        run_records_old = instance.get_run_records(
             filters=RunsFilter(job_name="annotate_with_hf_modules_job"),
             limit=20,
         )
+        # Merge and sort by start_time descending
+        run_records = sorted(
+            list(run_records_new) + list(run_records_old),
+            key=lambda r: r.start_time or 0,
+            reverse=True,
+        )[:20]
         
         run_list = []
         for record in run_records:
@@ -2122,3 +2109,73 @@ class UploadState(rx.State):
             run_list.append(run_info)
         
         self.runs = run_list
+
+
+class OutputPreviewState(LazyFrameGridMixin):
+    """Independent state for the output file preview grid.
+
+    Inherits its own ``LazyFrameGridMixin`` so the output grid has a
+    completely separate LazyFrame cache, column defs, rows, etc. from
+    the VCF input grid managed by ``UploadState``.
+
+    The ``on_click`` handler in the output file card calls
+    ``OutputPreviewState.view_output_file`` **directly** — no bridge
+    through ``UploadState`` is needed.
+    """
+
+    output_preview_loading: bool = False
+    output_preview_error: str = ""
+    output_preview_label: str = ""
+    output_preview_expanded: bool = False
+
+    @rx.var
+    def has_output_preview(self) -> bool:
+        """True when the output grid has data loaded."""
+        return bool(self.lf_grid_loaded)
+
+    @rx.var
+    def output_preview_row_count(self) -> int:
+        """Total filtered row count in the output grid."""
+        return int(self.lf_grid_row_count)
+
+    @rx.var
+    def has_output_preview_error(self) -> bool:
+        """True when the last output preview load failed."""
+        return bool(self.output_preview_error)
+
+    def view_output_file(self, file_path: str):
+        """Load an output data file into the output preview grid.
+
+        Generator — use ``yield from`` or call directly from ``on_click``.
+        Reflex will iterate the generator and push intermediate state
+        updates to the frontend.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            self.output_preview_error = f"File not found: {path.name}"
+            return
+
+        self.output_preview_loading = True
+        self.output_preview_error = ""
+        self.output_preview_expanded = True
+        yield
+
+        lf, descriptions = scan_file(path)
+        yield from self.set_lazyframe(lf, descriptions, chunk_size=300)
+
+        self.output_preview_label = path.name
+        self.output_preview_loading = False
+
+    def toggle_output_preview(self):
+        """Toggle the output preview section open/closed."""
+        self.output_preview_expanded = not self.output_preview_expanded
+
+    def clear_output_preview(self):
+        """Reset the output preview grid to empty state."""
+        self.output_preview_label = ""
+        self.output_preview_error = ""
+        self.output_preview_expanded = False
+        self.lf_grid_loaded = False
+        self.lf_grid_rows = []
+        self.lf_grid_columns = []
+        self.lf_grid_row_count = 0

@@ -207,8 +207,8 @@ def read_vcf_file(
               Example: data.vcf.gz -> data.parquet
             - Path: save to the provided location
         engine: Parquet engine to use for sinking (defaults to "streaming")
-        thread_num: The number of threads to use for reading the VCF file. Used **only** for 
-            parallel decompression of BGZF blocks. Works only for **local** files.
+        thread_num: Backward-compatible concurrency knob for VCF reading.
+            In polars-bio >= 0.23 this is mapped to ``concurrent_fetches``.
         with_formats: Whether to extract FORMAT fields (GT, GQ, etc.).
             If None (default), auto-detected: True for user VCFs (path containing "users"), False otherwise.
         format_fields: List of FORMAT fields to extract. If None and with_formats is True, 
@@ -298,12 +298,13 @@ def read_vcf_file(
                         removed_from_format=sorted(duplicates),
                     )
 
-        # Use polars-bio scan_vcf with native format_fields support
+        # Use polars-bio scan_vcf with native format_fields support.
+        # polars-bio >= 0.23 removed `thread_num`; map to `concurrent_fetches`.
         result = pb.scan_vcf(
             str(file_path),
             info_fields=actual_info_fields,
             format_fields=actual_format_fields,
-            thread_num=thread_num
+            concurrent_fetches=max(1, int(thread_num)),
         )
 
         # Compute genotype from GT + ref + alt if requested and GT is present in schema
@@ -364,8 +365,8 @@ def vcf_to_parquet(
         parquet_path: Path where to save the Parquet file. 
             If None (default), saves next to VCF with .parquet extension ("auto" behavior).
         info_fields: The fields to read from the INFO column. If None, reads all available fields
-        thread_num: The number of threads to use for reading the VCF file. 
-            Used only for parallel decompression of BGZF blocks. Works only for local files.
+        thread_num: Backward-compatible concurrency knob for VCF reading.
+            In polars-bio >= 0.23 this is mapped to ``concurrent_fetches``.
         overwrite: Whether to overwrite existing Parquet file (default False)
         with_formats: Whether to extract FORMAT fields (GT, GQ, etc.).
             If None (default), auto-detected in read_vcf_file.

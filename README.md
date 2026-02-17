@@ -72,6 +72,12 @@ uv run pipelines sync-vcf-partitions
 
 ## Configuration
 
+### Module Sources
+
+Annotation module sources are configured in `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`. Modules are auto-discovered from any fsspec-compatible URL (HuggingFace, GitHub, HTTP, S3, etc.). To add a new source, edit the `sources:` list in the YAML. Display metadata (titles, icons, colors) can be overridden under `module_metadata:`.
+
+### Environment Variables
+
 The stack is configured via environment variables (a `.env` in the repo root is fine):
 
 ```bash
@@ -112,7 +118,7 @@ uv run pytest just-dna-pipelines/tests/
 - [Dagster guide](docs/DAGSTER_GUIDE.md)
 - [Performance & Engines](docs/DAGSTER_GUIDE.md#performance--engine-optimization)
 - [Hugging Face Integration](docs/DAGSTER_GUIDE.md#hugging-face-integration--authentication)
-- [Hugging Face Modules](docs/HF_MODULES.md)
+- [Annotation Modules](docs/HF_MODULES.md)
 - [Web UI Status](docs/WEBUI_STATUS.md) - Current implementation status and architecture
 - [Design System](docs/DESIGN.md) - Fomantic UI patterns and component styling
 - [Agent Guidelines](AGENTS.md)

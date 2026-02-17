@@ -8,6 +8,7 @@ import psutil
 from dagster import Config
 
 from just_dna_pipelines.models import SampleInfo
+from just_dna_pipelines.module_config import DEFAULT_REPOS
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, validate_modules
 
 
@@ -103,10 +104,11 @@ class AnnotationConfig(Config, SampleInfo):
 
 class HfModuleAnnotationConfig(Config, SampleInfo):
     """
-    Configuration for annotating VCF with HuggingFace modules.
+    Configuration for annotating VCF with annotation modules.
     
-    Modules are discovered dynamically from one or more HuggingFace repositories.
-    By default, scans 'just-dna-seq/annotators'.
+    Modules are discovered dynamically from configured sources (modules.yaml).
+    Sources can be HuggingFace repos, GitHub repos, HTTP URLs, or any
+    fsspec-compatible URL. By default, uses sources from modules.yaml.
     
     Pass None for modules to use all discovered modules, or a list of
     specific module names to use a subset.
@@ -128,8 +130,8 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     zenodo_url: Optional[str] = None  # Zenodo record or file URL
     user_name: Optional[str] = None
     
-    # Repositories to scan for modules
-    repos: list[str] = ["just-dna-seq/annotators"]
+    # Repositories to scan for modules (from modules.yaml)
+    repos: list[str] = DEFAULT_REPOS
     
     # Module selection - list of module names (all discovered modules by default)
     modules: Optional[list[str]] = None  # None means all discovered modules from the repos

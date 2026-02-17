@@ -23,15 +23,25 @@ def _ensure_dagster_config(dagster_home: Path) -> None:
     """
     Ensure dagster.yaml exists with proper configuration.
     
-    Creates the config file if missing, enabling auto-materialization
-    and other important features.
+    Creates the config file and required subdirectories if missing,
+    enabling auto-materialization and other important features.
+    Always ensures required subdirectories exist even if config already present.
     """
+    dagster_home.mkdir(parents=True, exist_ok=True)
+    # Always ensure logs directory exists — Dagster telemetry writes here
+    # and will crash if it's missing, even if dagster.yaml already exists
+    (dagster_home / "logs").mkdir(parents=True, exist_ok=True)
+    
     config_file = dagster_home / "dagster.yaml"
     
     if config_file.exists():
+        # Ensure telemetry is disabled in existing config to avoid
+        # RotatingFileHandler errors when logs/event.log path issues occur
+        config_text = config_file.read_text(encoding="utf-8")
+        if "telemetry:" not in config_text:
+            config_text = config_text.rstrip() + "\n\ntelemetry:\n  enabled: false\n"
+            config_file.write_text(config_text, encoding="utf-8")
         return
-    
-    dagster_home.mkdir(parents=True, exist_ok=True)
     
     config_content = """# Dagster instance configuration
 # Storage defaults to DAGSTER_HOME
@@ -40,6 +50,10 @@ def _ensure_dagster_config(dagster_home: Path) -> None:
 auto_materialize:
   enabled: true
   minimum_interval_seconds: 60
+
+# Disable telemetry to avoid RotatingFileHandler errors
+telemetry:
+  enabled: false
 """
     
     config_file.write_text(config_content, encoding="utf-8")

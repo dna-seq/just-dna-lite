@@ -8,9 +8,10 @@
 
 1. **2-Panel Run-Centric Layout**:
    - **Files (Left Panel)**: Upload zone for VCF files, file library with status badges (`ready`, `running`, `completed`, `error`), and file deletion.
-   - **Right Panel (Three Collapsible Sections)**:
-     - **Outputs Section** (teal segment, top): Inline display of output files for the selected sample with type icons, module labels, file sizes, and download buttons. Shows "No outputs yet" with a prompt to run analysis when empty.
-     - **Run History** (green segment, middle): Unified timeline of all runs for the selected file. The most recent run is highlighted with a "latest" badge and includes Re-run/Modify action buttons. Each run expands to show modules, run ID, and Dagster link.
+   - **Right Panel (Four Collapsible Sections)**:
+     - **Input VCF Preview** (violet segment, top): Server-side data grid (`lazyframe_grid`) showing the uploaded VCF file contents. Uses `UploadState` with `LazyFrameGridMixin` for lazy loading, filtering, and sorting. Loads automatically when a file is selected.
+     - **Outputs Section** (teal segment): Inline display of output files for the selected sample with type icons, module labels, file sizes, download buttons, and an **inline output preview grid**. When the user clicks the eye icon on a data file, a second independent data grid appears within this section showing the parquet/CSV contents. Uses `OutputPreviewState` with its own `LazyFrameGridMixin` — completely independent from the VCF grid. Shows "No outputs yet" with a prompt to run analysis when empty.
+     - **Run History** (green segment): Unified timeline of all runs for the selected file. The most recent run is highlighted with a "latest" badge and includes Re-run/Modify action buttons. Each run expands to show modules, run ID, and Dagster link.
      - **New Analysis Section** (blue segment, bottom): Shows HF repository sources with clickable links, collapsible module selection grid with logos from HuggingFace, "Select All/None" controls, and Start Analysis button.
 
 2. **Dagster Integration**:
@@ -44,7 +45,13 @@
      - `{module}_annotations.parquet` - Variant facts (optional)
      - `{module}_studies.parquet` - Literature evidence (optional)
    - Inline outputs section shows files with type icons (scale/file-text/book-open), module labels, file sizes, and download buttons.
+   - **Output Preview Grid**: Clicking the eye icon on any data file opens an inline data grid within the Outputs section. Uses `OutputPreviewState` (separate `LazyFrameGridMixin`) so it is fully independent from the VCF input grid. Supports filtering, sorting, and infinite scroll. Can be dismissed with the close (X) button.
    - Empty state shows "No outputs yet" with prompt to run analysis.
+
+6. **Two Independent Data Grids**:
+   - **Input VCF Grid** (`UploadState` + `LazyFrameGridMixin`): Always shows the input VCF file. Violet segment at the top of the right panel.
+   - **Output Preview Grid** (`OutputPreviewState` + `LazyFrameGridMixin`): Shows output data files on demand inside the Outputs section. Each state class gets its own LazyFrame cache (keyed by `type(self).__name__`), so the grids never interfere.
+   - Both grids use `reflex_mui_datagrid.lazyframe_grid` with server-side filtering, sorting, and lazy scroll loading.
 
 ### Architecture
 
@@ -57,7 +64,7 @@ webui/
 │   │   ├── annotate.py        # 2-panel run-centric layout
 │   │   ├── index.py           # Main landing page (aliases annotate)
 │   │   └── analysis.py        # Analysis page (placeholder)
-│   ├── state.py               # Main UploadState: Uploads, Dagster API, Run state, Output files
+│   ├── state.py               # UploadState (uploads, Dagster, VCF grid) + OutputPreviewState (output grid)
 │   └── app.py                 # Reflex app setup, routing & download API endpoint
 └── rxconfig.py                # Configuration & Fomantic UI CDN
 ```
@@ -76,12 +83,16 @@ The Web UI connects to Dagster directly via the Python API (not HTTP). Both run 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      Reflex Web UI (Python)                              │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │  state.py - UploadState                                          │    │
+│  │  state.py - UploadState (LazyFrameGridMixin)                      │    │
 │  │  ├── get_dagster_instance() → DagsterInstance                    │    │
 │  │  ├── Files: upload, delete, list                                 │    │
 │  │  ├── Runs: submit, poll status, fetch logs                       │    │
 │  │  ├── Run History: last_run_for_file, filtered_runs               │    │
-│  │  └── Outputs: scan parquet files from filesystem                 │    │
+│  │  ├── Outputs: scan parquet files from filesystem                 │    │
+│  │  └── VCF Grid: LazyFrameGridMixin for input VCF preview         │    │
+│  ├─────────────────────────────────────────────────────────────────┤    │
+│  │  state.py - OutputPreviewState (LazyFrameGridMixin)               │    │
+│  │  └── Output Grid: independent LazyFrameGridMixin for output files │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -127,10 +138,12 @@ The Web UI connects to Dagster directly via the Python API (not HTTP). Both run 
 
 The right panel uses a run-centric design with three collapsible sections:
 
-**State variables in `UploadState`:**
+**State variables in `UploadState` (inherits `LazyFrameGridMixin` for VCF grid):**
 - `filtered_runs` - Computed var returning all runs for the selected file (sorted by date, newest first)
 - `latest_run_id` - Computed var returning the run_id of the most recent run
 - `output_files` - List of output file metadata for the selected sample
+- `vcf_preview_loading` / `vcf_preview_error` / `preview_source_label` - VCF preview state
+- `vcf_preview_expanded` - Boolean controlling the VCF preview section collapse state
 - `outputs_expanded` - Boolean controlling the outputs section collapse state
 - `run_history_expanded` - Boolean controlling the run history section collapse state
 - `new_analysis_expanded` - Boolean controlling the new analysis section collapse state
@@ -140,22 +153,38 @@ The right panel uses a run-centric design with three collapsible sections:
 - `backend_api_url` - Computed var returning the backend API URL for downloads
 - `repo_info_list` - Computed var returning HF repository sources grouped by repo_id with browsable URLs
 
+**State variables in `OutputPreviewState` (inherits `LazyFrameGridMixin` for output grid):**
+- `output_preview_loading` / `output_preview_error` / `output_preview_label` - Output preview state
+- `output_preview_expanded` - Boolean controlling the output preview visibility (hidden until user clicks eye icon)
+- `has_output_preview` - Computed var: true when the output grid has data loaded
+- `output_preview_row_count` - Computed var: total filtered row count in the output grid
+- `view_output_file(file_path)` - Generator event handler that loads a file into the output grid
+- `clear_output_preview()` - Resets the output grid to empty/hidden state
+
 **Component functions in `annotate.py`:**
-- `outputs_section()` - Collapsible section showing output files with download buttons
-- `output_file_card()` - Individual output file card with type icon, labels, and download
+- `input_vcf_preview_section()` - Collapsible VCF data grid (violet segment, uses `UploadState`)
+- `outputs_section()` - Collapsible section showing output files with download buttons + inline output preview grid
+- `_output_preview_grid()` - Inline output data grid inside Outputs section (uses `OutputPreviewState`)
+- `output_file_card()` - Individual output file card with type icon, labels, eye (preview) and download buttons
 - `run_timeline_card()` - Individual run card with expand/collapse (latest run highlighted)
 - `run_timeline()` - Unified scrollable list of all runs
 - `repo_source_card()` - Compact card for an HF repository source with link and module count
 - `module_logo_or_icon()` - Shows HF logo image if available, falls back to static icon
 - `new_analysis_section()` - Collapsible module selection with HF sources and run button
-- `right_panel_run_view()` - Main right panel combining all three sections
+- `right_panel_run_view()` - Main right panel combining all four sections
 - `_collapsible_header()` - Reusable header component for foldable sections
 
 **Layout Order (top to bottom):**
 ```
 ┌─────────────────────────────────────┐
-│  Outputs (teal segment)             │  ← Results first - what users want
+│  Input VCF Preview (violet segment) │  ← Inspect input data
+│  - Server-side data grid (UploadSt) │
+│  - Filtering, sorting, scroll-load  │
+├─────────────────────────────────────┤
+│  Outputs (teal segment)             │  ← Results - what users want
 │  - File list with download buttons  │
+│  - [Output Preview Grid] (inline)   │  ← Appears on eye-icon click
+│  -   Uses OutputPreviewState        │     (independent from VCF grid)
 │  - Empty state: "No outputs yet"    │
 ├─────────────────────────────────────┤
 │  Run History (green segment)        │  ← Context - how results were made
@@ -202,13 +231,15 @@ Each uploaded VCF file has associated metadata stored in `UploadState.file_metad
 ### Key Design Decisions
 
 1. **Run-Centric vs Tab-Based**: Replaced tab-based layout with run-centric view that shows the relationship between input files, runs, and outputs.
-2. **Results First**: Outputs section at the top of the right panel - users care most about results, then context (runs), then actions (new analysis).
-3. **Unified Run History**: Merged "Last Run" and "Run History" into a single timeline. The latest run is visually highlighted with a blue segment and "latest" badge.
-4. **Inline Outputs vs Modal**: Outputs are displayed inline in a collapsible section rather than a modal dialog - no disruptive popups, always visible when expanded.
-5. **In-Process Execution vs Daemon**: Prefers `instance.submit_run` for immediate Run ID feedback, with `execute_in_process` logic for robust execution without daemon dependency in local dev.
-6. **Fomantic Checkboxes**: Uses raw HTML structure with `ui checkbox` classes to avoid `rx.checkbox` styling conflicts.
-7. **Reactive Styling**: Uses `rx.cond` and `rx.match` for all state-dependent UI changes (colors, icons, visibility).
-8. **Collapsible Sections**: All three right panel sections use the same `_collapsible_header()` pattern with chevron icons and right-aligned badges.
+2. **Input First, Then Results**: VCF preview at the top so users can inspect their input, then Outputs section for results, then context (runs), then actions (new analysis).
+3. **Two Independent Grids**: Input VCF and output files use separate `LazyFrameGridMixin` state classes (`UploadState` and `OutputPreviewState`). Each gets its own LazyFrame cache keyed by class name, so they never interfere. The output grid is called directly from `on_click` — no cross-state event bridging needed.
+4. **Output Preview Inside Outputs Section**: The output data grid appears inline within the Outputs segment (not as a separate segment), keeping the preview contextually close to the file list. Hidden until the user clicks the eye icon; dismissed with the close (X) button.
+5. **Unified Run History**: Merged "Last Run" and "Run History" into a single timeline. The latest run is visually highlighted with a blue segment and "latest" badge.
+6. **Inline Outputs vs Modal**: Outputs are displayed inline in a collapsible section rather than a modal dialog - no disruptive popups, always visible when expanded.
+7. **In-Process Execution vs Daemon**: Prefers `instance.submit_run` for immediate Run ID feedback, with `execute_in_process` logic for robust execution without daemon dependency in local dev.
+8. **Fomantic Checkboxes**: Uses raw HTML structure with `ui checkbox` classes to avoid `rx.checkbox` styling conflicts.
+9. **Reactive Styling**: Uses `rx.cond` and `rx.match` for all state-dependent UI changes (colors, icons, visibility).
+10. **Collapsible Sections**: All four right panel sections use the same `_collapsible_header()` pattern with chevron icons and right-aligned badges.
 
 ### Dagster API Patterns Used
 
@@ -241,4 +272,3 @@ uv run start
 1. **Implement Auto-scroll for Logs**: Ensure the log window follows the latest output.
 2. **Advanced Filtering**: Add ability to filter files by upload date or status.
 3. **Analysis Page**: Implement the `analysis` page to visualize annotation results (plots, stats).
-4. **Output File Preview**: Add ability to preview parquet file contents (first N rows) in the UI.
