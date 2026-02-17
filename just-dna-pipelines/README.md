@@ -53,7 +53,12 @@ Just DNA Pipelines' architecture is built around three core concepts:
 
 ### Module Sources
 
-Annotation module sources are configured in `src/just_dna_pipelines/modules.yaml`. Modules are auto-discovered from configured sources (HuggingFace, GitHub, HTTP, S3, or any fsspec URL). See `src/just_dna_pipelines/module_config.py` for the Pydantic models and loader.
+Annotation module sources are configured in **`modules.yaml`**. The loader checks two locations (first found wins):
+
+1. **Project root** (`../modules.yaml`) — preferred, easy for users to find and edit
+2. **Package directory** (`src/just_dna_pipelines/modules.yaml`) — bundled fallback
+
+Modules are auto-discovered from configured sources (HuggingFace, GitHub, HTTP, S3, or any fsspec URL). See `src/just_dna_pipelines/module_config.py` for the Pydantic models and loader.
 
 ### Environment Variables
 

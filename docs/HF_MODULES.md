@@ -17,7 +17,12 @@ The modules are **self-contained**—they include all annotation data (gene symb
 
 ## Module Sources Configuration
 
-Module sources are configured in `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`. Sources can be any fsspec-compatible URL:
+Module sources are configured in **`modules.yaml`**. The loader checks two locations (first found wins):
+
+1. **Project root** (`./modules.yaml`) — preferred, easy for users to find and edit
+2. **Package directory** (`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) — bundled fallback
+
+Sources can be any fsspec-compatible URL:
 
 - **HuggingFace** (default): `just-dna-seq/annotators`
 - **GitHub**: `github://org/repo`

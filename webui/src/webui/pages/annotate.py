@@ -877,7 +877,16 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
             file_type_icon(file_info["type"]),
             # File info
             rx.el.div(
-                rx.el.strong(file_info["name"].to(str), style={"fontSize": "0.85rem"}),
+                rx.el.span(
+                    file_info["name"].to(str),
+                    on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
+                    style={
+                        "fontSize": "0.85rem",
+                        "fontWeight": "bold",
+                        "color": "#2185d0",
+                        "cursor": "pointer",
+                    },
+                ),
                 rx.el.div(
                     file_type_label(file_info["type"]),
                     rx.el.span(
@@ -937,7 +946,18 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
             fomantic_icon("file-text", size=20, color="#e03997"),
             # File info
             rx.el.div(
-                rx.el.strong(file_info["name"].to(str), style={"fontSize": "0.85rem"}),
+                rx.el.a(
+                    file_info["name"].to(str),
+                    href=view_url,
+                    target="_blank",
+                    style={
+                        "fontSize": "0.85rem",
+                        "fontWeight": "bold",
+                        "color": "#e03997",
+                        "textDecoration": "none",
+                        "cursor": "pointer",
+                    },
+                ),
                 rx.el.div(
                     rx.el.span("report", class_name="ui mini pink label"),
                     rx.el.span(

@@ -48,7 +48,12 @@ The recommended way to start the application is from the repo root:
 
 ## Module Configuration (`modules.yaml`)
 
-Annotation module sources and display metadata are configured in **`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`**. This is the single source of truth for:
+Annotation module sources and display metadata are configured in **`modules.yaml`**. The loader checks two locations (first found wins):
+
+1. **Project root** (`./modules.yaml`) — preferred, easy for users to find and edit
+2. **Package directory** (`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) — bundled fallback
+
+This is the single source of truth for:
 
 1. **Sources** to scan for modules (any fsspec-compatible URL: HuggingFace, GitHub, HTTP, S3, etc.)
 2. **Display metadata** overrides (title, description, icon, color, report_title) for known modules

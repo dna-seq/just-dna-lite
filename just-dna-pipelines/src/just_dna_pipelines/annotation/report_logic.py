@@ -173,6 +173,11 @@ def load_annotated_weights(
     Joins the user's annotated weights with the module's annotations table
     (which has gene, phenotype, category) and the studies table.
 
+    The weights parquet has the actual rsid values in a column named
+    ``rsid_{module_name}`` (the plain ``rsid`` column from the VCF is
+    typically empty). We resolve the correct column and use it for the
+    join against the annotations table.
+
     Args:
         weights_parquet: Path to the user's {module}_weights.parquet
         module_name: Name of the HF module
@@ -183,6 +188,15 @@ def load_annotated_weights(
     """
     with start_action(action_type="load_annotated_weights", module=module_name, path=str(weights_parquet)):
         weights_lf = pl.scan_parquet(weights_parquet)
+
+        # The actual rsid values live in rsid_{module_name}, not the VCF rsid column.
+        # Resolve the correct column name for joining.
+        schema_cols = weights_lf.collect_schema().names()
+        module_rsid_col = f"rsid_{module_name}"
+        if module_rsid_col in schema_cols:
+            # Rename module-specific rsid column to "rsid" for the join,
+            # dropping the original empty rsid column first.
+            weights_lf = weights_lf.drop("rsid").rename({module_rsid_col: "rsid"})
 
         # Load annotations table from HF (has gene, category, phenotype)
         annotations_lf = scan_module_table(module_name, ModuleTable.ANNOTATIONS, module_info=module_info)
@@ -261,6 +275,11 @@ def build_longevity_report_data(
         # Get all rsids for study lookup
         rsids = annotated.select("rsid").unique().to_series().to_list()
         studies_by_rsid = load_studies_for_variants(rsids, module_name, module_info)
+
+        # Assign null categories to "other"
+        annotated = annotated.with_columns(
+            pl.col("category").fill_null("other").alias("category")
+        )
 
         # Group variants by category
         categories: dict[str, dict] = {}

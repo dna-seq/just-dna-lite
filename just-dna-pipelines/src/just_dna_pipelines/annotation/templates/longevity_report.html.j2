@@ -2,335 +2,415 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Longevity Report{% if user_name %} — {{ user_name }}{% endif %}</title>
 <style>
 /* ========== General ========== */
-*, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+* { box-sizing: border-box; scroll-behavior: smooth; }
+a { color: #87cec3; text-decoration: none; }
+a:hover { color: #92e0d3; }
 body {
-    background: linear-gradient(135deg, #f9f6f0, #f2f7e6, #d9f9f2, #e7f1ff, #f0eefd);
+    background-image: linear-gradient(to left bottom, rgb(249, 246, 240), #f8f6ec, #f6f6e8, #f2f7e6, #edf8e4, #e5f9e8, #dff9ec, #d9f9f2, #d8f7fb, #def5ff, #e7f1ff, #f0eefd);
+    background-repeat: no-repeat;
     background-attachment: fixed;
-    color: #42584e;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: rgb(66, 92, 88);
+    font-family: Arial, Helvetica, sans-serif;
     margin: 0; padding: 0;
-    line-height: 1.6;
 }
-a { color: #3a9e8f; text-decoration: none; }
-a:hover { color: #56c3bd; text-decoration: underline; }
-
-/* ========== Layout ========== */
-.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
-.report-header {
-    text-align: center;
-    padding: 3rem 1rem 2rem;
-}
-.report-header h1 {
-    color: #269292;
-    font-size: 2.8rem;
-    font-weight: 600;
-    margin: 0 0 0.5rem;
-}
-.report-header .subtitle {
-    color: #5a7a72;
-    font-size: 1.1rem;
-}
+h1, h2 { text-align: center; font-size: 2.5vw; font-weight: 500; }
+h2 { margin-top: 4vw; margin-bottom: 20px; color: rgb(57, 145, 123); }
 
 /* ========== Intro ========== */
 .intro {
-    max-width: 800px;
-    margin: 0 auto 3rem;
-    text-align: center;
-    color: #545570;
-    font-size: 1.05rem;
+    width: 60%; text-align: center;
+    margin-left: auto; margin-right: auto;
+    line-height: 3; font-size: 1vw;
 }
-.intro p { line-height: 1.8; }
-.attention {
-    margin: 2rem auto;
-    padding: 1.2rem 1.8rem;
-    border: 3px solid #7abdb7;
-    border-radius: 16px;
+.intro p { color: rgb(84, 85, 110); line-height: 2em; font-size: 1.3em; font-weight: 400; }
+.intro a { word-wrap: break-word; }
+.intro ul { padding-left: 0; margin-left: auto; margin-right: auto; font-weight: 500; margin-top: 40px; list-style-type: none; margin-bottom: 120px; }
+.li1 { font-weight: 400; font-size: 1.3vw; }
+.first { margin-top: 3vw; color: #269292; font-size: 3vw; }
+.attention { margin-top: 4vw; margin-bottom: 4vw; margin-left: auto; margin-right: auto; width: 65%; padding: 0.8vw 1.7vw; font-size: 0.8vw; border: rgb(122, 189, 183) solid 5px; border-radius: 30px; background-color: white; box-shadow: 0px 5px 5px 0px #4a887c; }
+.attention strong { color: rgb(71, 155, 148); font-size: 1.25vw; }
+.attention p { color: #3a6e65; }
+
+/* ========== Tables ========== */
+table.ui {
+    transition: max-height 0.5s ease-in;
+    border-radius: 0.28571429rem;
+    font-size: 0.8vw;
     background: white;
-    box-shadow: 0 4px 12px rgba(74, 136, 124, 0.15);
+    width: 85%;
+    margin-right: auto; margin-left: auto;
+    padding: 0.78571429em;
     text-align: left;
+    border-collapse: collapse;
+    vertical-align: middle;
+    border: 1px solid rgba(34,36,38,.15);
+    line-height: 1.4285em;
 }
-.attention strong { color: #479b94; font-size: 1.1rem; }
-.attention p { color: #3a6e65; margin: 0.5rem 0; }
-.toc { list-style: none; padding: 0; margin: 2rem 0 0; }
-.toc li { margin: 0.5rem 0; }
-.toc a { font-size: 1.15rem; font-weight: 500; }
+table.ui th {
+    background: #f9fafb;
+    color: rgba(0,0,0,.87);
+    padding: 0.92857143em 0.78571429em;
+    vertical-align: inherit;
+    font-weight: 700;
+    text-transform: none;
+    border-bottom: 1px solid rgba(34,36,38,.1);
+    border-right: 1px solid rgba(34,36,38,.1);
+}
+table.ui.selectable.celled.teal.table tr:hover { background-color: #eef1f5; }
+table.ui td {
+    border-bottom: 1px solid rgba(34,36,38,.1);
+    border-top: none;
+    border-left: 1px solid rgba(34,36,38,.1);
+    padding: 10px;
+}
+table.ui td:first-child { border-left: none; }
+.ui.selectable.celled.teal.table.table.variants {
+    margin-top: 0px;
+    box-shadow: 0 1px 3px 1px rgba(118, 49, 40, 0.3);
+    margin-bottom: 80px;
+    border-top: 0.4em solid rgb(101, 189, 162);
+}
+.ui.padded.table { width: 100%; }
+th, td { padding: 2px; }
+
+/* ========== Buttons ========== */
+div.ui.tiny.circular.compact.positive.button {
+    border-radius: 10em; background-color: #86caf7; color: #fff;
+    padding: 0.58928571em 1.125em; cursor: pointer; display: inline-block;
+    min-height: 1em; outline: 0; border: none; vertical-align: baseline;
+    margin: 0 0.25em 0 0; font-weight: 700; line-height: 1em;
+    font-style: normal; text-align: center;
+}
+div.ui.tiny.circular.compact.negative.button {
+    border-radius: 10em; background-color: #a6f069; color: #fff;
+    padding: 0.58928571em 1.125em; cursor: pointer; display: inline-block;
+    min-height: 1em; outline: 0; border: none; vertical-align: baseline;
+    margin: 0 0.25em 0 0; font-weight: 700; line-height: 1em;
+    font-style: normal; text-align: center;
+}
+
+/* ========== Accordions ========== */
+.accordion0 {
+    position: relative;
+    border: rgb(101, 189, 162) solid 6px;
+    border-bottom: none;
+    width: 50%; margin-left: 25%; margin-right: 25%;
+    text-align: left; padding-left: 2vw;
+    height: 4vw; font-size: 1.5vw;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
+    margin-top: 0.7vw;
+    color: rgb(81, 139, 122);
+    cursor: pointer;
+}
+.accordion.accordion-heading.active, .accordion:hover { background-color: rgba(255, 255, 255, 0.2); }
+.accordion.accordion-heading:hover, .accordion.accordion-heading.active:hover { color: rgb(127, 201, 182); }
+.accordion1 { margin-top: 3vw; }
+.accordion-heading {
+    width: 50%; margin-left: 25%; margin-right: 25%;
+    user-select: none; height: 5vw;
+    padding-top: 1vw; padding-bottom: 1vw;
+    cursor: pointer;
+    border: rgb(101, 189, 162, 0.5) solid 6px;
+    background-color: rgba(255, 255, 255, 0.5);
+    font-size: 1.7vw; border-radius: 15px;
+    margin-top: 2vw;
+    transition-property: width, margin-left, margin-right;
+    transition-duration: 0.2s;
+    color: rgb(47, 116, 106);
+    border-bottom: none;
+}
+.accordion-heading:hover { background-color: rgba(255, 255, 255, 0.5); }
+
+/* ========== Panels ========== */
+.board { width: 50%; margin-top: 40px; padding-top: 10px; color: rgb(84, 85, 110); margin-right: auto; margin-left: auto; font-size: 1.1vw; }
+.board p { line-height: 1.7; font-weight: 400; }
+.panel {
+    padding: 1.5vw 2.5vw;
+    display: none;
+    border: rgb(66, 92, 88) solid 3px;
+    border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;
+    border-top: none;
+    background-color: white;
+    margin-top: 0px;
+}
+.variants.panel { border: rgb(101, 189, 162) 6px solid; border-top: none; }
+.content { margin-left: auto; margin-right: auto; overflow-x: auto; transition: max-height 0.5s ease-in; display: none; }
+.hidden { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-in; }
+.basic-panel, .panel, .content { max-height: 0; overflow: hidden; transition-property: max-height, width; transition-duration: 0.2s, 0.5s; }
+.basic-panel {
+    background-color: rgba(255, 255, 255, 0.2);
+    margin-left: auto; margin-right: auto;
+    width: 85%;
+    border-right: rgb(101, 189, 162, 0.5) solid 6px;
+    border-left: rgb(101, 189, 162, 0.5) solid 6px;
+    border-bottom-left-radius: 3%; border-bottom-right-radius: 3%;
+}
+.accordion-result, .accordion-result.active { transition-property: width, margin-left, margin-right; transition-duration: 0.2s; }
+.accordion1, .basic-panel .accordion1 + .panel-description { width: 50%; margin-left: 25%; margin-right: 25%; }
+
+/* ========== Arrow ========== */
+.accordion0 div.arrow-indicator {
+    border-top: rgba(61, 128, 119, 0.7) solid 0.3vw;
+    border-right: rgba(61, 128, 119, 0.7) solid 0.3vw;
+    border-radius: 5px;
+    height: 1vw; width: 1vw;
+    margin-right: 1vw;
+    display: inline-block;
+    transform: rotate(45deg);
+    transition: transform 0.5s;
+}
+.accordion0.active div.arrow-indicator { transform: rotate(135deg); }
 
 /* ========== Summary Card ========== */
 .summary-card {
-    display: flex;
-    gap: 1.5rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin: 2rem 0 3rem;
+    display: flex; gap: 1.5rem; justify-content: center;
+    flex-wrap: wrap; margin: 2rem auto 3rem; max-width: 800px;
 }
 .stat-box {
-    background: white;
-    border-radius: 12px;
-    padding: 1.2rem 2rem;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    min-width: 150px;
+    background: white; border-radius: 12px;
+    padding: 1.2rem 2rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); min-width: 150px;
 }
-.stat-box .number {
-    font-size: 2rem;
-    font-weight: 700;
-}
-.stat-box .label {
-    font-size: 0.85rem;
-    color: #777;
-    margin-top: 0.3rem;
-}
+.stat-box .number { font-size: 2rem; font-weight: 700; }
+.stat-box .label { font-size: 0.85rem; color: #777; margin-top: 0.3rem; }
 .stat-positive .number { color: #2e8b57; }
 .stat-negative .number { color: #c0392b; }
 .stat-total .number { color: #269292; }
 .stat-weight .number { color: #5a7a72; }
 
-/* ========== Section headings ========== */
-.section-heading {
-    color: #39917b;
-    font-size: 1.8rem;
-    font-weight: 500;
-    text-align: center;
-    margin: 3rem 0 1.5rem;
-    padding-top: 1rem;
-    border-top: 2px solid rgba(101, 189, 162, 0.3);
-}
-
-/* ========== Accordion / Pathway cards ========== */
-.pathway-card {
-    margin: 1.5rem 0;
-    border: 2px solid rgba(101, 189, 162, 0.5);
-    border-radius: 12px;
-    overflow: hidden;
-    background: rgba(255,255,255,0.6);
-}
-.pathway-header {
-    background: rgba(255,255,255,0.8);
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: #2f746a;
-    transition: background 0.2s;
-}
-.pathway-header:hover { background: rgba(255,255,255,0.95); }
-.pathway-header .arrow {
-    display: inline-block;
-    width: 10px; height: 10px;
-    border-right: 3px solid #3d8077;
-    border-top: 3px solid #3d8077;
-    transform: rotate(45deg);
-    transition: transform 0.3s;
-    flex-shrink: 0;
-}
-.pathway-card.open .pathway-header .arrow {
-    transform: rotate(135deg);
-}
-.pathway-header .badge {
-    margin-left: auto;
-    font-size: 0.8rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 10px;
-    font-weight: 600;
-}
-.badge-positive { background: #e8f5e9; color: #2e7d32; }
-.badge-negative { background: #fce4ec; color: #c62828; }
-
-.pathway-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s ease;
-}
-.pathway-card.open .pathway-body {
-    max-height: none;
-}
-.pathway-description {
-    padding: 1rem 1.5rem;
-    color: #545570;
-    border-bottom: 1px solid rgba(101,189,162,0.2);
-    font-size: 0.95rem;
-    line-height: 1.7;
-}
-
-/* ========== Variant table ========== */
-.variants-table-wrap {
-    overflow-x: auto;
-    padding: 0.5rem 1rem 1rem;
-}
-table.variants {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.88rem;
-    background: white;
-    border: 1px solid rgba(34,36,38,0.12);
-    border-radius: 6px;
-    overflow: hidden;
-}
-table.variants th {
-    background: #f5f8f7;
-    color: rgba(0,0,0,0.8);
-    padding: 0.7rem 0.6rem;
-    font-weight: 600;
-    text-align: left;
-    border-bottom: 2px solid rgba(101,189,162,0.4);
-    white-space: nowrap;
-}
-table.variants td {
-    padding: 0.55rem 0.6rem;
-    border-bottom: 1px solid rgba(34,36,38,0.06);
-    vertical-align: top;
-}
-table.variants tbody tr:hover {
-    background: #f0f7f5;
-}
-table.variants .weight-cell {
-    font-weight: 700;
-    text-align: center;
-    border-radius: 4px;
-    min-width: 50px;
-}
-
-/* ========== Expandable detail row ========== */
-.detail-toggle {
-    cursor: pointer;
-    color: #3a9e8f;
-    font-weight: 600;
-    text-align: center;
-    width: 30px;
-}
-.detail-toggle:hover { color: #269292; }
-.variant-detail {
-    display: none;
-    background: #fafcfb;
-}
-.variant-detail td {
-    padding: 1rem;
-}
-.detail-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.84rem;
-    margin: 0.5rem 0;
-}
-.detail-table th {
-    background: #f0f4f3;
-    padding: 0.4rem 0.5rem;
-    text-align: left;
-    font-weight: 600;
-    border-bottom: 1px solid #ddd;
-}
-.detail-table td {
-    padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid #eee;
-}
-
 /* ========== Module section ========== */
-.module-section {
-    margin: 2rem 0;
-    padding: 1.5rem;
-    background: rgba(255,255,255,0.7);
-    border-radius: 12px;
-    border: 2px solid rgba(101,189,162,0.3);
-}
-.module-section h3 {
-    color: #2f746a;
-    font-size: 1.3rem;
-    margin: 0 0 1rem;
-}
+.module-section { margin: 0.5rem auto; width: 85%; }
+.module-section .board { width: 100%; }
 
 /* ========== Back to top ========== */
 #toTop {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    width: 50px; height: 50px;
-    background: #308499;
-    border-radius: 50%;
-    display: none;
-    align-items: center;
-    justify-content: center;
+    z-index: 100; height: 70px; width: 70px;
+    background-color: #308499; border-radius: 50%;
+    position: fixed; right: 2.35%; bottom: 10%;
+    display: none; box-shadow: 3px 3px 15px rgba(30, 77, 88, 0.7);
     cursor: pointer;
-    box-shadow: 0 3px 12px rgba(30,77,88,0.4);
-    z-index: 100;
-    transition: background 0.2s;
 }
-#toTop:hover { background: #56c3bd; }
-#toTop::after {
-    content: '';
-    display: block;
-    width: 12px; height: 12px;
-    border-top: 3px solid white;
-    border-left: 3px solid white;
-    transform: rotate(45deg);
-    margin-top: 4px;
-}
+#toTop:hover { background-color: #56C3BD; }
+.arrow-nav { position: absolute; bottom: 10%; z-index: 10; }
+.bodypart { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 16px solid white; right: 20px; top: 20%; }
+.line-nav { right: 31px; bottom: 18px; background: white; width: 8px; height: 33px; }
+
+/* ========== Clickable rows ========== */
+.clickable { cursor: pointer; }
+.clickable:hover { background-color: #eef1f5; }
 
 /* ========== Responsive ========== */
-@media (max-width: 768px) {
-    .report-header h1 { font-size: 2rem; }
-    .summary-card { gap: 0.8rem; }
-    .stat-box { min-width: 120px; padding: 0.8rem 1rem; }
-    .stat-box .number { font-size: 1.5rem; }
-    .pathway-header { font-size: 1rem; }
-    table.variants { font-size: 0.78rem; }
-    table.variants th, table.variants td { padding: 0.4rem; }
+@media only screen and (max-width: 1400px) {
+    .intro { width: 75%; font-size: 1.4vw; }
+    .first { font-size: 4.5vw; }
+    .attention p { font-size: 1.6vw; }
+    .attention { margin-top: 7vw; margin-bottom: 7vw; width: 90%; }
+    .attention strong { font-size: 1.8vw; }
+    h2 { line-height: 5vw; font-size: 4vw; }
+    .li1 { font-size: 2.2vw; }
+    .accordion0, .accordion-heading, .accordion0.accordion.accordion1 { width: 80%; margin-left: 10%; margin-right: 10%; height: 8vw; font-size: 2.5vw; }
+    .panel, .accordion0.accordion.accordion1 + .panel-description { width: 80%; margin-left: 10%; margin-right: 10%; font-size: 1.7vw; padding: 2.5vw 3.5vw; }
+    .accordion0 div.arrow-indicator { height: 2vw; width: 2vw; border-top-width: 0.6vw; border-right-width: 0.6vw; margin-right: 2vw; }
+    .basic-panel { width: 98%; }
+    table.ui { font-size: 1.3vw; }
+    h2 { margin-top: 18vw; }
+}
+@media only screen and (max-width: 600px) {
+    .intro { width: 90%; font-size: 3.1vw; }
+    .attention p { font-size: 3.1vw; }
+    .attention strong { font-size: 4vw; }
+    .attention { padding: 3vw 4vw; }
+    .basic-panel { width: 100%; }
+    .accordion0, .accordion-heading, .accordion0.accordion.accordion1 { height: 12vw; font-size: 4vw; width: 95%; margin-left: 2.5%; margin-right: 2.5%; }
+    .panel, .accordion0.accordion.accordion1 + .panel-description { margin-left: 2.5%; margin-right: 2.5%; width: 95%; font-size: 3vw; }
+    .accordion0 div.arrow-indicator { height: 3.5vw; width: 3.5vw; border-top-width: 1vw; border-right-width: 1vw; margin-right: 2vw; margin-left: 1vw; }
+    .accordion.accordion-heading { height: 16vw; }
+    .first { font-size: 8vw; }
+    .li1 { font-size: 4.8vw; }
+    .attention { margin-top: 10vw; margin-bottom: 10vw; width: 90%; border-width: 2px; border-radius: 13px; }
+    h1 { line-height: 9vw; font-size: 6vw; }
+    h2 { line-height: 8vw; font-size: 7vw; margin-top: 20vw; }
+    table.ui td, table.ui th { padding: 2px; font-size: 1.5vw; line-height: 2.3vw; }
 }
 </style>
+
+<script>
+/* Expand a variant detail row (inside a table) */
+function expand(obj) {
+    var tdEl = obj.children[0];
+    var el = obj.nextSibling;
+    if (el.nodeName == "#text") el = el.nextSibling;
+    var parent = el.parentElement;
+    parent = parent.parentElement.parentElement;
+    var board = parent.parentElement;
+    el.style.display = "";
+    el.style.maxHeight = el.scrollHeight + "px";
+    if (board.classList.contains("basic-panel")) {
+        board.style.maxHeight = Number(board.style.maxHeight.slice(0, -2)) + el.scrollHeight + "px";
+    }
+    parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) + el.scrollHeight + "px";
+    tdEl.innerHTML = '<div class="ui tiny circular compact negative button">-</div>';
+}
+
+/* Collapse a variant detail row */
+function collapse(obj) {
+    var tdEl = obj.children[0];
+    var el = obj.nextSibling;
+    if (el.nodeName == "#text") el = el.nextSibling;
+    var parent = el.parentElement;
+    parent = parent.parentElement.parentElement;
+    var board = parent.parentElement;
+    if (board.classList.contains("basic-panel")) {
+        board.style.maxHeight = Number(board.style.maxHeight.slice(0, -2)) - el.scrollHeight + "px";
+    }
+    parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) - el.scrollHeight + "px";
+    el.style.maxHeight = '0';
+    setTimeout(function() { el.style.display = "none"; }, 150);
+    tdEl.innerHTML = '<div class="ui tiny circular compact positive button">+</div>';
+}
+
+/* Toggle a variant detail row on click */
+function doOnClick(obj) {
+    var el = obj.nextSibling;
+    if (el.nodeName == "#text") el = el.nextSibling;
+    if (el.style.display == "none") expand(obj);
+    else collapse(obj);
+}
+
+/* Expand/collapse all variant details in a table body */
+function collapseExpandAll(obj, id) {
+    var el = document.getElementById(id);
+    if (obj.innerHTML.indexOf("positive") !== -1) {
+        for (var i = 0; i < el.children.length; i++)
+            if (el.children[i].children && el.children[i].children.length > 3)
+                expand(el.children[i]);
+        obj.innerHTML = '<div class="ui tiny circular compact negative button">-</div>';
+    } else {
+        for (var i = 0; i < el.children.length; i++)
+            if (el.children[i].children && el.children[i].children.length > 3)
+                collapse(el.children[i]);
+        obj.innerHTML = '<div class="ui tiny circular compact positive button">+</div>';
+    }
+}
+
+/* Toggle a sub-accordion (Description / Results buttons) */
+function toggleAccordion(btn) {
+    btn.classList.toggle('active');
+    var panel = btn.nextElementSibling;
+    if (btn.classList.contains('active')) {
+        panel.style.display = 'block';
+        panel.style.maxHeight = panel.scrollHeight + 'px';
+        /* Also grow the parent basic-panel if nested */
+        var parent = btn.parentElement;
+        if (parent && parent.classList.contains('basic-panel')) {
+            parent.style.maxHeight = (Number(parent.style.maxHeight.slice(0, -2)) || 0) + panel.scrollHeight + 100 + 'px';
+        }
+    } else {
+        var oldHeight = panel.scrollHeight;
+        panel.style.maxHeight = '0';
+        setTimeout(function() { panel.style.display = 'none'; }, 200);
+        /* Shrink parent basic-panel */
+        var parent = btn.parentElement;
+        if (parent && parent.classList.contains('basic-panel')) {
+            parent.style.maxHeight = Math.max(0, (Number(parent.style.maxHeight.slice(0, -2)) || 0) - oldHeight) + 'px';
+        }
+    }
+}
+
+/* Toggle a pathway heading accordion */
+function toggleHeading(btn) {
+    btn.classList.toggle('active');
+    var panel = btn.nextElementSibling;
+    if (btn.classList.contains('active')) {
+        /* Expand: widen button and show panel */
+        panel.style.maxHeight = panel.scrollHeight + 'px';
+        btn.style.width = '85%';
+        btn.style.marginLeft = '7.5%';
+        btn.style.marginRight = '7.5%';
+        btn.style.borderBottomLeftRadius = '0';
+        btn.style.borderBottomRightRadius = '0';
+    } else {
+        /* Collapse: restore button width and hide panel */
+        panel.style.maxHeight = '0';
+        btn.style.width = '';
+        btn.style.marginLeft = '';
+        btn.style.marginRight = '';
+        btn.style.borderBottomLeftRadius = '';
+        btn.style.borderBottomRightRadius = '';
+    }
+}
+
+/* Back to top button */
+window.onscroll = function() {
+    var btn = document.getElementById("toTop");
+    if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
+        btn.style.display = "block";
+    } else {
+        btn.style.display = "none";
+    }
+};
+</script>
 </head>
+
 <body>
-
-<div id="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})"></div>
-
-<div class="container">
-
-<!-- ===== HEADER ===== -->
-<div class="report-header">
-    <h1>Longevity Report</h1>
-    {% if user_name or sample_name %}
-    <div class="subtitle">
-        {% if user_name %}{{ user_name }}{% endif %}
-        {% if sample_name %} &mdash; {{ sample_name }}{% endif %}
-    </div>
-    {% endif %}
+<div id="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <section class="line-nav arrow-nav"></section>
+    <section class="bodypart arrow-nav"></section>
 </div>
 
-<!-- ===== INTRO ===== -->
+<h1 class="first" align="center">Longevity Report</h1>
+<br>
+
 <div class="intro">
-    <p>This report provides data about your longevity genetics. Longevity and healthy lifespan are among the most complex phenotypes, with heritability of age at death in adulthood being approximately 25%. The other 75% is highly dependent on lifestyle.</p>
-    <p>This report is based on your genome data cross-referenced against available genetic databases. Annotation modules used: <a href="https://huggingface.co/datasets/just-dna-seq/annotators">just-dna-seq/annotators</a> (LongevityMap and other modules).</p>
+    {% if user_name or sample_name %}
+    <p style="font-size: 1.5em; color: #269292;">
+        {% if user_name %}{{ user_name }}{% endif %}
+        {% if sample_name %} &mdash; {{ sample_name }}{% endif %}
+    </p>
+    {% endif %}
+
+    <p>This report provides data about your longevity genetics. Longevity and healthy lifespan are among the most complex phenotypes, with heritability of age at death in adulthood being approximately 25%. So, the other 75% is highly dependent on lifestyle.</p>
+
+    <p>This report is based on your genome data cross-referenced against available genetic databases. Annotation modules used:
+        <a href="https://huggingface.co/datasets/just-dna-seq/annotators">just-dna-seq/annotators</a> (LongevityMap and other modules).
+    </p>
 
     <div class="attention">
         <p><strong>Attention!</strong> The information provided is for informational purposes only. Its clinical implementation is possible only after consulting your healthcare practitioner. All drugs, vitamins and lifestyle changes may be prescribed only by your healthcare practitioner, based on clinical blood test results, family history, etc.</p>
     </div>
 
-    <ul class="toc">
+    <p>The report consists of:</p>
+    <ul>
         {% if longevity %}
-        <li><a href="#longevity-variants">Longevity Variants</a></li>
+        <li><a href="#variants" class="li1">Longevity variants</a></li>
         {% endif %}
         {% for mod in other_modules %}
-        <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
+        <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
         {% endfor %}
     </ul>
 </div>
 
-<!-- ===== LONGEVITY VARIANTS SECTION ===== -->
+{# ===== LONGEVITY VARIANTS SECTION ===== #}
 {% if longevity %}
-<h2 id="longevity-variants" class="section-heading">Longevity Variants</h2>
+<h2 id="variants">Longevity variants</h2>
 
-<p style="text-align:center; color:#545570; max-width:800px; margin:0 auto 1rem;">
-    This section estimates how many significant longevity variations you have. The data is obtained mainly by studying centenarians' genomes and is based on variants from <a href="https://genomics.senescence.info/longevity/">LongevityMap</a> and other data sources.
-</p>
+<button class="accordion accordion0 accordion1 panel-variants module-button active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
+    <div class="arrow-indicator"></div> Description
+</button>
+<div class="board variants panel panel-description" style="display: block; max-height: 2000px;">
+    <p>This report estimates how many significant longevity variations you have. The data is obtained mainly by studying centenarians' genomes.</p>
+    <p>The longevity variants report is based on variants from <a href="https://genomics.senescence.info/longevity/">LongevityMap</a> and other data sources which are scored and prioritized according to multiple criteria.</p>
+    <p>In the table you can see how many significant variants were found in your genome. Positively longevity-associated variants are marked with green, negatively associated with red.</p>
+    <p>We have analyzed genes that affect different longevity pathways in your genome and divided them into {{ longevity.categories | length }} distinct groups, so you can see which of them "work well" and which do not.</p>
+</div>
 
-<!-- Summary -->
+{# Summary stats #}
 <div class="summary-card">
     <div class="stat-box stat-total">
         <div class="number">{{ longevity.summary.total_variants }}</div>
@@ -350,108 +430,107 @@ table.variants .weight-cell {
     </div>
 </div>
 
-<!-- Pathway categories -->
+{# Pathway categories with variants #}
 {% for cat_key, cat in longevity.categories.items() %}
 {% if cat.total_count > 0 %}
-<div class="pathway-card" id="pathway-{{ cat_key }}">
-    <div class="pathway-header" onclick="togglePathway(this)">
-        <span class="arrow"></span>
-        <span>{{ cat.title }}</span>
-        {% if cat.positive_count > 0 %}
-        <span class="badge badge-positive">+{{ cat.positive_count }}</span>
-        {% endif %}
-        {% if cat.negative_count > 0 %}
-        <span class="badge badge-negative">&minus;{{ cat.negative_count }}</span>
-        {% endif %}
+<button class="accordion accordion-heading" onclick="toggleHeading(this)">{{ cat.title }}</button>
+<div class="basic-panel" id="pathway-{{ cat_key }}">
+
+    <button class="accordion accordion0 accordion1 active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
+        <div class="arrow-indicator"></div> Description
+    </button>
+    <div class="board variants panel panel-description" style="display: block; max-height: 2000px;">
+        <p>{{ cat.description }}</p>
     </div>
-    <div class="pathway-body">
-        <div class="pathway-description">{{ cat.description }}</div>
-        <div class="variants-table-wrap">
-            <table class="variants">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>RSID</th>
-                        <th>Gene</th>
-                        <th>Your genotype</th>
-                        <th>Ref</th>
-                        <th>Alt</th>
-                        <th>Zygosity</th>
-                        <th>Weight</th>
-                    </tr>
-                </thead>
-                <tbody>
+
+    <button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
+        <div class="arrow-indicator"></div> Results
+    </button>
+    <div class="content content-variants">
+        <table class="ui selectable celled teal table table variants">
+            <thead>
+                <tr>
+                    <th class="clickable title" onclick="collapseExpandAll(this, '{{ cat_key }}TBody')"><div class="ui tiny circular compact positive button">+</div></th>
+                    <th>RSID</th>
+                    <th>Gene</th>
+                    <th>Your genotype</th>
+                    <th>Ref allele</th>
+                    <th>Alt allele</th>
+                    <th>Zygosity</th>
+                    <th>Weight</th>
+                </tr>
+            </thead>
+            <tbody id="{{ cat_key }}TBody">
                 {% for v in cat.variants %}
-                    <tr class="variant-row" onclick="toggleDetail(this)">
-                        <td class="detail-toggle">+</td>
-                        <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}" onclick="event.stopPropagation()">{{ v.rsid }}</a></td>
-                        <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}" onclick="event.stopPropagation()">{{ v.gene }}</a>{% endif %}</td>
-                        <td>{{ v.genotype_str }}</td>
-                        <td>{{ v.ref }}</td>
-                        <td>{{ v.alt }}</td>
-                        <td>{{ v.zygosity }}</td>
-                        <td class="weight-cell" style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
-                    </tr>
-                    <tr class="variant-detail">
-                        <td colspan="8">
-                            <table class="detail-table">
-                                {% if v.conclusion %}
-                                <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
-                                {% endif %}
-                                {% if v.method %}
-                                <tr><th>Method</th><td>{{ v.method }}</td></tr>
-                                {% endif %}
-                                {% if v.state %}
-                                <tr><th>State</th><td>{{ v.state }}</td></tr>
-                                {% endif %}
-                                {% if v.clinvar %}
-                                <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
-                                {% endif %}
-                            </table>
-                            {% if v.studies %}
-                            <table class="detail-table" style="margin-top:0.5rem">
-                                <thead>
-                                    <tr>
-                                        <th>PubMed ID</th>
-                                        <th>Population</th>
-                                        <th>P-value</th>
-                                        <th>Conclusion</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                <tr class="clickable" onclick="doOnClick(this)">
+                    <td><div class="ui tiny circular compact positive button">+</div></td>
+                    <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
+                    <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
+                    <td>{{ v.genotype_str }}</td>
+                    <td>{{ v.ref }}</td>
+                    <td>{{ v.alt }}</td>
+                    <td>{{ v.zygosity }}</td>
+                    <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+                </tr>
+                <tr class="hidden" style="display:none;"><td colspan="8">
+                    <table class="ui padded table">
+                    <tbody>
+                        {% if v.conclusion %}
+                        <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
+                        {% endif %}
+                        {% if v.method %}
+                        <tr><th>Method</th><td>{{ v.method }}</td></tr>
+                        {% endif %}
+                        {% if v.state %}
+                        <tr><th>State</th><td>{{ v.state }}</td></tr>
+                        {% endif %}
+                        {% if v.clinvar %}
+                        <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                        {% endif %}
+                        {% if v.studies %}
+                        <tr><td colspan="2">
+                        <table class="ui selectable celled teal table table variants">
+                            <thead>
+                                <tr>
+                                    <th>Pubmed ID</th>
+                                    <th>Population</th>
+                                    <th>Study design</th>
+                                    <th>Conclusions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 {% for s in v.studies %}
-                                    <tr>
-                                        <td>{{ s.pmid }}</td>
-                                        <td>{{ s.population }}</td>
-                                        <td>{{ s.p_value }}</td>
-                                        <td>{{ s.conclusion }}</td>
-                                    </tr>
+                                <tr>
+                                    <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
+                                    <td style="font-weight: normal;">{{ s.population }}</td>
+                                    <td style="font-weight: normal;">{{ s.study_design }}</td>
+                                    <td style="font-weight: normal;">{{ s.conclusion }}</td>
+                                </tr>
                                 {% endfor %}
-                                </tbody>
-                            </table>
-                            {% endif %}
-                        </td>
-                    </tr>
+                            </tbody>
+                        </table>
+                        </td></tr>
+                        {% endif %}
+                    </tbody></table>
+                </td></tr>
                 {% endfor %}
-                </tbody>
-            </table>
-        </div>
+            </tbody>
+        </table>
     </div>
+
+    <div style="height: 4vw;"></div>
 </div>
 {% endif %}
 {% endfor %}
 
-<!-- Categories with no variants -->
+{# Pathway categories with no variants #}
 {% for cat_key, cat in longevity.categories.items() %}
 {% if cat.total_count == 0 %}
-<div class="pathway-card">
-    <div class="pathway-header" onclick="togglePathway(this)">
-        <span class="arrow"></span>
-        <span>{{ cat.title }}</span>
-        <span class="badge" style="background:#f5f5f5; color:#999;">0 variants</span>
-    </div>
-    <div class="pathway-body">
-        <div class="pathway-description">{{ cat.description }}<br><br><em>No annotated variants found for this pathway in your genome.</em></div>
+<button class="accordion accordion-heading" onclick="toggleHeading(this)" style="opacity: 0.6;">{{ cat.title }} (0 variants)</button>
+<div class="basic-panel">
+    <div class="board variants panel panel-description" style="display: block; max-height: 500px;">
+        <p>{{ cat.description }}</p>
+        <p><em>No annotated variants found for this pathway in your genome.</em></p>
     </div>
 </div>
 {% endif %}
@@ -459,11 +538,18 @@ table.variants .weight-cell {
 
 {% endif %}
 
-<!-- ===== OTHER MODULES ===== -->
+{# ===== OTHER MODULES ===== #}
 {% for mod in other_modules %}
-<h2 id="module-{{ mod.module_name }}" class="section-heading">{{ mod.display_name }}</h2>
+<h2 id="module-{{ mod.module_name }}">{{ mod.display_name }}</h2>
 
 {% if mod.variants %}
+<button class="accordion accordion0 accordion1 module-button active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
+    <div class="arrow-indicator"></div> Description
+</button>
+<div class="board variants panel panel-description" style="display: block; max-height: 500px;">
+    <p>This section shows your genetic variants annotated with the <strong>{{ mod.display_name }}</strong> module. {{ mod.summary.total_variants }} variants were found, {{ mod.summary.total_positive }} with positive weight and {{ mod.summary.total_negative }} with negative weight.</p>
+</div>
+
 <div class="summary-card">
     <div class="stat-box stat-total">
         <div class="number">{{ mod.summary.total_variants }}</div>
@@ -483,119 +569,87 @@ table.variants .weight-cell {
     </div>
 </div>
 
-<div class="module-section">
-    <div class="variants-table-wrap">
-        <table class="variants">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>RSID</th>
-                    <th>Gene</th>
-                    <th>Your genotype</th>
-                    <th>Ref</th>
-                    <th>Alt</th>
-                    <th>Zygosity</th>
-                    <th>Weight</th>
-                </tr>
-            </thead>
-            <tbody>
+<button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
+    <div class="arrow-indicator"></div> Results
+</button>
+<div class="content content-variants module-section">
+    <table class="ui selectable celled teal table table variants">
+        <thead>
+            <tr>
+                <th class="clickable title" onclick="collapseExpandAll(this, '{{ mod.module_name }}TBody')"><div class="ui tiny circular compact positive button">+</div></th>
+                <th>RSID</th>
+                <th>Gene</th>
+                <th>Your genotype</th>
+                <th>Ref allele</th>
+                <th>Alt allele</th>
+                <th>Zygosity</th>
+                <th>Weight</th>
+            </tr>
+        </thead>
+        <tbody id="{{ mod.module_name }}TBody">
             {% for v in mod.variants %}
-                <tr class="variant-row" onclick="toggleDetail(this)">
-                    <td class="detail-toggle">+</td>
-                    <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}" onclick="event.stopPropagation()">{{ v.rsid }}</a></td>
-                    <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}" onclick="event.stopPropagation()">{{ v.gene }}</a>{% endif %}</td>
-                    <td>{{ v.genotype_str }}</td>
-                    <td>{{ v.ref }}</td>
-                    <td>{{ v.alt }}</td>
-                    <td>{{ v.zygosity }}</td>
-                    <td class="weight-cell" style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
-                </tr>
-                <tr class="variant-detail">
-                    <td colspan="8">
-                        <table class="detail-table">
-                            {% if v.conclusion %}
-                            <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
-                            {% endif %}
-                            {% if v.method %}
-                            <tr><th>Method</th><td>{{ v.method }}</td></tr>
-                            {% endif %}
-                            {% if v.state %}
-                            <tr><th>State</th><td>{{ v.state }}</td></tr>
-                            {% endif %}
-                            {% if v.clinvar %}
-                            <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
-                            {% endif %}
-                        </table>
-                        {% if v.studies %}
-                        <table class="detail-table" style="margin-top:0.5rem">
-                            <thead>
-                                <tr>
-                                    <th>PubMed ID</th>
-                                    <th>Population</th>
-                                    <th>P-value</th>
-                                    <th>Conclusion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+            <tr class="clickable" onclick="doOnClick(this)">
+                <td><div class="ui tiny circular compact positive button">+</div></td>
+                <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
+                <td>{% if v.gene %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
+                <td>{{ v.genotype_str }}</td>
+                <td>{{ v.ref }}</td>
+                <td>{{ v.alt }}</td>
+                <td>{{ v.zygosity }}</td>
+                <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+            </tr>
+            <tr class="hidden" style="display:none;"><td colspan="8">
+                <table class="ui padded table">
+                <tbody>
+                    {% if v.conclusion %}
+                    <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
+                    {% endif %}
+                    {% if v.method %}
+                    <tr><th>Method</th><td>{{ v.method }}</td></tr>
+                    {% endif %}
+                    {% if v.state %}
+                    <tr><th>State</th><td>{{ v.state }}</td></tr>
+                    {% endif %}
+                    {% if v.clinvar %}
+                    <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                    {% endif %}
+                    {% if v.studies %}
+                    <tr><td colspan="2">
+                    <table class="ui selectable celled teal table table variants">
+                        <thead>
+                            <tr>
+                                <th>Pubmed ID</th>
+                                <th>Population</th>
+                                <th>Study design</th>
+                                <th>Conclusions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             {% for s in v.studies %}
-                                <tr>
-                                    <td>{{ s.pmid }}</td>
-                                    <td>{{ s.population }}</td>
-                                    <td>{{ s.p_value }}</td>
-                                    <td>{{ s.conclusion }}</td>
-                                </tr>
+                            <tr>
+                                <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
+                                <td style="font-weight: normal;">{{ s.population }}</td>
+                                <td style="font-weight: normal;">{{ s.study_design }}</td>
+                                <td style="font-weight: normal;">{{ s.conclusion }}</td>
+                            </tr>
                             {% endfor %}
-                            </tbody>
-                        </table>
-                        {% endif %}
-                    </td>
-                </tr>
+                        </tbody>
+                    </table>
+                    </td></tr>
+                    {% endif %}
+                </tbody></table>
+            </td></tr>
             {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        </tbody>
+    </table>
 </div>
+
 {% else %}
-<p style="text-align:center; color:#888;">No annotated variants found for this module.</p>
+<p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
 {% endif %}
 {% endfor %}
 
-</div><!-- .container -->
-
-<div style="height:80px"></div>
-
-<script>
-/* Toggle pathway accordion */
-function togglePathway(header) {
-    var card = header.parentElement;
-    card.classList.toggle('open');
-}
-
-/* Toggle variant detail row */
-function toggleDetail(row) {
-    var detail = row.nextElementSibling;
-    var toggle = row.querySelector('.detail-toggle');
-    if (detail && detail.classList.contains('variant-detail')) {
-        if (detail.style.display === 'table-row') {
-            detail.style.display = 'none';
-            toggle.textContent = '+';
-        } else {
-            detail.style.display = 'table-row';
-            toggle.textContent = '\u2212';
-        }
-    }
-}
-
-/* Back to top button */
-window.addEventListener('scroll', function() {
-    var btn = document.getElementById('toTop');
-    if (window.pageYOffset > 300) {
-        btn.style.display = 'flex';
-    } else {
-        btn.style.display = 'none';
-    }
-});
-</script>
+<div style="height: 80px;"></div>
 
 </body>
 </html>

@@ -4,6 +4,10 @@ Module configuration loader.
 Reads modules.yaml to determine which sources to scan for annotation modules
 and provides optional display metadata overrides for discovered modules.
 
+The file is searched in two locations (first found wins):
+  1. Project root (next to the workspace pyproject.toml) — easy for users to find/edit
+  2. Package directory (just_dna_pipelines/src/just_dna_pipelines/) — bundled fallback
+
 Modules are always auto-discovered from sources. This config only controls
 which sources to scan and how modules are displayed in the UI, CLI, and
 reports. Modules not listed in the YAML get sensible defaults.
@@ -104,16 +108,47 @@ class ModulesConfig(BaseModel):
         return data
 
 
+def _find_project_root() -> Optional[Path]:
+    """Walk up from CWD looking for the workspace pyproject.toml with [tool.uv.workspace]."""
+    candidate = Path.cwd()
+    for _ in range(10):  # safety limit
+        pyproject = candidate / "pyproject.toml"
+        if pyproject.exists() and "[tool.uv.workspace]" in pyproject.read_text():
+            return candidate
+        parent = candidate.parent
+        if parent == candidate:
+            break
+        candidate = parent
+    return None
+
+
 def _load_config() -> ModulesConfig:
-    """Load modules.yaml from the package directory."""
-    config_path = Path(__file__).parent / "modules.yaml"
-    if not config_path.exists():
-        return ModulesConfig()
-    with open(config_path) as f:
-        raw = yaml.safe_load(f)
-    if raw is None:
-        return ModulesConfig()
-    return ModulesConfig.model_validate(raw)
+    """
+    Load modules.yaml, checking two locations in order:
+
+    1. Project root (next to the workspace pyproject.toml) — easy for users to find/edit
+    2. Package directory (just_dna_pipelines/) — bundled fallback
+
+    The first file found wins. If neither exists, returns defaults.
+    """
+    search_paths: list[Path] = []
+
+    # 1. Project root (preferred — user-facing)
+    project_root = _find_project_root()
+    if project_root is not None:
+        search_paths.append(project_root / "modules.yaml")
+
+    # 2. Package directory (bundled fallback)
+    search_paths.append(Path(__file__).parent / "modules.yaml")
+
+    for config_path in search_paths:
+        if config_path.exists():
+            with open(config_path) as f:
+                raw = yaml.safe_load(f)
+            if raw is not None:
+                return ModulesConfig.model_validate(raw)
+
+    return ModulesConfig()
 
 
 # Loaded once at import time

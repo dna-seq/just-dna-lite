@@ -74,7 +74,9 @@ uv run pipelines sync-vcf-partitions
 
 ### Module Sources
 
-Annotation module sources are configured in `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`. Modules are auto-discovered from any fsspec-compatible URL (HuggingFace, GitHub, HTTP, S3, etc.). To add a new source, edit the `sources:` list in the YAML. Display metadata (titles, icons, colors) can be overridden under `module_metadata:`.
+Annotation module sources are configured in **`modules.yaml`** at the project root. Modules are auto-discovered from any fsspec-compatible URL (HuggingFace, GitHub, HTTP, S3, etc.). To add a new source, edit the `sources:` list in the YAML. Display metadata (titles, icons, colors) can be overridden under `module_metadata:`.
+
+The loader also checks `just-dna-pipelines/src/just_dna_pipelines/modules.yaml` as a fallback, but the root-level file takes priority.
 
 ### Environment Variables
 
