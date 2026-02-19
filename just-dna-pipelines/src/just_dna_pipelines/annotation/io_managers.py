@@ -13,6 +13,7 @@ from just_dna_pipelines.annotation.resources import (
     get_user_output_dir,
     get_default_ensembl_cache_dir,
 )
+from eliot import start_action
 
 
 class SourceMetadataIOManager(IOManager):
@@ -64,15 +65,25 @@ class AnnotationCacheIOManager(IOManager):
         context.log.info(f"Annotation asset stored at: {obj}")
     
     def load_input(self, context: InputContext) -> Path:
-        """Load asset by returning its cache path."""
+        """Load asset by returning its cache path.
+        
+        For ensembl_duckdb, auto-builds from existing parquet cache if the
+        DuckDB file is missing but the parquet files are present.
+        """
         asset_key = context.upstream_output.asset_key.to_user_string() if context.upstream_output else "unknown"
         cache_path = self._get_asset_path(asset_key)
         
         if not cache_path.exists():
-            raise FileNotFoundError(
-                f"Annotation cache not found at {cache_path}. "
-                f"Materialize the {asset_key} asset first."
-            )
+            if asset_key == "ensembl_duckdb":
+                with start_action(action_type="auto_build_ensembl_duckdb"):
+                    from just_dna_pipelines.annotation.duckdb_assets import ensure_ensembl_duckdb_exists
+                    context.log.info("DuckDB file missing, attempting auto-build from parquet cache...")
+                    cache_path = ensure_ensembl_duckdb_exists(logger=context.log)
+            else:
+                raise FileNotFoundError(
+                    f"Annotation cache not found at {cache_path}. "
+                    f"Materialize the {asset_key} asset first."
+                )
         
         context.log.info(f"Loading annotation from cache: {cache_path}")
         return cache_path

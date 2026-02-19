@@ -179,6 +179,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
     available_modules: list[str] = DISCOVERED_MODULES.copy()
     selected_modules: list[str] = DISCOVERED_MODULES.copy()
     
+    # Ensembl annotation toggle (DuckDB-based, optional)
+    include_ensembl: bool = False
+    
     # Class variable to track active in-process runs (for SIGTERM cleanup)
     # Maps run_id -> partition_key for runs executing via execute_in_process
     _active_inproc_runs: Dict[str, str] = {}
@@ -608,6 +611,10 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.last_run_success = False
         self.selected_modules = []
 
+    def toggle_ensembl(self):
+        """Toggle Ensembl variation annotation on/off."""
+        self.include_ensembl = not self.include_ensembl
+
     async def run_hf_annotation(self, filename: str = ""):
         """
         Trigger HF module annotation for a file.
@@ -638,10 +645,18 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.asset_statuses[partition_key]["hf_annotated"] = "running"
         yield
         
-        job_name = "annotate_and_report_job"
+        has_hf_modules = bool(self.selected_modules)
+        has_ensembl = self.include_ensembl
         
-        # Use selected modules, or None for all if none selected
-        modules_to_use = self.selected_modules if self.selected_modules else None
+        # Determine job based on what's selected
+        if has_hf_modules and has_ensembl:
+            job_name = "annotate_all_job"
+        elif has_ensembl:
+            job_name = "annotate_ensembl_only_job"
+        else:
+            job_name = "annotate_and_report_job"
+        
+        modules_to_use = self.selected_modules if has_hf_modules else None
         
         # Get file metadata for the selected file
         file_info = self.file_metadata.get(filename, {})
@@ -654,39 +669,49 @@ class UploadState(LazyFrameGridMixin, rx.State):
         if sex_value:
             normalize_config["sex"] = sex_value
 
-        run_config = {
+        run_config: dict = {
             "ops": {
                 "user_vcf_normalized": {
                     "config": normalize_config,
                 },
-                "user_hf_module_annotations": {
-                    "config": {
-                        "vcf_path": str(vcf_path.absolute()),
-                        "user_name": self.safe_user_id,
-                        "sample_name": sample_name,
-                        "modules": modules_to_use,
-                        "species": file_info.get("species", "Homo sapiens"),
-                        "reference_genome": file_info.get("reference_genome", "GRCh38"),
-                        "subject_id": file_info.get("subject_id") or None,
-                        "sex": sex_value,
-                        "tissue": file_info.get("tissue") or None,
-                        "study_name": file_info.get("study_name") or None,
-                        "description": file_info.get("notes") or None,
-                        "custom_metadata": custom_metadata if custom_metadata else None,
-                    }
-                },
-                "user_longevity_report": {
-                    "config": {
-                        "user_name": self.safe_user_id,
-                        "sample_name": sample_name,
-                        "modules": modules_to_use,
-                    }
-                },
             }
         }
 
-        # Execute job in-process (like prepare-annotations does)
-        modules_info = ", ".join(modules_to_use) if modules_to_use else "all modules"
+        if has_hf_modules:
+            run_config["ops"]["user_hf_module_annotations"] = {
+                "config": {
+                    "vcf_path": str(vcf_path.absolute()),
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                    "species": file_info.get("species", "Homo sapiens"),
+                    "reference_genome": file_info.get("reference_genome", "GRCh38"),
+                    "subject_id": file_info.get("subject_id") or None,
+                    "sex": sex_value,
+                    "tissue": file_info.get("tissue") or None,
+                    "study_name": file_info.get("study_name") or None,
+                    "description": file_info.get("notes") or None,
+                    "custom_metadata": custom_metadata if custom_metadata else None,
+                }
+            }
+            run_config["ops"]["user_longevity_report"] = {
+                "config": {
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                }
+            }
+
+        if has_ensembl:
+            run_config["ops"]["user_annotated_vcf_duckdb"] = {
+                "config": {
+                    "vcf_path": str(vcf_path.absolute()),
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                }
+            }
+
+        modules_info = ", ".join(modules_to_use) if modules_to_use else ("Ensembl only" if has_ensembl else "all modules")
         result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
         
         if result.success:
@@ -753,11 +778,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Metadata editing mode - when False, shows read-only view
     metadata_edit_mode: bool = False
 
-    # Per-sample pipeline asset status: maps asset step to status info
-    # Each entry: {"status": "fresh"|"stale"|"missing", "materialized_at": str|"", "stale_reason": str|""}
-    pipeline_status_normalized: Dict[str, str] = {}
-    pipeline_status_annotated: Dict[str, str] = {}
-    pipeline_status_report: Dict[str, str] = {}
 
     def toggle_metadata_edit_mode(self):
         """Toggle between read-only and edit mode for metadata."""
@@ -896,73 +916,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.norm_filters_hash = ""
         self.norm_stats_loaded = False
 
-    def _load_asset_pipeline_status(self):
-        """Load materialization status for each pipeline step of the selected sample.
-
-        Checks four assets in the pipeline chain:
-          user_vcf_source -> user_vcf_normalized -> user_hf_module_annotations -> user_longevity_report
-
-        For each downstream asset, it is "stale" if its upstream was materialized more recently,
-        "fresh" if it exists and is up-to-date, or "missing" if never materialized.
-        """
-        empty: Dict[str, str] = {"status": "missing", "materialized_at": "", "stale_reason": ""}
-        if not self.selected_file or not self.safe_user_id:
-            self.pipeline_status_normalized = dict(empty)
-            self.pipeline_status_annotated = dict(empty)
-            self.pipeline_status_report = dict(empty)
-            return
-
-        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
-        partition_key = f"{self.safe_user_id}/{sample_name}"
-        instance = get_dagster_instance()
-
-        asset_names = [
-            "user_vcf_source",
-            "user_vcf_normalized",
-            "user_hf_module_annotations",
-            "user_longevity_report",
-        ]
-
-        # Fetch all timestamps in one pass (4 queries total)
-        timestamps: Dict[str, float] = {}
-        mat_times: Dict[str, str] = {}
-        for asset_name in asset_names:
-            result = instance.fetch_materializations(
-                records_filter=AssetRecordsFilter(
-                    asset_key=AssetKey(asset_name),
-                    asset_partitions=[partition_key],
-                ),
-                limit=1,
-            )
-            if result.records:
-                ts = result.records[0].timestamp or 0.0
-                timestamps[asset_name] = ts
-                mat_times[asset_name] = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
-            else:
-                timestamps[asset_name] = 0.0
-                mat_times[asset_name] = ""
-
-        def _build_status(asset_name: str, upstream_name: str) -> Dict[str, str]:
-            ts = timestamps[asset_name]
-            if ts == 0.0:
-                return {"status": "missing", "materialized_at": "", "stale_reason": "Not yet materialized"}
-            upstream_ts = timestamps.get(upstream_name, 0.0)
-            if upstream_ts > ts:
-                return {
-                    "status": "stale",
-                    "materialized_at": mat_times[asset_name],
-                    "stale_reason": f"Upstream ({upstream_name.replace('user_', '')}) is newer",
-                }
-            return {"status": "fresh", "materialized_at": mat_times[asset_name], "stale_reason": ""}
-
-        self.pipeline_status_normalized = _build_status("user_vcf_normalized", "user_vcf_source")
-        self.pipeline_status_annotated = _build_status("user_hf_module_annotations", "user_vcf_normalized")
-        self.pipeline_status_report = _build_status("user_longevity_report", "user_hf_module_annotations")
-
-    @rx.var
-    def has_pipeline_status(self) -> bool:
-        """True when pipeline status has been loaded for the selected sample."""
-        return bool(self.pipeline_status_normalized.get("status"))
 
     def _load_norm_stats_from_dagster(self):
         """Load normalization filter stats from the latest Dagster materialization.
@@ -1553,9 +1506,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
         # Load output files for the selected sample
         self._load_output_files_sync()
 
-        # Load pipeline asset status for the selected sample
-        self._load_asset_pipeline_status()
-
         # Clear the output preview grid (belongs to OutputPreviewState)
         return OutputPreviewState.clear_output_preview
 
@@ -1567,7 +1517,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self._load_output_files_sync()
 
     def _load_output_files_sync(self):
-        """Load output files for the selected sample (synchronous version)."""
+        """Load output files for the selected sample (synchronous version).
+
+        Enriches each file dict with Dagster materialization info:
+        ``materialized_at`` (human-readable datetime or ""),
+        ``needs_materialization`` (bool — True when upstream is newer or asset never materialized).
+        """
         if not self.selected_file or not self.safe_user_id:
             self.output_files = []
             self.report_files = []
@@ -1575,6 +1530,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
         
         sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
         root = Path(__file__).resolve().parents[3]
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+
+        # Fetch Dagster materialization timestamps for relevant assets
+        mat_info = self._fetch_output_materialization_info(partition_key)
+        annotations_mat = mat_info.get("user_hf_module_annotations", {})
+        report_mat = mat_info.get("user_longevity_report", {})
         
         # Load parquet data files from modules/ directory
         output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
@@ -1582,7 +1543,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
         files: list[dict] = []
         if output_dir.exists():
             for f in output_dir.glob("*.parquet"):
-                # Determine file type from name
                 if "_weights" in f.name:
                     file_type = "weights"
                 elif "_annotations" in f.name:
@@ -1592,7 +1552,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 else:
                     file_type = "data"
                 
-                # Extract module name
                 module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
                 
                 files.append({
@@ -1602,9 +1561,26 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "module": module,
                     "type": file_type,
                     "sample_name": sample_name,
+                    "materialized_at": annotations_mat.get("materialized_at", ""),
+                    "needs_materialization": annotations_mat.get("needs_materialization", True),
                 })
         
-        # Sort by module name, then type
+        # Also scan sample root for Ensembl annotation parquets (*_annotated_duckdb.parquet)
+        ensembl_mat = mat_info.get("user_annotated_vcf_duckdb", {})
+        sample_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name
+        if sample_dir.exists():
+            for f in sample_dir.glob("*_annotated_duckdb.parquet"):
+                files.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    "module": "ensembl",
+                    "type": "annotations",
+                    "sample_name": sample_name,
+                    "materialized_at": ensembl_mat.get("materialized_at", ""),
+                    "needs_materialization": ensembl_mat.get("needs_materialization", True),
+                })
+
         files.sort(key=lambda x: (x["module"], x["type"]))
         self.output_files = files
         
@@ -1619,10 +1595,54 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "path": str(f),
                     "size_kb": round(f.stat().st_size / 1024, 1),
                     "sample_name": sample_name,
+                    "materialized_at": report_mat.get("materialized_at", ""),
+                    "needs_materialization": report_mat.get("needs_materialization", True),
                 })
         
         reports.sort(key=lambda x: x["name"])
         self.report_files = reports
+
+    def _fetch_output_materialization_info(self, partition_key: str) -> Dict[str, Dict[str, Any]]:
+        """Fetch materialization timestamps and staleness for output assets.
+
+        Returns a dict keyed by asset name, each containing:
+        ``materialized_at`` (str), ``needs_materialization`` (bool), ``timestamp`` (float).
+        """
+        instance = get_dagster_instance()
+        asset_chain = [
+            "user_vcf_normalized",
+            "user_hf_module_annotations",
+            "user_longevity_report",
+            "user_annotated_vcf_duckdb",
+        ]
+        timestamps: Dict[str, float] = {}
+        for asset_name in asset_chain:
+            result = instance.fetch_materializations(
+                records_filter=AssetRecordsFilter(
+                    asset_key=AssetKey(asset_name),
+                    asset_partitions=[partition_key],
+                ),
+                limit=1,
+            )
+            timestamps[asset_name] = result.records[0].timestamp if result.records else 0.0
+
+        info: Dict[str, Dict[str, Any]] = {}
+        upstream_map = {
+            "user_hf_module_annotations": "user_vcf_normalized",
+            "user_longevity_report": "user_hf_module_annotations",
+            "user_annotated_vcf_duckdb": "user_vcf_normalized",
+        }
+        for asset_name in ["user_hf_module_annotations", "user_longevity_report", "user_annotated_vcf_duckdb"]:
+            ts = timestamps[asset_name]
+            upstream_ts = timestamps.get(upstream_map[asset_name], 0.0)
+            mat_at = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
+            needs = (ts == 0.0) or (upstream_ts > ts)
+            info[asset_name] = {
+                "materialized_at": mat_at,
+                "needs_materialization": needs,
+                "timestamp": ts,
+            }
+        return info
 
     @rx.var
     def has_output_files(self) -> bool:
@@ -1748,8 +1768,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
     @rx.var
     def can_run_annotation(self) -> bool:
-        """Check if annotation can be run (file and modules selected, and selected file not already running)."""
-        if not self.selected_file or not self.selected_modules:
+        """Check if annotation can be run.
+        
+        Requires: file selected AND (HF modules selected OR Ensembl enabled).
+        Also blocks if the selected file already has a running job.
+        """
+        if not self.selected_file:
+            return False
+        if not self.selected_modules and not self.include_ensembl:
             return False
         
         # Check if the SELECTED file has a running job
@@ -1915,9 +1941,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.polling_active = False
             self.last_run_success = result.success
             
-            # Refresh output files and pipeline status so UI shows them immediately
+            # Refresh output files so UI shows them immediately
             self._load_output_files_sync()
-            self._load_asset_pipeline_status()
             
         except Exception as e:
             error_message = str(e)
@@ -1943,9 +1968,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 del UploadState._active_inproc_runs[actual_run_id]
 
     async def start_annotation_run(self):
-        """Start annotation for the selected file with selected modules."""
-        if not self.selected_file or not self.selected_modules:
-            yield rx.toast.error("Please select a file and at least one module")
+        """Start annotation for the selected file with selected modules and/or Ensembl."""
+        if not self.selected_file:
+            yield rx.toast.error("Please select a file")
+            return
+        if not self.selected_modules and not self.include_ensembl:
+            yield rx.toast.error("Please select at least one module or enable Ensembl annotations")
             return
 
         self.running = True
@@ -1963,13 +1991,27 @@ class UploadState(LazyFrameGridMixin, rx.State):
         root = Path(__file__).resolve().parents[3]
         vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
 
+        has_hf_modules = bool(self.selected_modules)
+        has_ensembl = self.include_ensembl
+        
         self._add_log(f"File: {self.selected_file}")
-        self._add_log(f"Modules: {', '.join(self.selected_modules)}")
+        if has_hf_modules:
+            self._add_log(f"Modules: {', '.join(self.selected_modules)}")
+        if has_ensembl:
+            self._add_log("Ensembl annotation enabled (DuckDB)")
         self._add_log(f"User: {self.safe_user_id}")
 
         instance = get_dagster_instance()
-        job_name = "annotate_and_report_job"
-        modules_to_use = self.selected_modules.copy()
+        
+        # Determine job based on what's selected
+        if has_hf_modules and has_ensembl:
+            job_name = "annotate_all_job"
+        elif has_ensembl:
+            job_name = "annotate_ensembl_only_job"
+        else:
+            job_name = "annotate_and_report_job"
+        
+        modules_to_use = self.selected_modules.copy() if has_hf_modules else []
         
         file_info = self.file_metadata.get(self.selected_file, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
@@ -1981,36 +2023,47 @@ class UploadState(LazyFrameGridMixin, rx.State):
         if sex_value_async:
             normalize_config_async["sex"] = sex_value_async
 
-        run_config = {
+        run_config: dict = {
             "ops": {
                 "user_vcf_normalized": {
                     "config": normalize_config_async,
                 },
-                "user_hf_module_annotations": {
-                    "config": {
-                        "vcf_path": str(vcf_path.absolute()),
-                        "user_name": self.safe_user_id,
-                        "sample_name": sample_name,
-                        "modules": modules_to_use,
-                        "species": file_info.get("species", "Homo sapiens"),
-                        "reference_genome": file_info.get("reference_genome", "GRCh38"),
-                        "subject_id": file_info.get("subject_id") or None,
-                        "sex": sex_value_async,
-                        "tissue": file_info.get("tissue") or None,
-                        "study_name": file_info.get("study_name") or None,
-                        "description": file_info.get("notes") or None,
-                        "custom_metadata": custom_metadata if custom_metadata else None,
-                    }
-                },
-                "user_longevity_report": {
-                    "config": {
-                        "user_name": self.safe_user_id,
-                        "sample_name": sample_name,
-                        "modules": modules_to_use,
-                    }
-                },
             }
         }
+
+        if has_hf_modules:
+            run_config["ops"]["user_hf_module_annotations"] = {
+                "config": {
+                    "vcf_path": str(vcf_path.absolute()),
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                    "species": file_info.get("species", "Homo sapiens"),
+                    "reference_genome": file_info.get("reference_genome", "GRCh38"),
+                    "subject_id": file_info.get("subject_id") or None,
+                    "sex": sex_value_async,
+                    "tissue": file_info.get("tissue") or None,
+                    "study_name": file_info.get("study_name") or None,
+                    "description": file_info.get("notes") or None,
+                    "custom_metadata": custom_metadata if custom_metadata else None,
+                }
+            }
+            run_config["ops"]["user_longevity_report"] = {
+                "config": {
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                }
+            }
+
+        if has_ensembl:
+            run_config["ops"]["user_annotated_vcf_duckdb"] = {
+                "config": {
+                    "vcf_path": str(vcf_path.absolute()),
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                }
+            }
 
         # Create the run in Dagster immediately to get a REAL Run ID
         # Tag with source=webui so shutdown handler only cancels our runs
@@ -2145,9 +2198,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.polling_active = False
             self.running = False
             self.last_run_success = (run.status == DagsterRunStatus.SUCCESS)
-            # Reload output files and pipeline status so the UI shows them immediately
+            # Reload output files so the UI shows them immediately
             self._load_output_files_sync()
-            self._load_asset_pipeline_status()
             if run.status == DagsterRunStatus.SUCCESS:
                 return rx.toast.success("Annotation completed successfully!")
             elif run.status == DagsterRunStatus.FAILURE:
@@ -2364,20 +2416,25 @@ class UploadState(LazyFrameGridMixin, rx.State):
         """Load recent annotation runs from Dagster."""
         instance = get_dagster_instance()
         
-        # Get recent runs for annotation jobs (both old and new job names)
+        # Get recent runs for all annotation jobs
         # Use get_run_records to get timestamps (start_time, end_time are on RunRecord, not DagsterRun)
         from dagster import RunsFilter
-        run_records_new = instance.get_run_records(
-            filters=RunsFilter(job_name="annotate_and_report_job"),
-            limit=20,
-        )
-        run_records_old = instance.get_run_records(
-            filters=RunsFilter(job_name="annotate_with_hf_modules_job"),
-            limit=20,
-        )
+        annotation_job_names = [
+            "annotate_and_report_job",
+            "annotate_all_job",
+            "annotate_ensembl_only_job",
+            "annotate_with_hf_modules_job",
+        ]
+        all_run_records = []
+        for jn in annotation_job_names:
+            records = instance.get_run_records(
+                filters=RunsFilter(job_name=jn),
+                limit=20,
+            )
+            all_run_records.extend(records)
         # Merge and sort by start_time descending
         run_records = sorted(
-            list(run_records_new) + list(run_records_old),
+            all_run_records,
             key=lambda r: r.start_time or 0,
             reverse=True,
         )[:20]
@@ -2387,12 +2444,18 @@ class UploadState(LazyFrameGridMixin, rx.State):
             run = record.dagster_run
             # Extract info from run config - use "ops" key (not "assets")
             config = run.run_config or {}
-            ops_config = config.get("ops", {}).get("user_hf_module_annotations", {}).get("config", {})
+            ops = config.get("ops", {})
+            hf_config = ops.get("user_hf_module_annotations", {}).get("config", {})
+            duckdb_config = ops.get("user_annotated_vcf_duckdb", {}).get("config", {})
+            norm_config = ops.get("user_vcf_normalized", {}).get("config", {})
             
-            vcf_path = ops_config.get("vcf_path", "")
+            # Get VCF path from whichever config has it (HF, DuckDB, or normalize)
+            vcf_path = hf_config.get("vcf_path") or duckdb_config.get("vcf_path") or norm_config.get("vcf_path", "")
             filename = Path(vcf_path).name if vcf_path else "unknown"
-            sample_name = ops_config.get("sample_name", "")
-            modules = ops_config.get("modules", [])
+            sample_name = hf_config.get("sample_name") or duckdb_config.get("sample_name", "")
+            modules = hf_config.get("modules", [])
+            if duckdb_config and not modules:
+                modules = ["ensembl"]
             
             # Timestamps are on RunRecord as Unix timestamps (floats) or create_timestamp as datetime
             started_at = None
@@ -2416,7 +2479,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             # Check for output if successful
             if run.status == DagsterRunStatus.SUCCESS and sample_name:
                 root = Path(__file__).resolve().parents[3]
-                user_name = ops_config.get("user_name", self.safe_user_id)
+                user_name = hf_config.get("user_name") or duckdb_config.get("user_name", self.safe_user_id)
                 output_dir = root / "data" / "output" / "users" / user_name / sample_name / "modules"
                 if output_dir.exists():
                     run_info["output_path"] = str(output_dir)

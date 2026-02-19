@@ -44,52 +44,59 @@ def get_workspace_root() -> Path:
 
 
 def get_default_ensembl_cache_dir() -> Path:
-    """Get the default cache directory for ensembl_variations."""
+    """Get the default cache directory for ensembl_variations.
+
+    Layout after downloading via fsspec::
+
+        {cache_dir}/ensembl_variations/data/homo_sapiens-chr1.parquet
+        {cache_dir}/ensembl_variations/data/homo_sapiens-chr2.parquet
+        ...
+
+    The directory is created automatically if it does not exist yet.
+    """
     env_cache = os.getenv("JUST_DNA_PIPELINES_CACHE_DIR")
     if env_cache:
-        return Path(env_cache) / "ensembl_variations" / "splitted_variants"
+        cache_dir = Path(env_cache) / "ensembl_variations"
     else:
         user_cache_path = Path(user_cache_dir(appname="just-dna-pipelines"))
-        return user_cache_path / "ensembl_variations" / "splitted_variants"
+        cache_dir = user_cache_path / "ensembl_variations"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def get_ensembl_parquet_dir(ensembl_cache: Optional[Path] = None) -> Path:
+    """Return the directory containing Ensembl chromosome parquet files.
+
+    The canonical location is ``{ensembl_cache}/data/``.  If *ensembl_cache*
+    is ``None``, :func:`get_default_ensembl_cache_dir` is used.
+
+    Raises:
+        FileNotFoundError: If no parquet files can be found.
+    """
+    cache = ensembl_cache or get_default_ensembl_cache_dir()
+    data_dir = cache / "data"
+    if data_dir.exists() and any(data_dir.glob("*.parquet")):
+        return data_dir
+    raise FileNotFoundError(
+        f"No Ensembl Parquet files found at {data_dir}. "
+        "Please materialize the ensembl_annotations asset first via Dagster UI, "
+        "or run: uv run dg asset materialize --select ensembl_annotations"
+    )
 
 
 def ensure_ensembl_cache_exists(logger=None) -> Path:
-    """
-    Ensure the Ensembl annotations cache exists.
-    
-    Unlike the DuckDB helper, this cannot auto-create the cache because
-    it requires downloading from HuggingFace. It only validates and
-    provides a helpful error message.
-    
-    Args:
-        logger: Optional logger for messages
-        
-    Returns:
-        Path to the Ensembl cache directory
-        
+    """Validate that the Ensembl parquet cache is populated.
+
+    Returns the *root* cache directory (the parent of ``data/``).
+
     Raises:
-        FileNotFoundError: If cache doesn't exist
+        FileNotFoundError: If the cache is empty or missing.
     """
     cache_dir = get_default_ensembl_cache_dir()
-    
-    if not cache_dir.exists():
-        raise FileNotFoundError(
-            f"Ensembl cache not found at {cache_dir}. "
-            "Please materialize the ensembl_annotations asset first via Dagster UI, "
-            "or run: uv run dg asset materialize --select ensembl_annotations"
-        )
-    
-    # Verify parquet files exist
-    parquet_files = list(cache_dir.rglob("*.parquet"))
-    if not parquet_files:
-        raise FileNotFoundError(
-            f"Ensembl cache at {cache_dir} exists but contains no Parquet files. "
-            "Please re-materialize the ensembl_annotations asset."
-        )
-    
+    data_dir = get_ensembl_parquet_dir(cache_dir)
+    parquet_files = list(data_dir.glob("*.parquet"))
     if logger:
-        logger.info(f"Using Ensembl cache at {cache_dir} with {len(parquet_files)} Parquet files")
-    
+        logger.info(f"Using Ensembl cache at {data_dir} with {len(parquet_files)} Parquet files")
     return cache_dir
 
 

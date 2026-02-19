@@ -77,6 +77,33 @@ annotate_and_report_job = define_asset_job(
     hooks={resource_summary_hook},
 )
 
+# Job for full pipeline with Ensembl: normalize + HF modules + Ensembl DuckDB + report
+annotate_all_job = define_asset_job(
+    name="annotate_all_job",
+    selection=AssetSelection.assets(
+        "quality_filters_config", "user_vcf_normalized",
+        "user_hf_module_annotations", "user_annotated_vcf_duckdb",
+        "ensembl_duckdb", "ensembl_annotations",
+        "user_longevity_report",
+    ),
+    description="Full pipeline: normalize VCF, annotate with HF modules + Ensembl (DuckDB), generate report.",
+    tags={"annotation": "all", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
+# Job for Ensembl-only annotation: normalize + Ensembl DuckDB (no HF modules, no report)
+annotate_ensembl_only_job = define_asset_job(
+    name="annotate_ensembl_only_job",
+    selection=AssetSelection.assets(
+        "quality_filters_config", "user_vcf_normalized",
+        "user_annotated_vcf_duckdb",
+        "ensembl_duckdb", "ensembl_annotations",
+    ),
+    description="Ensembl-only pipeline: normalize VCF, annotate with Ensembl variations via DuckDB.",
+    tags={"annotation": "ensembl", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
 
 def _build_definitions() -> Definitions:
     """Build the combined definitions from core + discovered modules."""
@@ -118,7 +145,7 @@ def _build_definitions() -> Definitions:
     # 4. Report generation assets (depend on module annotation outputs)
     _reports = Definitions(
         assets=[user_longevity_report],
-        jobs=[generate_longevity_report_job, annotate_and_report_job],
+        jobs=[generate_longevity_report_job, annotate_and_report_job, annotate_all_job, annotate_ensembl_only_job],
     )
     
     # 5. Discover and merge module definitions from data/modules/

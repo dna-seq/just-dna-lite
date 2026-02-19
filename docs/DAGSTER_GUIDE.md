@@ -48,18 +48,20 @@ For multi-user support, we use **Dynamic Partitions**. Each partition key (e.g.,
 
 ## Annotation Pipelines
 
-Our annotation logic (`just-dna-pipelines/src/just_dna_pipelines/annotation/`) provides two annotation systems:
+Our annotation logic (`just-dna-pipelines/src/just_dna_pipelines/annotation/`) provides two annotation systems that share `user_vcf_normalized` as input:
 
-### 1. Ensembl Annotations (Legacy)
+### 1. Ensembl Annotations
 
-Position-based annotation using Ensembl variation database.
+Position-based annotation using the Ensembl variation database. Both Ensembl engines now read from `user_vcf_normalized` (quality-filtered, chr-stripped) instead of re-parsing the raw VCF.
 
 **Asset Graph:**
 1. `ensembl_hf_dataset`: External HuggingFace dataset source
 2. `ensembl_annotations`: Local cache from HuggingFace
-3. `user_vcf_source`: Partitioned source for input VCFs
-4. `user_annotated_vcf`: Annotated output (Polars-based)
-5. `user_annotated_vcf_duckdb`: Alternative DuckDB-based annotation
+3. `user_vcf_source` → `user_vcf_normalized`: Normalized VCF parquet (shared with HF modules)
+4. `user_annotated_vcf`: Annotated output (Polars-based), depends on `user_vcf_normalized` + `ensembl_annotations`
+5. `user_annotated_vcf_duckdb`: DuckDB-based annotation, depends on `user_vcf_normalized` + `ensembl_duckdb`
+
+Ensembl annotation is available in the Web UI annotate page via the "Include Ensembl Variation Annotations" toggle. When enabled, the `annotate_all_job` runs both HF modules and Ensembl DuckDB annotation in a single pipeline.
 
 ### 2. HuggingFace Module Annotations (Recommended)
 
@@ -77,7 +79,7 @@ Module display metadata (titles, icons, colors) is configured in `modules.yaml` 
 **Asset Graph:**
 1. `hf_annotators_dataset`: External HuggingFace modules source
 2. `user_vcf_source`: Partitioned source for input VCFs (metadata: path, size, upload date)
-3. `user_vcf_normalized`: Normalized VCF as parquet (strip chr prefix, id→rsid, genotype); **required** before HF annotation
+3. `user_vcf_normalized`: Normalized VCF as parquet (strip chr prefix, id→rsid, genotype); **required** before both HF and Ensembl annotation
 4. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
 5. `user_longevity_report`: HTML report generated from annotated parquets (depends on `user_hf_module_annotations`)
 
@@ -133,7 +135,9 @@ Example: `data/output/users/anonymous/other_livia/user_vcf_normalized.parquet`
 
 **Jobs:**
 - `normalize_vcf_job`: Normalize only (runs automatically on upload in the Web UI)
-- `annotate_and_report_job`: Full pipeline (normalize → annotate → report)
+- `annotate_and_report_job`: Full pipeline (normalize → HF modules → report)
+- `annotate_all_job`: Full pipeline with Ensembl (normalize → HF modules + Ensembl DuckDB → report)
+- `annotate_ensembl_only_job`: Ensembl only (normalize → Ensembl DuckDB, no HF modules or report)
 
 **When normalize runs:**
 - On upload: The Web UI runs `normalize_vcf_job` in-process after each VCF upload.
@@ -154,7 +158,8 @@ Or use a small script that calls `job_def.execute_in_process()` with the correct
 
 **Report jobs:**
 - `generate_longevity_report_job`: Generate report only (requires prior annotation materialization)
-- `annotate_and_report_job`: Full pipeline — normalize + annotate VCF + generate report in one run
+- `annotate_and_report_job`: Full pipeline — normalize + HF annotate + report
+- `annotate_all_job`: Full pipeline — normalize + HF annotate + Ensembl DuckDB + report
 
 ### Why both assets and jobs?
 
@@ -202,10 +207,21 @@ If the dataset is private or you encounter rate limits, set your Hugging Face to
 export HF_TOKEN="your_token_here"
 ```
 
-### Resource Caching
-The `ensembl_annotations` asset downloads reference shards into a local cache.
-*   **Default Location**: Your OS user cache for `just-dna-pipelines`.
+### Ensembl Reference Dataset
+
+The Ensembl variation reference is configured in `modules.yaml` under `ensembl_source:`:
+
+```yaml
+ensembl_source:
+  repo_id: just-dna-seq/ensembl_variations
+```
+
+The `ensembl_annotations` asset reads this config and downloads the parquet files via **fsspec** (`HfFileSystem`) directly into our local cache — no duplicate HuggingFace blob storage. Change `repo_id` to use a different Ensembl dataset without touching any Python code.
+
+*   **Default Location**: `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`
 *   **Override**: Set `JUST_DNA_PIPELINES_CACHE_DIR`.
+*   **Layout**: Flat chromosome-split parquets under `data/`. No SNV/INDEL subdirs.
+*   **DuckDB catalog**: A single `ensembl_variations` VIEW is created over all parquet files.
 
 ---
 

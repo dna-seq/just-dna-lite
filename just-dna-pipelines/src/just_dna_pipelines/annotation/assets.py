@@ -7,7 +7,6 @@ tracked, and lineage-aware.
 
 from pathlib import Path
 
-from huggingface_hub import snapshot_download
 from dagster import (
     asset,
     AssetExecutionContext,
@@ -358,73 +357,80 @@ def user_vcf_normalized(
 )
 def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotationsConfig) -> Output[Path]:
     """
-    Asset representing the Ensembl variation annotations.
-    This is a persistent data product that can be materialized once and reused.
+    Download Ensembl variation parquets via fsspec into our local cache.
+
+    Uses HfFileSystem (fsspec) so files land directly in
+    ``~/.cache/just-dna-pipelines/ensembl_variations/data/`` with no
+    duplicate HuggingFace blob storage.  Swap the ``repo_id`` for any
+    fsspec-compatible URL in the future without changing downstream code.
     """
     logger = context.log
-    
-    # Determine cache directory
-    if config.cache_dir is None:
-        cache_dir = get_default_ensembl_cache_dir()
-    else:
+
+    if config.cache_dir is not None:
         cache_dir = Path(config.cache_dir)
-    
-    logger.info(f"Determined cache directory: {cache_dir}")
-    
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        cache_dir = get_default_ensembl_cache_dir()
+
+    data_dir = cache_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Ensembl cache directory: {cache_dir}")
+
     with resource_tracker("Download Ensembl Reference") as tracker:
-        # Check if cache exists and skip download if not forced
-        if cache_dir.exists() and not config.force_download:
-            parquet_files = list(cache_dir.rglob("*.parquet"))
-            if parquet_files:
-                logger.info(f"Cache exists, skipping download. Found {len(parquet_files)} parquet files.")
-                total_size = sum(p.stat().st_size for p in parquet_files) / (1024 * 1024 * 1024)
-                
-                return Output(
-                    cache_dir,
-                    metadata={
-                        "cache_path": MetadataValue.path(str(cache_dir.absolute())),
-                        "num_files": MetadataValue.int(len(parquet_files)),
-                        "total_size_gb": MetadataValue.float(round(total_size, 2)),
-                        "status": MetadataValue.text("cached"),
-                    }
-                )
-        
-        logger.info(f"Downloading {config.repo_id} from HuggingFace Hub...")
-        
-        # Get token from config or from HF login (for private repos)
-        from huggingface_hub import get_token
+        existing = list(data_dir.glob("*.parquet"))
+        if existing and not config.force_download:
+            total_size = sum(p.stat().st_size for p in existing) / (1024 ** 3)
+            logger.info(f"Cache exists with {len(existing)} parquet files ({total_size:.2f} GB), skipping download.")
+            return Output(
+                cache_dir,
+                metadata={
+                    "cache_path": MetadataValue.path(str(cache_dir.absolute())),
+                    "num_files": MetadataValue.int(len(existing)),
+                    "total_size_gb": MetadataValue.float(round(total_size, 2)),
+                    "status": MetadataValue.text("cached"),
+                },
+            )
+
+        from huggingface_hub import HfFileSystem, get_token
+
         token = config.token or get_token()
-        
-        downloaded_path = snapshot_download(
-            repo_id=config.repo_id,
-            repo_type="dataset",
-            local_dir=cache_dir,
-            local_dir_use_symlinks=False,
-            token=token,
-            allow_patterns=config.allow_patterns or ["data/**/*.parquet"],
-        )
-        
-        logger.info(f"Download complete: {downloaded_path}")
-    
-    # Get stats for metadata
-    parquet_files = list(cache_dir.rglob("*.parquet"))
-    total_size = sum(p.stat().st_size for p in parquet_files) / (1024 * 1024 * 1024)
-    
-    metadata_dict = {
+        fs = HfFileSystem(token=token)
+
+        remote_prefix = f"datasets/{config.repo_id}/data"
+        remote_files = [
+            f for f in fs.ls(remote_prefix, detail=False)
+            if f.endswith(".parquet")
+        ]
+        logger.info(f"Found {len(remote_files)} remote parquet files in {config.repo_id}")
+
+        for remote_path in remote_files:
+            filename = remote_path.rsplit("/", 1)[-1]
+            local_path = data_dir / filename
+            if local_path.exists() and not config.force_download:
+                logger.info(f"  {filename} already cached, skipping")
+                continue
+            logger.info(f"  Downloading {filename} ...")
+            fs.get(remote_path, str(local_path))
+
+        logger.info("Download complete")
+
+    parquet_files = list(data_dir.glob("*.parquet"))
+    total_size = sum(p.stat().st_size for p in parquet_files) / (1024 ** 3)
+
+    metadata_dict: dict = {
         "cache_path": MetadataValue.path(str(cache_dir.absolute())),
         "num_files": MetadataValue.int(len(parquet_files)),
         "total_size_gb": MetadataValue.float(round(total_size, 2)),
         "status": MetadataValue.text("downloaded"),
     }
-    
-    # Add resource metrics if available
     if "report" in tracker:
         report = tracker["report"]
         metadata_dict.update({
             "download_duration_sec": MetadataValue.float(round(report.duration, 2)),
             "download_cpu_percent": MetadataValue.float(round(report.cpu_usage_percent, 1)),
         })
-    
+
     return Output(cache_dir, metadata=metadata_dict)
 
 
@@ -433,13 +439,15 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
 # ============================================================================
 
 @asset(
-    description="User-specific annotated VCF variants with Ensembl variation database.",
+    description="User-specific annotated VCF variants with Ensembl variation database. "
+                "Uses the normalized VCF (quality-filtered, chr-stripped) as input.",
     compute_kind="polars",
     partitions_def=user_vcf_partitions,
     io_manager_key="user_asset_io_manager",
     ins={
         "ensembl_annotations": AssetIn(input_manager_key="annotation_cache_io_manager"),
-        "user_vcf_source": AssetIn(),  # Explicit dependency for partition tracking
+        "user_vcf_source": AssetIn(),
+        "user_vcf_normalized": AssetIn(),
     },
     metadata={
         "partition_type": "user",
@@ -450,21 +458,19 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
 def user_annotated_vcf(
     context: AssetExecutionContext,
     ensembl_annotations: Path,
-    user_vcf_source: dict,  # Receives metadata from source asset
+    user_vcf_source: dict,
+    user_vcf_normalized: Path,
     config: AnnotationConfig,
 ) -> Output[Path]:
     """
     Dynamically partitioned asset for user VCF annotations.
     
-    Each partition represents a user's annotated VCF file:
-    - Partition key: {user_name}/{sample_name} or {user_name}
-    - Full asset tracking and lineage
-    - Reports can depend on specific partitions
+    Reads from the normalized parquet (chr-stripped, quality-filtered)
+    produced by user_vcf_normalized, and joins with Ensembl reference data.
     """
     logger = context.log
     partition_key = context.partition_key
     
-    # Log source asset info for debugging
     logger.info(f"Received VCF source metadata: {user_vcf_source}")
     
     if "/" in partition_key:
@@ -473,13 +479,10 @@ def user_annotated_vcf(
         user_name = partition_key
         sample_name = config.sample_name
     
-    # Overwrite with config if provided
     user_name = config.user_name or user_name
     sample_name = config.sample_name or sample_name
     
     vcf_path = Path(config.vcf_path)
-    
-    # Ensure VCF is in the expected user input directory
     vcf_path = ensure_vcf_in_user_input_dir(vcf_path, user_name, logger)
     
     final_output_path, metadata_dict = annotate_vcf_with_ensembl(
@@ -488,10 +491,10 @@ def user_annotated_vcf(
         ensembl_cache=ensembl_annotations,
         config=config,
         user_name=user_name,
-        sample_name=sample_name
+        sample_name=sample_name,
+        normalized_parquet=user_vcf_normalized,
     )
     
-    # Add partition-specific metadata
     metadata_dict["partition_key"] = MetadataValue.text(partition_key)
     
     return Output(final_output_path, metadata=metadata_dict)

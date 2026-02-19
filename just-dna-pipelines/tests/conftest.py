@@ -8,25 +8,11 @@ import tempfile
 import shutil
 import os
 from pathlib import Path
-import pooch
 from pycomfort.logging import to_nice_stdout
 
 
 def pytest_addoption(parser):
-    """Add CLI flags.
-
-    By default we keep and reuse the shared pooch cache across test runs.
-    Pass --no-shared-pooch-cache to force temporary, cleaned caches.
-    """
-    parser.addoption(
-        "--no-shared-pooch-cache",
-        action="store_true",
-        default=False,
-        help=(
-            "Use temporary per-test pooch caches and clean them after tests. "
-            "Defaults to False (shared pooch cache is reused)."
-        ),
-    )
+    """Add CLI flags."""
     parser.addoption(
         "--clean-cache",
         action="store_true",
@@ -36,23 +22,10 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="session")
-def use_shared_pooch_cache(request) -> bool:
-    """Whether to use the shared pooch cache across tests (default True)."""
-    return not request.config.getoption("--no-shared-pooch-cache")
-
-
-@pytest.fixture(scope="session")
-def shared_pooch_cache_dir() -> Path:
-    """Path to the shared pooch cache used by downloaders by default."""
-    return Path(pooch.os_cache("ensembl_variation"))
-
-
-@pytest.fixture(scope="session")
 def test_data_dir():
     """Create a temporary directory for test data that persists across tests in a session."""
     temp_dir = tempfile.mkdtemp(prefix="just_dna_pipelines_test_data_")
     yield Path(temp_dir)
-    # Cleanup after all tests
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 

@@ -60,6 +60,12 @@ quality_filters:
   # Set to null or 0 to disable.
   min_qual: 20
 
+# Ensembl variation reference dataset.
+# Downloaded via fsspec (HfFileSystem) into ~/.cache/just-dna-pipelines/ensembl_variations/data/.
+# Change repo_id to point at a different dataset (any HuggingFace org/repo).
+ensembl_source:
+  repo_id: just-dna-seq/ensembl_variations
+
 # Sources to scan for annotation modules.
 # Simple string = URL with auto-detect. Object = URL + overrides.
 sources:

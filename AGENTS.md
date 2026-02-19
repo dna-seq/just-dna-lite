@@ -57,13 +57,14 @@ This is the single source of truth for:
 
 1. **Sources** to scan for modules (any fsspec-compatible URL: HuggingFace, GitHub, HTTP, S3, etc.)
 2. **Display metadata** overrides (title, description, icon, color, report_title) for known modules
+3. **Ensembl reference dataset** (`ensembl_source.repo_id`) — the HuggingFace dataset used for Ensembl variation annotation
 
 **Modules are always auto-discovered** from the configured sources. The YAML only provides optional display overrides. Modules not listed in `module_metadata` get auto-generated defaults (titlecased name, generic icon, default color).
 
 ### Key files
 
-- **`modules.yaml`**: Declares sources and optional metadata overrides
-- **`module_config.py`**: Pydantic models (`Source`, `ModuleMetadata`, `ModulesConfig`), YAML loader, helper functions (`get_module_meta()`, `build_module_metadata_dict()`, etc.)
+- **`modules.yaml`**: Declares sources, Ensembl reference, quality filters, and optional metadata overrides
+- **`module_config.py`**: Pydantic models (`Source`, `ModuleMetadata`, `EnsemblSource`, `ModulesConfig`), YAML loader, helper functions (`get_module_meta()`, `build_module_metadata_dict()`, etc.)
 - **`annotation/hf_modules.py`**: Discovery logic — scans sources via fsspec, builds `MODULE_INFOS` and `DISCOVERED_MODULES`
 
 ### Adding a new module source
@@ -90,6 +91,7 @@ Each source can be a single module or a collection:
 
 - **Never hardcode module lists or metadata in Python files** — always use `get_module_meta()` or `build_module_metadata_dict()` from `module_config`
 - **Never hardcode HF repo URLs** — use `DEFAULT_REPOS` or `MODULES_CONFIG.sources` from `module_config`
+- **Never hardcode Ensembl repo ID** — `EnsemblAnnotationsConfig.repo_id` defaults to `MODULES_CONFIG.ensembl_source.repo_id`
 - `HF_DEFAULT_REPOS`, `HF_REPO_ID` in `hf_modules.py` are backward-compatible aliases sourced from the YAML
 
 ---
@@ -139,7 +141,15 @@ When `sex="Female"` is set in `NormalizeVcfConfig`, the normalization asset logs
 
 ## Dagster Pipeline
 
-**For any Dagster-related changes, architecture, or troubleshooting, see [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md).** The guide explains the full pipeline (VCF normalization → HF annotation → reports), output paths, jobs, and known quirks (e.g. polars-bio non-fatal Rust panic).
+**For any Dagster-related changes, architecture, or troubleshooting, see [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md).** The guide explains the full pipeline (VCF normalization → HF annotation + optional Ensembl → reports), output paths, jobs, and known quirks (e.g. polars-bio non-fatal Rust panic).
+
+**Shared normalization**: Both HF module annotation and Ensembl annotation read from `user_vcf_normalized` (quality-filtered, chr-stripped parquet). Ensembl assets (`user_annotated_vcf`, `user_annotated_vcf_duckdb`) depend on `user_vcf_normalized` — they do NOT re-parse the raw VCF.
+
+**Jobs:**
+- `annotate_and_report_job`: normalize → HF modules → report (default)
+- `annotate_all_job`: normalize → HF modules + Ensembl DuckDB → report (when Ensembl toggle is on in UI)
+- `annotate_ensembl_only_job`: normalize → Ensembl DuckDB only (no HF modules, no report)
+- `normalize_vcf_job`: normalize only (auto-runs on upload)
 
 ### Resource Tracking (MANDATORY)
 
@@ -190,6 +200,7 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 - **Declarative Assets**: We prioritize Software-Defined Assets (SDA) over imperative ops.
 - **IO Managers**: Reference assets (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`.
 - **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`.
+- **Ensembl cache layout**: Flat chromosome parquets at `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`. Downloaded via fsspec (`HfFileSystem`). The repo is configured in `modules.yaml` under `ensembl_source:`. DuckDB creates a single `ensembl_variations` VIEW over all files.
 - **Lazy materialization**: Assets check if cache exists before downloading.
 - **Start UI**: `uv run start` (full stack) or `uv run dagster` (pipelines only).
 
@@ -224,6 +235,25 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 - **All assets in `Definitions(assets=[...])`** for lineage visibility in UI
 
 ### API Gotchas
+
+**Never use `huggingface_hub.snapshot_download` for large datasets:**
+
+`snapshot_download` duplicates data into HuggingFace's own blob store (`~/.cache/huggingface/`) and then copies/links to `local_dir`. This wastes disk space and is unreliable. Instead, use **fsspec** via `HfFileSystem` for direct file-by-file downloads into our cache:
+
+```python
+# WRONG - duplicates data in HF blob store, unreliable local_dir population
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="org/repo", local_dir=cache_dir, ...)
+
+# CORRECT - direct download via fsspec, files land exactly where we want
+from huggingface_hub import HfFileSystem, get_token
+fs = HfFileSystem(token=get_token())
+for remote_path in fs.ls("datasets/org/repo/data", detail=False):
+    if remote_path.endswith(".parquet"):
+        fs.get(remote_path, str(local_path))
+```
+
+This pattern is also future-proof: swapping `HfFileSystem` for any other fsspec backend (S3, GCS, HTTP) requires minimal changes.
 
 **polars-bio `scan_vcf` API changed (0.23+):**
 
@@ -578,6 +608,7 @@ except Exception as e:
 - `dagster job execute` CLI (deprecated)
 - Hardcoded asset names; use `defs.get_all_asset_specs()`
 - **Silent fallbacks when primary data is missing** — If normalized parquet does not exist (e.g. user_vcf_normalized), do NOT silently fall back to raw VCF and display it as if it were normalized. Users will not know the data source differs. Either show an explicit error ("Run normalization first") or a very prominent banner ("Using raw VCF — normalize job has not run"). See [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md) § VCF Normalization.
+- **Ensembl assets bypassing user_vcf_normalized** — `user_annotated_vcf` and `user_annotated_vcf_duckdb` MUST depend on `user_vcf_normalized` and pass the normalized parquet via `normalized_parquet=` parameter. Never read the raw VCF directly in annotation assets.
 - Config for unselected assets (validation errors)
 - Suspended jobs holding DuckDB file locks
 - **Accessing `run.start_time` on DagsterRun** - use RunRecord instead

@@ -8,7 +8,7 @@ import psutil
 from dagster import Config
 
 from just_dna_pipelines.models import SampleInfo
-from just_dna_pipelines.module_config import DEFAULT_REPOS
+from just_dna_pipelines.module_config import DEFAULT_REPOS, MODULES_CONFIG
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, validate_modules
 
 
@@ -50,12 +50,16 @@ def get_default_duckdb_threads() -> int:
 
 
 class EnsemblAnnotationsConfig(Config):
-    """Configuration for the Ensembl annotations asset."""
-    repo_id: str = "just-dna-seq/ensembl_variations"
+    """Configuration for the Ensembl annotations asset.
+
+    Downloads parquet files via fsspec (HfFileSystem) into a local cache.
+    The default ``repo_id`` comes from ``ensembl_source.repo_id`` in
+    ``modules.yaml``; override here for one-off runs.
+    """
+    repo_id: str = MODULES_CONFIG.ensembl_source.repo_id
     cache_dir: Optional[str] = None
     token: Optional[str] = None
     force_download: bool = False
-    allow_patterns: Optional[list[str]] = None
 
 
 class DuckDBConfig(Config):
@@ -92,7 +96,6 @@ class AnnotationConfig(Config, SampleInfo):
     """
     vcf_path: str
     user_name: Optional[str] = None  # Optional user identifier
-    variant_type: str = "SNV"
     join_columns: Optional[list[str]] = None
     output_path: Optional[str] = None
     compression: str = "zstd"

@@ -87,7 +87,6 @@ def run_benchmark():
     config = AnnotationConfig(
         vcf_path=str(vcf_path),
         user_name="benchmark_user",
-        variant_type="SNV"
     )
     
     manager = multiprocessing.Manager()

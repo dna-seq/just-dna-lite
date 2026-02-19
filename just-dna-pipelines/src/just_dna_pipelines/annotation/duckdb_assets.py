@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Optional
 
 import duckdb
-import polars as pl
 from dagster import (
     asset,
     AssetExecutionContext,
@@ -21,17 +20,11 @@ from dagster import (
 )
 
 from just_dna_pipelines.runtime import resource_tracker
-from just_dna_pipelines.io import read_vcf_file
 from just_dna_pipelines.annotation.configs import AnnotationConfig, DuckDBConfig
 from just_dna_pipelines.annotation.resources import (
     get_default_ensembl_cache_dir,
-    get_user_output_dir,
+    get_ensembl_parquet_dir,
     ensure_vcf_in_user_input_dir,
-)
-from just_dna_pipelines.annotation.chromosomes import (
-    get_input_chrom_style_and_values,
-    rewrite_chromosome_column_strip_chr_prefix,
-    rewrite_chromosome_column_to_chr_prefixed,
 )
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 
@@ -101,63 +94,29 @@ def build_duckdb_from_parquet(
         logger.info(f"Creating memory-efficient DuckDB catalog at: {duckdb_path}")
     
     with resource_tracker("Build Ensembl DuckDB") as tracker:
-        # Create new database with memory-efficient settings
         con = duckdb.connect(str(duckdb_path))
-        
-        # Configure DuckDB for memory efficiency (auto-detect system resources)
         configure_duckdb_for_memory_efficiency(con, logger=logger)
         
-        # Find variant directories (e.g., SNV, INDEL)
-        variant_dirs = [d for d in ensembl_cache.iterdir() if d.is_dir() and d.name in ["SNV", "INDEL"]]
-        if not variant_dirs:
-            # Try data subdirectory
-            data_dir = ensembl_cache / "data"
-            if data_dir.exists():
-                variant_dirs = [d for d in data_dir.iterdir() if d.is_dir() and d.name in ["SNV", "INDEL"]]
-        
-        if not variant_dirs:
-            con.close()
-            raise FileNotFoundError(f"No variant directories (SNV/INDEL) found in {ensembl_cache}")
+        parquet_dir = get_ensembl_parquet_dir(ensembl_cache)
+        parquet_files = list(parquet_dir.glob("*.parquet"))
         
         if logger:
-            logger.info(f"Found variant types: {[d.name for d in variant_dirs]}")
+            logger.info(f"Creating VIEW 'ensembl_variations' over {len(parquet_files)} Parquet files in {parquet_dir}")
         
-        views_created = []
-        total_files = 0
+        parquet_pattern = str(parquet_dir / "*.parquet")
+        con.execute(f"""
+            CREATE OR REPLACE VIEW ensembl_variations AS 
+            SELECT * FROM read_parquet('{parquet_pattern}', 
+                hive_partitioning=false,
+                union_by_name=true
+            )
+        """)
         
-        for variant_dir in variant_dirs:
-            variant_type = variant_dir.name.lower()
-            view_name = f"ensembl_{variant_type}"
-            
-            # Find all Parquet files for this variant type
-            parquet_files = list(variant_dir.rglob("*.parquet"))
-            
-            if not parquet_files:
-                if logger:
-                    logger.warning(f"No Parquet files found in {variant_dir}")
-                continue
-            
-            if logger:
-                logger.info(f"Creating VIEW '{view_name}' referencing {len(parquet_files)} Parquet files...")
-            
-            # Use glob pattern - DuckDB will scan Parquet metadata only
-            parquet_pattern = str(variant_dir / "**/*.parquet")
-            
-            # Create VIEW (not TABLE) - this is just metadata, no data copying!
-            # DuckDB will use Parquet column statistics (min/max per row group) for filtering
-            con.execute(f"""
-                CREATE OR REPLACE VIEW {view_name} AS 
-                SELECT * FROM read_parquet('{parquet_pattern}', 
-                    hive_partitioning=false,
-                    union_by_name=true
-                )
-            """)
-            
-            if logger:
-                logger.info(f"VIEW '{view_name}' created (streaming access to Parquet files)")
-            
-            views_created.append(view_name)
-            total_files += len(parquet_files)
+        views_created = ["ensembl_variations"]
+        total_files = len(parquet_files)
+        
+        if logger:
+            logger.info(f"VIEW 'ensembl_variations' created (streaming access to {total_files} Parquet files)")
         
         con.close()
     
@@ -222,25 +181,8 @@ def ensure_ensembl_duckdb_exists(logger = None) -> Path:
                 logger.warning(f"DuckDB database exists but has no tables/views, rebuilding...")
             duckdb_path.unlink()
     
-    # Check if Ensembl Parquet cache exists
-    if not cache_dir.exists():
-        raise FileNotFoundError(
-            f"Ensembl cache not found at {cache_dir}. "
-            "Please materialize the ensembl_annotations asset first via Dagster UI."
-        )
-    
-    # Check for variant directories
-    variant_dirs = [d for d in cache_dir.iterdir() if d.is_dir() and d.name in ["SNV", "INDEL"]]
-    if not variant_dirs:
-        data_dir = cache_dir / "data"
-        if data_dir.exists():
-            variant_dirs = [d for d in data_dir.iterdir() if d.is_dir() and d.name in ["SNV", "INDEL"]]
-    
-    if not variant_dirs:
-        raise FileNotFoundError(
-            f"No variant directories found in Ensembl cache at {cache_dir}. "
-            "Please materialize the ensembl_annotations asset first via Dagster UI."
-        )
+    # Validates that parquet data exists (raises FileNotFoundError if not)
+    get_ensembl_parquet_dir(cache_dir)
     
     # Build the DuckDB from Parquet files
     if logger:
@@ -344,13 +286,14 @@ from just_dna_pipelines.annotation.logic import annotate_vcf_with_duckdb
 
 @asset(
     description="User-specific annotated VCF variants using DuckDB for annotation joins. "
-                "Alternative to Polars-based annotation for performance comparison.",
+                "Uses the normalized VCF (quality-filtered, chr-stripped) as input.",
     compute_kind="duckdb",
     partitions_def=user_vcf_partitions,
     io_manager_key="user_asset_io_manager",
     ins={
         "ensembl_duckdb": AssetIn(input_manager_key="annotation_cache_io_manager"),
         "user_vcf_source": AssetIn(),
+        "user_vcf_normalized": AssetIn(),
     },
     metadata={
         "partition_type": "user",
@@ -363,19 +306,15 @@ def user_annotated_vcf_duckdb(
     context: AssetExecutionContext,
     ensembl_duckdb: Path,
     user_vcf_source: dict,
+    user_vcf_normalized: Path,
     config: AnnotationConfig,
 ) -> Output[Path]:
     """
     DuckDB-based user VCF annotation asset.
     
-    This asset uses DuckDB for the annotation join instead of Polars.
-    Compare performance and memory usage with the standard `user_annotated_vcf` asset.
-    
-    Advantages:
-    - Better join optimization for large datasets
-    - More predictable memory usage
-    - Native support for complex joins (future: interval joins)
-    - Easier to extend with multiple annotation sources
+    Reads from the normalized parquet (chr-stripped, quality-filtered)
+    produced by user_vcf_normalized, and joins with Ensembl reference
+    data via DuckDB streaming engine.
     """
     logger = context.log
     partition_key = context.partition_key
@@ -383,33 +322,28 @@ def user_annotated_vcf_duckdb(
     logger.info(f"DuckDB annotation for partition: {partition_key}")
     logger.info(f"VCF source metadata: {user_vcf_source}")
     
-    # Parse partition key
     if "/" in partition_key:
         user_name, sample_name = partition_key.split("/", 1)
     else:
         user_name = partition_key
         sample_name = config.sample_name
     
-    # Overwrite with config if provided
     user_name = config.user_name or user_name
     sample_name = config.sample_name or sample_name
     
     vcf_path = Path(config.vcf_path)
-    
-    # Ensure VCF is in expected directory
     vcf_path = ensure_vcf_in_user_input_dir(vcf_path, user_name, logger)
     
-    # Run DuckDB annotation
     final_output_path, metadata_dict = annotate_vcf_with_duckdb(
         logger=logger,
         vcf_path=vcf_path,
         duckdb_path=ensembl_duckdb,
         config=config,
         user_name=user_name,
-        sample_name=sample_name
+        sample_name=sample_name,
+        normalized_parquet=user_vcf_normalized,
     )
     
-    # Add partition metadata
     metadata_dict["partition_key"] = MetadataValue.text(partition_key)
     
     return Output(final_output_path, metadata=metadata_dict)

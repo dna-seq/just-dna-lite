@@ -812,101 +812,6 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
 # RUN-CENTRIC UI COMPONENTS
 # ============================================================================
 
-def _pipeline_step_badge(
-    label: str,
-    status_dict: rx.Var[dict],
-    icon_name: str,
-) -> rx.Component:
-    """Render a single pipeline step badge showing fresh/stale/missing status."""
-    status = status_dict["status"].to(str)
-    mat_at = status_dict["materialized_at"].to(str)
-    reason = status_dict["stale_reason"].to(str)
-
-    color_class = rx.match(
-        status,
-        ("fresh", "ui mini green label"),
-        ("stale", "ui mini orange label"),
-        ("missing", "ui mini grey label"),
-        "ui mini grey label",
-    )
-    status_icon = rx.match(
-        status,
-        ("fresh", fomantic_icon("circle-check", size=10, color="#21ba45", style={"marginRight": "3px"})),
-        ("stale", fomantic_icon("circle-alert", size=10, color="#f2711c", style={"marginRight": "3px"})),
-        ("missing", fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"})),
-        fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"}),
-    )
-
-    return rx.el.div(
-        status_icon,
-        rx.el.span(label, style={"fontWeight": "600", "fontSize": "0.75rem", "marginRight": "4px"}),
-        rx.el.span(
-            rx.match(
-                status,
-                ("fresh", "fresh"),
-                ("stale", "stale"),
-                ("missing", "---"),
-                "---",
-            ),
-            class_name=color_class,
-        ),
-        rx.cond(
-            mat_at != "",
-            rx.el.span(
-                mat_at,
-                style={"fontSize": "0.65rem", "color": "#999", "marginLeft": "4px"},
-            ),
-            rx.fragment(),
-        ),
-        rx.cond(
-            (status == "stale") & (reason != ""),
-            rx.el.span(
-                reason,
-                style={"fontSize": "0.65rem", "color": "#f2711c", "marginLeft": "4px", "fontStyle": "italic"},
-            ),
-            rx.fragment(),
-        ),
-        style={"display": "flex", "alignItems": "center", "padding": "2px 0"},
-        title=reason,
-    )
-
-
-def pipeline_status_banner() -> rx.Component:
-    """Compact banner showing the materialization state of each pipeline step.
-
-    Three steps: Normalized -> Annotated -> Report
-    Each shows fresh (green), stale (orange), or missing (grey).
-    """
-    return rx.cond(
-        UploadState.has_pipeline_status,
-        rx.el.div(
-            rx.el.div(
-                fomantic_icon("activity", size=14, color="#2185d0", style={"marginRight": "6px", "flexShrink": "0"}),
-                rx.el.span("Pipeline Status", style={"fontWeight": "600", "fontSize": "0.85rem", "marginRight": "16px", "whiteSpace": "nowrap"}),
-                _pipeline_step_badge("Normalized", UploadState.pipeline_status_normalized, "filter"),
-                rx.el.span("->", style={"margin": "0 6px", "color": "#ccc", "fontSize": "0.8rem"}),
-                _pipeline_step_badge("Annotated", UploadState.pipeline_status_annotated, "dna"),
-                rx.el.span("->", style={"margin": "0 6px", "color": "#ccc", "fontSize": "0.8rem"}),
-                _pipeline_step_badge("Report", UploadState.pipeline_status_report, "file-text"),
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "flexWrap": "wrap",
-                    "gap": "2px",
-                },
-            ),
-            style={
-                "padding": "8px 12px",
-                "marginBottom": "12px",
-                "backgroundColor": "#f8f9fa",
-                "border": "1px solid #e8e8e8",
-                "borderRadius": "4px",
-            },
-            id="pipeline-status-banner",
-        ),
-        rx.fragment(),
-    )
-
 
 def run_status_badge(status: rx.Var[str]) -> rx.Component:
     """Return a colored badge based on run status (DNA palette: green/yellow/red/grey)."""
@@ -982,6 +887,45 @@ def _collapsible_header(
     )
 
 
+def _materialization_badge(
+    materialized_at: rx.Var[str],
+    needs_materialization: rx.Var[bool],
+) -> rx.Component:
+    """Compact badge showing last materialization datetime and staleness."""
+    return rx.el.div(
+        rx.cond(
+            materialized_at != "",
+            rx.el.div(
+                rx.cond(
+                    needs_materialization,
+                    fomantic_icon("circle-alert", size=10, color="#f2711c", style={"marginRight": "3px"}),
+                    fomantic_icon("circle-check", size=10, color="#21ba45", style={"marginRight": "3px"}),
+                ),
+                rx.el.span(
+                    materialized_at,
+                    style={"fontSize": "0.7rem", "color": "#888"},
+                ),
+                rx.cond(
+                    needs_materialization,
+                    rx.el.span(
+                        " stale",
+                        class_name="ui mini orange label",
+                        style={"marginLeft": "4px", "fontSize": "0.6rem", "padding": "2px 4px"},
+                    ),
+                    rx.fragment(),
+                ),
+                style={"display": "flex", "alignItems": "center"},
+            ),
+            rx.el.div(
+                fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"}),
+                rx.el.span("not materialized", style={"fontSize": "0.7rem", "color": "#999"}),
+                style={"display": "flex", "alignItems": "center"},
+            ),
+        ),
+        style={"marginTop": "2px"},
+    )
+
+
 def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
     """Compact card for a single output file with view and download buttons."""
     download_url = UploadState.backend_api_url + "/api/download/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str)
@@ -1016,6 +960,10 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
                     ),
                     style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
                 ),
+                _materialization_badge(
+                    file_info["materialized_at"].to(str),
+                    file_info["needs_materialization"].to(bool),
+                ),
                 style={"flex": "1", "marginLeft": "10px"},
             ),
             # Action buttons
@@ -1047,7 +995,6 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
 
 def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
     """Card for a single report file with view and download buttons."""
-    # Build URL for viewing in browser (serves HTML)
     view_url = (
         UploadState.backend_api_url + "/api/report/"
         + UploadState.safe_user_id + "/"
@@ -1081,6 +1028,10 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
                         style={"color": "#888", "fontSize": "0.75rem", "marginLeft": "8px"},
                     ),
                     style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
+                ),
+                _materialization_badge(
+                    file_info["materialized_at"].to(str),
+                    file_info["needs_materialization"].to(bool),
                 ),
                 style={"flex": "1", "marginLeft": "10px"},
             ),
@@ -1833,6 +1784,51 @@ def new_analysis_section() -> rx.Component:
                     },
                     id="module-cards-grid",
                 ),
+
+                # Ensembl annotation toggle
+                rx.el.div(
+                    rx.el.div(
+                        rx.el.div(
+                            rx.el.input(
+                                type="checkbox",
+                                checked=UploadState.include_ensembl,
+                                read_only=True,
+                            ),
+                            rx.el.label(
+                                rx.el.strong("Include Ensembl Variation Annotations"),
+                            ),
+                            on_click=UploadState.toggle_ensembl,
+                            class_name=rx.cond(
+                                UploadState.include_ensembl,
+                                "ui checked checkbox",
+                                "ui checkbox",
+                            ),
+                        ),
+                        style={"display": "flex", "alignItems": "center", "gap": "10px"},
+                    ),
+                    rx.el.div(
+                        "Position-based annotation with the Ensembl variation database via DuckDB. "
+                        "Adds rsid mapping and known variant classifications.",
+                        style={
+                            "fontSize": "0.85rem",
+                            "color": "#666",
+                            "marginTop": "6px",
+                            "lineHeight": "1.3",
+                        },
+                    ),
+                    class_name="ui segment",
+                    style={
+                        "padding": "14px",
+                        "marginBottom": "16px",
+                        "border": "1px solid #e0e0e0",
+                        "borderRadius": "6px",
+                        "backgroundColor": rx.cond(
+                            UploadState.include_ensembl,
+                            "#f0f7ff",
+                            "#fff",
+                        ),
+                    },
+                ),
                 
                 # Start button
                 rx.el.button(
@@ -2034,12 +2030,6 @@ def right_panel_run_view() -> rx.Component:
                 "borderRadius": "6px",
             },
             id="right-column-header",
-        ),
-        # Pipeline status banner (shows asset freshness)
-        rx.cond(
-            UploadState.has_selected_file,
-            pipeline_status_banner(),
-            rx.fragment(),
         ),
         # Content: show sections based on whether sample has been analyzed
         rx.cond(

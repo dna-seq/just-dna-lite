@@ -114,17 +114,12 @@ def test_duckdb_uses_views_not_tables(tmp_path):
     
     This ensures minimal memory footprint during database creation.
     """
-    # This test would need actual Ensembl Parquet files to run
-    # For now, we'll create a mock structure
-    
-    # Create mock Parquet structure
     import polars as pl
     
     mock_cache = tmp_path / "ensembl_cache"
-    snv_dir = mock_cache / "SNV"
-    snv_dir.mkdir(parents=True)
+    data_dir = mock_cache / "data"
+    data_dir.mkdir(parents=True)
     
-    # Create a small mock Parquet file
     mock_data = pl.DataFrame({
         "chrom": ["1", "1", "2"],
         "start": [1000, 2000, 3000],
@@ -132,43 +127,31 @@ def test_duckdb_uses_views_not_tables(tmp_path):
         "alt": ["T", "C", "G"],
         "rsid": ["rs123", "rs456", "rs789"],
     })
-    mock_data.write_parquet(snv_dir / "chr1-snv.parquet")
+    mock_data.write_parquet(data_dir / "homo_sapiens-chr1.parquet")
     
-    # Build DuckDB
     db_path = tmp_path / "test.duckdb"
     result_path, metadata = build_duckdb_from_parquet(mock_cache, db_path)
     
-    # Verify the database was created
     assert result_path.exists()
     
-    # Verify it uses VIEWs (indicated by storage_type in metadata)
     assert metadata["storage_type"] == "views_over_parquet"
     assert metadata["memory_efficient"] is True
     assert metadata["num_views"] == 1
     
-    # Connect and verify the view exists
     con = duckdb.connect(str(db_path), read_only=True)
     
-    # Check for views using information_schema
     views = con.execute("SELECT table_name FROM information_schema.views WHERE table_schema = 'main'").fetchall()
     
     assert len(views) >= 1, f"Expected at least 1 view, found {len(views)}"
     view_names = [v[0] for v in views]
-    assert "ensembl_snv" in view_names, f"Expected 'ensembl_snv' in {view_names}"
+    assert "ensembl_variations" in view_names, f"Expected 'ensembl_variations' in {view_names}"
     
-    # Verify we can query the view
-    result = con.execute("SELECT COUNT(*) FROM ensembl_snv").fetchone()
-    assert result[0] == 3  # Our mock data has 3 rows
+    result = con.execute("SELECT COUNT(*) FROM ensembl_variations").fetchone()
+    assert result[0] == 3
     
-    # Check that there are NO materialized tables (only views)
-    tables = con.execute("SHOW TABLES").fetchall()
-    # Views might show up in SHOW TABLES, but the key is no heavy materialization
-    # The database file size should be tiny (just metadata + DuckDB overhead)
     db_size_kb = db_path.stat().st_size / 1024
     assert db_size_kb < 500, f"Database too large: {db_size_kb}KB (should be < 500KB for view metadata only)"
     
-    # For comparison: if we had materialized the data, it would be much larger
-    # The Parquet file itself is just a few KB, but database overhead exists
     con.close()
 
 

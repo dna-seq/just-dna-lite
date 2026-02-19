@@ -23,7 +23,7 @@ dev = [
 
 [project.scripts]
 start = "just_dna_lite.cli:start_all"
-ui = "just_dna_lite.cli:start_ui"
+ui = "webui.run:main"
 dagster-ui = "just_dna_lite.cli:start_dagster"
 pipelines = "just_dna_lite.cli:app"
 

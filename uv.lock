@@ -4233,7 +4233,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.129.0" },
     { name = "granian", specifier = ">=2.7.1" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "reflex", specifier = ">=0.8.26" },
+    { name = "reflex", specifier = ">=0.8.27" },
     { name = "reflex-mui-datagrid", specifier = ">=0.1.8" },
 ]
 

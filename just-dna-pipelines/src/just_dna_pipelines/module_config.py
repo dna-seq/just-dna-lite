@@ -150,11 +150,21 @@ class Source(BaseModel):
         return "file"
 
 
+class EnsemblSource(BaseModel):
+    """Ensembl variation reference dataset configuration.
+
+    Loaded from ``ensembl_source:`` in modules.yaml.
+    The ``repo_id`` must be a HuggingFace dataset (``org/repo``).
+    """
+    repo_id: str = "just-dna-seq/ensembl_variations"
+
+
 class ModulesConfig(BaseModel):
     """Top-level configuration from modules.yaml."""
     sources: list[Source] = [Source(url="just-dna-seq/annotators")]
     module_metadata: dict[str, ModuleMetadata] = {}
     quality_filters: QualityFilters = QualityFilters()
+    ensembl_source: EnsemblSource = EnsemblSource()
 
     @model_validator(mode="before")
     @classmethod

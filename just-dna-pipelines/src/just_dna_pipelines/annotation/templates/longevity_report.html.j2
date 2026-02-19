@@ -108,24 +108,19 @@ div.ui.tiny.circular.compact.negative.button {
     color: rgb(81, 139, 122);
     cursor: pointer;
 }
-.accordion.accordion-heading.active, .accordion:hover { background-color: rgba(255, 255, 255, 0.2); }
-.accordion.accordion-heading:hover, .accordion.accordion-heading.active:hover { color: rgb(127, 201, 182); }
-.accordion1 { margin-top: 3vw; }
-.accordion-heading {
-    width: 50%; margin-left: 25%; margin-right: 25%;
-    user-select: none; height: 5vw;
-    padding-top: 1vw; padding-bottom: 1vw;
-    cursor: pointer;
+.accordion:hover { background-color: rgba(255, 255, 255, 0.2); }
+.section-heading {
+    width: 85%; margin-left: 7.5%; margin-right: 7.5%;
+    text-align: center;
+    padding-top: 1.2vw; padding-bottom: 1.2vw;
     border: rgb(101, 189, 162, 0.5) solid 6px;
     background-color: rgba(255, 255, 255, 0.5);
-    font-size: 1.7vw; border-radius: 15px;
+    font-size: 1.7vw; border-radius: 15px 15px 0 0;
     margin-top: 2vw;
-    transition-property: width, margin-left, margin-right;
-    transition-duration: 0.2s;
     color: rgb(47, 116, 106);
     border-bottom: none;
+    font-weight: 500;
 }
-.accordion-heading:hover { background-color: rgba(255, 255, 255, 0.5); }
 
 /* ========== Panels ========== */
 .board { width: 50%; margin-top: 40px; padding-top: 10px; color: rgb(84, 85, 110); margin-right: auto; margin-left: auto; font-size: 1.1vw; }
@@ -142,17 +137,18 @@ div.ui.tiny.circular.compact.negative.button {
 .variants.panel { border: rgb(101, 189, 162) 6px solid; border-top: none; }
 .content { margin-left: auto; margin-right: auto; overflow-x: auto; transition: max-height 0.5s ease-in; display: none; }
 .hidden { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-in; }
-.basic-panel, .panel, .content { max-height: 0; overflow: hidden; transition-property: max-height, width; transition-duration: 0.2s, 0.5s; }
+.panel, .content { max-height: 0; overflow: hidden; transition-property: max-height, width; transition-duration: 0.2s, 0.5s; }
 .basic-panel {
     background-color: rgba(255, 255, 255, 0.2);
     margin-left: auto; margin-right: auto;
     width: 85%;
     border-right: rgb(101, 189, 162, 0.5) solid 6px;
     border-left: rgb(101, 189, 162, 0.5) solid 6px;
+    border-bottom: rgb(101, 189, 162, 0.5) solid 6px;
     border-bottom-left-radius: 3%; border-bottom-right-radius: 3%;
+    padding-bottom: 1vw;
 }
 .accordion-result, .accordion-result.active { transition-property: width, margin-left, margin-right; transition-duration: 0.2s; }
-.accordion1, .basic-panel .accordion1 + .panel-description { width: 50%; margin-left: 25%; margin-right: 25%; }
 
 /* ========== Arrow ========== */
 .accordion0 div.arrow-indicator {
@@ -214,10 +210,11 @@ div.ui.tiny.circular.compact.negative.button {
     .attention strong { font-size: 1.8vw; }
     h2 { line-height: 5vw; font-size: 4vw; }
     .li1 { font-size: 2.2vw; }
-    .accordion0, .accordion-heading, .accordion0.accordion.accordion1 { width: 80%; margin-left: 10%; margin-right: 10%; height: 8vw; font-size: 2.5vw; }
-    .panel, .accordion0.accordion.accordion1 + .panel-description { width: 80%; margin-left: 10%; margin-right: 10%; font-size: 1.7vw; padding: 2.5vw 3.5vw; }
+    .accordion0, .section-heading { width: 80%; margin-left: 10%; margin-right: 10%; height: 8vw; font-size: 2.5vw; }
+    .section-heading { height: auto; padding: 2vw; }
+    .panel { width: 80%; margin-left: 10%; margin-right: 10%; font-size: 1.7vw; padding: 2.5vw 3.5vw; }
+    .basic-panel { width: 80%; }
     .accordion0 div.arrow-indicator { height: 2vw; width: 2vw; border-top-width: 0.6vw; border-right-width: 0.6vw; margin-right: 2vw; }
-    .basic-panel { width: 98%; }
     table.ui { font-size: 1.3vw; }
     h2 { margin-top: 18vw; }
 }
@@ -227,10 +224,11 @@ div.ui.tiny.circular.compact.negative.button {
     .attention strong { font-size: 4vw; }
     .attention { padding: 3vw 4vw; }
     .basic-panel { width: 100%; }
-    .accordion0, .accordion-heading, .accordion0.accordion.accordion1 { height: 12vw; font-size: 4vw; width: 95%; margin-left: 2.5%; margin-right: 2.5%; }
-    .panel, .accordion0.accordion.accordion1 + .panel-description { margin-left: 2.5%; margin-right: 2.5%; width: 95%; font-size: 3vw; }
+    .accordion0, .section-heading { height: 12vw; font-size: 4vw; width: 95%; margin-left: 2.5%; margin-right: 2.5%; }
+    .section-heading { height: auto; padding: 3vw; }
+    .panel { margin-left: 2.5%; margin-right: 2.5%; width: 95%; font-size: 3vw; }
     .accordion0 div.arrow-indicator { height: 3.5vw; width: 3.5vw; border-top-width: 1vw; border-right-width: 1vw; margin-right: 2vw; margin-left: 1vw; }
-    .accordion.accordion-heading { height: 16vw; }
+    .basic-panel { width: 95%; }
     .first { font-size: 8vw; }
     .li1 { font-size: 4.8vw; }
     .attention { margin-top: 10vw; margin-bottom: 10vw; width: 90%; border-width: 2px; border-radius: 13px; }
@@ -248,12 +246,8 @@ function expand(obj) {
     if (el.nodeName == "#text") el = el.nextSibling;
     var parent = el.parentElement;
     parent = parent.parentElement.parentElement;
-    var board = parent.parentElement;
     el.style.display = "";
     el.style.maxHeight = el.scrollHeight + "px";
-    if (board.classList.contains("basic-panel")) {
-        board.style.maxHeight = Number(board.style.maxHeight.slice(0, -2)) + el.scrollHeight + "px";
-    }
     parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) + el.scrollHeight + "px";
     tdEl.innerHTML = '<div class="ui tiny circular compact negative button">-</div>';
 }
@@ -265,10 +259,6 @@ function collapse(obj) {
     if (el.nodeName == "#text") el = el.nextSibling;
     var parent = el.parentElement;
     parent = parent.parentElement.parentElement;
-    var board = parent.parentElement;
-    if (board.classList.contains("basic-panel")) {
-        board.style.maxHeight = Number(board.style.maxHeight.slice(0, -2)) - el.scrollHeight + "px";
-    }
     parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) - el.scrollHeight + "px";
     el.style.maxHeight = '0';
     setTimeout(function() { el.style.display = "none"; }, 150);
@@ -306,43 +296,9 @@ function toggleAccordion(btn) {
     if (btn.classList.contains('active')) {
         panel.style.display = 'block';
         panel.style.maxHeight = panel.scrollHeight + 'px';
-        /* Also grow the parent basic-panel if nested */
-        var parent = btn.parentElement;
-        if (parent && parent.classList.contains('basic-panel')) {
-            parent.style.maxHeight = (Number(parent.style.maxHeight.slice(0, -2)) || 0) + panel.scrollHeight + 100 + 'px';
-        }
     } else {
-        var oldHeight = panel.scrollHeight;
         panel.style.maxHeight = '0';
         setTimeout(function() { panel.style.display = 'none'; }, 200);
-        /* Shrink parent basic-panel */
-        var parent = btn.parentElement;
-        if (parent && parent.classList.contains('basic-panel')) {
-            parent.style.maxHeight = Math.max(0, (Number(parent.style.maxHeight.slice(0, -2)) || 0) - oldHeight) + 'px';
-        }
-    }
-}
-
-/* Toggle a pathway heading accordion */
-function toggleHeading(btn) {
-    btn.classList.toggle('active');
-    var panel = btn.nextElementSibling;
-    if (btn.classList.contains('active')) {
-        /* Expand: widen button and show panel */
-        panel.style.maxHeight = panel.scrollHeight + 'px';
-        btn.style.width = '85%';
-        btn.style.marginLeft = '7.5%';
-        btn.style.marginRight = '7.5%';
-        btn.style.borderBottomLeftRadius = '0';
-        btn.style.borderBottomRightRadius = '0';
-    } else {
-        /* Collapse: restore button width and hide panel */
-        panel.style.maxHeight = '0';
-        btn.style.width = '';
-        btn.style.marginLeft = '';
-        btn.style.marginRight = '';
-        btn.style.borderBottomLeftRadius = '';
-        btn.style.borderBottomRightRadius = '';
     }
 }
 
@@ -400,10 +356,7 @@ window.onscroll = function() {
 {% if longevity %}
 <h2 id="variants">Longevity variants</h2>
 
-<button class="accordion accordion0 accordion1 panel-variants module-button active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
-    <div class="arrow-indicator"></div> Description
-</button>
-<div class="board variants panel panel-description" style="display: block; max-height: 2000px;">
+<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
     <p>This report estimates how many significant longevity variations you have. The data is obtained mainly by studying centenarians' genomes.</p>
     <p>The longevity variants report is based on variants from <a href="https://genomics.senescence.info/longevity/">LongevityMap</a> and other data sources which are scored and prioritized according to multiple criteria.</p>
     <p>In the table you can see how many significant variants were found in your genome. Positively longevity-associated variants are marked with green, negatively associated with red.</p>
@@ -433,10 +386,10 @@ window.onscroll = function() {
 {# Pathway categories with variants #}
 {% for cat_key, cat in longevity.categories.items() %}
 {% if cat.total_count > 0 %}
-<button class="accordion accordion-heading" onclick="toggleHeading(this)">{{ cat.title }}</button>
+<div class="section-heading">{{ cat.title }}</div>
 <div class="basic-panel" id="pathway-{{ cat_key }}">
 
-    <button class="accordion accordion0 accordion1 active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
+    <button class="accordion accordion0 active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
         <div class="arrow-indicator"></div> Description
     </button>
     <div class="board variants panel panel-description" style="display: block; max-height: 2000px;">
@@ -526,9 +479,9 @@ window.onscroll = function() {
 {# Pathway categories with no variants #}
 {% for cat_key, cat in longevity.categories.items() %}
 {% if cat.total_count == 0 %}
-<button class="accordion accordion-heading" onclick="toggleHeading(this)" style="opacity: 0.6;">{{ cat.title }} (0 variants)</button>
-<div class="basic-panel">
-    <div class="board variants panel panel-description" style="display: block; max-height: 500px;">
+<div class="section-heading" style="opacity: 0.6;">{{ cat.title }} (0 variants)</div>
+<div class="basic-panel" style="opacity: 0.6;">
+    <div class="board" style="width: 80%; margin: 0 auto; padding: 1vw 2vw;">
         <p>{{ cat.description }}</p>
         <p><em>No annotated variants found for this pathway in your genome.</em></p>
     </div>
@@ -543,10 +496,7 @@ window.onscroll = function() {
 <h2 id="module-{{ mod.module_name }}">{{ mod.display_name }}</h2>
 
 {% if mod.variants %}
-<button class="accordion accordion0 accordion1 module-button active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
-    <div class="arrow-indicator"></div> Description
-</button>
-<div class="board variants panel panel-description" style="display: block; max-height: 500px;">
+<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
     <p>This section shows your genetic variants annotated with the <strong>{{ mod.display_name }}</strong> module. {{ mod.summary.total_variants }} variants were found, {{ mod.summary.total_positive }} with positive weight and {{ mod.summary.total_negative }} with negative weight.</p>
 </div>
 

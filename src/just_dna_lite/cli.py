@@ -155,50 +155,6 @@ def _kill_port_owner(port: int) -> None:
         typer.secho(f"Error during port cleanup for {port}: {e}", fg=typer.colors.RED, err=True)
 
 
-@app.command("ui")
-def start_ui(
-    granian: Annotated[
-        bool, typer.Option("--granian", help="Use Granian for the backend.")
-    ] = True,
-) -> None:
-    """Start only the Reflex Web UI."""
-    root = _find_workspace_root(Path.cwd())
-    if root is None:
-        raise typer.BadParameter("Could not find workspace root. Run this from the repo root.")
-
-    if granian:
-        os.environ["REFLEX_USE_GRANIAN"] = "true"
-    
-    webui_dir = root / "webui"
-    if not webui_dir.exists():
-        raise typer.BadParameter(f"webui folder not found: {webui_dir}")
-
-    typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN, bold=True)
-    
-    typer.echo("\n" + "═" * 65)
-    typer.secho("⏳ The UI is initializing. It will be available shortly at:", fg=typer.colors.YELLOW)
-    typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
-    typer.echo(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
-    typer.secho("\nNote: It may take 10-20 seconds to compile the frontend.", fg=typer.colors.DIM)
-    typer.echo("═" * 65 + "\n")
-
-    # Clean up UI ports
-    for port in [3000, 3001, 8000]:
-        _kill_port_owner(port)
-
-    # Reflex already runs both frontend+backend in dev.
-    proc = subprocess.Popen(
-        ["uv", "run", "reflex", "run"], 
-        cwd=str(webui_dir),
-        preexec_fn=os.setpgrp if hasattr(os, "setpgrp") else None
-    )
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        typer.secho("\nStopping UI...", fg=typer.colors.YELLOW)
-        _kill_process_group(proc)
-
-
 @app.command("dagster")
 def start_dagster(
     file: Annotated[
@@ -297,14 +253,9 @@ def start_all(
     for port in ports_to_clean:
         _kill_port_owner(port)
 
-    # 1. Start the UI in the background
-    webui_dir = root / "webui"
+    # 1. Start the UI in the background via the workspace script
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
-    # UI runs in background as orphaned process (will be cleaned up by port owner on next start)
-    subprocess.Popen(
-        [sys.executable, "-m", "reflex", "run"],
-        cwd=str(webui_dir)
-    )
+    subprocess.Popen(["uv", "run", "--package", "webui", "run"])
 
     # Give it a moment to initialize
     time.sleep(2)
