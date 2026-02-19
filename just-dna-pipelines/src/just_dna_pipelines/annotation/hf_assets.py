@@ -67,9 +67,10 @@ hf_annotators_dataset = AssetSpec(
     partitions_def=user_vcf_partitions,
     io_manager_key="user_asset_io_manager",
     ins={
-        "user_vcf_source": AssetIn(),  # Partition dependency for lineage
+        "user_vcf_source": AssetIn(),
+        "user_vcf_normalized": AssetIn(),
     },
-    deps=[hf_annotators_dataset],  # Lineage to HF source
+    deps=[hf_annotators_dataset],
     metadata={
         "partition_type": "user",
         "output_format": "parquet",
@@ -80,19 +81,16 @@ hf_annotators_dataset = AssetSpec(
 def user_hf_module_annotations(
     context: AssetExecutionContext,
     user_vcf_source: dict,
+    user_vcf_normalized: Path,
     config: HfModuleAnnotationConfig,
 ) -> Output[Path]:
     """
     Annotate user VCF with selected HuggingFace modules.
     
-    This asset:
-    1. Reads the user's VCF with FORMAT fields (including genotype)
-    2. For each selected module, joins with the weights table on rsid + genotype
-    3. Outputs one parquet file per module
-    4. Returns a manifest describing all outputs
-    
-    The genotype column is computed from GT field as List[String] sorted alphabetically,
-    matching the format in the HF modules.
+    This asset reads from the pre-normalized parquet produced by
+    ``user_vcf_normalized`` (chromosomes stripped of 'chr', genotype
+    computed, id renamed to rsid).  Falls back to raw VCF parsing if
+    the normalized parquet is not available.
     
     Output structure:
     data/output/users/{user}/{sample}/modules/
@@ -106,15 +104,14 @@ def user_hf_module_annotations(
     
     logger.info(f"HF Module annotation for partition: {partition_key}")
     logger.info(f"VCF source metadata: {user_vcf_source}")
+    logger.info(f"Normalized parquet: {user_vcf_normalized}")
     
-    # Parse partition key
     if "/" in partition_key:
         user_name, sample_name = partition_key.split("/", 1)
     else:
         user_name = partition_key
         sample_name = config.sample_name
     
-    # Override with config if provided
     user_name = config.user_name or user_name
     sample_name = config.sample_name or sample_name
     
@@ -122,22 +119,25 @@ def user_hf_module_annotations(
     resolved_vcf_path = config.resolve_vcf_path(logger=logger)
     vcf_path = Path(resolved_vcf_path)
     
-    # Log source type
     if config.zenodo_url:
         logger.info(f"VCF source: Zenodo ({config.zenodo_url})")
     else:
         logger.info(f"VCF source: Local ({vcf_path})")
     
-    # Ensure VCF is in expected directory
     vcf_path = ensure_vcf_in_user_input_dir(vcf_path, user_name, logger)
     
-    # Run annotation with all selected modules
+    # Use pre-normalized parquet when available
+    normalized_path: Path | None = None
+    if isinstance(user_vcf_normalized, Path) and user_vcf_normalized.exists():
+        normalized_path = user_vcf_normalized
+    
     manifest, metadata_dict = annotate_vcf_with_all_modules(
         logger=logger,
         vcf_path=vcf_path,
         config=config,
         user_name=user_name,
         sample_name=sample_name,
+        normalized_parquet_path=normalized_path,
     )
     
     # Add partition metadata

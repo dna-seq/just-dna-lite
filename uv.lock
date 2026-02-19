@@ -3282,7 +3282,7 @@ wheels = [
 
 [[package]]
 name = "reflex"
-version = "0.8.26"
+version = "0.8.27"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -3303,9 +3303,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/7d/b4e6e7de6eae4258bae3dee3e2196eca0f8a59655c471be3e9beb51734bf/reflex-0.8.26.tar.gz", hash = "sha256:27e0571b5422454032674d155a4372fe526670312ddeb9b137bbe1e14d6835d9", size = 572220, upload-time = "2026-01-20T22:54:43.21Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/51/f6dd657f04a097aa7b02fb6ab08b24f3a4fe676378af5b9e6dff2d92c64b/reflex-0.8.27.tar.gz", hash = "sha256:c90cca51d77955e0162baf4384b843e4350c75afa656589e484470222b48368f", size = 572762, upload-time = "2026-02-17T19:23:37.574Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/49/0441019df3c113927cdb5d439a975c5c6674183d637186f439e4a25d7d58/reflex-0.8.26-py3-none-any.whl", hash = "sha256:b51bc6c1a5087f52c1567ace3752edcbff4bd12453fee0f90384271d0cc4da48", size = 814949, upload-time = "2026-01-20T22:54:41.292Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/03/abdfa493299dd63ecb3f046755a71748a259c7535f58c8d9203eced73262/reflex-0.8.27-py3-none-any.whl", hash = "sha256:1ddd492542d39735f2d1a002549025698022a130b6fa2af1cea33af516058ac6", size = 815640, upload-time = "2026-02-17T19:23:35.897Z" },
 ]
 
 [[package]]
@@ -3326,16 +3326,16 @@ wheels = [
 
 [[package]]
 name = "reflex-mui-datagrid"
-version = "0.1.7"
+version = "0.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
     { name = "reflex" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/e4/ae24781657bc15e0932422d5b990d72618855cc3113139cf9758f1d39009/reflex_mui_datagrid-0.1.7.tar.gz", hash = "sha256:a23d5db9a2cb7ba9c01cf660a0f139c950829008c635d3eb5b7c012e7dc654de", size = 41312, upload-time = "2026-02-16T21:38:50.046Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/67/056f7c6aa29b37097ec31afa6fb695e18aa162b414bd30df32406f44dffe/reflex_mui_datagrid-0.1.8.tar.gz", hash = "sha256:0e1c0b6e3c14661d7f3b0d4cf8f7296a0d205702c013c6f48bbd70945e52a811", size = 41197, upload-time = "2026-02-19T01:37:18.328Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/b9/3ba22fbe915b68ae7a58c4ed0b1adb2a0695d7198b5a4784023617e041d5/reflex_mui_datagrid-0.1.7-py3-none-any.whl", hash = "sha256:9fecfd78d9f1e749831b558094f24e30c545c33774f86a9e52378fd2ea58eafd", size = 46532, upload-time = "2026-02-16T21:38:51.593Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/43/d5cdfe4662506fa226839cb21020c1b033343603d7a70ea00eb813687cb6/reflex_mui_datagrid-0.1.8-py3-none-any.whl", hash = "sha256:7b1e6ad2a4a7f599bd1406ff7c6d0e0de1474244446cb52e85c5d67e7b3f0493", size = 46705, upload-time = "2026-02-19T01:37:16.392Z" },
 ]
 
 [[package]]
@@ -4234,7 +4234,7 @@ requires-dist = [
     { name = "granian", specifier = ">=2.7.1" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
     { name = "reflex", specifier = ">=0.8.26" },
-    { name = "reflex-mui-datagrid", specifier = ">=0.1.7" },
+    { name = "reflex-mui-datagrid", specifier = ">=0.1.8" },
 ]
 
 [package.metadata.requires-dev]

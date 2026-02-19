@@ -9,7 +9,7 @@ dependencies = [
   "just-dna-pipelines",
   "granian>=2.7.1",
   "fastapi>=0.129.0",
-  "reflex-mui-datagrid>=0.1.7",
+  "reflex-mui-datagrid>=0.1.8",
 ]
 
 [tool.uv.sources]

@@ -205,6 +205,21 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
         raise ValueError("Must provide either vcf_path or zenodo_url")
 
 
+class NormalizeVcfConfig(Config, SampleInfo):
+    """Configuration for VCF normalization asset.
+
+    Reads a raw VCF, strips 'chr' prefix from chromosomes (case-insensitive),
+    renames 'id' -> 'rsid', computes genotype, applies quality filters from
+    modules.yaml, and sinks to parquet.
+    """
+    vcf_path: str
+    user_name: Optional[str] = None
+    compression: str = "zstd"
+    info_fields: Optional[list[str]] = None
+    format_fields: Optional[list[str]] = None
+    sex: Optional[str] = None  # Biological sex for chrY warning (informational only, never filters)
+
+
 class ReportConfig(Config):
     """
     Configuration for generating HTML reports from annotated parquet files.    The report asset depends on module annotation outputs and produces

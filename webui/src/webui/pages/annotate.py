@@ -442,6 +442,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
     """
     is_selected = UploadState.selected_file == filename
     display_name = UploadState.sample_display_names[filename]
+    upload_date = UploadState.sample_upload_dates[filename]
     
     return rx.el.div(
         # === HEADER ROW (always visible) ===
@@ -452,17 +453,33 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                 fomantic_icon("chevron-down", size=12, color="#fff", style={"marginRight": "4px", "flexShrink": "0"}),
                 fomantic_icon("chevron-right", size=12, color="#888", style={"marginRight": "4px", "flexShrink": "0"}),
             ),
-            # Display name (Subject ID or sample name)
-            rx.el.span(
-                display_name,
-                style={
-                    "fontSize": "0.85rem", 
-                    "flex": "1", 
-                    "overflow": "hidden", 
-                    "textOverflow": "ellipsis", 
-                    "whiteSpace": "nowrap",
-                    "fontWeight": "500",
-                },
+            # Name + upload date stacked
+            rx.el.div(
+                # Display name (Subject ID or sample name)
+                rx.el.div(
+                    display_name,
+                    style={
+                        "fontSize": "0.85rem", 
+                        "overflow": "hidden", 
+                        "textOverflow": "ellipsis", 
+                        "whiteSpace": "nowrap",
+                        "fontWeight": "500",
+                    },
+                ),
+                # Upload date
+                rx.cond(
+                    upload_date != "",
+                    rx.el.div(
+                        upload_date,
+                        style={
+                            "fontSize": "0.65rem",
+                            "color": rx.cond(is_selected, "rgba(255,255,255,0.7)", "#999"),
+                            "lineHeight": "1.2",
+                        },
+                    ),
+                    rx.fragment(),
+                ),
+                style={"flex": "1", "minWidth": "0"},
             ),
             # Status label
             file_status_label(UploadState.file_statuses[filename]),
@@ -475,6 +492,8 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                 style={"padding": "3px 5px", "marginLeft": "4px", "flexShrink": "0"},
             ),
             on_click=lambda: UploadState.select_file(filename),
+            role="button",
+            tab_index=0,
             style={
                 "display": "flex",
                 "alignItems": "center",
@@ -792,6 +811,102 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
 # ============================================================================
 # RUN-CENTRIC UI COMPONENTS
 # ============================================================================
+
+def _pipeline_step_badge(
+    label: str,
+    status_dict: rx.Var[dict],
+    icon_name: str,
+) -> rx.Component:
+    """Render a single pipeline step badge showing fresh/stale/missing status."""
+    status = status_dict["status"].to(str)
+    mat_at = status_dict["materialized_at"].to(str)
+    reason = status_dict["stale_reason"].to(str)
+
+    color_class = rx.match(
+        status,
+        ("fresh", "ui mini green label"),
+        ("stale", "ui mini orange label"),
+        ("missing", "ui mini grey label"),
+        "ui mini grey label",
+    )
+    status_icon = rx.match(
+        status,
+        ("fresh", fomantic_icon("circle-check", size=10, color="#21ba45", style={"marginRight": "3px"})),
+        ("stale", fomantic_icon("circle-alert", size=10, color="#f2711c", style={"marginRight": "3px"})),
+        ("missing", fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"})),
+        fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"}),
+    )
+
+    return rx.el.div(
+        status_icon,
+        rx.el.span(label, style={"fontWeight": "600", "fontSize": "0.75rem", "marginRight": "4px"}),
+        rx.el.span(
+            rx.match(
+                status,
+                ("fresh", "fresh"),
+                ("stale", "stale"),
+                ("missing", "---"),
+                "---",
+            ),
+            class_name=color_class,
+        ),
+        rx.cond(
+            mat_at != "",
+            rx.el.span(
+                mat_at,
+                style={"fontSize": "0.65rem", "color": "#999", "marginLeft": "4px"},
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            (status == "stale") & (reason != ""),
+            rx.el.span(
+                reason,
+                style={"fontSize": "0.65rem", "color": "#f2711c", "marginLeft": "4px", "fontStyle": "italic"},
+            ),
+            rx.fragment(),
+        ),
+        style={"display": "flex", "alignItems": "center", "padding": "2px 0"},
+        title=reason,
+    )
+
+
+def pipeline_status_banner() -> rx.Component:
+    """Compact banner showing the materialization state of each pipeline step.
+
+    Three steps: Normalized -> Annotated -> Report
+    Each shows fresh (green), stale (orange), or missing (grey).
+    """
+    return rx.cond(
+        UploadState.has_pipeline_status,
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("activity", size=14, color="#2185d0", style={"marginRight": "6px", "flexShrink": "0"}),
+                rx.el.span("Pipeline Status", style={"fontWeight": "600", "fontSize": "0.85rem", "marginRight": "16px", "whiteSpace": "nowrap"}),
+                _pipeline_step_badge("Normalized", UploadState.pipeline_status_normalized, "filter"),
+                rx.el.span("->", style={"margin": "0 6px", "color": "#ccc", "fontSize": "0.8rem"}),
+                _pipeline_step_badge("Annotated", UploadState.pipeline_status_annotated, "dna"),
+                rx.el.span("->", style={"margin": "0 6px", "color": "#ccc", "fontSize": "0.8rem"}),
+                _pipeline_step_badge("Report", UploadState.pipeline_status_report, "file-text"),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "flexWrap": "wrap",
+                    "gap": "2px",
+                },
+            ),
+            style={
+                "padding": "8px 12px",
+                "marginBottom": "12px",
+                "backgroundColor": "#f8f9fa",
+                "border": "1px solid #e8e8e8",
+                "borderRadius": "4px",
+            },
+            id="pipeline-status-banner",
+        ),
+        rx.fragment(),
+    )
+
 
 def run_status_badge(status: rx.Var[str]) -> rx.Component:
     """Return a colored badge based on run status (DNA palette: green/yellow/red/grey)."""
@@ -1265,6 +1380,70 @@ def outputs_section() -> rx.Component:
     )
 
 
+def quality_filter_stats_banner() -> rx.Component:
+    """Compact banner showing quality filter statistics from normalization.
+
+    Displayed between the collapsible header and the data grid when
+    filter stats are available from the Dagster materialization metadata.
+    """
+    return rx.cond(
+        UploadState.has_norm_stats,
+        rx.el.div(
+            # Icon + main message
+            rx.el.div(
+                fomantic_icon("filter", size=16, color="#6435c9", style={"marginRight": "8px", "flexShrink": "0"}),
+                rx.el.span(
+                    "Quality Filters Applied",
+                    style={"fontWeight": "600", "fontSize": "0.9rem", "marginRight": "12px"},
+                ),
+                # Stats chips
+                rx.el.span(
+                    UploadState.norm_rows_before.to(str),
+                    " total",
+                    class_name="ui mini label",
+                    style={"marginRight": "4px"},
+                ),
+                fomantic_icon("arrow-right", size=12, color="#888", style={"margin": "0 4px"}),
+                rx.el.span(
+                    UploadState.norm_rows_after.to(str),
+                    " kept",
+                    class_name="ui mini green label",
+                    style={"marginRight": "4px"},
+                ),
+                rx.cond(
+                    UploadState.norm_filters_active,
+                    rx.el.span(
+                        UploadState.norm_rows_removed.to(str),
+                        " removed (",
+                        UploadState.norm_removed_pct,
+                        "%)",
+                        class_name="ui mini orange label",
+                    ),
+                    rx.el.span(
+                        "0 removed",
+                        class_name="ui mini label",
+                    ),
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "flexWrap": "wrap",
+                    "gap": "2px",
+                },
+            ),
+            style={
+                "padding": "8px 12px",
+                "marginBottom": "10px",
+                "backgroundColor": "#f8f6ff",
+                "border": "1px solid #e0d8f0",
+                "borderRadius": "4px",
+            },
+            id="quality-filter-stats-banner",
+        ),
+        rx.fragment(),
+    )
+
+
 def input_vcf_preview_section() -> rx.Component:
     """Collapsible section showing the selected input VCF file.
 
@@ -1276,7 +1455,7 @@ def input_vcf_preview_section() -> rx.Component:
         _collapsible_header(
             expanded=UploadState.vcf_preview_expanded,
             icon_name="database",
-            title="Input VCF Preview",
+            title="Normalized VCF Preview",
             right_badge=rx.el.div(
                 # File name label
                 rx.cond(
@@ -1302,6 +1481,8 @@ def input_vcf_preview_section() -> rx.Component:
         rx.cond(
             UploadState.vcf_preview_expanded,
             rx.el.div(
+                # Quality filter statistics banner
+                quality_filter_stats_banner(),
                 # Initial-load spinner (only during first VCF scan, NOT scroll loads)
                 rx.cond(
                     UploadState.vcf_preview_loading,
@@ -1854,11 +2035,17 @@ def right_panel_run_view() -> rx.Component:
             },
             id="right-column-header",
         ),
+        # Pipeline status banner (shows asset freshness)
+        rx.cond(
+            UploadState.has_selected_file,
+            pipeline_status_banner(),
+            rx.fragment(),
+        ),
         # Content: show sections based on whether sample has been analyzed
         rx.cond(
             UploadState.has_selected_file,
             rx.fragment(
-                # Section 0: Input VCF Preview (top) - inspect user input directly
+                # Section 0: Normalized VCF Preview (top)
                 rx.el.div(
                     input_vcf_preview_section(),
                     class_name="ui violet segment",

@@ -19,14 +19,20 @@ from dagster import (
     DataVersion,
 )
 
+import polars as pl
+
 from just_dna_pipelines.runtime import resource_tracker
+from just_dna_pipelines.io import read_vcf_file
+from just_dna_pipelines.annotation.chromosomes import rewrite_chromosome_column_strip_chr_prefix
 from just_dna_pipelines.annotation.configs import (
     EnsemblAnnotationsConfig,
     AnnotationConfig,
+    NormalizeVcfConfig,
 )
 from just_dna_pipelines.annotation.resources import (
     get_default_ensembl_cache_dir,
     get_user_input_dir,
+    get_user_output_dir,
     ensure_vcf_in_user_input_dir,
 )
 from just_dna_pipelines.annotation.logic import annotate_vcf_with_ensembl
@@ -147,6 +153,192 @@ def user_vcf_source(context: AssetExecutionContext) -> Output[dict]:
         value={"partition_key": partition_key, "data_version": version.value},
         metadata=metadata
     )
+
+
+# ============================================================================
+# QUALITY FILTERS CONFIG ASSET
+# ============================================================================
+
+@asset(
+    description="Quality filter settings from modules.yaml. Re-materialize to pick up config changes. "
+                "Downstream assets (user_vcf_normalized) depend on this for staleness tracking.",
+    compute_kind="config",
+)
+def quality_filters_config(context: AssetExecutionContext) -> Output[dict]:
+    """
+    Lightweight asset that materializes the current quality filter settings.
+
+    Reads modules.yaml at materialization time (not import time) so edits
+    to the YAML are picked up on re-materialization. The DataVersion is a
+    hash of the filter config — when it changes, Dagster marks downstream
+    assets as stale.
+    """
+    from just_dna_pipelines.module_config import _load_config, QualityFilters
+
+    config = _load_config()
+    filters = config.quality_filters
+    logger = context.log
+
+    logger.info(f"Quality filters loaded: {filters.model_dump()}")
+    logger.info(f"Config hash: {filters.config_hash()}")
+
+    dump = filters.model_dump()
+    metadata_dict: dict = {
+        "config_hash": MetadataValue.text(filters.config_hash()),
+        "is_active": MetadataValue.bool(filters.is_active),
+    }
+    if filters.pass_filters:
+        metadata_dict["pass_filters"] = MetadataValue.text(", ".join(filters.pass_filters))
+    if filters.min_depth is not None:
+        metadata_dict["min_depth"] = MetadataValue.int(filters.min_depth)
+    if filters.min_qual is not None:
+        metadata_dict["min_qual"] = MetadataValue.float(filters.min_qual)
+
+    return Output(
+        value=dump,
+        data_version=DataVersion(filters.config_hash()),
+        metadata=metadata_dict,
+    )
+
+
+# ============================================================================
+# NORMALIZED VCF ASSET
+# ============================================================================
+
+@asset(
+    description="Normalized VCF as parquet: chromosomes stripped of 'chr' prefix, "
+                "'id' renamed to 'rsid', genotype computed from GT+ref+alt, "
+                "quality-filtered per modules.yaml settings.",
+    compute_kind="polars",
+    partitions_def=user_vcf_partitions,
+    io_manager_key="user_asset_io_manager",
+    ins={
+        "user_vcf_source": AssetIn(),
+        "quality_filters_config": AssetIn(),
+    },
+    metadata={
+        "partition_type": "user",
+        "output_format": "parquet",
+        "storage": "output",
+    },
+)
+def user_vcf_normalized(
+    context: AssetExecutionContext,
+    user_vcf_source: dict,
+    quality_filters_config: dict,
+    config: NormalizeVcfConfig,
+) -> Output[Path]:
+    """
+    Read a raw VCF, normalise it, apply quality filters, and persist as parquet.
+
+    Normalization steps:
+    1. Strip 'chr' prefix from chromosome column (case-insensitive)
+    2. Rename 'id' column to 'rsid'
+    3. Compute genotype column from GT + ref + alt
+    4. Apply quality filters from modules.yaml (FILTER, min depth, min qual)
+
+    If sex="Female" is set, logs a warning when chrY variants are present
+    (informational only — never removes chrY).
+    """
+    from just_dna_pipelines.module_config import QualityFilters, build_quality_filter_expr
+
+    logger = context.log
+    partition_key = context.partition_key
+
+    logger.info(f"Normalizing VCF for partition: {partition_key}")
+    logger.info(f"VCF source metadata: {user_vcf_source}")
+
+    if "/" in partition_key:
+        user_name, sample_name = partition_key.split("/", 1)
+    else:
+        user_name = partition_key
+        sample_name = config.sample_name
+
+    user_name = config.user_name or user_name
+    sample_name = config.sample_name or sample_name
+
+    vcf_path = Path(config.vcf_path)
+    vcf_path = ensure_vcf_in_user_input_dir(vcf_path, user_name, logger)
+
+    filters = QualityFilters.model_validate(quality_filters_config)
+    logger.info(f"Quality filters: {filters.model_dump()}")
+
+    with resource_tracker("Normalize VCF to Parquet", context=context):
+        lf = read_vcf_file(
+            vcf_path,
+            info_fields=config.info_fields,
+            save_parquet=None,
+            with_formats=True,
+            format_fields=config.format_fields,
+        )
+
+        schema = lf.collect_schema()
+
+        if "id" in schema.names() and "rsid" not in schema.names():
+            lf = lf.rename({"id": "rsid"})
+
+        if "chrom" in schema.names():
+            lf = rewrite_chromosome_column_strip_chr_prefix(lf, chrom_col="chrom")
+
+        # --- Quality filtering ---
+        rows_before_filter: int | None = None
+        filter_expr = build_quality_filter_expr(filters, lf.collect_schema().names())
+
+        if filter_expr is not None:
+            # Materialize row count before filtering (reads parquet metadata only
+            # if lf comes from scan_parquet, otherwise a cheap count)
+            rows_before_filter = lf.select(pl.len()).collect().item()
+            lf = lf.filter(filter_expr)
+            logger.info(
+                f"Quality filter applied: {rows_before_filter} rows before filter"
+            )
+
+        # --- chrY informational warning for female-labeled samples ---
+        if config.sex and config.sex.strip().lower() == "female":
+            chrom_col = "chrom" if "chrom" in lf.collect_schema().names() else None
+            if chrom_col:
+                y_count = (
+                    lf.filter(pl.col(chrom_col).is_in(["Y", "chrY"]))
+                    .select(pl.len())
+                    .collect()
+                    .item()
+                )
+                if y_count > 0:
+                    logger.warning(
+                        f"WARNING: {y_count} chrY variants found in female-labeled "
+                        f"sample '{sample_name}'. These are likely sequencing noise "
+                        f"but are NOT removed. Quality filters may reduce this count."
+                    )
+
+        output_dir = get_user_output_dir() / partition_key
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "user_vcf_normalized.parquet"
+
+        lf.sink_parquet(str(output_path), compression=config.compression)
+
+    file_size_mb = output_path.stat().st_size / (1024 * 1024)
+    row_count = pl.scan_parquet(str(output_path)).select(pl.len()).collect().item()
+
+    if rows_before_filter is not None:
+        rows_removed = rows_before_filter - row_count
+        logger.info(
+            f"Quality filter result: {row_count} rows after filter "
+            f"({rows_removed} removed, {rows_removed / rows_before_filter * 100:.1f}% filtered)"
+        )
+
+    metadata_dict: dict = {
+        "partition_key": MetadataValue.text(partition_key),
+        "output_path": MetadataValue.path(str(output_path)),
+        "row_count": MetadataValue.int(row_count),
+        "size_mb": MetadataValue.float(round(file_size_mb, 2)),
+    }
+    if rows_before_filter is not None:
+        metadata_dict["rows_before_filter"] = MetadataValue.int(rows_before_filter)
+        metadata_dict["rows_after_filter"] = MetadataValue.int(row_count)
+        metadata_dict["rows_removed"] = MetadataValue.int(rows_before_filter - row_count)
+    metadata_dict["quality_filters_hash"] = MetadataValue.text(filters.config_hash())
+
+    return Output(output_path, metadata=metadata_dict)
 
 
 # ============================================================================

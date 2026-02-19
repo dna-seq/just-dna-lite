@@ -76,8 +76,12 @@ Module display metadata (titles, icons, colors) is configured in `modules.yaml` 
 
 **Asset Graph:**
 1. `hf_annotators_dataset`: External HuggingFace modules source
-2. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
-3. `user_longevity_report`: HTML report generated from annotated parquets (depends on `user_hf_module_annotations`)
+2. `user_vcf_source`: Partitioned source for input VCFs (metadata: path, size, upload date)
+3. `user_vcf_normalized`: Normalized VCF as parquet (strip chr prefix, id→rsid, genotype); **required** before HF annotation
+4. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
+5. `user_longevity_report`: HTML report generated from annotated parquets (depends on `user_hf_module_annotations`)
+
+**Execution order:** For each partition (e.g. `anonymous/other_livia`), Dagster runs: `user_vcf_normalized` → `user_hf_module_annotations` → `user_longevity_report`. The HF annotation asset **requires** `user_vcf_normalized` as input; if the parquet does not exist, the IO manager raises `FileNotFoundError`.
 
 **Key Features:**
 - No Ensembl join required (modules are self-contained)
@@ -112,9 +116,45 @@ Report assets depend on annotation outputs and produce self-contained HTML repor
 data/output/users/{user}/{sample}/reports/longevity_report.html
 ```
 
+### 4. VCF Normalization (user_vcf_normalized)
+
+Before HF module annotation, the raw VCF is normalized and persisted as parquet. This avoids re-parsing the VCF for the UI preview and for the annotation pipeline.
+
+**Normalization steps:**
+1. Strip `chr` prefix from chromosome column (case-insensitive: `chr1` → `1`, `CHR1` → `1`)
+2. Rename `id` column to `rsid`
+3. Compute genotype column from GT + REF + ALT as `List[String]` sorted alphabetically
+
+**Output path:**
+```
+data/output/users/{partition_key}/user_vcf_normalized.parquet
+```
+Example: `data/output/users/anonymous/other_livia/user_vcf_normalized.parquet`
+
 **Jobs:**
+- `normalize_vcf_job`: Normalize only (runs automatically on upload in the Web UI)
+- `annotate_and_report_job`: Full pipeline (normalize → annotate → report)
+
+**When normalize runs:**
+- On upload: The Web UI runs `normalize_vcf_job` in-process after each VCF upload.
+- With full pipeline: `annotate_and_report_job` materializes `user_vcf_normalized` first, then downstream assets.
+
+**If normalized parquet is missing:**
+- `user_hf_module_annotations` will fail with `FileNotFoundError` when loading via IO manager (no silent fallback in the pipeline).
+- Web UI preview: Should show an error or explicit fallback notice — **never silently display raw VCF as if it were normalized**. See "Avoid silent fallbacks" in AGENTS.md.
+
+**Running normalize manually (CLI):**
+```bash
+# From workspace root, with DAGSTER_HOME set
+uv run dg asset materialize --select user_vcf_normalized --partition "user_id/sample_name"
+```
+Or use a small script that calls `job_def.execute_in_process()` with the correct run config and partition tag (see `webui/state.py` `_normalize_vcf_sync` for the pattern).
+
+**Known quirk (polars-bio) — FIXED:** The `ALLELE_ID` INFO field (Number=R, common in DRAGEN VCFs) triggers a Rust panic in `OptionalField::append_array_string_iter` when REF has value `.` (e.g. `ALLELE_ID=.,NM_000157.4:c.1604G>A`). We exclude `ALLELE_ID` from auto-detected INFO fields in `io.get_info_fields()` via `_VCF_INFO_BLOCKLIST`. If you see similar panics with other fields, add them to the blocklist in `just_dna_pipelines/io.py`.
+
+**Report jobs:**
 - `generate_longevity_report_job`: Generate report only (requires prior annotation materialization)
-- `annotate_and_report_job`: Full pipeline — annotate VCF + generate report in one run
+- `annotate_and_report_job`: Full pipeline — normalize + annotate VCF + generate report in one run
 
 ### Why both assets and jobs?
 
@@ -197,6 +237,13 @@ Modules are discovered via the registry in `registry.py`. A module typically pro
     ```bash
     uv run dg instance add-dynamic-partitions user_vcf_files "user1/sample1"
     ```
+*   **Normalize VCF (when parquet missing):**
+    Run `normalize_vcf_job` for a partition so the Web UI preview and HF annotation use normalized data:
+    ```bash
+    # Ensure DAGSTER_HOME is set (default: data/interim/dagster)
+    uv run dg asset materialize --select user_vcf_normalized --partition "user_id/sample_name"
+    ```
+    Partition key format: `{user_id}/{sample_name}` (e.g. `anonymous/other_livia`). Sample name is filename stem (e.g. `other_livia.vcf.gz` → `other_livia`).
 *   **Annotate with HF modules (CLI):**
     ```bash
     # Local VCF

@@ -110,9 +110,17 @@ def _parse_vcf_header_fields(vcf_path: str) -> tuple[list[str], list[str]]:
     return info_fields, format_fields
 
 
+# INFO fields that cause polars-bio Rust panic (OptionalField::append_array_string_iter
+# unwrap on None) when parsing DRAGEN/Illumina VCFs. ALLELE_ID has Number=R with "." for REF
+# in some records, triggering the bug. Exclude from auto-detect to avoid crash.
+_VCF_INFO_BLOCKLIST: frozenset[str] = frozenset({"ALLELE_ID"})
+
+
 def get_info_fields(vcf_path: str) -> list[str]:
     """
     Extract INFO field names from a VCF file header by parsing the header directly.
+    
+    Excludes fields in _VCF_INFO_BLOCKLIST that cause polars-bio panics.
     
     Args:
         vcf_path: Path to the VCF file
@@ -123,6 +131,7 @@ def get_info_fields(vcf_path: str) -> list[str]:
     with start_action(action_type="get_info_fields", vcf_path=vcf_path) as action:
         try:
             info_fields, _ = _parse_vcf_header_fields(vcf_path)
+            info_fields = [f for f in info_fields if f not in _VCF_INFO_BLOCKLIST]
             
             action.log(
                 message_type="info",
@@ -298,13 +307,17 @@ def read_vcf_file(
                         removed_from_format=sorted(duplicates),
                     )
 
-        # Use polars-bio scan_vcf with native format_fields support.
         # polars-bio >= 0.23 removed `thread_num`; map to `concurrent_fetches`.
+        # predicate_pushdown=False: polars-bio 0.23 has a bug in _translate_in_expr
+        # where the `column` variable is unbound when the regex doesn't match,
+        # causing spurious warnings on semi-joins. Since we read the full VCF and
+        # immediately sink to parquet, pushdown gives no benefit here anyway.
         result = pb.scan_vcf(
             str(file_path),
             info_fields=actual_info_fields,
             format_fields=actual_format_fields,
             concurrent_fetches=max(1, int(thread_num)),
+            predicate_pushdown=False,
         )
 
         # Compute genotype from GT + ref + alt if requested and GT is present in schema

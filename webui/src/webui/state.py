@@ -15,7 +15,7 @@ from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
 from just_dna_pipelines.module_config import build_module_metadata_dict
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
-from just_dna_pipelines.io import read_vcf_file
+from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 
 
@@ -159,7 +159,7 @@ class AuthState(rx.State):
         return rx.toast.info("Logged out")
 
 
-class UploadState(LazyFrameGridMixin):
+class UploadState(LazyFrameGridMixin, rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
     uploading: bool = False
@@ -313,6 +313,7 @@ class UploadState(LazyFrameGridMixin):
             # Register in Dagster
             sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
             partition_key = f"{self.safe_user_id}/{sample_name}"
+            upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
             
             # 1. Add partition if missing
             from just_dna_pipelines.annotation.assets import user_vcf_partitions
@@ -329,12 +330,15 @@ class UploadState(LazyFrameGridMixin):
                         "path": str(file_path.absolute()),
                         "size_bytes": len(content),
                         "uploaded_via": "webui",
+                        "upload_date": upload_date,
                     }
                 )
             )
             
-            if file.filename not in self.files:
-                self.files.append(file.filename)
+            # Move re-uploaded files to front (newest first)
+            if file.filename in self.files:
+                self.files.remove(file.filename)
+            self.files.insert(0, file.filename)
             new_files.append(file.filename)
             
             # Update status
@@ -343,10 +347,22 @@ class UploadState(LazyFrameGridMixin):
                 "annotated": "uploaded"
             }
         
+        # Normalize each uploaded VCF to parquet (lightweight, synchronous)
+        for file in files:
+            if not file.filename:
+                continue
+            sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+            pk = f"{self.safe_user_id}/{sample_name}"
+            fp = upload_dir / file.filename
+            if fp.exists():
+                self._normalize_vcf_sync(instance, fp, pk)
+
         self.uploading = False
         if new_files:
-            # Automatically select the last uploaded file
             self.selected_file = new_files[-1]
+            self.vcf_preview_expanded = True
+            self._load_vcf_preview_sync()
+            self._load_output_files_sync()
             yield rx.toast.success(f"Uploaded and registered {len(new_files)} files.")
         else:
             yield rx.toast.warning("No files were uploaded")
@@ -388,6 +404,7 @@ class UploadState(LazyFrameGridMixin):
             
             sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
             partition_key = f"{self.safe_user_id}/{sample_name}"
+            upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
             
             # Add partition if missing
             from just_dna_pipelines.annotation.assets import user_vcf_partitions
@@ -400,6 +417,7 @@ class UploadState(LazyFrameGridMixin):
                 "path": MetadataValue.path(str(file_path.absolute())),
                 "size_bytes": MetadataValue.int(len(content)),
                 "uploaded_via": MetadataValue.text("webui"),
+                "upload_date": MetadataValue.text(upload_date),
                 "species": MetadataValue.text(self.new_sample_species),
                 "reference_genome": MetadataValue.text(self.new_sample_reference_genome),
                 "sex": MetadataValue.text(self.new_sample_sex),
@@ -423,14 +441,17 @@ class UploadState(LazyFrameGridMixin):
                 )
             )
             
-            if file.filename not in self.files:
-                self.files.append(file.filename)
+            # Move re-uploaded files to front (newest first)
+            if file.filename in self.files:
+                self.files.remove(file.filename)
+            self.files.insert(0, file.filename)
             new_files.append(file.filename)
             
-            # Also store in local file_metadata for immediate UI access
+            # Store in local file_metadata for immediate UI access (full replace, not merge)
             self.file_metadata[file.filename] = {
                 "filename": file.filename,
                 "sample_name": sample_name,
+                "upload_date": upload_date,
                 "species": self.new_sample_species,
                 "reference_genome": self.new_sample_reference_genome,
                 "sex": self.new_sample_sex,
@@ -449,15 +470,44 @@ class UploadState(LazyFrameGridMixin):
                 "annotated": "uploaded"
             }
         
+        # Normalize each uploaded VCF to parquet (lightweight, synchronous)
+        for file in files:
+            if not file.filename:
+                continue
+            sn = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+            pk = f"{self.safe_user_id}/{sn}"
+            fp = upload_dir / file.filename
+            if fp.exists():
+                self._normalize_vcf_sync(instance, fp, pk)
+
         self.uploading = False
         
         if new_files:
-            # Reset the form and select the new file
             self._reset_new_sample_form()
             self.selected_file = new_files[-1]
+            self.vcf_preview_expanded = True
+            self._load_vcf_preview_sync()
+            self._load_output_files_sync()
             yield rx.toast.success(f"Added {len(new_files)} sample(s) with metadata")
         else:
             yield rx.toast.warning("No files were uploaded")
+
+    def _normalize_vcf_sync(self, instance: DagsterInstance, file_path: Path, partition_key: str) -> bool:
+        """Run normalize_vcf_job in-process so the preview shows normalized data.
+
+        Returns True on success, False on failure (logged but non-fatal).
+        """
+        run_config = {
+            "ops": {
+                "user_vcf_normalized": {
+                    "config": {
+                        "vcf_path": str(file_path.absolute()),
+                    }
+                }
+            }
+        }
+        result = self._execute_job_in_process(instance, "normalize_vcf_job", run_config, partition_key)
+        return result.success
 
     def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
         """
@@ -597,24 +647,31 @@ class UploadState(LazyFrameGridMixin):
         file_info = self.file_metadata.get(filename, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
         
-        # Use "ops" config key for asset jobs
+        normalize_config: dict = {
+            "vcf_path": str(vcf_path.absolute()),
+        }
+        sex_value = file_info.get("sex") or None
+        if sex_value:
+            normalize_config["sex"] = sex_value
+
         run_config = {
             "ops": {
+                "user_vcf_normalized": {
+                    "config": normalize_config,
+                },
                 "user_hf_module_annotations": {
                     "config": {
                         "vcf_path": str(vcf_path.absolute()),
                         "user_name": self.safe_user_id,
                         "sample_name": sample_name,
                         "modules": modules_to_use,
-                        # Sample/subject metadata from file info
                         "species": file_info.get("species", "Homo sapiens"),
                         "reference_genome": file_info.get("reference_genome", "GRCh38"),
                         "subject_id": file_info.get("subject_id") or None,
-                        "sex": file_info.get("sex") or None,
+                        "sex": sex_value,
                         "tissue": file_info.get("tissue") or None,
                         "study_name": file_info.get("study_name") or None,
                         "description": file_info.get("notes") or None,
-                        # Arbitrary user-defined fields
                         "custom_metadata": custom_metadata if custom_metadata else None,
                     }
                 },
@@ -677,6 +734,13 @@ class UploadState(LazyFrameGridMixin):
     vcf_preview_loading: bool = False
     vcf_preview_error: str = ""
     preview_source_label: str = ""  # e.g. "input.vcf.gz"
+
+    # Normalization filter stats (loaded from Dagster materialization metadata)
+    norm_rows_before: int = 0
+    norm_rows_after: int = 0
+    norm_rows_removed: int = 0
+    norm_filters_hash: str = ""
+    norm_stats_loaded: bool = False
     
     # Run-centric UI state
     vcf_preview_expanded: bool = True  # Whether the VCF preview section is expanded
@@ -688,6 +752,12 @@ class UploadState(LazyFrameGridMixin):
     
     # Metadata editing mode - when False, shows read-only view
     metadata_edit_mode: bool = False
+
+    # Per-sample pipeline asset status: maps asset step to status info
+    # Each entry: {"status": "fresh"|"stale"|"missing", "materialized_at": str|"", "stale_reason": str|""}
+    pipeline_status_normalized: Dict[str, str] = {}
+    pipeline_status_annotated: Dict[str, str] = {}
+    pipeline_status_report: Dict[str, str] = {}
 
     def toggle_metadata_edit_mode(self):
         """Toggle between read-only and edit mode for metadata."""
@@ -717,6 +787,24 @@ class UploadState(LazyFrameGridMixin):
         return bool(self.vcf_preview_error)
 
     @rx.var
+    def has_norm_stats(self) -> bool:
+        """True when normalization filter stats are available."""
+        return self.norm_stats_loaded and self.norm_rows_before > 0
+
+    @rx.var
+    def norm_removed_pct(self) -> str:
+        """Percentage of rows removed by quality filters."""
+        if self.norm_rows_before == 0:
+            return "0.0"
+        pct = (self.norm_rows_removed / self.norm_rows_before) * 100
+        return f"{pct:.1f}"
+
+    @rx.var
+    def norm_filters_active(self) -> bool:
+        """True when quality filters actually removed rows."""
+        return self.norm_rows_removed > 0
+
+    @rx.var
     def sample_display_names(self) -> Dict[str, str]:
         """
         Map filenames to display names.
@@ -731,6 +819,15 @@ class UploadState(LazyFrameGridMixin):
             else:
                 # Use sample name (filename without extension)
                 result[filename] = filename.replace(".vcf.gz", "").replace(".vcf", "")
+        return result
+
+    @rx.var
+    def sample_upload_dates(self) -> Dict[str, str]:
+        """Map filenames to their upload date strings for display."""
+        result = {}
+        for filename in self.files:
+            meta = self.file_metadata.get(filename, {})
+            result[filename] = meta.get("upload_date", "")
         return result
 
     def _load_file_metadata(self, filename: str):
@@ -789,12 +886,204 @@ class UploadState(LazyFrameGridMixin):
         self.vcf_preview_error = ""
         self.vcf_preview_loading = False
         self.preview_source_label = ""
+        self._clear_norm_stats()
+
+    def _clear_norm_stats(self):
+        """Reset normalization filter statistics."""
+        self.norm_rows_before = 0
+        self.norm_rows_after = 0
+        self.norm_rows_removed = 0
+        self.norm_filters_hash = ""
+        self.norm_stats_loaded = False
+
+    def _load_asset_pipeline_status(self):
+        """Load materialization status for each pipeline step of the selected sample.
+
+        Checks four assets in the pipeline chain:
+          user_vcf_source -> user_vcf_normalized -> user_hf_module_annotations -> user_longevity_report
+
+        For each downstream asset, it is "stale" if its upstream was materialized more recently,
+        "fresh" if it exists and is up-to-date, or "missing" if never materialized.
+        """
+        empty: Dict[str, str] = {"status": "missing", "materialized_at": "", "stale_reason": ""}
+        if not self.selected_file or not self.safe_user_id:
+            self.pipeline_status_normalized = dict(empty)
+            self.pipeline_status_annotated = dict(empty)
+            self.pipeline_status_report = dict(empty)
+            return
+
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+        instance = get_dagster_instance()
+
+        asset_names = [
+            "user_vcf_source",
+            "user_vcf_normalized",
+            "user_hf_module_annotations",
+            "user_longevity_report",
+        ]
+
+        # Fetch all timestamps in one pass (4 queries total)
+        timestamps: Dict[str, float] = {}
+        mat_times: Dict[str, str] = {}
+        for asset_name in asset_names:
+            result = instance.fetch_materializations(
+                records_filter=AssetRecordsFilter(
+                    asset_key=AssetKey(asset_name),
+                    asset_partitions=[partition_key],
+                ),
+                limit=1,
+            )
+            if result.records:
+                ts = result.records[0].timestamp or 0.0
+                timestamps[asset_name] = ts
+                mat_times[asset_name] = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
+            else:
+                timestamps[asset_name] = 0.0
+                mat_times[asset_name] = ""
+
+        def _build_status(asset_name: str, upstream_name: str) -> Dict[str, str]:
+            ts = timestamps[asset_name]
+            if ts == 0.0:
+                return {"status": "missing", "materialized_at": "", "stale_reason": "Not yet materialized"}
+            upstream_ts = timestamps.get(upstream_name, 0.0)
+            if upstream_ts > ts:
+                return {
+                    "status": "stale",
+                    "materialized_at": mat_times[asset_name],
+                    "stale_reason": f"Upstream ({upstream_name.replace('user_', '')}) is newer",
+                }
+            return {"status": "fresh", "materialized_at": mat_times[asset_name], "stale_reason": ""}
+
+        self.pipeline_status_normalized = _build_status("user_vcf_normalized", "user_vcf_source")
+        self.pipeline_status_annotated = _build_status("user_hf_module_annotations", "user_vcf_normalized")
+        self.pipeline_status_report = _build_status("user_longevity_report", "user_hf_module_annotations")
+
+    @rx.var
+    def has_pipeline_status(self) -> bool:
+        """True when pipeline status has been loaded for the selected sample."""
+        return bool(self.pipeline_status_normalized.get("status"))
+
+    def _load_norm_stats_from_dagster(self):
+        """Load normalization filter stats from the latest Dagster materialization.
+
+        Also detects stale parquets: if the stored quality_filters_hash differs
+        from the current config hash, re-runs normalization automatically.
+        """
+        if not self.selected_file or not self.safe_user_id:
+            self._clear_norm_stats()
+            return
+
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+        instance = get_dagster_instance()
+
+        result = instance.fetch_materializations(
+            records_filter=AssetRecordsFilter(
+                asset_key=AssetKey("user_vcf_normalized"),
+                asset_partitions=[partition_key],
+            ),
+            limit=1,
+        )
+        if not result.records:
+            self._clear_norm_stats()
+            return
+
+        mat = result.records[0].asset_materialization
+        if not mat or not mat.metadata:
+            self._clear_norm_stats()
+            return
+
+        def _int(key: str) -> int:
+            v = mat.metadata.get(key)
+            return int(v.value) if v and hasattr(v, "value") else 0
+
+        def _str(key: str) -> str:
+            v = mat.metadata.get(key)
+            return str(v.value) if v and hasattr(v, "value") else ""
+
+        self.norm_rows_before = _int("rows_before_filter")
+        self.norm_rows_after = _int("rows_after_filter")
+        self.norm_rows_removed = _int("rows_removed")
+        self.norm_filters_hash = _str("quality_filters_hash")
+        self.norm_stats_loaded = True
+
+    def _ensure_normalized_fresh(self) -> bool:
+        """Re-normalize if the parquet is stale (quality filters changed).
+
+        Compares the hash stored on the materialization against the current
+        config.  Returns True if re-normalization happened, False otherwise.
+        """
+        from just_dna_pipelines.module_config import _load_config
+
+        current_hash = _load_config().quality_filters.config_hash()
+
+        # If no stats loaded or hashes match, nothing to do
+        if not self.norm_stats_loaded:
+            # No previous materialization — need to normalize
+            pass
+        elif self.norm_filters_hash == current_hash:
+            return False
+
+        # Stale or missing — re-normalize
+        if not self.selected_file or not self.safe_user_id:
+            return False
+
+        root = Path(__file__).resolve().parents[3]
+        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+        if not vcf_path.exists():
+            return False
+
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+        instance = get_dagster_instance()
+
+        self._normalize_vcf_sync(instance, vcf_path, partition_key)
+        # Reload stats from the fresh materialization
+        self._load_norm_stats_from_dagster()
+        return True
+
+    def _get_normalized_parquet_path(self) -> Path | None:
+        """Return the normalized parquet path if it exists, else None."""
+        if not self.selected_file or not self.safe_user_id:
+            return None
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        root = Path(__file__).resolve().parents[3]
+        parquet_path = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "user_vcf_normalized.parquet"
+        if parquet_path.exists():
+            return parquet_path
+        return None
 
     def _load_vcf_preview_sync(self):
-        """Prepare selected VCF for server-side DataGrid browsing."""
+        """Load normalized parquet for preview; fall back to raw VCF.
+
+        Also ensures the parquet is fresh (quality filters match current config)
+        and loads filter statistics from Dagster for UI display.
+        """
         if not self.selected_file or not self.safe_user_id:
             self._clear_vcf_preview()
             return
+
+        self.vcf_preview_loading = True
+        self.vcf_preview_error = ""
+
+        # Load normalization stats and re-normalize if quality filters changed
+        self._load_norm_stats_from_dagster()
+        self._ensure_normalized_fresh()
+
+        import polars as pl
+
+        normalized = self._get_normalized_parquet_path()
+        if normalized is not None:
+            try:
+                lf = pl.scan_parquet(str(normalized))
+                for _ in self.set_lazyframe(lf, {}, chunk_size=300):
+                    pass
+                self.preview_source_label = f"{self.selected_file} (normalized)"
+                self.vcf_preview_loading = False
+                return
+            except Exception:
+                pass  # fall through to raw VCF
 
         root = Path(__file__).resolve().parents[3]
         vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
@@ -803,14 +1092,12 @@ class UploadState(LazyFrameGridMixin):
             self.vcf_preview_error = f"VCF file not found: {vcf_path.name}"
             return
 
-        self.vcf_preview_loading = True
-        self.vcf_preview_error = ""
         try:
-            lazy_vcf = read_vcf_file(vcf_path, save_parquet=None, with_formats=True)
+            lazy_vcf = prepare_vcf_for_module_annotation(vcf_path)
             descriptions = extract_vcf_descriptions(lazy_vcf)
             for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
                 pass
-            self.preview_source_label = vcf_path.name
+            self.preview_source_label = f"{vcf_path.name} (normalized)"
         except Exception as e:
             self._clear_vcf_preview()
             self.vcf_preview_error = str(e)
@@ -1124,14 +1411,21 @@ class UploadState(LazyFrameGridMixin):
                         break
             
             if filename and filename in self.files:
-                # Merge Dagster metadata with existing file metadata
+                # Dagster metadata fully replaces existing metadata to avoid
+                # stale fields from a previous upload leaking into a re-upload
                 existing = self.file_metadata.get(filename, {})
-                # Dagster metadata takes precedence for fields it has
-                merged = {**existing, **dagster_info}
-                # Ensure custom_fields is properly merged
-                if "custom_fields" in existing and "custom_fields" in dagster_info:
-                    merged["custom_fields"] = {**existing.get("custom_fields", {}), **dagster_info.get("custom_fields", {})}
-                self.file_metadata[filename] = merged
+                # Keep only filesystem-derived fields that Dagster doesn't track
+                base = {
+                    "filename": existing.get("filename", filename),
+                    "sample_name": existing.get("sample_name", ""),
+                    "size_mb": existing.get("size_mb", 0),
+                    "upload_date": existing.get("upload_date", ""),
+                    "path": existing.get("path", ""),
+                    "custom_fields": {},
+                }
+                # Dagster metadata overwrites everything it provides
+                base.update(dagster_info)
+                self.file_metadata[filename] = base
 
     @rx.var
     def current_custom_fields(self) -> Dict[str, str]:
@@ -1258,6 +1552,12 @@ class UploadState(LazyFrameGridMixin):
 
         # Load output files for the selected sample
         self._load_output_files_sync()
+
+        # Load pipeline asset status for the selected sample
+        self._load_asset_pipeline_status()
+
+        # Clear the output preview grid (belongs to OutputPreviewState)
+        return OutputPreviewState.clear_output_preview
 
     def switch_tab(self, tab_name: str):
         """Switch to a different tab in the right panel."""
@@ -1615,8 +1915,9 @@ class UploadState(LazyFrameGridMixin):
             self.polling_active = False
             self.last_run_success = result.success
             
-            # Refresh output files so UI shows them immediately
+            # Refresh output files and pipeline status so UI shows them immediately
             self._load_output_files_sync()
+            self._load_asset_pipeline_status()
             
         except Exception as e:
             error_message = str(e)
@@ -1670,27 +1971,34 @@ class UploadState(LazyFrameGridMixin):
         job_name = "annotate_and_report_job"
         modules_to_use = self.selected_modules.copy()
         
-        # Get file metadata for the selected file
         file_info = self.file_metadata.get(self.selected_file, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
 
+        normalize_config_async: dict = {
+            "vcf_path": str(vcf_path.absolute()),
+        }
+        sex_value_async = file_info.get("sex") or None
+        if sex_value_async:
+            normalize_config_async["sex"] = sex_value_async
+
         run_config = {
             "ops": {
+                "user_vcf_normalized": {
+                    "config": normalize_config_async,
+                },
                 "user_hf_module_annotations": {
                     "config": {
                         "vcf_path": str(vcf_path.absolute()),
                         "user_name": self.safe_user_id,
                         "sample_name": sample_name,
                         "modules": modules_to_use,
-                        # Sample/subject metadata from file info
                         "species": file_info.get("species", "Homo sapiens"),
                         "reference_genome": file_info.get("reference_genome", "GRCh38"),
                         "subject_id": file_info.get("subject_id") or None,
-                        "sex": file_info.get("sex") or None,
+                        "sex": sex_value_async,
                         "tissue": file_info.get("tissue") or None,
                         "study_name": file_info.get("study_name") or None,
                         "description": file_info.get("notes") or None,
-                        # Arbitrary user-defined fields
                         "custom_metadata": custom_metadata if custom_metadata else None,
                     }
                 },
@@ -1837,8 +2145,9 @@ class UploadState(LazyFrameGridMixin):
             self.polling_active = False
             self.running = False
             self.last_run_success = (run.status == DagsterRunStatus.SUCCESS)
-            # Reload output files so the UI shows them immediately
+            # Reload output files and pipeline status so the UI shows them immediately
             self._load_output_files_sync()
+            self._load_asset_pipeline_status()
             if run.status == DagsterRunStatus.SUCCESS:
                 return rx.toast.success("Annotation completed successfully!")
             elif run.status == DagsterRunStatus.FAILURE:
@@ -2004,16 +2313,22 @@ class UploadState(LazyFrameGridMixin):
         if not user_dir.exists():
             return
 
-        # Find VCF files
+        # Find VCF files, sorted by modification time (newest first)
         vcf_files = list(user_dir.glob("*.vcf")) + list(user_dir.glob("*.vcf.gz"))
+        vcf_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
         self.files = [f.name for f in vcf_files]
         
         # Load basic metadata for all files (from filesystem)
         for filename in self.files:
             self._load_file_metadata(filename)
         
-        # Load persisted metadata from Dagster (overwrites/merges with filesystem metadata)
+        # Load persisted metadata from Dagster (overwrites filesystem metadata)
         self._load_metadata_from_dagster()
+        
+        # Re-sort files by upload_date (newest first) after Dagster metadata is loaded
+        def sort_key(fname: str) -> str:
+            return self.file_metadata.get(fname, {}).get("upload_date", "0000-00-00 00:00")
+        self.files = sorted(self.files, key=sort_key, reverse=True)
         
         # Sync statuses with Dagster
         instance = get_dagster_instance()
@@ -2111,7 +2426,7 @@ class UploadState(LazyFrameGridMixin):
         self.runs = run_list
 
 
-class OutputPreviewState(LazyFrameGridMixin):
+class OutputPreviewState(LazyFrameGridMixin, rx.State):
     """Independent state for the output file preview grid.
 
     Inherits its own ``LazyFrameGridMixin`` so the output grid has a

@@ -345,6 +345,7 @@ def annotate_vcf_with_all_modules(
     config: HfModuleAnnotationConfig,
     user_name: str,
     sample_name: Optional[str] = None,
+    normalized_parquet_path: Optional[Path] = None,
 ) -> tuple[AnnotationManifest, dict]:
     """
     Annotate VCF with all selected HF modules.
@@ -356,10 +357,14 @@ def annotate_vcf_with_all_modules(
     
     Args:
         logger: Logger instance
-        vcf_path: Path to input VCF
+        vcf_path: Path to input VCF (used as fallback and for manifest metadata)
         config: HfModuleAnnotationConfig with module selection
         user_name: User identifier for output organization
         sample_name: Optional sample name
+        normalized_parquet_path: If provided, read pre-normalized parquet instead
+            of parsing the raw VCF.  The parquet is expected to already have
+            chromosomes stripped of 'chr', 'id' renamed to 'rsid', and genotype
+            computed.
         
     Returns:
         Tuple of (AnnotationManifest, metadata_dict)
@@ -383,13 +388,16 @@ def annotate_vcf_with_all_modules(
     logger.info(f"Annotating with modules: {selected_names}")
     
     with resource_tracker("Annotate VCF with HF Modules") as tracker:
-        # Prepare VCF once (with genotype column)
-        logger.info(f"Preparing VCF: {vcf_path}")
-        vcf_lf = prepare_vcf_for_module_annotation(
-            vcf_path,
-            info_fields=config.info_fields,
-            format_fields=config.format_fields,
-        )
+        if normalized_parquet_path is not None and normalized_parquet_path.exists():
+            logger.info(f"Using pre-normalized parquet: {normalized_parquet_path}")
+            vcf_lf = pl.scan_parquet(str(normalized_parquet_path))
+        else:
+            logger.info(f"Preparing VCF from scratch: {vcf_path}")
+            vcf_lf = prepare_vcf_for_module_annotation(
+                vcf_path,
+                info_fields=config.info_fields,
+                format_fields=config.format_fields,
+            )
         
         # Process each module
         module_outputs: list[ModuleOutputMapping] = []

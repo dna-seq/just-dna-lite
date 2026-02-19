@@ -147,6 +147,14 @@ def sample_catalog() -> rx.Component:
                         fomantic_icon("file-text", size=40, style={"color": "#2185d0"}),
                         rx.el.div(
                             rx.el.div(f, class_name="header", style={"fontSize": "1.5rem", "fontWeight": "bold"}),
+                            rx.cond(
+                                UploadState.sample_upload_dates[f] != "",
+                                rx.el.div(
+                                    UploadState.sample_upload_dates[f],
+                                    style={"fontSize": "0.85rem", "color": "#888", "marginTop": "2px"},
+                                ),
+                                rx.fragment(),
+                            ),
                             rx.el.div(
                                 UploadState.file_statuses[f],
                                 class_name=rx.match(
@@ -157,6 +165,7 @@ def sample_catalog() -> rx.Component:
                                     ("error", "ui red label"),
                                     "ui grey label"
                                 ),
+                                style={"marginTop": "4px"},
                             ),
                             class_name="content",
                             style={"marginLeft": "15px", "flex": "1"},

@@ -12,7 +12,9 @@ from just_dna_pipelines.annotation.utils import resource_summary_hook
 from just_dna_pipelines.annotation.assets import (
     ensembl_hf_dataset,
     ensembl_annotations,
+    quality_filters_config,
     user_vcf_source,
+    user_vcf_normalized,
     user_annotated_vcf,
 )
 from just_dna_pipelines.annotation.duckdb_assets import (
@@ -39,6 +41,15 @@ from just_dna_pipelines.annotation.io_managers import (
 from just_dna_pipelines.annotation.registry import load_module_definitions
 
 
+# Job for normalizing user VCF to parquet (triggered on upload)
+normalize_vcf_job = define_asset_job(
+    name="normalize_vcf_job",
+    selection=AssetSelection.assets("quality_filters_config", "user_vcf_normalized"),
+    description="Normalize user VCF (strip chr prefix, compute genotype, apply quality filters) and persist as parquet.",
+    tags={"normalization": "vcf", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
 # Job for HF module annotation
 annotate_with_hf_modules_job = define_asset_job(
     name="annotate_with_hf_modules_job",
@@ -57,11 +68,11 @@ generate_longevity_report_job = define_asset_job(
     hooks={resource_summary_hook},
 )
 
-# Job for full pipeline: annotate + report
+# Job for full pipeline: normalize + annotate + report
 annotate_and_report_job = define_asset_job(
     name="annotate_and_report_job",
-    selection=AssetSelection.assets("user_hf_module_annotations", "user_longevity_report"),
-    description="Full pipeline: annotate user VCF with HF modules and generate longevity report.",
+    selection=AssetSelection.assets("quality_filters_config", "user_vcf_normalized", "user_hf_module_annotations", "user_longevity_report"),
+    description="Full pipeline: normalize VCF, annotate with HF modules, and generate longevity report.",
     tags={"annotation": "hf_modules", "report": "longevity", "multi-user": "true"},
     hooks={resource_summary_hook},
 )
@@ -74,10 +85,12 @@ def _build_definitions() -> Definitions:
         assets=[
             ensembl_hf_dataset,
             ensembl_annotations,
+            quality_filters_config,
             user_vcf_source,
+            user_vcf_normalized,
             user_annotated_vcf,
         ],
-        jobs=[annotate_vcf_job, annotate_vcf_duckdb_job],
+        jobs=[annotate_vcf_job, annotate_vcf_duckdb_job, normalize_vcf_job],
         sensors=[discover_user_vcf_sensor],
         resources={
             "source_metadata_io_manager": source_metadata_io_manager,

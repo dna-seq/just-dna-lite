@@ -23,9 +23,12 @@ Auto-detect: weights.parquet at root = module, subfolders = collection.
 Override with kind: "module" or kind: "collection".
 """
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Literal, Optional
 
+import polars as pl
 import yaml
 from pydantic import BaseModel, model_validator
 
@@ -33,6 +36,65 @@ from pydantic import BaseModel, model_validator
 # Default values for modules not listed in the YAML
 _DEFAULT_ICON = "database"
 _DEFAULT_COLOR = "#6435c9"
+
+
+class QualityFilters(BaseModel):
+    """VCF quality filter thresholds loaded from modules.yaml.
+
+    Applied during normalization to remove low-quality variants before annotation.
+    All fields default to None (no filtering) for backward compatibility.
+    """
+    pass_filters: Optional[list[str]] = None
+    min_depth: Optional[int] = None
+    min_qual: Optional[float] = None
+
+    @property
+    def is_active(self) -> bool:
+        """True if at least one filter is configured."""
+        return bool(self.pass_filters) or bool(self.min_depth) or bool(self.min_qual)
+
+    def config_hash(self) -> str:
+        """Deterministic hash of the active filter settings for DataVersion tracking."""
+        canonical = json.dumps(self.model_dump(), sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _find_column(schema_names: list[str], candidates: tuple[str, ...]) -> Optional[str]:
+    """Return the first column name from *candidates* found in *schema_names*, or None."""
+    for col in candidates:
+        if col in schema_names:
+            return col
+    return None
+
+
+def build_quality_filter_expr(
+    filters: QualityFilters,
+    schema_names: list[str],
+) -> Optional[pl.Expr]:
+    """Build a combined Polars filter expression from quality filter config.
+
+    Returns None if no filters are active or no matching columns exist.
+    """
+    conditions: list[pl.Expr] = []
+
+    if filters.pass_filters:
+        col = _find_column(schema_names, ("filter", "Filter", "FILTER"))
+        if col is not None:
+            conditions.append(pl.col(col).is_in(filters.pass_filters))
+
+    if filters.min_depth is not None and filters.min_depth > 0:
+        col = _find_column(schema_names, ("DP", "Dp", "dp"))
+        if col is not None:
+            conditions.append(pl.col(col).cast(pl.Int64, strict=False) >= filters.min_depth)
+
+    if filters.min_qual is not None and filters.min_qual > 0:
+        col = _find_column(schema_names, ("qual", "Qual", "QUAL"))
+        if col is not None:
+            conditions.append(pl.col(col).cast(pl.Float64, strict=False) >= filters.min_qual)
+
+    if not conditions:
+        return None
+    return conditions[0] if len(conditions) == 1 else pl.all_horizontal(conditions)
 
 
 class ModuleMetadata(BaseModel):
@@ -92,6 +154,7 @@ class ModulesConfig(BaseModel):
     """Top-level configuration from modules.yaml."""
     sources: list[Source] = [Source(url="just-dna-seq/annotators")]
     module_metadata: dict[str, ModuleMetadata] = {}
+    quality_filters: QualityFilters = QualityFilters()
 
     @model_validator(mode="before")
     @classmethod

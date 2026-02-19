@@ -94,9 +94,52 @@ Each source can be a single module or a collection:
 
 ---
 
+## VCF Quality Filtering
+
+Quality filters are configured in `modules.yaml` under `quality_filters:` and applied during normalization (`user_vcf_normalized` asset). All downstream assets receive filtered data.
+
+### Configuration (`modules.yaml`)
+
+```yaml
+quality_filters:
+  pass_filters: ["PASS", "."]  # FILTER column values to keep (null to disable)
+  min_depth: 10                 # Minimum DP (null/0 to disable)
+  min_qual: 20                  # Minimum QUAL (null/0 to disable)
+```
+
+- **gVCF support**: Reference blocks (`FILTER=RefCall`, `GT=0/0`) are correctly dropped by `pass_filters` since `RefCall` is not in `["PASS", "."]`. This is intentional — ref blocks have no alt allele and would never match annotation module weights.
+- **Backward compatible**: If `quality_filters` is absent from YAML, no filtering occurs (all fields default to `None`).
+
+### Config Asset Pattern
+
+A non-partitioned `quality_filters_config` asset materializes the current filter settings from `modules.yaml`. `user_vcf_normalized` depends on it.
+
+**When `modules.yaml` changes:**
+1. Re-materialize `quality_filters_config` (its `DataVersion` is a hash of the filter config)
+2. Dagster marks `user_vcf_normalized` partitions as stale
+3. Re-materialize stale partitions to apply new filters
+
+### Key files
+
+- **`modules.yaml`**: `quality_filters` section (single source of truth)
+- **`module_config.py`**: `QualityFilters` model, `build_quality_filter_expr()` helper
+- **`annotation/assets.py`**: `quality_filters_config` asset, filter application in `user_vcf_normalized`
+
+### chrY Warning for Female Samples
+
+When `sex="Female"` is set in `NormalizeVcfConfig`, the normalization asset logs a warning if chrY variants are found (e.g., `"WARNING: 1200 chrY variants found in female-labeled sample"`) but **never removes them**. This is informational only — QC filters (FILTER, depth, qual) handle the actual cleanup. We deliberately avoid sex-based chromosome filtering to prevent data loss for XXY, XYY, and other karyotype variations.
+
+### Important patterns
+
+- **Never bypass quality filters** — all VCF annotation paths should read from the normalized (and filtered) parquet, not raw VCF
+- **Column name detection is case-tolerant** — `build_quality_filter_expr()` searches for `(filter, Filter, FILTER)`, `(DP, Dp, dp)`, `(qual, Qual, QUAL)` to handle different VCF parser conventions
+- **Cast before comparison** — DP and QUAL columns are cast to numeric types before threshold comparison to handle string-typed parquet columns
+
+---
+
 ## Dagster Pipeline
 
-For any Dagster-related changes, see **[docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)**.
+**For any Dagster-related changes, architecture, or troubleshooting, see [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md).** The guide explains the full pipeline (VCF normalization → HF annotation → reports), output paths, jobs, and known quirks (e.g. polars-bio non-fatal Rust panic).
 
 ### Resource Tracking (MANDATORY)
 
@@ -534,6 +577,7 @@ except Exception as e:
 
 - `dagster job execute` CLI (deprecated)
 - Hardcoded asset names; use `defs.get_all_asset_specs()`
+- **Silent fallbacks when primary data is missing** — If normalized parquet does not exist (e.g. user_vcf_normalized), do NOT silently fall back to raw VCF and display it as if it were normalized. Users will not know the data source differs. Either show an explicit error ("Run normalization first") or a very prominent banner ("Using raw VCF — normalize job has not run"). See [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md) § VCF Normalization.
 - Config for unselected assets (validation errors)
 - Suspended jobs holding DuckDB file locks
 - **Accessing `run.start_time` on DagsterRun** - use RunRecord instead

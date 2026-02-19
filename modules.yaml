@@ -27,6 +27,39 @@
 #   icon:         database
 #   color:        #6435c9
 
+# VCF Quality Filters
+#
+# Applied during normalization (user_vcf_normalized asset) before annotation.
+# All downstream assets (HF module annotations, reports) receive filtered data.
+# Re-materialize the quality_filters_config asset to pick up changes.
+#
+# gVCF support: gVCF files contain reference blocks (FILTER=RefCall, GT=0/0)
+# for every sequenced position. These are correctly dropped by pass_filters
+# since RefCall != PASS. This is intentional — reference blocks carry no
+# alternate alleles and would never match annotation module weights.
+#
+# Set any field to null or 0 to disable that filter.
+quality_filters:
+  # Only keep variants where FILTER column matches one of these values.
+  # Common values:
+  #   "PASS"    — standard passing filter
+  #   "."       — missing filter (treated as pass by some callers)
+  # Excluded by default (correctly filtered out):
+  #   "RefCall" — gVCF reference blocks (homozygous ref, no alt allele)
+  #   "LowQual" / "LowDepth" / "PloidyConflict" — low-confidence calls
+  # Set to null or empty list to disable FILTER-based filtering.
+  pass_filters:
+    - "PASS"
+    - "."
+
+  # Minimum read depth (DP/Dp field). Variants below this are dropped.
+  # Set to null or 0 to disable.
+  min_depth: 10
+
+  # Minimum variant quality score (QUAL/qual field). Variants below this are dropped.
+  # Set to null or 0 to disable.
+  min_qual: 20
+
 # Sources to scan for annotation modules.
 # Simple string = URL with auto-detect. Object = URL + overrides.
 sources:
