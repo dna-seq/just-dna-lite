@@ -1,0 +1,13 @@
+rsid,pmid,population,p_value,conclusion,study_design
+rs4244285,17622601,Mixed,,"CPIC guideline: CYP2C19 poor metabolizers have significantly reduced clopidogrel activation. Alternative antiplatelet therapy recommended.",clinical-guideline
+rs4244285,21716271,European,"<0.001","CYP2C19*2 carriers showed 32% higher rate of major adverse cardiovascular events on clopidogrel vs non-carriers.",meta-analysis
+rs4986893,17622601,Mixed,,"CPIC guideline: CYP2C19*3 classified as no-function allele. Same clinical recommendations as *2.",clinical-guideline
+rs12248560,22992668,European,"0.003","CYP2C19*17 carriers showed significantly increased clopidogrel active metabolite levels and enhanced platelet inhibition.",prospective-cohort
+rs12248560,17622601,Mixed,,"CPIC guideline: *17 allele associated with ultra-rapid metabolizer phenotype. Increased bleeding risk on standard clopidogrel dose.",clinical-guideline
+rs3892097,21270786,Mixed,,"CPIC guideline: CYP2D6 poor metabolizers should avoid codeine due to lack of morphine formation. Alternative analgesics recommended.",clinical-guideline
+rs3892097,16958828,European,"<0.001","CYP2D6*4 homozygotes showed virtually no morphine formation from codeine. Tramadol O-desmethylation also abolished.",pharmacokinetic-study
+rs1799853,27441996,Mixed,,"CPIC guideline: CYP2C9*2 reduces warfarin dose requirements. Include in pharmacogenomic dosing algorithms with VKORC1.",clinical-guideline
+rs1057910,27441996,Mixed,,"CPIC guideline: CYP2C9*3 has the largest effect on warfarin dose among CYP2C9 variants. ~50% dose reduction for *3/*3.",clinical-guideline
+rs1057910,12893985,European,"<0.001","CYP2C9*3 carriers required significantly lower warfarin maintenance doses (mean 3.4 vs 5.1 mg/day).",case-control
+rs35599367,24458010,European,"0.002","CYP3A4*22 carriers required significantly lower simvastatin doses to achieve equivalent LDL reduction.",prospective-cohort
+rs35599367,23588305,European,"<0.001","CYP3A4*22 associated with 1.8x higher tacrolimus trough concentrations. Dose reduction recommended for carriers.",pharmacokinetic-study

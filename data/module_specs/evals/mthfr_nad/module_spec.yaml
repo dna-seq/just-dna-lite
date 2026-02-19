@@ -1,0 +1,16 @@
+schema_version: "1.0"
+
+module:
+  name: mthfr_nad
+  title: "Methylation & NAD+"
+  description: "MTHFR methylation cycle and NAD+ biosynthesis variants affecting aging and metabolism"
+  report_title: "Methylation & NAD+ Metabolism"
+  icon: dna
+  color: "#6435c9"
+
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+  priority: medium
+
+genome_build: GRCh38

@@ -82,6 +82,30 @@ The initialization is called by:
 1. Workspace scripts: `uv run start` and `uv run dagster-ui`.
 2. The Web UI when it needs a Dagster instance (see `webui/src/webui/state.py`).
 
+## Ensembl Reference Cache
+
+The annotation pipeline requires the Ensembl variation database downloaded locally.
+Use the built-in CLI commands to manage it — they read `JUST_DNA_PIPELINES_CACHE_DIR`
+from `.env` automatically.
+
+```bash
+# Download all chromosome parquet files (~14 GB) to the configured cache
+uv run pipelines download-ensembl
+
+# Resume an interrupted download (already-valid files are skipped by SHA256)
+uv run pipelines download-ensembl
+
+# Check integrity of an existing cache without downloading
+uv run pipelines verify-ensembl
+
+# Force a full re-download
+uv run pipelines download-ensembl --force
+```
+
+Files land at `{JUST_DNA_PIPELINES_CACHE_DIR}/ensembl_variations/data/`.
+Each file is validated against the SHA256 checksum from the HuggingFace LFS manifest,
+so partial or corrupted downloads are detected and will be re-fetched on the next run.
+
 ## Environment Variables
 
 You can override the default location:

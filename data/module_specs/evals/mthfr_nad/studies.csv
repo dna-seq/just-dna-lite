@@ -1,0 +1,13 @@
+rsid,pmid,population,p_value,conclusion,study_design
+rs1801133,9545397,European,,"Landmark study: MTHFR 677TT genotype produces thermolabile enzyme with ~30% residual activity. Elevated plasma homocysteine in TT individuals.",biochemical-study
+rs1801133,21732829,Mixed,"<0.001","Meta-analysis: MTHFR 677TT associated with significantly increased neural tube defect risk (OR 1.98, 95% CI 1.72-2.28).",meta-analysis
+rs1801133,15166130,Mixed,"<0.001","Meta-analysis: MTHFR 677TT associated with increased coronary heart disease risk (OR 1.16), effect modified by folate status.",meta-analysis
+rs1801131,15060105,European,"0.04","MTHFR 1298CC homozygotes showed reduced enzyme activity. Compound heterozygotes (677CT/1298AC) had biochemical profile similar to 677TT.",case-control
+rs1805087,16284405,Mixed,"0.01","MTR 2756GG genotype associated with altered homocysteine metabolism and increased neural tube defect risk in folate-deplete populations.",meta-analysis
+rs1801394,16284405,Mixed,"0.03","MTRR 66GG associated with elevated homocysteine and increased NTD risk, particularly when combined with low B12.",meta-analysis
+rs4680,17913843,Mixed,"<0.001","Meta-analysis: COMT Val158Met Met/Met associated with better cognitive performance (d=0.12) but increased anxiety and pain sensitivity.",meta-analysis
+rs4680,18088359,European,"0.002","COMT Met/Met genotype associated with higher prefrontal cortex dopamine and improved working memory under low-stress conditions.",neuroimaging-study
+rs61330082,22139851,Asian,"0.008","NAMPT rs61330082 T allele associated with lower circulating visfatin/NAMPT levels and increased metabolic syndrome risk.",GWAS
+rs7895833,23435088,European,"0.003","SIRT1 rs7895833 GG genotype associated with increased visceral adiposity and insulin resistance. G allele is an independent cardiovascular risk factor.",prospective-cohort
+rs7895833,25637372,Mixed,"0.01","SIRT1 genetic variants modulate caloric restriction response. GG carriers showed attenuated sirtuin activation with fasting.",intervention-study
+rs3741534,31467085,Mixed,"0.005","NADSYN1 variants associated with circulating NAD+ metabolite levels in large-scale metabolomics GWAS. NAD+ decline with age is genetically modifiable.",GWAS

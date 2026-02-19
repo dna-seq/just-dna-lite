@@ -1,0 +1,16 @@
+schema_version: "1.0"
+
+module:
+  name: cyp_panel
+  title: "CYP Drug Metabolism"
+  description: "Cytochrome P450 pharmacogenomic variants affecting drug metabolism"
+  report_title: "Pharmacogenomics — CYP Panel"
+  icon: pill
+  color: "#a333c8"
+
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+  priority: high
+
+genome_build: GRCh38
