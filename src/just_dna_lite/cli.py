@@ -276,7 +276,7 @@ def start_all(
     typer.secho("⏳ Note: Reflex UI takes ~20s to initialize.", fg=typer.colors.YELLOW)
     typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
     typer.echo(f"  • Pipelines UI: http://localhost:{dagster_port} (Dagster Dashboard)")
-    typer.echo(f"  • Backend API:  http://localhost:8000 (Reflex Internal)")
+    typer.echo(f"  • Backend API:  http://localhost:8000+ (Reflex Internal, auto-selected)")
     typer.echo("═" * 65 + "\n")
 
     # Clean up orphaned STARTED runs from previous session
