@@ -9,6 +9,7 @@ factory + runner functions.
 Decoupled from the web UI -- usable from CLI, tests, or programmatically.
 """
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -18,10 +19,12 @@ from dotenv import load_dotenv
 
 from agno.agent import Agent
 from agno.models.google import Gemini
+from agno.tools.mcp import MCPTools
 
 load_dotenv()
 
 _SPEC_PATH = Path(__file__).parent / "module_creator.yaml"
+BIOCONTEXT_KB_URL = "https://biocontext-kb.fastmcp.app/mcp"
 
 
 def _load_agent_spec() -> Dict[str, Any]:
@@ -60,6 +63,7 @@ def _write_spec_files(
     color: str,
     variants_csv_content: str,
     studies_csv_content: Optional[str] = None,
+    version: int = 1,
 ) -> str:
     """Persist module_spec.yaml + CSV files to disk."""
     spec_dir.mkdir(parents=True, exist_ok=True)
@@ -68,6 +72,7 @@ def _write_spec_files(
         f'schema_version: "1.0"\n\n'
         f"module:\n"
         f"  name: {module_name}\n"
+        f"  version: {version}\n"
         f'  title: "{title}"\n'
         f'  description: "{description}"\n'
         f'  report_title: "{report_title}"\n'
@@ -121,6 +126,61 @@ def _register_module(spec_dir: str) -> str:
             f"Annotations: {stats.get('annotations_rows', '?')} rows."
         )
     return f"FAILED. Errors: {result.errors}. Warnings: {result.warnings or 'none'}"
+
+
+def read_spec_meta(spec_dir: Path) -> Dict[str, Any]:
+    """Read module metadata from a spec directory's module_spec.yaml.
+
+    Returns dict with keys: name, version, title, description, report_title, icon, color.
+    Returns empty dict if the yaml is missing or unparseable.
+    """
+    yaml_path = spec_dir / "module_spec.yaml"
+    if not yaml_path.exists():
+        return {}
+    raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        return {}
+    module = raw.get("module", {})
+    if not isinstance(module, dict):
+        return {}
+    return {
+        "name": module.get("name", ""),
+        "version": int(module.get("version", 1)),
+        "title": module.get("title", ""),
+        "description": module.get("description", ""),
+        "report_title": module.get("report_title", ""),
+        "icon": module.get("icon", "database"),
+        "color": module.get("color", "#6435c9"),
+    }
+
+
+def bump_spec_version(spec_dir: Path, new_version: int) -> None:
+    """Rewrite version field in an existing module_spec.yaml.
+
+    If the file already has a ``version:`` line, its value is replaced.
+    Otherwise a ``version:`` line is inserted right after ``name:``.
+    """
+    yaml_path = spec_dir / "module_spec.yaml"
+    if not yaml_path.exists():
+        return
+    content = yaml_path.read_text(encoding="utf-8")
+    if re.search(r"^\s*version:\s*\d+", content, flags=re.MULTILINE):
+        updated = re.sub(
+            r"^(\s*version:\s*)\d+",
+            rf"\g<1>{new_version}",
+            content,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        lines = content.split("\n")
+        for i, line in enumerate(lines):
+            if line.strip().startswith("name:"):
+                indent = " " * (len(line) - len(line.lstrip()))
+                lines.insert(i + 1, f"{indent}version: {new_version}")
+                break
+        updated = "\n".join(lines)
+    yaml_path.write_text(updated, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -199,11 +259,13 @@ def create_module_agent(
         """
         return _register_module(spec_dir)
 
+    biocontext = MCPTools(url=BIOCONTEXT_KB_URL)
+
     return Agent(
         name=spec.get("name", "ModuleCreator"),
         description=spec.get("description", ""),
-        model=Gemini(id=resolved_model, api_key=api_key, vertexai=False),
-        tools=[write_spec_files, validate_spec, register_module],
+        model=Gemini(id=resolved_model, api_key=api_key, vertexai=False), #search=True disables tool calls
+        tools=[write_spec_files, validate_spec, register_module, biocontext],
         instructions=spec.get("instructions", ""),
         markdown=agent_cfg.get("markdown", True),
         debug_mode=agent_cfg.get("debug_mode", False),

@@ -2,7 +2,7 @@
 Module Manager Page — manage module sources, upload custom DSL modules,
 and interact with the Paper-to-Module AI agent.
 
-Left Panel:  Module sources tree, DSL upload, agent file upload
+Left Panel:  Module sources tree, editing slot with module details + actions
 Right Panel: Agent chat (Module Creator AI)
 """
 from __future__ import annotations
@@ -34,11 +34,10 @@ def _custom_module_item(name: rx.Var[str]) -> rx.Component:
 
 
 def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
-    """Compact card showing a module source. Local sources list individual modules with remove buttons."""
+    """Compact card showing a module source."""
     is_local = repo["is_local"].to(bool)
 
     return rx.el.div(
-        # Header row
         rx.el.div(
             rx.cond(
                 is_local,
@@ -77,7 +76,6 @@ def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
-        # For local sources: list each module with a remove button
         rx.cond(
             is_local,
             rx.el.div(
@@ -96,141 +94,192 @@ def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
     )
 
 
-def custom_module_upload() -> rx.Component:
-    """Upload component for adding a custom DSL module (module_spec.yaml + variants.csv)."""
+# ============================================================================
+# EDITING SLOT COMPONENT
+# ============================================================================
+
+def _slot_empty_state() -> rx.Component:
+    """Shown when the editing slot is empty."""
     return rx.el.div(
+        fomantic_icon("inbox", size=28, color="#ccc"),
         rx.el.div(
-            fomantic_icon("upload", size=16, color="#a333c8"),
+            "No module loaded",
+            style={"color": "#999", "fontSize": "0.9rem", "marginTop": "6px"},
+        ),
+        rx.el.div(
+            "Upload files or use the agent to create a module",
+            style={"color": "#bbb", "fontSize": "0.78rem", "marginTop": "2px"},
+        ),
+        style={"textAlign": "center", "padding": "18px 8px"},
+    )
+
+
+def _slot_populated_state() -> rx.Component:
+    """Shown when the editing slot has a module loaded."""
+    return rx.el.div(
+        # Module name + version badge
+        rx.el.div(
+            fomantic_icon("circle-check", size=16, color="#21ba45"),
             rx.el.span(
-                " Upload Custom Module Files",
-                style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
-            ),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
-        ),
-        # Module name preview banner (shown immediately after file drop)
-        rx.cond(
-            UploadState.pending_module_name != "",
-            rx.el.div(
-                fomantic_icon("dna", size=14, color="#a333c8"),
-                rx.el.span(
-                    " Module: ",
-                    style={"fontSize": "0.82rem", "color": "#888", "marginLeft": "6px"},
-                ),
-                rx.el.strong(
-                    UploadState.pending_module_name,
-                    style={"color": "#a333c8", "fontSize": "0.88rem"},
-                ),
+                AgentState.slot_module_name,
                 style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "padding": "5px 10px",
-                    "marginBottom": "6px",
-                    "border": "1px solid #d6c4e8",
-                    "borderRadius": "4px",
-                    "backgroundColor": "#f3eaff",
+                    "fontSize": "0.95rem",
+                    "fontWeight": "600",
+                    "color": "#a333c8",
+                    "marginLeft": "6px",
                 },
+            ),
+            rx.cond(
+                AgentState.slot_version > 0,
+                rx.el.span(
+                    "v", AgentState.slot_version.to(str),
+                    class_name="ui mini purple label",
+                    style={"marginLeft": "8px"},
+                ),
+                rx.fragment(),
+            ),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+        ),
+        # Title
+        rx.cond(
+            AgentState.slot_module_title != "",
+            rx.el.div(
+                AgentState.slot_module_title,
+                style={"fontSize": "0.85rem", "fontWeight": "500", "color": "#555", "marginBottom": "4px"},
             ),
             rx.fragment(),
         ),
-        # Inline preview validation error (before clicking Add)
+        # Description
         rx.cond(
-            UploadState.pending_module_preview_error != "",
+            AgentState.slot_module_description != "",
             rx.el.div(
-                fomantic_icon("circle-alert", size=13, color="#9f3a38"),
-                rx.el.span(
-                    " ",
-                    UploadState.pending_module_preview_error,
-                    style={"fontSize": "0.82rem", "color": "#9f3a38", "marginLeft": "4px"},
-                ),
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "padding": "5px 10px",
-                    "marginBottom": "6px",
-                    "border": "1px solid #e0b4b4",
-                    "borderRadius": "4px",
-                    "backgroundColor": "#fff6f6",
-                },
+                AgentState.slot_module_description,
+                style={"fontSize": "0.8rem", "color": "#777", "marginBottom": "6px", "lineHeight": "1.3"},
             ),
             rx.fragment(),
         ),
+        # File list
+        rx.el.div(
+            rx.foreach(
+                AgentState.slot_files,
+                lambda fname: rx.el.span(
+                    fomantic_icon("file-text", size=11, color="#666"),
+                    rx.el.span(fname, style={"marginLeft": "3px"}),
+                    style={
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "fontSize": "0.78rem",
+                        "color": "#555",
+                        "marginRight": "8px",
+                    },
+                ),
+            ),
+            style={"marginBottom": "2px"},
+        ),
+    )
+
+
+def _slot_button_bar() -> rx.Component:
+    """Upload / Add / Clear / Download button row for the editing slot."""
+    return rx.el.div(
+        # Upload button
         rx.upload(
-            rx.el.div(
-                fomantic_icon("file-text", size=14, color="#a333c8"),
-                rx.cond(
-                    rx.selected_files("module_upload").length() > 0,
-                    rx.el.span(
-                        rx.selected_files("module_upload").join(", "),
-                        style={"marginLeft": "6px", "color": "#a333c8", "fontSize": "0.82rem", "fontWeight": "500"},
-                    ),
-                    rx.el.span(
-                        "Select module_spec.yaml + variants.csv (or .zip)",
-                        style={"marginLeft": "6px", "color": "#888", "fontSize": "0.82rem"},
-                    ),
-                ),
-                style={"display": "flex", "alignItems": "center"},
+            rx.el.button(
+                fomantic_icon("upload", size=13),
+                " Upload",
+                class_name="ui mini button",
+                style={"flex": "1", "cursor": "pointer"},
             ),
-            id="module_upload",
+            id="slot_upload",
             multiple=True,
             accept={
                 "text/yaml": [".yaml", ".yml"],
                 "text/csv": [".csv"],
                 "application/zip": [".zip"],
             },
-            on_drop=UploadState.preview_module_upload(
-                rx.upload_files(upload_id="module_upload"),
+            on_drop=AgentState.upload_to_slot(
+                rx.upload_files(upload_id="slot_upload"),
             ),
-            style={
-                "padding": "6px 10px",
-                "border": "1px solid #d6c4e8",
-                "borderRadius": "4px",
-                "backgroundColor": "#fff",
-                "cursor": "pointer",
-            },
+            style={"display": "contents"},
         ),
+        # Add to registry
         rx.el.button(
             rx.cond(
-                UploadState.custom_module_adding,
+                AgentState.slot_adding,
                 rx.el.i("", class_name="spinner loading icon"),
-                fomantic_icon("plus", size=14),
+                fomantic_icon("plus", size=13),
             ),
             " Add",
-            on_click=UploadState.commit_module_upload,
-            disabled=UploadState.custom_module_adding
-                | (UploadState.pending_module_name == "")
-                | (UploadState.pending_module_preview_error != ""),
-            class_name="ui purple small button",
-            style={"marginTop": "8px", "width": "100%", "boxSizing": "border-box"},
+            on_click=AgentState.add_slot_module,
+            disabled=~AgentState.slot_is_populated | AgentState.slot_adding,
+            class_name="ui mini purple button",
+            style={"flex": "1"},
         ),
-        rx.el.div(
-            "Required: module_spec.yaml, variants.csv. Optional: studies.csv. Also accepts .zip",
-            style={"fontSize": "0.75rem", "color": "#999", "marginTop": "4px"},
+        # Clear
+        rx.el.button(
+            fomantic_icon("trash-2", size=13),
+            " Clear",
+            on_click=AgentState.clear_slot,
+            disabled=~AgentState.slot_is_populated,
+            class_name="ui mini button",
+            style={"flex": "1"},
         ),
+        # Download zip
         rx.cond(
-            UploadState.custom_module_error != "",
-            rx.el.div(
-                UploadState.custom_module_error,
-                class_name="ui mini negative message",
-                style={"marginTop": "6px", "padding": "8px 10px", "fontSize": "0.85rem"},
+            AgentState.slot_is_populated,
+            rx.el.a(
+                fomantic_icon("download", size=13, color="#fff"),
+                " .zip",
+                href=AgentState.slot_zip_url,
+                class_name="ui mini teal button",
+                style={"flex": "1", "textAlign": "center"},
             ),
-            rx.fragment(),
+            rx.el.button(
+                fomantic_icon("download", size=13),
+                " .zip",
+                disabled=True,
+                class_name="ui mini button",
+                style={"flex": "1"},
+            ),
         ),
-        style={
-            "padding": "10px 12px",
-            "border": "1px dashed #d6c4e8",
-            "borderRadius": "4px",
-            "backgroundColor": "#faf6ff",
-            "marginBottom": "6px",
-        },
+        style={"display": "flex", "gap": "4px", "marginTop": "8px"},
+    )
+
+
+def editing_slot() -> rx.Component:
+    """Editing slot card — shows module details or empty state + action buttons."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("edit", size=16, color="#a333c8"),
+            rx.el.span(
+                " Editing Slot",
+                style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
+            ),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+        ),
+        # Content: empty or populated
+        rx.cond(
+            AgentState.slot_is_populated,
+            _slot_populated_state(),
+            _slot_empty_state(),
+        ),
+        # Button bar (always visible)
+        _slot_button_bar(),
+        rx.el.div(
+            "Upload: module_spec.yaml + variants.csv (.zip OK). Add: register to system.",
+            style={"fontSize": "0.72rem", "color": "#aaa", "marginTop": "6px"},
+        ),
+        class_name="ui segment",
+        style={"padding": "12px", "marginBottom": "12px", "border": "1px solid #d6c4e8", "backgroundColor": "#faf6ff"},
     )
 
 
 # ============================================================================
-# LEFT PANEL — Sources + Uploads
+# LEFT PANEL — Sources + Editing Slot
 # ============================================================================
 
 def modules_left_panel() -> rx.Component:
-    """Left panel: module sources, custom DSL upload."""
+    """Left panel: module sources, editing slot."""
     return rx.el.div(
         # Header
         rx.el.div(
@@ -257,23 +306,8 @@ def modules_left_panel() -> rx.Component:
             style={"padding": "12px", "marginBottom": "12px"},
         ),
 
-        # Custom DSL upload — collapsible (advanced)
-        rx.el.details(
-            rx.el.summary(
-                fomantic_icon("upload", size=14, color="#767676"),
-                rx.el.span(
-                    " Upload custom module files (advanced)",
-                    style={"fontSize": "0.85rem", "color": "#666", "marginLeft": "4px", "cursor": "pointer"},
-                ),
-                style={"display": "flex", "alignItems": "center", "padding": "8px 12px", "listStyle": "none"},
-            ),
-            rx.el.div(
-                custom_module_upload(),
-                style={"padding": "0 12px 12px 12px"},
-            ),
-            class_name="ui segment",
-            style={"padding": "0", "marginBottom": "12px"},
-        ),
+        # Editing Slot
+        editing_slot(),
 
         id="modules-left-panel",
     )
@@ -405,71 +439,8 @@ def agent_chat_panel() -> rx.Component:
             },
         ),
 
-        # Result actions (register module when spec is ready)
-        rx.cond(
-            AgentState.has_agent_spec,
-            rx.el.div(
-                rx.el.div(
-                    fomantic_icon("circle-check", size=16, color="#21ba45"),
-                    rx.el.span(
-                        " Module spec ready: ",
-                        style={"marginLeft": "6px", "fontSize": "0.9rem"},
-                    ),
-                    rx.el.strong(
-                        AgentState.agent_spec_name,
-                        style={"color": "#a333c8"},
-                    ),
-                    style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
-                ),
-                # File list
-                rx.el.div(
-                    rx.foreach(
-                        AgentState.agent_spec_files,
-                        lambda fname: rx.el.span(
-                            fomantic_icon("file-text", size=11, color="#666"),
-                            rx.el.span(fname, style={"marginLeft": "3px"}),
-                            style={
-                                "display": "inline-flex",
-                                "alignItems": "center",
-                                "fontSize": "0.8rem",
-                                "color": "#555",
-                                "marginRight": "10px",
-                            },
-                        ),
-                    ),
-                    style={"marginBottom": "10px"},
-                ),
-                # Action buttons row
-                rx.el.div(
-                    rx.el.button(
-                        fomantic_icon("plus-circle", size=16),
-                        " Register Module",
-                        on_click=AgentState.register_agent_result,
-                        class_name="ui green button",
-                        style={"flex": "1"},
-                    ),
-                    rx.el.a(
-                        fomantic_icon("download", size=16, color="#fff"),
-                        " Download .zip",
-                        href=AgentState.agent_spec_zip_url,
-                        class_name="ui purple button",
-                        style={"marginLeft": "8px", "flex": "0 0 auto"},
-                    ),
-                    style={"display": "flex", "alignItems": "center"},
-                ),
-                rx.el.div(
-                    "Auto-saved to data/module_specs/generated/",
-                    style={"fontSize": "0.72rem", "color": "#999", "marginTop": "6px"},
-                ),
-                class_name="ui green segment",
-                style={"padding": "12px", "marginBottom": "12px"},
-            ),
-            rx.fragment(),
-        ),
-
-        # Input bar with attach + file chip + send (no form — JS handles Enter)
+        # Input bar with attach + file chip + send
         rx.el.div(
-            # Row: attach + file chip + textarea + send
             rx.el.div(
                 # Attach button (upload trigger)
                 rx.upload(
@@ -605,7 +576,7 @@ def agent_chat_panel() -> rx.Component:
                 style={"display": "flex", "alignItems": "flex-end", "gap": "0"},
             ),
             rx.el.div(
-                "Enter to send · Shift+Enter for new line",
+                "Enter to send \u00b7 Shift+Enter for new line",
                 style={"fontSize": "0.72rem", "color": "#bbb", "marginTop": "4px", "textAlign": "right"},
             ),
         ),
@@ -641,7 +612,7 @@ def agent_chat_panel() -> rx.Component:
 
 @rx.page(route="/modules", on_load=UploadState.on_load)
 def modules_page() -> rx.Component:
-    """Module Manager page — sources, uploads, and AI agent chat."""
+    """Module Manager page — sources, editing slot, and AI agent chat."""
     return template(
         two_column_layout(
             left=modules_left_panel(),

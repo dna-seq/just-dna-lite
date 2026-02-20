@@ -17,6 +17,7 @@ dependencies = [
     "fsspec>=2026.2.0",
     "google-genai>=1.52.0",
     "huggingface-hub>=1.4.1",
+    "mcp>=1.26.0",
     "polars-bio>=0.23.0",
     "pooch>=1.9.0",
     "psutil>=7.1.3",

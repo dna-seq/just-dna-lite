@@ -88,3 +88,11 @@ module_metadata:
     report_title: Athletic Potential & Injury Risk
     icon: activity
     color: '#2185d0'
+  longevity_2025:
+    title: Longevity 2025
+    description: Rare protein-altering variants associated with familial longevity
+      from the Leiden Longevity Study (2025) and SIRT6 variants from Sheikholmolouki
+      et al. (2025).
+    report_title: Familial Longevity (2025)
+    icon: heart-pulse
+    color: '#21ba45'

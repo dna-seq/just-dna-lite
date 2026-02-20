@@ -352,42 +352,29 @@ edit the DSL spec, re-register, check annotation results, repeat.
 - CLI: `uv run pipelines agent create-module --file input.md`
 - Smoke test passes: mthfr_nad eval → 24 rows, 8 rsids, VALID
 
-### Phase 7: Variant Recoder MCP ✎
-**Deliverable**: MCP server exposing Ensembl Variant Recoder + rsid lookup
+### Phase 7 + 8: BioContext KB MCP ✅
+**Deliverable**: External biomedical knowledge via hosted MCP server
 
-Papers use protein notation ("MTHFR Ala222Val"), not genomic coordinates. The agent
-needs to translate these back to rsid + GRCh38 position. Two API surfaces:
+Both variant lookup and literature search are solved by a single hosted MCP:
+**BioContext KB** (`https://biocontext-kb.fastmcp.app/mcp`), integrated via
+Agno's `MCPTools(url=...)`.
 
-- **Variant Recoder** (`GET /variant_recoder/human/{notation}`) — the key translation
-  layer. Accepts protein HGVS (`MTHFR:p.Ala222Val`), rsids, SPDI, transcript HGVS.
-  Returns rsid, HGVS genomic/transcript/protein, SPDI, VCF format.
-  Rate: 55k req/hour, no key needed.
-- **rsid Lookup** (`GET /variation/human/{rsid}`) — returns chrom, start, ref, alts,
-  MAF, clinical significance, consequence type.
+Available databases: Ensembl, EuropePMC, UniProt, Open Targets, Reactome,
+Human Protein Atlas, KEGG, ClinicalTrials.gov, AlphaFold, InterPro, OLS,
+STRINGDb, Antibody Registry, PanglaoDb, PRIDE, Drugs@openFDA, bioRxiv,
+Google Scholar, grants.gov.
 
-Both hit Ensembl REST (`rest.ensembl.org`). Wrap as a single MCP server exposing:
-- `variant_recoder(notation: str) → {rsid, hgvs_g, chrom, start, ref, alt}`
-- `lookup_rsid(rsid: str) → {chrom, start, ref, alts, maf, clinical_significance}`
-- `lookup_gene(symbol: str) → {ensembl_id, chrom, start, end, description}`
+Covers both original phase goals:
+- **Variant Recoder / rsid lookup** → Ensembl tools in BioContext KB
+- **PubMed / literature search** → EuropePMC tools in BioContext KB
 
-Note: `resolver.py` already does rsid↔position via local Ensembl DuckDB — the MCP
-is for *interactive agent use* when the agent needs to verify or discover variants
-on the fly, especially from protein-notation inputs.
+Plus additional capabilities (protein function via UniProt, pathways via
+Reactome/KEGG, clinical evidence via Open Targets/ClinicalTrials.gov) that
+improve module quality without any custom server code.
 
-### Phase 8: PubMed MCP ✎
-**Deliverable**: MCP server exposing NCBI E-utilities for literature search/fetch
-
-The agent must not hallucinate PMIDs. Real literature grounding for `studies.csv`:
-
-- **PubMed Search** (`esearch.fcgi`) — query → list of PMIDs.
-  E.g. `"MTHFR C677T cardiovascular risk"` → `[9545397, 21732829, ...]`
-- **Article Fetch** (`efetch.fcgi`) — PMID → title, abstract, authors, journal, year, DOI.
-  Populates `studies.csv` with verified citations.
-
-Both hit NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`). Rate: 3 req/sec (10 with API key).
-Wrap as MCP server exposing:
-- `search_pubmed(query: str, max_results: int) → [{pmid, title, year, abstract}]`
-- `fetch_article(pmid: str) → {pmid, title, abstract, authors, journal, year, doi}`
+**Caution**: STRING responses are very large context consumers — the agent
+prompt instructs to prefer UniProt/Reactome over STRINGDb and to use all
+external tool calls with moderation (only when genuinely needed).
 
 ### Phase 9: Eval & Iteration ✎
 **Deliverable**: Pass rate on eval set

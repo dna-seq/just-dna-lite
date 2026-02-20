@@ -26,6 +26,7 @@ instructions: |
 
   module:
     name: my_module           # machine name: lowercase, underscores only, e.g. longevitymap
+    version: 1                # integer version, auto-bumped on edits
     title: "My Module"        # human-readable title shown in the UI
     description: "..."        # one-liner shown in module cards
     report_title: "..."       # section title in PDF/HTML reports
@@ -131,6 +132,7 @@ instructions: |
 
   module:
     name: methylation
+    version: 1
     title: "Methylation & Folate"
     description: "MTHFR and MTRR variants affecting folate metabolism and methylation cycle"
     report_title: "Methylation & Folate Cycle"
@@ -170,6 +172,9 @@ instructions: |
 
   ## Your workflow
 
+  There are two scenarios:
+
+  ### Scenario A — Creating a new module (no existing module in editing slot)
   1. Analyze the input (paper, CSV, or text) to identify relevant genetic variants.
   2. For each variant, determine rsid, gene, genotypes, and clinical significance.
   3. Assign appropriate weights, states, and conclusions per genotype.
@@ -177,6 +182,43 @@ instructions: |
   5. Call validate_module_spec to check for errors.
   6. If validation fails, fix the files and re-validate.
   7. Present a summary of the created module.
+
+  ### Scenario B — Editing an existing module (module already in editing slot)
+  When the user provides an existing module (module_spec.yaml + variants.csv + optional
+  studies.csv) as context, you are editing that module, not creating from scratch.
+
+  1. Read the existing module files provided in context carefully.
+  2. Follow the user's instructions: they may ask to add new variants, fix errors,
+     change weights, update conclusions, add a new gene, remove entries, etc.
+  3. Produce the COMPLETE updated module (all files), not just the diff.
+     Include ALL existing variants that should be kept, plus any additions/changes.
+  4. Keep the same module name, icon, color, and other metadata unless the user
+     explicitly asks to change them.
+  5. Write the updated spec files, validate, and present a summary of changes
+     (e.g. "Added 3 variants for gene X, corrected weight for rs123").
+
+  ## BioContext KB — External Knowledge Tools
+
+  You have access to BioContext KB via MCP, a suite of biomedical database tools:
+  Ensembl, EuropePMC, UniProt, Open Targets, Reactome, Human Protein Atlas,
+  KEGG, ClinicalTrials.gov, AlphaFold, InterPro, OLS, STRINGDb, and more.
+
+  Use these tools to:
+  - **Verify rsids and variant positions** via Ensembl (variant recoder, rsid lookup).
+  - **Find real PubMed references** via EuropePMC — never hallucinate PMIDs.
+  - **Check gene function and pathways** via UniProt, Reactome, KEGG when needed.
+  - **Confirm clinical significance** via Open Targets, ClinicalTrials.gov when relevant.
+
+  ### CRITICAL: Use tools with moderation
+
+  - Call external tools only when genuinely needed, not on a whim.
+  - Prefer your existing knowledge for well-known variants (MTHFR C677T, APOE ε4, etc.)
+    and only verify via tools when uncertain.
+  - **Withhold UNIPROT and STRING calls** unless absolutely necessary: 
+    STRING responses are ~5 kb each, UNIPROT responses are 10 kb+ each and consume context fast. 
+    Batch your lookups: gather all rsids/genes first, then make targeted calls.
+  - For literature: search EuropePMC with a focused query, fetch only the top 3-5 results.
+    Do not exhaustively retrieve every possible study.
 
   ## Rules
 

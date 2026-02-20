@@ -192,13 +192,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Ensembl annotation toggle (DuckDB-based, optional)
     include_ensembl: bool = False
 
-    # Custom module registry (upload-based)
-    custom_module_error: str = ""
-    custom_module_adding: bool = False
-    # Module preview — populated on file drop before clicking Add
-    pending_module_name: str = ""
-    pending_module_preview_error: str = ""
-    _pending_upload_dir: str = ""
+    # Custom module registry (managed by AgentState slot, kept here for remove/refresh)
 
     # Class variable to track active in-process runs (for SIGTERM cleanup)
     # Maps run_id -> partition_key for runs executing via execute_in_process
@@ -649,181 +643,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # ============================================================
     # Custom Module Registry
     # ============================================================
-
-    async def preview_module_upload(self, files: list[rx.UploadFile]):
-        """Upload files on drop, validate module_spec.yaml, and show a preview.
-
-        Writes files to a temp dir so ``commit_module_upload`` can use them
-        without a second upload round-trip.  Accepts loose files or a single
-        .zip archive containing the spec files.
-        """
-        import zipfile as _zipfile
-
-        # Clean up any previous staged upload
-        if self._pending_upload_dir:
-            shutil.rmtree(self._pending_upload_dir, ignore_errors=True)
-            self._pending_upload_dir = ""
-
-        self.pending_module_name = ""
-        self.pending_module_preview_error = ""
-        self.custom_module_error = ""
-
-        if not files:
-            return
-
-        # Write all uploaded files to a temp dir first
-        tmp_path = Path(tempfile.mkdtemp(prefix="dna_module_prev_"))
-
-        for f in files:
-            if not f.filename:
-                continue
-            content = await f.read()
-            (tmp_path / f.filename).write_bytes(content)
-
-        # If a single zip was uploaded, extract it in place
-        zip_files = list(tmp_path.glob("*.zip"))
-        if zip_files:
-            for zf_path in zip_files:
-                try:
-                    with _zipfile.ZipFile(zf_path, "r") as zf:
-                        zf.extractall(tmp_path)
-                except _zipfile.BadZipFile:
-                    self.pending_module_preview_error = f"{zf_path.name} is not a valid zip file"
-                    shutil.rmtree(tmp_path, ignore_errors=True)
-                    return
-                zf_path.unlink()
-
-        # After extraction, files may be at root or inside a single subfolder
-        extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
-        if "module_spec.yaml" not in extracted_names:
-            # Check one level down (zip may contain a folder)
-            subdirs = [d for d in tmp_path.iterdir() if d.is_dir()]
-            for subdir in subdirs:
-                sub_names = {p.name for p in subdir.iterdir() if p.is_file()}
-                if "module_spec.yaml" in sub_names:
-                    # Promote files up to tmp_path
-                    for child in subdir.iterdir():
-                        if child.is_file():
-                            shutil.move(str(child), str(tmp_path / child.name))
-                    subdir.rmdir()
-                    extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
-                    break
-
-        if "module_spec.yaml" not in extracted_names:
-            self.pending_module_preview_error = "module_spec.yaml not found — required"
-            shutil.rmtree(tmp_path, ignore_errors=True)
-            return
-        if "variants.csv" not in extracted_names:
-            self.pending_module_preview_error = "variants.csv not found — required"
-            shutil.rmtree(tmp_path, ignore_errors=True)
-            return
-
-        self._pending_upload_dir = str(tmp_path)
-        yaml_bytes = (tmp_path / "module_spec.yaml").read_bytes()
-
-        # Parse YAML and extract module name from module.name
-        try:
-            spec = yaml.safe_load(yaml_bytes.decode("utf-8"))
-            if not spec or not isinstance(spec, dict):
-                self.pending_module_preview_error = "module_spec.yaml is empty or not a valid YAML mapping"
-                return
-            module_section = spec.get("module")
-            if not isinstance(module_section, dict):
-                self.pending_module_preview_error = "module_spec.yaml missing 'module:' section"
-                return
-            name = module_section.get("name")
-            if not name:
-                self.pending_module_preview_error = "module_spec.yaml missing 'module.name' field"
-                return
-            self.pending_module_name = str(name)
-            title = module_section.get("title")
-            if title:
-                self.pending_module_name = f"{name} — {title}"
-        except yaml.YAMLError as exc:
-            self.pending_module_preview_error = f"Invalid YAML: {exc}"
-
-    async def commit_module_upload(self):
-        """Compile and register the already-staged module files."""
-        if not self._pending_upload_dir:
-            yield rx.toast.warning("No staged files — re-select files")
-            return
-
-        self.custom_module_adding = True
-        self.custom_module_error = ""
-        yield
-
-        tmp_path = Path(self._pending_upload_dir)
-        result = register_custom_module(tmp_path)
-
-        shutil.rmtree(tmp_path, ignore_errors=True)
-        self._pending_upload_dir = ""
-        self.custom_module_adding = False
-
-        if not result.success:
-            self.custom_module_error = "; ".join(result.errors[:3])
-            yield rx.toast.error(f"Compilation failed: {result.errors[0]}")
-            return
-
-        module_name = result.stats.get("module_name", "module")
-        variant_count = result.stats.get("weights_rows", 0)
-        self.pending_module_name = ""
-        self.custom_module_error = ""
-        self._refresh_module_ui_state()
-        yield
-        yield rx.toast.success(
-            f"Module '{module_name}' registered → custom_modules/{module_name}/ ({variant_count} variants)"
-        )
-
-    async def handle_module_upload(self, files: list[rx.UploadFile]):
-        """Receive uploaded DSL spec files, validate, compile, register.
-
-        Expects at minimum ``module_spec.yaml`` and ``variants.csv``.
-        ``studies.csv`` is optional. Files are written to a temp directory,
-        compiled via ``register_custom_module``, then the temp dir is cleaned up.
-        """
-        if not files:
-            yield rx.toast.warning("No files selected")
-            return
-
-        filenames = {f.filename for f in files if f.filename}
-        if "module_spec.yaml" not in filenames:
-            self.custom_module_error = "Missing module_spec.yaml — select at least module_spec.yaml + variants.csv"
-            yield rx.toast.error("Missing module_spec.yaml")
-            return
-        if "variants.csv" not in filenames:
-            self.custom_module_error = "Missing variants.csv — select at least module_spec.yaml + variants.csv"
-            yield rx.toast.error("Missing variants.csv")
-            return
-
-        self.custom_module_adding = True
-        self.custom_module_error = ""
-        yield
-
-        with tempfile.TemporaryDirectory(prefix="dna_module_") as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            for f in files:
-                if not f.filename:
-                    continue
-                content = await f.read()
-                (tmp_path / f.filename).write_bytes(content)
-
-            result = register_custom_module(tmp_path)
-
-        self.custom_module_adding = False
-        if not result.success:
-            self.custom_module_error = "; ".join(result.errors[:3])
-            yield rx.toast.error(f"Compilation failed: {result.errors[0]}")
-            return
-
-        self._refresh_module_ui_state()
-        yield
-
-        module_name = result.stats.get("module_name", "module")
-        variant_count = result.stats.get("weights_rows", 0)
-        self.custom_module_error = ""
-        yield rx.toast.success(
-            f"Module '{module_name}' registered → custom_modules/{module_name}/ ({variant_count} variants)"
-        )
 
     def remove_custom_module(self, module_name: str):
         """Remove a custom module, update modules.yaml, refresh UI."""
@@ -2800,50 +2619,231 @@ _AGENT_UPLOADS_DIR = Path("data/agent_uploads")
 
 
 class AgentState(rx.State):
-    """State for the Paper-to-Module AI agent chat panel."""
+    """State for the Module Creator agent chat and the editing slot.
 
+    The editing slot is the central workspace for a module being created or
+    refined.  It can be populated by the agent (after a chat turn) or by
+    manual file upload.  The *Add* action registers the slot contents as a
+    custom module; *Clear* empties the slot; *Download* fetches a zip.
+    """
+
+    # -- Chat state -----------------------------------------------------------
     agent_messages: List[Dict[str, str]] = []
     agent_processing: bool = False
     agent_input: str = ""
     agent_uploaded_file: str = ""
     _agent_uploaded_path: str = ""
-    _agent_spec_dir: str = ""
+
+    # -- Editing slot state ---------------------------------------------------
+    _slot_spec_dir: str = ""
+    slot_module_name: str = ""
+    slot_module_title: str = ""
+    slot_module_description: str = ""
+    slot_module_icon: str = ""
+    slot_module_color: str = ""
+    slot_version: int = 0
+    slot_adding: bool = False
 
     def set_agent_input(self, value: str) -> None:
         """Explicit setter for agent_input (avoids deprecation warning)."""
         self.agent_input = value
 
+    # -- Slot computed vars ---------------------------------------------------
+
     @rx.var
-    def has_agent_spec(self) -> bool:
-        """True when the agent has produced a valid spec directory."""
-        if not self._agent_spec_dir:
+    def slot_is_populated(self) -> bool:
+        """True when the editing slot contains a valid module spec."""
+        if not self._slot_spec_dir:
             return False
-        return (Path(self._agent_spec_dir) / "module_spec.yaml").exists()
+        return (Path(self._slot_spec_dir) / "module_spec.yaml").exists()
 
     @rx.var
-    def agent_spec_name(self) -> str:
-        """Module name from the last agent spec directory."""
-        if not self._agent_spec_dir:
-            return ""
-        return Path(self._agent_spec_dir).name
-
-    @rx.var
-    def agent_spec_files(self) -> List[str]:
-        """List of filenames in the current spec directory."""
-        if not self._agent_spec_dir:
+    def slot_files(self) -> List[str]:
+        """Filenames in the current editing slot."""
+        if not self._slot_spec_dir:
             return []
-        spec_dir = Path(self._agent_spec_dir)
-        if not spec_dir.exists():
+        d = Path(self._slot_spec_dir)
+        if not d.exists():
             return []
-        return sorted(f.name for f in spec_dir.iterdir() if f.is_file())
+        return sorted(f.name for f in d.iterdir() if f.is_file())
 
     @rx.var
-    def agent_spec_zip_url(self) -> str:
-        """URL to download all spec files as a zip (uses auto-resolved backend port)."""
-        if not self._agent_spec_dir:
+    def slot_zip_url(self) -> str:
+        """URL to download the slot spec as a zip."""
+        if not self._slot_spec_dir:
             return ""
         api_url = rx.config.get_config().api_url
-        return f"{api_url}/api/agent-spec-zip/{Path(self._agent_spec_dir).name}"
+        return f"{api_url}/api/agent-spec-zip/{Path(self._slot_spec_dir).name}"
+
+    @rx.var
+    def slot_display_name(self) -> str:
+        """Human-readable slot title: 'name — title (v3)'."""
+        if not self.slot_module_name:
+            return ""
+        parts = [self.slot_module_name]
+        if self.slot_module_title and self.slot_module_title != self.slot_module_name:
+            parts.append(f"— {self.slot_module_title}")
+        if self.slot_version > 0:
+            parts.append(f"(v{self.slot_version})")
+        return " ".join(parts)
+
+    # -- Helpers --------------------------------------------------------------
+
+    def _add_chat_message(self, role: str, content: str) -> None:
+        """Append a message to the chat log."""
+        self.agent_messages = [*self.agent_messages, {"role": role, "content": content}]
+
+    def _populate_slot(self, spec_dir: Path, source: str = "upload") -> None:
+        """Read module_spec.yaml from *spec_dir* and populate slot state.
+
+        If *source* is ``"agent"`` and the slot already held the same module
+        name, the version is auto-bumped.
+        """
+        from just_dna_pipelines.agents.module_creator import read_spec_meta, bump_spec_version
+
+        meta = read_spec_meta(spec_dir)
+        if not meta.get("name"):
+            return
+
+        new_version = int(meta.get("version", 1))
+        if source == "agent" and self.slot_module_name and self.slot_module_name == meta["name"]:
+            new_version = self.slot_version + 1
+            bump_spec_version(spec_dir, new_version)
+
+        self._slot_spec_dir = str(spec_dir)
+        self.slot_module_name = meta["name"]
+        self.slot_module_title = meta.get("title", "")
+        self.slot_module_description = meta.get("description", "")
+        self.slot_module_icon = meta.get("icon", "database")
+        self.slot_module_color = meta.get("color", "#6435c9")
+        self.slot_version = new_version
+
+    def _build_slot_context(self) -> str:
+        """Build a context block from the current slot files for the agent prompt."""
+        if not self._slot_spec_dir:
+            return ""
+        d = Path(self._slot_spec_dir)
+        if not d.exists():
+            return ""
+        parts = ["\n\n--- EXISTING MODULE IN EDITING SLOT (Scenario B) ---"]
+        for fname in ("module_spec.yaml", "variants.csv", "studies.csv"):
+            fpath = d / fname
+            if fpath.exists():
+                parts.append(f"\n=== {fname} ===\n{fpath.read_text(encoding='utf-8')}")
+        parts.append(
+            "\nThe user wants to modify this module. Produce the COMPLETE "
+            "updated module (all files), not just the diff. Keep the same "
+            "module name unless instructed otherwise.\n--- END EXISTING MODULE ---"
+        )
+        return "\n".join(parts)
+
+    # -- Slot actions ---------------------------------------------------------
+
+    async def upload_to_slot(self, files: list[rx.UploadFile]) -> None:
+        """Upload module spec files and populate the editing slot."""
+        import zipfile as _zipfile
+
+        if not files:
+            return
+
+        tmp_path = Path(tempfile.mkdtemp(prefix="dna_slot_"))
+        for f in files:
+            if not f.filename:
+                continue
+            content = await f.read()
+            (tmp_path / f.filename).write_bytes(content)
+
+        # Extract zips in place
+        for zf_path in list(tmp_path.glob("*.zip")):
+            try:
+                with _zipfile.ZipFile(zf_path, "r") as zf:
+                    zf.extractall(tmp_path)
+            except _zipfile.BadZipFile:
+                self._add_chat_message("agent", f"{zf_path.name} is not a valid zip file")
+                shutil.rmtree(tmp_path, ignore_errors=True)
+                return
+            zf_path.unlink()
+
+        # Promote files from a single subfolder if needed
+        extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
+        if "module_spec.yaml" not in extracted_names:
+            for subdir in [d for d in tmp_path.iterdir() if d.is_dir()]:
+                sub_names = {p.name for p in subdir.iterdir() if p.is_file()}
+                if "module_spec.yaml" in sub_names:
+                    for child in subdir.iterdir():
+                        if child.is_file():
+                            shutil.move(str(child), str(tmp_path / child.name))
+                    subdir.rmdir()
+                    extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
+                    break
+
+        if "module_spec.yaml" not in extracted_names:
+            self._add_chat_message("agent", "Upload failed: module_spec.yaml not found")
+            shutil.rmtree(tmp_path, ignore_errors=True)
+            return
+        if "variants.csv" not in extracted_names:
+            self._add_chat_message("agent", "Upload failed: variants.csv not found")
+            shutil.rmtree(tmp_path, ignore_errors=True)
+            return
+
+        # Persist to data/module_specs/generated/<name>/
+        from just_dna_pipelines.agents.module_creator import read_spec_meta
+        meta = read_spec_meta(tmp_path)
+        module_name = meta.get("name", "uploaded_module")
+        root = Path(__file__).resolve().parents[3]
+        persist_dir = root / "data" / "module_specs" / "generated" / module_name
+        persist_dir.mkdir(parents=True, exist_ok=True)
+        for fp in tmp_path.iterdir():
+            if fp.is_file():
+                shutil.copy2(fp, persist_dir / fp.name)
+        shutil.rmtree(tmp_path, ignore_errors=True)
+
+        self._populate_slot(persist_dir, source="upload")
+        self._add_chat_message(
+            "agent",
+            f"Module **{self.slot_module_name}** loaded into editing slot (v{self.slot_version}).",
+        )
+
+    async def add_slot_module(self) -> None:
+        """Register the editing slot as a custom module."""
+        if not self._slot_spec_dir:
+            return
+        self.slot_adding = True
+        yield
+
+        result = register_custom_module(Path(self._slot_spec_dir))
+        self.slot_adding = False
+
+        if result.success:
+            stats = result.stats or {}
+            name = stats.get("module_name", self.slot_module_name)
+            variant_count = stats.get("weights_rows", 0)
+            self._add_chat_message(
+                "agent",
+                f"Module **{name}** registered successfully! "
+                f"({variant_count} variants) — now available for annotation.",
+            )
+            upload_state = await self.get_state(UploadState)
+            upload_state._refresh_module_ui_state()
+        else:
+            self._add_chat_message(
+                "agent",
+                f"Registration failed: {'; '.join(result.errors[:3])}",
+            )
+        yield
+
+    def clear_slot(self) -> None:
+        """Empty the editing slot."""
+        self._slot_spec_dir = ""
+        self.slot_module_name = ""
+        self.slot_module_title = ""
+        self.slot_module_description = ""
+        self.slot_module_icon = ""
+        self.slot_module_color = ""
+        self.slot_version = 0
+        self._add_chat_message("agent", "Editing slot cleared.")
+
+    # -- Agent file attachment ------------------------------------------------
 
     async def upload_agent_file(self, files: list[rx.UploadFile]) -> None:
         """Save an uploaded PDF/CSV for the agent to use as context."""
@@ -2858,16 +2858,27 @@ class AgentState(rx.State):
         self.agent_uploaded_file = filename
         self._agent_uploaded_path = str(dest)
 
+    def clear_agent_file(self) -> None:
+        """Remove the attached file without clearing the chat."""
+        self.agent_uploaded_file = ""
+        self._agent_uploaded_path = ""
+
+    # -- Chat send ------------------------------------------------------------
+
     @rx.event(background=True)
     async def send_agent_message(self) -> None:
-        """Send a message to the agent (runs in background, UI stays responsive)."""
-        question = self.agent_input.strip()
-        if not question:
-            return
+        """Send a message to the agent (runs in background, UI stays responsive).
 
+        If the editing slot is populated, the existing module files are injected
+        as context so the agent can refine rather than recreate.
+        """
         async with self:
+            question = self.agent_input.strip()
+            if not question:
+                return
             message = question
             file_path = self._agent_uploaded_path
+            slot_context = self._build_slot_context()
             self.agent_messages = [
                 *self.agent_messages,
                 {"role": "user", "content": message},
@@ -2875,7 +2886,6 @@ class AgentState(rx.State):
             self.agent_input = ""
             self.agent_processing = True
 
-        import tempfile
         spec_output = Path(tempfile.mkdtemp(prefix="module_spec_"))
 
         msg_to_send = message
@@ -2888,6 +2898,9 @@ class AgentState(rx.State):
                     f"{file_content}\n\n{message}"
                 )
                 file_path = ""
+
+        if slot_context:
+            msg_to_send += slot_context
 
         msg_to_send += (
             f"\n\nWrite the spec files to: {spec_output}/<module_name>/ "
@@ -2912,7 +2925,7 @@ class AgentState(rx.State):
                     found_spec_dir = str(d)
                     break
 
-        # Auto-save to persistent location so specs survive Reflex reloads
+        # Persist and populate the slot
         if found_spec_dir:
             root = Path(__file__).resolve().parents[3]
             module_name = Path(found_spec_dir).name
@@ -2930,39 +2943,21 @@ class AgentState(rx.State):
             ]
             self.agent_processing = False
             if found_spec_dir:
-                self._agent_spec_dir = found_spec_dir
+                self._populate_slot(Path(found_spec_dir), source="agent")
 
-    async def register_agent_result(self) -> None:
-        """Register the agent's last spec as a custom module and refresh the UI list."""
-        if not self._agent_spec_dir:
-            return
-        result = register_custom_module(Path(self._agent_spec_dir))
-        if result.success:
-            stats = result.stats or {}
-            name = stats.get("module_name", "unknown")
-            self.agent_messages = [
-                *self.agent_messages,
-                {"role": "agent", "content": f"Module **{name}** registered successfully! It is now available for annotation."},
-            ]
-            # Refresh the module list in UploadState so the left panel updates
-            upload_state = await self.get_state(UploadState)
-            upload_state._refresh_module_ui_state()
-        else:
-            self.agent_messages = [
-                *self.agent_messages,
-                {"role": "agent", "content": f"Registration failed: {result.errors}"},
-            ]
-
-    def clear_agent_file(self) -> None:
-        """Remove the attached file without clearing the chat."""
-        self.agent_uploaded_file = ""
-        self._agent_uploaded_path = ""
+    # -- Clear chat -----------------------------------------------------------
 
     def clear_agent_chat(self) -> None:
-        """Reset the agent chat to initial state."""
+        """Reset the agent chat and editing slot to initial state."""
         self.agent_messages = []
         self.agent_processing = False
         self.agent_input = ""
         self.agent_uploaded_file = ""
         self._agent_uploaded_path = ""
-        self._agent_spec_dir = ""
+        self._slot_spec_dir = ""
+        self.slot_module_name = ""
+        self.slot_module_title = ""
+        self.slot_module_description = ""
+        self.slot_module_icon = ""
+        self.slot_module_color = ""
+        self.slot_version = 0
