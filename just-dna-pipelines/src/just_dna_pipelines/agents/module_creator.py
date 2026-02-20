@@ -259,13 +259,29 @@ def create_module_agent(
         """
         return _register_module(spec_dir)
 
+    def write_module_md(module_name: str, markdown_content: str) -> str:
+        """Write or update the MODULE.md documentation file for a module.
+
+        Call this to create or update the module's story / changelog / design
+        notes.  If a MODULE.md already exists, the new content replaces it
+        entirely — make sure to include everything that should be preserved.
+
+        Args:
+            module_name: Machine name matching the module (same as in module_spec.yaml).
+            markdown_content: Full markdown content for MODULE.md.
+        """
+        md_path = output_dir / module_name / "MODULE.md"
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(markdown_content, encoding="utf-8")
+        return f"MODULE.md written to {md_path} ({len(markdown_content)} chars)"
+
     biocontext = MCPTools(url=BIOCONTEXT_KB_URL)
 
     return Agent(
         name=spec.get("name", "ModuleCreator"),
         description=spec.get("description", ""),
         model=Gemini(id=resolved_model, api_key=api_key, vertexai=False), #search=True disables tool calls
-        tools=[write_spec_files, validate_spec, register_module, biocontext],
+        tools=[write_spec_files, validate_spec, register_module, write_module_md, biocontext],
         instructions=spec.get("instructions", ""),
         markdown=agent_cfg.get("markdown", True),
         debug_mode=agent_cfg.get("debug_mode", False),

@@ -2669,11 +2669,12 @@ class AgentState(rx.State):
 
     @rx.var
     def slot_zip_url(self) -> str:
-        """URL to download the slot spec as a zip."""
+        """URL to download the slot spec as a zip (version appended to filename)."""
         if not self._slot_spec_dir:
             return ""
         api_url = rx.config.get_config().api_url
-        return f"{api_url}/api/agent-spec-zip/{Path(self._slot_spec_dir).name}"
+        name = Path(self._slot_spec_dir).name
+        return f"{api_url}/api/agent-spec-zip/{name}?v={self.slot_version}"
 
     @rx.var
     def slot_display_name(self) -> str:
@@ -2726,14 +2727,17 @@ class AgentState(rx.State):
         if not d.exists():
             return ""
         parts = ["\n\n--- EXISTING MODULE IN EDITING SLOT (Scenario B) ---"]
-        for fname in ("module_spec.yaml", "variants.csv", "studies.csv"):
+        for fname in ("module_spec.yaml", "variants.csv", "studies.csv", "MODULE.md"):
             fpath = d / fname
             if fpath.exists():
                 parts.append(f"\n=== {fname} ===\n{fpath.read_text(encoding='utf-8')}")
         parts.append(
             "\nThe user wants to modify this module. Produce the COMPLETE "
             "updated module (all files), not just the diff. Keep the same "
-            "module name unless instructed otherwise.\n--- END EXISTING MODULE ---"
+            "module name unless instructed otherwise."
+            "\nIf a MODULE.md was included above, update it with a new changelog "
+            "entry via the write_module_md tool. If none was included, write a "
+            "fresh one.\n--- END EXISTING MODULE ---"
         )
         return "\n".join(parts)
 
@@ -2905,7 +2909,8 @@ class AgentState(rx.State):
         msg_to_send += (
             f"\n\nWrite the spec files to: {spec_output}/<module_name>/ "
             f"using the write_spec_files tool. "
-            f"Then call validate_spec on the resulting directory."
+            f"Then call validate_spec on the resulting directory. "
+            f"Finally, call write_module_md to document the module."
         )
 
         from just_dna_pipelines.agents.module_creator import run_agent_sync

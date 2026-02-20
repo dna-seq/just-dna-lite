@@ -67,13 +67,6 @@ module_metadata:
     report_title: Lipid Metabolism & Cardiovascular Risk
     icon: droplets
     color: '#fbbd08'
-  diabetes_metabolism:
-    title: Diabetes & Metabolism
-    description: Genetic insights into Type 2 Diabetes risk, insulin secretion, and
-      metabolism based on key validated markers.
-    report_title: Metabolic Health Profile
-    icon: droplets
-    color: '#fbbd08'
   sport_muscles_recovery:
     title: Sport, Muscles & Recovery
     description: Genetic markers for muscle fiber type, aerobic capacity, and injury
@@ -88,11 +81,17 @@ module_metadata:
     report_title: Athletic Potential & Injury Risk
     icon: activity
     color: '#2185d0'
+  diabetes_metabolism:
+    title: Diabetes & Metabolism
+    description: Genetic insights into Type 2 Diabetes risk, insulin secretion, and
+      metabolism based on key validated markers.
+    report_title: Metabolic Health Profile
+    icon: droplets
+    color: '#fbbd08'
   longevity_2025:
     title: Longevity 2025
-    description: Rare protein-altering variants associated with familial longevity
-      from the Leiden Longevity Study (2025) and SIRT6 variants from Sheikholmolouki
-      et al. (2025).
-    report_title: Familial Longevity (2025)
+    description: Rare protein-altering variants from Leiden Longevity Study, SIRT6
+      variants, and high-impact multimorbidity (mvARD) variants from Dinh et al. (2025).
+    report_title: Familial Longevity & Healthy Aging (2025)
     icon: heart-pulse
     color: '#21ba45'

@@ -180,7 +180,7 @@ def _slot_populated_state() -> rx.Component:
 
 
 def _slot_button_bar() -> rx.Component:
-    """Upload / Add / Clear / Download button row for the editing slot."""
+    """Upload / Clear / Download button row for the editing slot."""
     return rx.el.div(
         # Upload button
         rx.upload(
@@ -201,19 +201,6 @@ def _slot_button_bar() -> rx.Component:
                 rx.upload_files(upload_id="slot_upload"),
             ),
             style={"display": "contents"},
-        ),
-        # Add to registry
-        rx.el.button(
-            rx.cond(
-                AgentState.slot_adding,
-                rx.el.i("", class_name="spinner loading icon"),
-                fomantic_icon("plus", size=13),
-            ),
-            " Add",
-            on_click=AgentState.add_slot_module,
-            disabled=~AgentState.slot_is_populated | AgentState.slot_adding,
-            class_name="ui mini purple button",
-            style={"flex": "1"},
         ),
         # Clear
         rx.el.button(
@@ -246,6 +233,27 @@ def _slot_button_bar() -> rx.Component:
     )
 
 
+def _register_button() -> rx.Component:
+    """Standalone Register button between slot and module sources — visual 'push up'."""
+    return rx.el.div(
+        rx.el.button(
+            rx.cond(
+                AgentState.slot_adding,
+                rx.el.i("", class_name="spinner loading icon"),
+                rx.fragment(
+                    fomantic_icon("arrow up", size=14),
+                    " Register",
+                ),
+            ),
+            on_click=AgentState.add_slot_module,
+            disabled=~AgentState.slot_is_populated | AgentState.slot_adding,
+            class_name="ui purple button",
+            style={"width": "100%"},
+        ),
+        style={"marginBottom": "10px"},
+    )
+
+
 def editing_slot() -> rx.Component:
     """Editing slot card — shows module details or empty state + action buttons."""
     return rx.el.div(
@@ -266,7 +274,7 @@ def editing_slot() -> rx.Component:
         # Button bar (always visible)
         _slot_button_bar(),
         rx.el.div(
-            "Upload: module_spec.yaml + variants.csv (.zip OK). Add: register to system.",
+            "Upload module_spec.yaml + variants.csv (.zip OK)",
             style={"fontSize": "0.72rem", "color": "#aaa", "marginTop": "6px"},
         ),
         class_name="ui segment",
@@ -303,8 +311,11 @@ def modules_left_panel() -> rx.Component:
             ),
             rx.foreach(UploadState.repo_info_list, repo_source_card),
             class_name="ui segment",
-            style={"padding": "12px", "marginBottom": "12px"},
+            style={"padding": "12px", "marginBottom": "10px"},
         ),
+
+        # Register button — pushes slot contents up into module sources
+        _register_button(),
 
         # Editing Slot
         editing_slot(),

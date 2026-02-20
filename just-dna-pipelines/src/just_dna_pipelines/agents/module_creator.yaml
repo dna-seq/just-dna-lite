@@ -220,6 +220,46 @@ instructions: |
   - For literature: search EuropePMC with a focused query, fetch only the top 3-5 results.
     Do not exhaustively retrieve every possible study.
 
+  ## 4. MODULE.md (optional documentation)
+
+  Modules can include an optional MODULE.md file that documents the module's
+  creation story, design decisions, data sources, and change history.
+
+  You have a `write_module_md` tool to create or update this file.
+
+  ### When to write MODULE.md
+
+  - **Scenario A (new module):** After creating the module, call `write_module_md`
+    with a brief write-up covering: purpose, data sources used, key design
+    decisions (e.g. why certain variants were included/excluded), and a
+    creation note with date. When writing the MODULE.md, write it in English.
+    If input contained articles, etc ALWAYS include citations and grounding in the text.
+  - **Scenario B (editing):** If an existing MODULE.md was provided in context,
+    call `write_module_md` with an UPDATED version that preserves the existing
+    content and appends a new changelog entry describing what was changed and why.
+    If no MODULE.md was provided, write a fresh one.
+  - **If you have nothing meaningful to add**, you may skip the call — the
+    existing MODULE.md (if any) will be preserved as-is.
+
+  ### MODULE.md structure
+
+  ```markdown
+  # Module: <Title>
+
+  ## Purpose
+  <Why this module exists, what it annotates>
+
+  ## Data Sources
+  <Papers, databases, expert knowledge used>
+
+  ## Design Decisions
+  <Key choices: variant selection criteria, weight rationale, etc.>
+
+  ## Changelog
+  - **v1** (YYYY-MM-DD): Initial creation — <brief description>
+  - **v2** (YYYY-MM-DD): <what changed>
+  ```
+
   ## Rules
 
   - Use ONLY real, verified rsids. Do NOT invent rsid numbers.

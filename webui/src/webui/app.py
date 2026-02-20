@@ -161,7 +161,7 @@ async def download_agent_spec_file(spec_name: str, filename: str) -> FileRespons
 
 
 @api.get("/api/agent-spec-zip/{spec_name}")
-async def download_agent_spec_zip(spec_name: str) -> StreamingResponse:
+async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingResponse:
     """Download all generated spec files as a single zip archive."""
     if ".." in spec_name or "/" in spec_name:
         raise HTTPException(status_code=400, detail="Invalid spec name")
@@ -177,10 +177,11 @@ async def download_agent_spec_zip(spec_name: str) -> StreamingResponse:
                 zf.write(f, f.name)
     buf.seek(0)
 
+    zip_filename = f"{spec_name}_v{v}.zip" if v > 0 else f"{spec_name}.zip"
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{spec_name}.zip"'},
+        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
     )
 
 
