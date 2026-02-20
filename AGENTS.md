@@ -915,6 +915,67 @@ app = rx.App(
 
 ---
 
+## PRS Integration (Polygenic Risk Scores)
+
+The web UI integrates the `prs-ui` PyPI package for polygenic risk score computation using PGS Catalog data.
+
+### Dependencies
+
+- **`just-prs>=0.3.1`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
+- **`prs-ui>=0.1.1`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_section()`, score grid, results table
+
+Both are added to `webui/pyproject.toml`.
+
+### Architecture
+
+`PRSState` is an independent `rx.State` subclass (not a substate of `UploadState`) with its own `LazyFrameGridMixin` for the PGS Catalog scores DataGrid. This parallels `OutputPreviewState`.
+
+```python
+from prs_ui import PRSComputeStateMixin
+
+class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
+    genome_build: str = "GRCh38"
+    cache_dir: str = str(resolve_cache_dir())  # ~/.cache/just-prs/
+    status_message: str = ""
+    prs_expanded: bool = False
+```
+
+### Data flow
+
+1. User selects a VCF file in the left panel
+2. `UploadState.select_file()` returns `PRSState.initialize_prs_for_file(parquet_path, genome_build)`
+3. `PRSState` creates a `pl.scan_parquet()` LazyFrame from the normalized parquet and calls `set_prs_genotypes_lf(lf)` (preferred input method — lazy, memory-efficient)
+4. PGS Catalog scores are loaded into the MUI DataGrid for selection
+5. User selects scores and clicks Compute — `PRSComputeStateMixin.compute_selected_prs()` runs
+6. Results with quality assessment, percentiles, and effect sizes are displayed
+
+### Genome build mapping
+
+`current_reference_genome` from file metadata maps directly to PRS genome builds:
+- `"GRCh38"`, `"T2T-CHM13v2.0"` → `"GRCh38"` (default)
+- `"GRCh37"`, `"hg19"` → `"GRCh37"`
+
+### Key files
+
+| File | What it does |
+|------|-------------|
+| `webui/src/webui/state.py` (`PRSState`) | PRS computation state, inherits `PRSComputeStateMixin` + `LazyFrameGridMixin` |
+| `webui/src/webui/pages/annotate.py` | Collapsible PRS section between VCF Preview and Outputs |
+
+### Important patterns
+
+- **LazyFrame is the preferred input** — `set_prs_genotypes_lf(pl.scan_parquet(path))` avoids redundant I/O. The parquet path is also set as string fallback.
+- **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
+- **`prs_section()` uses Radix components** (`rx.hstack`, `rx.badge`, `rx.table`) which render without Radix theming in our `theme=None` app. Functional but unstyled. Future work: Fomantic-styled wrappers.
+- **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
+
+### Anti-patterns
+
+- **Never make PRSState a substate of UploadState** — it needs its own `LazyFrameGridMixin` instance; mixing into UploadState would create MRO conflicts.
+- **Never pass UploadState's internal LazyFrame across states** — Reflex states are isolated; create a new `pl.scan_parquet()` LazyFrame from the shared parquet path instead.
+
+---
+
 ## Design System
 
 For UI/frontend changes, see **[docs/DESIGN.md](docs/DESIGN.md)**.

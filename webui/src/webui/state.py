@@ -1559,8 +1559,15 @@ class UploadState(LazyFrameGridMixin, rx.State):
         # Load output files for the selected sample
         self._load_output_files_sync()
 
-        # Clear the output preview grid (belongs to OutputPreviewState)
-        return OutputPreviewState.clear_output_preview
+        # Initialize PRS state with normalized parquet + genome build
+        normalized = self._get_normalized_parquet_path()
+        ref_genome = self.file_metadata.get(filename, {}).get("reference_genome", "GRCh38")
+        parquet_str = str(normalized) if normalized else ""
+
+        return [
+            OutputPreviewState.clear_output_preview,
+            PRSState.initialize_prs_for_file(parquet_str, ref_genome),
+        ]
 
     def switch_tab(self, tab_name: str):
         """Switch to a different tab in the right panel."""
@@ -2609,6 +2616,63 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
         self.lf_grid_rows = []
         self.lf_grid_columns = []
         self.lf_grid_row_count = 0
+
+
+# ============================================================================
+# PRS STATE — Polygenic Risk Score computation via prs-ui
+# ============================================================================
+
+from prs_ui import PRSComputeStateMixin
+from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
+
+
+class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
+    """PRS computation state with its own LazyFrameGridMixin for the PGS scores grid.
+
+    Inherits ``PRSComputeStateMixin`` for PRS computation logic (score loading,
+    selection, batch compute, quality assessment, CSV export) and
+    ``LazyFrameGridMixin`` for the MUI DataGrid that displays PGS Catalog scores.
+
+    The host app (``UploadState``) calls ``PRSState.initialize_prs_for_file``
+    when a file is selected, passing the normalized parquet path and genome build.
+    """
+
+    genome_build: str = "GRCh38"
+    cache_dir: str = str(_prs_resolve_cache_dir())
+    status_message: str = ""
+    prs_expanded: bool = False
+    prs_initialized_for_file: str = ""
+
+    def toggle_prs_expanded(self) -> None:
+        """Toggle the PRS section open/closed."""
+        self.prs_expanded = not self.prs_expanded
+
+    def initialize_prs_for_file(self, parquet_path: str, genome_build: str) -> Any:
+        """Initialize PRS state for a newly selected VCF file.
+
+        Sets the genotypes LazyFrame from the normalized parquet (preferred
+        input method for PRSComputeStateMixin) and loads PGS Catalog scores
+        for the appropriate genome build.
+        """
+        import polars as pl
+
+        if genome_build in ("GRCh37", "hg19"):
+            self.genome_build = "GRCh37"
+        else:
+            self.genome_build = "GRCh38"
+
+        self.prs_initialized_for_file = parquet_path
+
+        if parquet_path and Path(parquet_path).exists():
+            lf = pl.scan_parquet(parquet_path)
+            self.set_prs_genotypes_lf(lf)
+            self.prs_genotypes_path = parquet_path
+
+        self.prs_results = []
+        self.selected_pgs_ids = []
+        self.low_match_warning = False
+
+        yield from self.initialize_prs()
 
 
 # ============================================================================

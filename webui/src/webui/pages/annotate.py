@@ -13,8 +13,9 @@ from __future__ import annotations
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
-from webui.state import UploadState, OutputPreviewState
+from webui.state import UploadState, OutputPreviewState, PRSState
 from reflex_mui_datagrid import lazyframe_grid
+from prs_ui import prs_section as _prs_section_component
 
 
 # ============================================================================
@@ -1997,6 +1998,39 @@ def right_panel_run_view() -> rx.Component:
                     class_name="ui violet segment",
                     style={"padding": "16px", "marginBottom": "16px"},
                     id="segment-vcf-preview",
+                ),
+                # Section 0.5: Polygenic Risk Scores (PRS)
+                rx.el.div(
+                    _collapsible_header(
+                        expanded=PRSState.prs_expanded,
+                        icon_name="chart-bar",
+                        title="Polygenic Risk Scores",
+                        right_badge=rx.cond(
+                            PRSState.prs_results.length() > 0,
+                            rx.el.span(
+                                PRSState.prs_results.length(),
+                                " results",
+                                class_name="ui mini orange label",
+                            ),
+                            rx.el.span("PGS Catalog", class_name="ui mini orange label"),
+                        ),
+                        on_toggle=PRSState.toggle_prs_expanded,
+                        accent_color="#f2711c",
+                    ),
+                    rx.cond(
+                        PRSState.prs_expanded,
+                        rx.el.div(
+                            rx.theme(
+                                _prs_section_component(PRSState),
+                                has_background=False,
+                            ),
+                            style={"marginTop": "12px"},
+                        ),
+                        rx.box(),
+                    ),
+                    class_name="ui orange segment",
+                    style={"padding": "16px", "marginBottom": "16px"},
+                    id="segment-prs",
                 ),
                 # Section 1: Outputs (top) - only shown when there are output files
                 rx.cond(
