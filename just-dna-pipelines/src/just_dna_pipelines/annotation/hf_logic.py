@@ -19,6 +19,7 @@ from eliot import start_action
 from just_dna_pipelines.io import read_vcf_file
 from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.annotation.hf_modules import (
+    MODULE_INFOS,
     ModuleTable,
     ModuleOutputMapping,
     AnnotationManifest,
@@ -369,10 +370,7 @@ def annotate_vcf_with_all_modules(
     Returns:
         Tuple of (AnnotationManifest, metadata_dict)
     """
-    from just_dna_pipelines.annotation.hf_modules import discover_hf_modules
-    
-    # Discover modules from the configured repos
-    module_infos = discover_hf_modules(config.repos)
+    module_infos = MODULE_INFOS
     selected_names = config.get_modules()
     
     sample_name = sample_name or config.sample_name or vcf_path.stem

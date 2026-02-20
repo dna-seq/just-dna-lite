@@ -76,6 +76,140 @@ def module_validate(
         raise typer.Exit(1)
 
 
+@app.command("register")
+def module_register(
+    spec_dir: Path = typer.Argument(
+        ...,
+        help="Path to module spec directory (contains module_spec.yaml + variants.csv).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    resolve: bool = typer.Option(
+        True,
+        "--resolve/--no-resolve",
+        help="Resolve missing rsid/position via Ensembl DuckDB.",
+    ),
+    ensembl_cache: Optional[Path] = typer.Option(
+        None,
+        "--ensembl-cache",
+        help="Explicit Ensembl parquet cache path.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+) -> None:
+    """
+    Compile a DSL spec, register it as a custom module, and refresh discovery.
+
+    This is the one-shot command for agents and scripts: it validates,
+    compiles to parquet, adds the local source + display metadata to
+    modules.yaml, and refreshes the in-memory module registry.
+
+    Equivalent to clicking "Add" in the web UI.
+
+    Examples:
+
+        uv run pipelines module register data/module_specs/evals/mthfr_nad/
+
+        uv run pipelines module register data/module_specs/my_panel/ --no-resolve
+    """
+    from just_dna_pipelines.module_registry import register_custom_module
+
+    console.print(f"\n[bold]Registering module from:[/bold] {spec_dir}\n")
+
+    result = register_custom_module(
+        spec_dir,
+        resolve_with_ensembl=resolve,
+        ensembl_cache=ensembl_cache,
+    )
+
+    if result.errors:
+        console.print("[bold red]Errors:[/bold red]")
+        for err in result.errors:
+            console.print(f"  [red]\u2717[/red] {err}")
+        console.print()
+
+    if result.warnings:
+        console.print("[bold yellow]Warnings:[/bold yellow]")
+        for warn in result.warnings:
+            console.print(f"  [yellow]\u26a0[/yellow] {warn}")
+        console.print()
+
+    if result.success:
+        table = Table(title="Registration Result")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+        for key, val in result.stats.items():
+            table.add_row(key, str(val))
+        console.print(table)
+        console.print(
+            f"\n[bold green]\u2713 Module registered and discoverable[/bold green]"
+        )
+        if result.output_dir:
+            console.print(f"  Output: {result.output_dir}\n")
+    else:
+        console.print(
+            f"[bold red]\u2717 Registration failed with {len(result.errors)} error(s)[/bold red]\n"
+        )
+        raise typer.Exit(1)
+
+
+@app.command("unregister")
+def module_unregister(
+    module_name: str = typer.Argument(
+        ...,
+        help="Machine name of the custom module to remove (e.g. 'mthfr_nad').",
+    ),
+) -> None:
+    """
+    Remove a custom module: delete its parquet, update modules.yaml, refresh discovery.
+
+    Equivalent to clicking "Remove" in the web UI.
+
+    Examples:
+
+        uv run pipelines module unregister mthfr_nad
+    """
+    from just_dna_pipelines.module_registry import unregister_custom_module
+
+    console.print(f"\n[bold]Unregistering module:[/bold] {module_name}\n")
+
+    removed = unregister_custom_module(module_name)
+    if removed:
+        console.print(f"[bold green]\u2713 Module '{module_name}' removed[/bold green]\n")
+    else:
+        console.print(f"[bold red]\u2717 Module '{module_name}' not found in custom modules[/bold red]\n")
+        raise typer.Exit(1)
+
+
+@app.command("list-custom")
+def module_list_custom() -> None:
+    """
+    List all custom modules currently compiled on disk.
+
+    Shows module names and their output directories.
+
+    Examples:
+
+        uv run pipelines module list-custom
+    """
+    from just_dna_pipelines.module_registry import get_custom_module_specs
+
+    specs = get_custom_module_specs()
+    if not specs:
+        console.print("\n[dim]No custom modules found.[/dim]\n")
+        return
+
+    table = Table(title="Custom Modules")
+    table.add_column("Module", style="cyan")
+    table.add_column("Output Directory", style="green")
+    for name, path in specs.items():
+        table.add_row(name, str(path))
+    console.print(table)
+    console.print()
+
+
 @app.command("compile")
 def module_compile(
     spec_dir: Path = typer.Argument(

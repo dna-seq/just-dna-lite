@@ -26,7 +26,7 @@ Override with kind: "module" or kind: "collection".
 import hashlib
 import json
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 import polars as pl
 import yaml
@@ -222,6 +222,63 @@ def _load_config() -> ModulesConfig:
                 return ModulesConfig.model_validate(raw)
 
     return ModulesConfig()
+
+
+def get_config_path() -> Path:
+    """Return the project-root modules.yaml path (the user-facing config file).
+
+    Falls back to the package-bundled copy if no project root is found.
+    """
+    project_root = _find_project_root()
+    if project_root is not None:
+        return project_root / "modules.yaml"
+    return Path(__file__).parent / "modules.yaml"
+
+
+def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
+    """Persist a ModulesConfig to modules.yaml using a merge strategy.
+
+    Reads the existing YAML as a raw dict, patches only the ``sources``
+    and ``module_metadata`` keys (preserving comments for other sections
+    like quality_filters), then writes back.  If the file does not exist
+    yet, a full dump is written.
+    """
+    target = path or get_config_path()
+
+    raw: Dict[str, Any] = {}
+    if target.exists():
+        with open(target) as f:
+            raw = yaml.safe_load(f) or {}
+
+    sources_data = []
+    for src in config.sources:
+        entry: Dict[str, Any] = {"url": src.url}
+        if src.kind is not None:
+            entry["kind"] = src.kind
+        if src.name is not None:
+            entry["name"] = src.name
+        sources_data.append(entry)
+    raw["sources"] = sources_data
+
+    metadata_data: Dict[str, Any] = {}
+    for name, meta in config.module_metadata.items():
+        entry = {}
+        if meta.title is not None:
+            entry["title"] = meta.title
+        if meta.description is not None:
+            entry["description"] = meta.description
+        if meta.report_title is not None:
+            entry["report_title"] = meta.report_title
+        if meta.icon != _DEFAULT_ICON:
+            entry["icon"] = meta.icon
+        if meta.color != _DEFAULT_COLOR:
+            entry["color"] = meta.color
+        metadata_data[name] = entry
+    raw["module_metadata"] = metadata_data
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w") as f:
+        yaml.dump(raw, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
 # Loaded once at import time

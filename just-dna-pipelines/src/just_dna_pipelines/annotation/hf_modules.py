@@ -285,6 +285,35 @@ MODULE_INFOS: dict[str, ModuleInfo] = discover_hf_modules()
 DISCOVERED_MODULES: list[str] = sorted(list(MODULE_INFOS.keys()))
 
 
+def refresh_modules() -> dict[str, ModuleInfo]:
+    """Reload modules.yaml from disk, re-discover all modules, and update globals.
+
+    This allows runtime registration/unregistration of custom modules
+    without restarting the process.
+
+    Returns:
+        The refreshed MODULE_INFOS dict.
+    """
+    import just_dna_pipelines.module_config as mc
+    mc.MODULES_CONFIG = mc._load_config()
+    mc.DEFAULT_REPOS[:] = [
+        s.hf_repo_id for s in mc.MODULES_CONFIG.sources
+        if s.is_hf and s.hf_repo_id is not None
+    ]
+
+    fresh = discover_all_modules()
+    MODULE_INFOS.clear()
+    MODULE_INFOS.update(fresh)
+    DISCOVERED_MODULES[:] = sorted(MODULE_INFOS.keys())
+
+    log_message(
+        message_type="info",
+        action="refresh_modules",
+        modules=list(DISCOVERED_MODULES),
+    )
+    return MODULE_INFOS
+
+
 class ModuleTable(str, Enum):
     """Tables available in each annotator module."""
     ANNOTATIONS = "annotations"

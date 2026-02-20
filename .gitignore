@@ -211,6 +211,8 @@ __marimo__/
 data/interim/
 data/input/
 data/output/
+data/module_specs/
+data/module_specs/generated/
 
 # Reflex runtime artifacts (should only exist under webui/, but guard globally)
 .web/

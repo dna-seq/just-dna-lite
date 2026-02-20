@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import shutil
 import asyncio
+import tempfile
 import time
+import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Optional
@@ -14,6 +17,13 @@ from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecord
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
 from just_dna_pipelines.module_config import build_module_metadata_dict
+from just_dna_pipelines.module_registry import (
+    CUSTOM_MODULES_DIR,
+    register_custom_module,
+    unregister_custom_module,
+    list_custom_modules,
+    refresh_module_registry,
+)
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
@@ -181,7 +191,15 @@ class UploadState(LazyFrameGridMixin, rx.State):
     
     # Ensembl annotation toggle (DuckDB-based, optional)
     include_ensembl: bool = False
-    
+
+    # Custom module registry (upload-based)
+    custom_module_error: str = ""
+    custom_module_adding: bool = False
+    # Module preview — populated on file drop before clicking Add
+    pending_module_name: str = ""
+    pending_module_preview_error: str = ""
+    _pending_upload_dir: str = ""
+
     # Class variable to track active in-process runs (for SIGTERM cleanup)
     # Maps run_id -> partition_key for runs executing via execute_in_process
     _active_inproc_runs: Dict[str, str] = {}
@@ -205,24 +223,41 @@ class UploadState(LazyFrameGridMixin, rx.State):
     @rx.var
     def module_details(self) -> Dict[str, Dict[str, Any]]:
         """Return details (logo, repo, etc.) for each available module."""
-        return {name: info.model_dump() for name, info in MODULE_INFOS.items()}
+        return {
+            name: MODULE_INFOS[name].model_dump()
+            for name in self.available_modules
+            if name in MODULE_INFOS
+        }
 
     @rx.var
     def repo_info_list(self) -> List[Dict[str, Any]]:
-        """
-        Return info about each HF repository used as a module source.
-        
-        Groups modules by their repo_id and provides browsable HF URLs.
+        """Return info about each module source, grouped by origin.
+
+        For HuggingFace sources the URL points to the HF web page.
+        For local/file sources the URL is the filesystem path and
+        ``is_local`` is True so the UI can render a remove button.
+
+        Iterates ``self.available_modules`` (a state var) so Reflex
+        knows to recompute when modules are added/removed.
         """
         repos: Dict[str, Dict[str, Any]] = {}
-        for name, info in MODULE_INFOS.items():
+        for name in self.available_modules:
+            info = MODULE_INFOS.get(name)
+            if info is None:
+                continue
             repo_id = info.repo_id
+            is_local = info.source_url.startswith("/") or info.source_url.startswith("file://")
             if repo_id not in repos:
+                if is_local:
+                    url = info.source_url
+                else:
+                    url = f"https://huggingface.co/datasets/{repo_id}"
                 repos[repo_id] = {
                     "repo_id": repo_id,
-                    "url": f"https://huggingface.co/datasets/{repo_id}",
+                    "url": url,
                     "modules": [],
                     "module_count": 0,
+                    "is_local": is_local,
                 }
             repos[repo_id]["modules"].append(name)
             repos[repo_id]["module_count"] = len(repos[repo_id]["modules"])
@@ -610,6 +645,205 @@ class UploadState(LazyFrameGridMixin, rx.State):
         """Deselect all modules."""
         self.last_run_success = False
         self.selected_modules = []
+
+    # ============================================================
+    # Custom Module Registry
+    # ============================================================
+
+    async def preview_module_upload(self, files: list[rx.UploadFile]):
+        """Upload files on drop, validate module_spec.yaml, and show a preview.
+
+        Writes files to a temp dir so ``commit_module_upload`` can use them
+        without a second upload round-trip.  Accepts loose files or a single
+        .zip archive containing the spec files.
+        """
+        import zipfile as _zipfile
+
+        # Clean up any previous staged upload
+        if self._pending_upload_dir:
+            shutil.rmtree(self._pending_upload_dir, ignore_errors=True)
+            self._pending_upload_dir = ""
+
+        self.pending_module_name = ""
+        self.pending_module_preview_error = ""
+        self.custom_module_error = ""
+
+        if not files:
+            return
+
+        # Write all uploaded files to a temp dir first
+        tmp_path = Path(tempfile.mkdtemp(prefix="dna_module_prev_"))
+
+        for f in files:
+            if not f.filename:
+                continue
+            content = await f.read()
+            (tmp_path / f.filename).write_bytes(content)
+
+        # If a single zip was uploaded, extract it in place
+        zip_files = list(tmp_path.glob("*.zip"))
+        if zip_files:
+            for zf_path in zip_files:
+                try:
+                    with _zipfile.ZipFile(zf_path, "r") as zf:
+                        zf.extractall(tmp_path)
+                except _zipfile.BadZipFile:
+                    self.pending_module_preview_error = f"{zf_path.name} is not a valid zip file"
+                    shutil.rmtree(tmp_path, ignore_errors=True)
+                    return
+                zf_path.unlink()
+
+        # After extraction, files may be at root or inside a single subfolder
+        extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
+        if "module_spec.yaml" not in extracted_names:
+            # Check one level down (zip may contain a folder)
+            subdirs = [d for d in tmp_path.iterdir() if d.is_dir()]
+            for subdir in subdirs:
+                sub_names = {p.name for p in subdir.iterdir() if p.is_file()}
+                if "module_spec.yaml" in sub_names:
+                    # Promote files up to tmp_path
+                    for child in subdir.iterdir():
+                        if child.is_file():
+                            shutil.move(str(child), str(tmp_path / child.name))
+                    subdir.rmdir()
+                    extracted_names = {p.name for p in tmp_path.iterdir() if p.is_file()}
+                    break
+
+        if "module_spec.yaml" not in extracted_names:
+            self.pending_module_preview_error = "module_spec.yaml not found — required"
+            shutil.rmtree(tmp_path, ignore_errors=True)
+            return
+        if "variants.csv" not in extracted_names:
+            self.pending_module_preview_error = "variants.csv not found — required"
+            shutil.rmtree(tmp_path, ignore_errors=True)
+            return
+
+        self._pending_upload_dir = str(tmp_path)
+        yaml_bytes = (tmp_path / "module_spec.yaml").read_bytes()
+
+        # Parse YAML and extract module name from module.name
+        try:
+            spec = yaml.safe_load(yaml_bytes.decode("utf-8"))
+            if not spec or not isinstance(spec, dict):
+                self.pending_module_preview_error = "module_spec.yaml is empty or not a valid YAML mapping"
+                return
+            module_section = spec.get("module")
+            if not isinstance(module_section, dict):
+                self.pending_module_preview_error = "module_spec.yaml missing 'module:' section"
+                return
+            name = module_section.get("name")
+            if not name:
+                self.pending_module_preview_error = "module_spec.yaml missing 'module.name' field"
+                return
+            self.pending_module_name = str(name)
+            title = module_section.get("title")
+            if title:
+                self.pending_module_name = f"{name} — {title}"
+        except yaml.YAMLError as exc:
+            self.pending_module_preview_error = f"Invalid YAML: {exc}"
+
+    async def commit_module_upload(self):
+        """Compile and register the already-staged module files."""
+        if not self._pending_upload_dir:
+            yield rx.toast.warning("No staged files — re-select files")
+            return
+
+        self.custom_module_adding = True
+        self.custom_module_error = ""
+        yield
+
+        tmp_path = Path(self._pending_upload_dir)
+        result = register_custom_module(tmp_path)
+
+        shutil.rmtree(tmp_path, ignore_errors=True)
+        self._pending_upload_dir = ""
+        self.custom_module_adding = False
+
+        if not result.success:
+            self.custom_module_error = "; ".join(result.errors[:3])
+            yield rx.toast.error(f"Compilation failed: {result.errors[0]}")
+            return
+
+        module_name = result.stats.get("module_name", "module")
+        variant_count = result.stats.get("weights_rows", 0)
+        self.pending_module_name = ""
+        self.custom_module_error = ""
+        self._refresh_module_ui_state()
+        yield
+        yield rx.toast.success(
+            f"Module '{module_name}' registered → custom_modules/{module_name}/ ({variant_count} variants)"
+        )
+
+    async def handle_module_upload(self, files: list[rx.UploadFile]):
+        """Receive uploaded DSL spec files, validate, compile, register.
+
+        Expects at minimum ``module_spec.yaml`` and ``variants.csv``.
+        ``studies.csv`` is optional. Files are written to a temp directory,
+        compiled via ``register_custom_module``, then the temp dir is cleaned up.
+        """
+        if not files:
+            yield rx.toast.warning("No files selected")
+            return
+
+        filenames = {f.filename for f in files if f.filename}
+        if "module_spec.yaml" not in filenames:
+            self.custom_module_error = "Missing module_spec.yaml — select at least module_spec.yaml + variants.csv"
+            yield rx.toast.error("Missing module_spec.yaml")
+            return
+        if "variants.csv" not in filenames:
+            self.custom_module_error = "Missing variants.csv — select at least module_spec.yaml + variants.csv"
+            yield rx.toast.error("Missing variants.csv")
+            return
+
+        self.custom_module_adding = True
+        self.custom_module_error = ""
+        yield
+
+        with tempfile.TemporaryDirectory(prefix="dna_module_") as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for f in files:
+                if not f.filename:
+                    continue
+                content = await f.read()
+                (tmp_path / f.filename).write_bytes(content)
+
+            result = register_custom_module(tmp_path)
+
+        self.custom_module_adding = False
+        if not result.success:
+            self.custom_module_error = "; ".join(result.errors[:3])
+            yield rx.toast.error(f"Compilation failed: {result.errors[0]}")
+            return
+
+        self._refresh_module_ui_state()
+        yield
+
+        module_name = result.stats.get("module_name", "module")
+        variant_count = result.stats.get("weights_rows", 0)
+        self.custom_module_error = ""
+        yield rx.toast.success(
+            f"Module '{module_name}' registered → custom_modules/{module_name}/ ({variant_count} variants)"
+        )
+
+    def remove_custom_module(self, module_name: str):
+        """Remove a custom module, update modules.yaml, refresh UI."""
+        removed = unregister_custom_module(module_name)
+        if not removed:
+            yield rx.toast.error(f"Module '{module_name}' not found in custom modules")
+            return
+
+        self._refresh_module_ui_state()
+        yield
+        yield rx.toast.info(f"Module '{module_name}' removed")
+
+    def _refresh_module_ui_state(self):
+        """Re-read MODULE_INFOS globals and update UI state vars."""
+        MODULE_METADATA.clear()
+        MODULE_METADATA.update(build_module_metadata_dict(list(MODULE_INFOS.keys())))
+        self.available_modules = sorted(list(MODULE_INFOS.keys()))
+        self.selected_modules = [
+            m for m in self.selected_modules if m in self.available_modules
+        ]
 
     def toggle_ensembl(self):
         """Toggle Ensembl variation annotation on/off."""
@@ -1400,8 +1634,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
     @rx.var
     def backend_api_url(self) -> str:
-        """Get the backend API URL for downloads."""
-        return os.getenv("API_URL", "http://localhost:8000")
+        """Get the backend API URL for downloads (uses auto-resolved backend port)."""
+        return rx.config.get_config().api_url
 
     @rx.var
     def current_subject_id(self) -> str:
@@ -1831,6 +2065,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
     @rx.var
     def module_metadata_list(self) -> List[Dict[str, Any]]:
         """Return module metadata for UI display."""
+        custom_names = set(list_custom_modules())
         result = []
         for module_name in self.available_modules:
             meta = MODULE_METADATA.get(module_name, {
@@ -1840,11 +2075,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 "color": "neutral",
             })
             info = MODULE_INFOS.get(module_name)
-            # Convert hf:// logo URL to browsable HTTPS URL for display
             browsable_logo_url = ""
             if info and info.logo_url:
-                # hf://datasets/just-dna-seq/annotators/data/module/logo.png
-                # -> https://huggingface.co/datasets/just-dna-seq/annotators/resolve/main/data/module/logo.png
                 hf_path = info.logo_url.replace("hf://", "")
                 browsable_logo_url = f"https://huggingface.co/{hf_path.replace(info.repo_id, info.repo_id + '/resolve/main', 1)}"
             result.append({
@@ -1856,6 +2088,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 "logo_url": browsable_logo_url,
                 "repo_id": info.repo_id if info else "",
                 "selected": module_name in self.selected_modules,
+                "is_custom": module_name in custom_names,
             })
         return result
 
@@ -2557,3 +2790,179 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
         self.lf_grid_rows = []
         self.lf_grid_columns = []
         self.lf_grid_row_count = 0
+
+
+# ============================================================================
+# AGENT STATE — Module Creator AI agent
+# ============================================================================
+
+_AGENT_UPLOADS_DIR = Path("data/agent_uploads")
+
+
+class AgentState(rx.State):
+    """State for the Paper-to-Module AI agent chat panel."""
+
+    agent_messages: List[Dict[str, str]] = []
+    agent_processing: bool = False
+    agent_input: str = ""
+    agent_uploaded_file: str = ""
+    _agent_uploaded_path: str = ""
+    _agent_spec_dir: str = ""
+
+    def set_agent_input(self, value: str) -> None:
+        """Explicit setter for agent_input (avoids deprecation warning)."""
+        self.agent_input = value
+
+    @rx.var
+    def has_agent_spec(self) -> bool:
+        """True when the agent has produced a valid spec directory."""
+        if not self._agent_spec_dir:
+            return False
+        return (Path(self._agent_spec_dir) / "module_spec.yaml").exists()
+
+    @rx.var
+    def agent_spec_name(self) -> str:
+        """Module name from the last agent spec directory."""
+        if not self._agent_spec_dir:
+            return ""
+        return Path(self._agent_spec_dir).name
+
+    @rx.var
+    def agent_spec_files(self) -> List[str]:
+        """List of filenames in the current spec directory."""
+        if not self._agent_spec_dir:
+            return []
+        spec_dir = Path(self._agent_spec_dir)
+        if not spec_dir.exists():
+            return []
+        return sorted(f.name for f in spec_dir.iterdir() if f.is_file())
+
+    @rx.var
+    def agent_spec_zip_url(self) -> str:
+        """URL to download all spec files as a zip (uses auto-resolved backend port)."""
+        if not self._agent_spec_dir:
+            return ""
+        api_url = rx.config.get_config().api_url
+        return f"{api_url}/api/agent-spec-zip/{Path(self._agent_spec_dir).name}"
+
+    async def upload_agent_file(self, files: list[rx.UploadFile]) -> None:
+        """Save an uploaded PDF/CSV for the agent to use as context."""
+        if not files:
+            return
+        upload_file = files[0]
+        _AGENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+        filename = upload_file.filename or "upload"
+        dest = _AGENT_UPLOADS_DIR / filename
+        data = await upload_file.read()
+        dest.write_bytes(data)
+        self.agent_uploaded_file = filename
+        self._agent_uploaded_path = str(dest)
+
+    @rx.event(background=True)
+    async def send_agent_message(self) -> None:
+        """Send a message to the agent (runs in background, UI stays responsive)."""
+        question = self.agent_input.strip()
+        if not question:
+            return
+
+        async with self:
+            message = question
+            file_path = self._agent_uploaded_path
+            self.agent_messages = [
+                *self.agent_messages,
+                {"role": "user", "content": message},
+            ]
+            self.agent_input = ""
+            self.agent_processing = True
+
+        import tempfile
+        spec_output = Path(tempfile.mkdtemp(prefix="module_spec_"))
+
+        msg_to_send = message
+        if file_path:
+            suffix = Path(file_path).suffix.lower()
+            if suffix in (".md", ".txt", ".csv"):
+                file_content = Path(file_path).read_text(encoding="utf-8")
+                msg_to_send = (
+                    f"Here is the input document ({Path(file_path).name}):\n\n"
+                    f"{file_content}\n\n{message}"
+                )
+                file_path = ""
+
+        msg_to_send += (
+            f"\n\nWrite the spec files to: {spec_output}/<module_name>/ "
+            f"using the write_spec_files tool. "
+            f"Then call validate_spec on the resulting directory."
+        )
+
+        from just_dna_pipelines.agents.module_creator import run_agent_sync
+
+        response = await asyncio.to_thread(
+            run_agent_sync,
+            msg_to_send,
+            Path(file_path) if file_path else None,
+            None,
+            spec_output,
+        )
+
+        found_spec_dir = ""
+        if spec_output.exists():
+            for d in spec_output.iterdir():
+                if d.is_dir() and (d / "module_spec.yaml").exists():
+                    found_spec_dir = str(d)
+                    break
+
+        # Auto-save to persistent location so specs survive Reflex reloads
+        if found_spec_dir:
+            root = Path(__file__).resolve().parents[3]
+            module_name = Path(found_spec_dir).name
+            persist_dir = root / "data" / "module_specs" / "generated" / module_name
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            for f in Path(found_spec_dir).iterdir():
+                if f.is_file():
+                    shutil.copy2(f, persist_dir / f.name)
+            found_spec_dir = str(persist_dir)
+
+        async with self:
+            self.agent_messages = [
+                *self.agent_messages,
+                {"role": "agent", "content": response or "Agent returned no response."},
+            ]
+            self.agent_processing = False
+            if found_spec_dir:
+                self._agent_spec_dir = found_spec_dir
+
+    async def register_agent_result(self) -> None:
+        """Register the agent's last spec as a custom module and refresh the UI list."""
+        if not self._agent_spec_dir:
+            return
+        result = register_custom_module(Path(self._agent_spec_dir))
+        if result.success:
+            stats = result.stats or {}
+            name = stats.get("module_name", "unknown")
+            self.agent_messages = [
+                *self.agent_messages,
+                {"role": "agent", "content": f"Module **{name}** registered successfully! It is now available for annotation."},
+            ]
+            # Refresh the module list in UploadState so the left panel updates
+            upload_state = await self.get_state(UploadState)
+            upload_state._refresh_module_ui_state()
+        else:
+            self.agent_messages = [
+                *self.agent_messages,
+                {"role": "agent", "content": f"Registration failed: {result.errors}"},
+            ]
+
+    def clear_agent_file(self) -> None:
+        """Remove the attached file without clearing the chat."""
+        self.agent_uploaded_file = ""
+        self._agent_uploaded_path = ""
+
+    def clear_agent_chat(self) -> None:
+        """Reset the agent chat to initial state."""
+        self.agent_messages = []
+        self.agent_processing = False
+        self.agent_input = ""
+        self.agent_uploaded_file = ""
+        self._agent_uploaded_path = ""
+        self._agent_spec_dir = ""

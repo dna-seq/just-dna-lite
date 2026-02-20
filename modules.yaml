@@ -1,117 +1,90 @@
-# Module Sources Configuration
-#
-# Modules are AUTO-DISCOVERED by scanning each source for weights.parquet files.
-# This file controls:
-#   1. Which sources to scan (any fsspec-compatible URL)
-#   2. Optional display metadata overrides for known modules
-#
-# Source types are auto-detected from the URL:
-#   - "org/repo"                     -> HuggingFace dataset (shorthand)
-#   - "hf://datasets/org/repo"       -> HuggingFace dataset (explicit)
-#   - "github://org/repo"            -> GitHub repository
-#   - "https://example.com/data"     -> HTTP/HTTPS
-#   - "s3://bucket/path"             -> Amazon S3
-#   - "gcs://bucket/path"            -> Google Cloud Storage
-#   - Any other fsspec-supported protocol
-#
-# Each source can be a single module or a collection of modules:
-#   - collection (default): scans subfolders for modules (each with weights.parquet)
-#   - module: the source itself IS a single module (weights.parquet at data root)
-#   Auto-detect: if weights.parquet at root -> module; if subfolders -> collection
-#   Override with "kind: module" or "kind: collection" in the source entry.
-#
-# Modules found in sources but NOT listed under module_metadata get auto-defaults:
-#   title:        folder name titlecased
-#   description:  "Annotation module: <name>"
-#   report_title: same as title
-#   icon:         database
-#   color:        #6435c9
-
-# VCF Quality Filters
-#
-# Applied during normalization (user_vcf_normalized asset) before annotation.
-# All downstream assets (HF module annotations, reports) receive filtered data.
-# Re-materialize the quality_filters_config asset to pick up changes.
-#
-# gVCF support: gVCF files contain reference blocks (FILTER=RefCall, GT=0/0)
-# for every sequenced position. These are correctly dropped by pass_filters
-# since RefCall != PASS. This is intentional — reference blocks carry no
-# alternate alleles and would never match annotation module weights.
-#
-# Set any field to null or 0 to disable that filter.
 quality_filters:
-  # Only keep variants where FILTER column matches one of these values.
-  # Common values:
-  #   "PASS"    — standard passing filter
-  #   "."       — missing filter (treated as pass by some callers)
-  # Excluded by default (correctly filtered out):
-  #   "RefCall" — gVCF reference blocks (homozygous ref, no alt allele)
-  #   "LowQual" / "LowDepth" / "PloidyConflict" — low-confidence calls
-  # Set to null or empty list to disable FILTER-based filtering.
   pass_filters:
-    - "PASS"
-    - "."
-
-  # Minimum read depth (DP/Dp field). Variants below this are dropped.
-  # Set to null or 0 to disable.
+  - PASS
+  - .
   min_depth: 10
-
-  # Minimum variant quality score (QUAL/qual field). Variants below this are dropped.
-  # Set to null or 0 to disable.
   min_qual: 20
-
-# Sources to scan for annotation modules.
-# Simple string = URL with auto-detect. Object = URL + overrides.
+ensembl_source:
+  repo_id: just-dna-seq/ensembl_variations
 sources:
-  - url: just-dna-seq/annotators
-  # Examples of other source types:
-  # - url: github://dna-seq/my-annotations
-  # - url: https://example.com/annotations/data
-  # - url: another-org/single-module
-  #   kind: module
-  #   name: custom_name
-
-# Optional per-module display metadata overrides.
-# Keys must match the folder name (or source name for single-module sources).
+- url: just-dna-seq/annotators
+  kind: collection
+- url: /data/sources/just-dna-lite/data/output/modules
+  kind: collection
 module_metadata:
   longevitymap:
     title: Longevity Map
     description: Longevity-associated genetic variants from LongevityMap database
     report_title: Longevity Variants
     icon: heart-pulse
-    color: "#21ba45"
-
+    color: '#21ba45'
   lipidmetabolism:
     title: Lipid Metabolism
     description: Lipid metabolism and cardiovascular risk variants
     report_title: Lipid Metabolism
     icon: droplets
-    color: "#fbbd08"
-
+    color: '#fbbd08'
   vo2max:
     title: VO2 Max
     description: Athletic performance and oxygen uptake capacity variants
-    report_title: "VO2max / Athletic Performance"
+    report_title: VO2max / Athletic Performance
     icon: activity
-    color: "#2185d0"
-
+    color: '#2185d0'
   superhuman:
     title: Superhuman
     description: Elite performance and rare beneficial variants
-    report_title: "Superhuman / Elite Performance"
+    report_title: Superhuman / Elite Performance
     icon: zap
-    color: "#00b5ad"
-
+    color: '#00b5ad'
   coronary:
     title: Coronary
     description: Coronary artery disease risk associations
     report_title: Coronary Artery Disease
     icon: heart
-    color: "#db2828"
-
+    color: '#db2828'
   drugs:
     title: Pharmacogenomics
-    description: "Drug response and metabolism (PharmGKB)"
+    description: Drug response and metabolism (PharmGKB)
     report_title: Pharmacogenomics
     icon: pill
-    color: "#a333c8"
+    color: '#a333c8'
+  mthfr_nad:
+    title: Methylation & NAD+
+    description: MTHFR methylation cycle and NAD+ biosynthesis variants affecting
+      aging and metabolism
+    report_title: Methylation & NAD+ Metabolism
+    icon: dna
+  cyp_panel:
+    title: CYP Drug Metabolism
+    description: Cytochrome P450 pharmacogenomic variants affecting drug metabolism
+    report_title: Pharmacogenomics — CYP Panel
+    icon: pill
+    color: '#a333c8'
+  lipid_metabolism:
+    title: Lipid Metabolism
+    description: Genetic markers affecting lipid metabolism (LDL, HDL, Triglycerides)
+      and cardiovascular risk.
+    report_title: Lipid Metabolism & Cardiovascular Risk
+    icon: droplets
+    color: '#fbbd08'
+  diabetes_metabolism:
+    title: Diabetes & Metabolism
+    description: Genetic insights into Type 2 Diabetes risk, insulin secretion, and
+      metabolism based on key validated markers.
+    report_title: Metabolic Health Profile
+    icon: droplets
+    color: '#fbbd08'
+  sport_muscles_recovery:
+    title: Sport, Muscles & Recovery
+    description: Genetic markers for muscle fiber type, aerobic capacity, and injury
+      risk recovery.
+    report_title: Sport, Muscles & Recovery
+    icon: activity
+    color: '#2185d0'
+  sports_recovery:
+    title: Sports, Muscles & Recovery
+    description: Genetic insights into muscle fiber type, tendon health, and injury
+      recovery.
+    report_title: Athletic Potential & Injury Risk
+    icon: activity
+    color: '#2185d0'

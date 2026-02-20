@@ -77,6 +77,9 @@ sources:
   #   kind: module
   #   name: custom_name
 
+  # - url: /data/sources/just-dna-lite/data/output/modules
+  #   kind: collection
+
 # Optional per-module display metadata overrides.
 # Keys must match the folder name (or source name for single-module sources).
 module_metadata:
@@ -121,3 +124,17 @@ module_metadata:
     report_title: Pharmacogenomics
     icon: pill
     color: "#a333c8"
+
+  # cyp_panel:
+  #   title: "CYP Drug Metabolism"
+  #   description: "Cytochrome P450 pharmacogenomic variants affecting drug metabolism"
+  #   report_title: "Pharmacogenomics — CYP Panel"
+  #   icon: pill
+  #   color: "#a333c8"
+
+  # mthfr_nad:
+  #   title: "Methylation & NAD+"
+  #   description: "MTHFR methylation cycle and NAD+ biosynthesis variants"
+  #   report_title: "Methylation & NAD+ Metabolism"
+  #   icon: dna
+  #   color: "#6435c9"

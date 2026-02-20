@@ -4,14 +4,18 @@ import sys
 from pathlib import Path
 
 import reflex as rx
+import io
+import zipfile
+
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from just_dna_pipelines.runtime import load_env
 
 from webui.pages.dashboard import dashboard_page
 from webui.pages.index import index_page
 from webui.pages.analysis import analysis_page
 from webui.pages.annotate import annotate_page
+from webui.pages.modules import modules_page
 
 # Load environment variables from .env file (searching up to root)
 load_env()
@@ -131,6 +135,55 @@ async def download_output_file(user_id: str, sample_name: str, filename: str) ->
     )
 
 
+@api.get("/api/agent-spec/{spec_name}/{filename}")
+async def download_agent_spec_file(spec_name: str, filename: str) -> FileResponse:
+    """Serve generated spec files (module_spec.yaml, variants.csv, studies.csv)."""
+    if ".." in spec_name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid path components")
+
+    allowed_extensions = {".yaml", ".yml", ".csv"}
+    if not any(filename.endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=400, detail="Only YAML and CSV files can be downloaded")
+
+    import tempfile
+    temp_root = Path(tempfile.gettempdir())
+    for candidate in temp_root.iterdir():
+        if candidate.name.startswith("module_spec_") and candidate.is_dir():
+            target = candidate / spec_name / filename
+            if target.exists() and target.is_file():
+                return FileResponse(
+                    path=str(target),
+                    filename=filename,
+                    media_type="application/octet-stream",
+                )
+
+    raise HTTPException(status_code=404, detail=f"Spec file not found: {spec_name}/{filename}")
+
+
+@api.get("/api/agent-spec-zip/{spec_name}")
+async def download_agent_spec_zip(spec_name: str) -> StreamingResponse:
+    """Download all generated spec files as a single zip archive."""
+    if ".." in spec_name or "/" in spec_name:
+        raise HTTPException(status_code=400, detail="Invalid spec name")
+
+    spec_dir = WORKSPACE_ROOT / "data" / "module_specs" / "generated" / spec_name
+    if not spec_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(spec_dir.iterdir()):
+            if f.is_file():
+                zf.write(f, f.name)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{spec_name}.zip"'},
+    )
+
+
 @api.get("/api/report/{user_id}/{sample_name}/{filename}")
 async def view_report_file(user_id: str, sample_name: str, filename: str) -> FileResponse:
     """
@@ -179,3 +232,4 @@ app.add_page(dashboard_page)
 app.add_page(index_page)
 app.add_page(analysis_page)
 app.add_page(annotate_page)
+app.add_page(modules_page)

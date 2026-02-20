@@ -55,7 +55,7 @@ def fomantic_icon(name: str, size: int | str | None = None, color: str | None = 
     
     fomantic_name = mapping.get(name, name)
     
-    icon_style = style or {}
+    icon_style = {"margin": "0", **(style or {})}
     if size is not None:
         # If size is numeric, assume pixels
         if isinstance(size, (int, float)) or (isinstance(size, str) and size.isdigit()):
@@ -120,9 +120,43 @@ def github_corner() -> rx.Component:
     )
 
 
+def _nav_tab(label: str, icon_name: str, href: str, is_active: rx.Var) -> rx.Component:
+    """Navigation tab for the topbar with reactive active state."""
+    base_style = {
+        "display": "flex",
+        "alignItems": "center",
+        "padding": "6px 16px",
+        "borderRadius": "4px",
+        "fontSize": "0.95rem",
+        "textDecoration": "none",
+        "transition": "all 0.15s ease",
+        "cursor": "pointer",
+    }
+    return rx.el.a(
+        fomantic_icon(icon_name, size=16),
+        rx.el.span(label, style={"marginLeft": "6px"}),
+        href=href,
+        style=base_style,
+        class_name=rx.cond(
+            is_active,
+            "nav-tab nav-tab-active",
+            "nav-tab",
+        ),
+    )
+
+
 def topbar() -> rx.Component:
-    """Top navigation bar using flexbox for reliable horizontal layout."""
+    """Top navigation bar with page tabs."""
+    current_path = rx.State.router.page.path
+    nav_tab_css = rx.el.style(
+        """
+        .nav-tab { color: #555; font-weight: 500; }
+        .nav-tab:hover { background-color: #f0f0f0; color: #333; }
+        .nav-tab-active { background-color: #e8f5e9 !important; color: #00897b !important; font-weight: 600 !important; }
+        """
+    )
     return rx.el.div(
+        nav_tab_css,
         # Left: Logo
         rx.el.div(
             rx.el.a(
@@ -139,25 +173,15 @@ def topbar() -> rx.Component:
             ),
             style={"display": "flex", "alignItems": "center", "flex": "0 0 auto"},
         ),
-        # Center: Page title and subtitle
+        # Center: Navigation tabs
         rx.el.div(
-            fomantic_icon("dna", size=28, color="#00b5ad"),
-            rx.el.div(
-                rx.el.span(
-                    "Genomic Annotation",
-                    style={"fontSize": "1.25rem", "fontWeight": "600", "color": "#333"},
-                ),
-                rx.el.span(
-                    " — Analyze your VCF files with specialized annotation modules",
-                    style={"fontSize": "0.95rem", "color": "#666", "marginLeft": "8px"},
-                ),
-                style={"display": "flex", "alignItems": "baseline", "marginLeft": "10px"},
-            ),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "center", "flex": "1 1 auto"},
+            _nav_tab("Annotation", "dna", "/", current_path != "/modules"),
+            _nav_tab("Module Manager", "boxes", "/modules", current_path == "/modules"),
+            style={"display": "flex", "alignItems": "center", "gap": "8px", "flex": "1 1 auto", "justifyContent": "center"},
         ),
-        # Right: Spacer for GitHub corner (the corner is positioned fixed separately)
+        # Right: Spacer for GitHub corner
         rx.el.div(
-            style={"width": "80px", "flex": "0 0 80px"},  # Reserve space for the corner
+            style={"width": "80px", "flex": "0 0 80px"},
         ),
         style={
             "position": "fixed",

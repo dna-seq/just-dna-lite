@@ -1664,53 +1664,6 @@ def run_timeline() -> rx.Component:
     )
 
 
-def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
-    """
-    Compact card showing a HuggingFace repository used as a module source.
-    Displays repo name, link, and module count.
-    """
-    return rx.el.div(
-        rx.el.div(
-            # HF icon (using database as closest match)
-            fomantic_icon("database", size=18, color="#2185d0"),
-            # Repo name (linked to HF)
-            rx.el.a(
-                repo["repo_id"].to(str),
-                href=repo["url"].to(str),
-                target="_blank",
-                style={
-                    "fontSize": "0.9rem",
-                    "fontWeight": "600",
-                    "marginLeft": "8px",
-                    "color": "#2185d0",
-                    "textDecoration": "none",
-                },
-            ),
-            # External link icon
-            fomantic_icon("external-link", size=12, color="#888", style={"marginLeft": "4px"}),
-            # Module count badge
-            rx.el.span(
-                repo["module_count"].to(int),
-                " modules",
-                class_name="ui mini label",
-                style={"marginLeft": "auto"},
-            ),
-            style={
-                "display": "flex",
-                "alignItems": "center",
-                "width": "100%",
-            },
-        ),
-        style={
-            "padding": "8px 12px",
-            "border": "1px solid #e0e0e0",
-            "borderRadius": "4px",
-            "backgroundColor": "#f8f9fa",
-            "marginBottom": "6px",
-        },
-    )
-
-
 def new_analysis_section() -> rx.Component:
     """
     Collapsible section for starting a new analysis.
@@ -1741,18 +1694,15 @@ def new_analysis_section() -> rx.Component:
         rx.cond(
             UploadState.new_analysis_expanded,
             rx.el.div(
-                # === HF REPOSITORY SOURCES ===
+                # Link to Module Manager for source management
                 rx.el.div(
-                    rx.el.div(
-                        fomantic_icon("boxes", size=16, color="#767676"),
-                        rx.el.span(
-                            " Module Sources",
-                            style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
-                        ),
-                        style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+                    fomantic_icon("boxes", size=14, color="#a333c8"),
+                    rx.el.a(
+                        " Manage module sources",
+                        href="/modules",
+                        style={"fontSize": "0.85rem", "color": "#a333c8", "marginLeft": "4px"},
                     ),
-                    rx.foreach(UploadState.repo_info_list, repo_source_card),
-                    style={"marginBottom": "16px"},
+                    style={"display": "flex", "alignItems": "center", "marginBottom": "14px"},
                 ),
                 
                 # Selection controls
@@ -1975,6 +1925,12 @@ def no_file_selected_message() -> rx.Component:
                     "3", "#2185d0", "play",
                     "Run and get results",
                     "Start the pipeline. Outputs and history will appear in this panel.",
+                ),
+                rx.el.div(class_name="ui divider", style={"margin": "16px 0"}),
+                workflow_step(
+                    "~", "#a333c8", "boxes",
+                    "Create custom modules",
+                    "Use the Module Manager tab to upload DSL specs or let the AI agent build one from a research paper.",
                 ),
                 style={"flex": "1", "paddingLeft": "40px"}
             ),

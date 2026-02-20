@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from just_dna_pipelines.module_compiler.cli import app as module_app
+from just_dna_pipelines.agents.cli import app as agent_app
 
 app = typer.Typer(
     name="pipelines",
@@ -19,6 +20,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(module_app, name="module")
+app.add_typer(agent_app, name="agent")
 
 console = Console()
 

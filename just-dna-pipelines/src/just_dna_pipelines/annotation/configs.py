@@ -9,7 +9,7 @@ from dagster import Config
 
 from just_dna_pipelines.models import SampleInfo
 from just_dna_pipelines.module_config import DEFAULT_REPOS, MODULES_CONFIG
-from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, validate_modules
+from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, validate_modules
 
 
 def get_default_duckdb_memory_limit() -> str:
@@ -158,26 +158,14 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     def get_modules(self) -> list[str]:
         """
         Get list of modules to annotate with.
-        
-        Discovers modules from the configured repos and returns the
-        selected subset (or all if none specified).
+
+        Uses the globally discovered modules (all sources from modules.yaml,
+        including local file sources) and returns the selected subset
+        (or all if none specified).
         """
-        from just_dna_pipelines.annotation.hf_modules import discover_hf_modules
-        
-        # Discover modules from the configured repos
-        module_infos = discover_hf_modules(self.repos)
-        discovered_names = sorted(list(module_infos.keys()))
-        
         if self.modules is None:
-            return discovered_names
-            
-        # Validate selected modules
-        valid = []
-        requested = [m.lower() for m in self.modules]
-        for name in discovered_names:
-            if name.lower() in requested:
-                valid.append(name)
-        return valid
+            return DISCOVERED_MODULES.copy()
+        return validate_modules(self.modules)
     
     def resolve_vcf_path(self, logger=None) -> str:
         """
