@@ -48,46 +48,6 @@ module_metadata:
     report_title: Pharmacogenomics
     icon: pill
     color: '#a333c8'
-  mthfr_nad:
-    title: Methylation & NAD+
-    description: MTHFR methylation cycle and NAD+ biosynthesis variants affecting
-      aging and metabolism
-    report_title: Methylation & NAD+ Metabolism
-    icon: dna
-  cyp_panel:
-    title: CYP Drug Metabolism
-    description: Cytochrome P450 pharmacogenomic variants affecting drug metabolism
-    report_title: Pharmacogenomics — CYP Panel
-    icon: pill
-    color: '#a333c8'
-  lipid_metabolism:
-    title: Lipid Metabolism
-    description: Genetic markers affecting lipid metabolism (LDL, HDL, Triglycerides)
-      and cardiovascular risk.
-    report_title: Lipid Metabolism & Cardiovascular Risk
-    icon: droplets
-    color: '#fbbd08'
-  sport_muscles_recovery:
-    title: Sport, Muscles & Recovery
-    description: Genetic markers for muscle fiber type, aerobic capacity, and injury
-      risk recovery.
-    report_title: Sport, Muscles & Recovery
-    icon: activity
-    color: '#2185d0'
-  sports_recovery:
-    title: Sports, Muscles & Recovery
-    description: Genetic insights into muscle fiber type, tendon health, and injury
-      recovery.
-    report_title: Athletic Potential & Injury Risk
-    icon: activity
-    color: '#2185d0'
-  diabetes_metabolism:
-    title: Diabetes & Metabolism
-    description: Genetic insights into Type 2 Diabetes risk, insulin secretion, and
-      metabolism based on key validated markers.
-    report_title: Metabolic Health Profile
-    icon: droplets
-    color: '#fbbd08'
   longevity_2025:
     title: Longevity 2025
     description: Rare protein-altering variants from Leiden Longevity Study, SIRT6

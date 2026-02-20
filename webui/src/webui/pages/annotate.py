@@ -70,8 +70,9 @@ def add_sample_form() -> rx.Component:
             # Row 1: Subject ID + Sex
             rx.el.div(
                 rx.el.input(
-                    value=UploadState.new_sample_subject_id,
-                    on_change=UploadState.set_new_sample_subject_id,
+                    key=UploadState._form_key,
+                    default_value=UploadState.new_sample_subject_id,
+                    on_change=UploadState.set_new_sample_subject_id.debounce(300),
                     placeholder="Subject ID",
                     style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
                 ),
@@ -108,8 +109,9 @@ def add_sample_form() -> rx.Component:
                     style={"flex": "1", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
                 ),
                 rx.el.input(
-                    value=UploadState.new_sample_study_name,
-                    on_change=UploadState.set_new_sample_study_name,
+                    key=UploadState._form_key,
+                    default_value=UploadState.new_sample_study_name,
+                    on_change=UploadState.set_new_sample_study_name.debounce(300),
                     placeholder="Study name",
                     style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
                 ),
@@ -200,8 +202,9 @@ def file_metadata_section() -> rx.Component:
                         required_field("Subject ID"),
                         rx.el.input(
                             type="text",
-                            value=UploadState.current_subject_id,
-                            on_change=UploadState.update_file_subject_id,
+                            key=UploadState.selected_file,
+                            default_value=UploadState.current_subject_id,
+                            on_change=UploadState.update_file_subject_id.debounce(300),
                             placeholder="e.g. Patient-001",
                         ),
                         class_name="required field",
@@ -276,8 +279,9 @@ def file_metadata_section() -> rx.Component:
                     optional_field("Study / Project"),
                     rx.el.input(
                         type="text",
-                        value=UploadState.current_study_name,
-                        on_change=UploadState.update_file_study_name,
+                        key=UploadState.selected_file + "_study",
+                        default_value=UploadState.current_study_name,
+                        on_change=UploadState.update_file_study_name.debounce(300),
                         placeholder="e.g. Longevity Study 2026",
                     ),
                     class_name="field",
@@ -287,8 +291,9 @@ def file_metadata_section() -> rx.Component:
                 rx.el.div(
                     optional_field("Notes"),
                     rx.el.textarea(
-                        value=UploadState.current_notes,
-                        on_change=UploadState.update_file_notes,
+                        key=UploadState.selected_file + "_notes",
+                        default_value=UploadState.current_notes,
+                        on_change=UploadState.update_file_notes.debounce(300),
                         placeholder="Additional notes about this sample...",
                         rows=2,
                     ),
@@ -331,8 +336,8 @@ def file_metadata_section() -> rx.Component:
                     rx.el.div(
                         rx.el.input(
                             type="text",
-                            value=UploadState.new_custom_field_name,
-                            on_change=UploadState.set_new_field_name,
+                            default_value=UploadState.new_custom_field_name,
+                            on_change=UploadState.set_new_field_name.debounce(300),
                             placeholder="Field name",
                         ),
                         class_name="field",
@@ -341,8 +346,8 @@ def file_metadata_section() -> rx.Component:
                     rx.el.div(
                         rx.el.input(
                             type="text",
-                            value=UploadState.new_custom_field_value,
-                            on_change=UploadState.set_new_field_value,
+                            default_value=UploadState.new_custom_field_value,
+                            on_change=UploadState.set_new_field_value.debounce(300),
                             placeholder="Value",
                         ),
                         class_name="field",

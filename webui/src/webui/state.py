@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Optional
 
+import httpx
 import reflex as rx
 from reflex.event import EventSpec
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecord
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
 from just_dna_pipelines.module_config import build_module_metadata_dict
+from just_dna_pipelines.annotation.resources import get_user_output_dir
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
     register_custom_module,
@@ -209,6 +211,11 @@ class UploadState(LazyFrameGridMixin, rx.State):
     new_sample_study_name: str = ""
     new_sample_notes: str = ""
 
+    # Key counter to force React re-mount of uncontrolled inputs on form reset.
+    # Uncontrolled inputs (default_value) don't update when state resets;
+    # changing the key forces React to destroy and recreate the DOM element.
+    _form_key: int = 0
+
     @rx.var
     def dagster_web_url(self) -> str:
         """Get the Dagster web UI URL."""
@@ -309,6 +316,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.new_sample_reference_genome = "GRCh38"
         self.new_sample_study_name = ""
         self.new_sample_notes = ""
+        self._form_key = self._form_key + 1
 
     def _get_safe_user_id(self, auth_email: str) -> str:
         """Sanitize user_id for path and partition key."""
@@ -391,10 +399,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
         self.uploading = False
         if new_files:
-            self.selected_file = new_files[-1]
-            self.vcf_preview_expanded = True
-            self._load_vcf_preview_sync()
-            self._load_output_files_sync()
+            for ev in self.select_file(new_files[-1]):
+                yield ev
             yield rx.toast.success(f"Uploaded and registered {len(new_files)} files.")
         else:
             yield rx.toast.warning("No files were uploaded")
@@ -516,10 +522,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
         
         if new_files:
             self._reset_new_sample_form()
-            self.selected_file = new_files[-1]
-            self.vcf_preview_expanded = True
-            self._load_vcf_preview_sync()
-            self._load_output_files_sync()
+            for ev in self.select_file(new_files[-1]):
+                yield ev
             yield rx.toast.success(f"Added {len(new_files)} sample(s) with metadata")
         else:
             yield rx.toast.warning("No files were uploaded")
@@ -1049,16 +1053,26 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self._load_norm_stats_from_dagster()
         return True
 
-    def _get_normalized_parquet_path(self) -> Path | None:
-        """Return the normalized parquet path if it exists, else None."""
+    def _get_expected_normalized_parquet_path(self) -> Optional[Path]:
+        """Return the canonical normalized parquet path regardless of whether it exists yet."""
         if not self.selected_file or not self.safe_user_id:
             return None
         sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
-        root = Path(__file__).resolve().parents[3]
-        parquet_path = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "user_vcf_normalized.parquet"
-        if parquet_path.exists():
-            return parquet_path
+        return get_user_output_dir() / self.safe_user_id / sample_name / "user_vcf_normalized.parquet"
+
+    def _get_normalized_parquet_path(self) -> Optional[Path]:
+        """Return the normalized parquet path only if it already exists on disk."""
+        path = self._get_expected_normalized_parquet_path()
+        if path is not None and path.exists():
+            return path
         return None
+
+    def _yield_prs_init_events(self) -> List[EventSpec]:
+        """Build the cross-state events that initialize PRSState for the selected file."""
+        expected_parquet = self._get_expected_normalized_parquet_path()
+        parquet_str = str(expected_parquet) if expected_parquet else ""
+        ref_genome = self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
+        return [PRSState.initialize_prs_for_file(parquet_str, ref_genome)]
 
     def _load_vcf_preview_sync(self):
         """Load normalized parquet for preview; fall back to raw VCF.
@@ -1103,7 +1117,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             descriptions = extract_vcf_descriptions(lazy_vcf)
             for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
                 pass
-            self.preview_source_label = f"{vcf_path.name} (normalized)"
+            self.preview_source_label = f"{vcf_path.name} (raw VCF fallback)"
         except Exception as e:
             self._clear_vcf_preview()
             self.vcf_preview_error = str(e)
@@ -1559,15 +1573,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         # Load output files for the selected sample
         self._load_output_files_sync()
 
-        # Initialize PRS state with normalized parquet + genome build
-        normalized = self._get_normalized_parquet_path()
-        ref_genome = self.file_metadata.get(filename, {}).get("reference_genome", "GRCh38")
-        parquet_str = str(normalized) if normalized else ""
-
-        return [
-            OutputPreviewState.clear_output_preview,
-            PRSState.initialize_prs_for_file(parquet_str, ref_genome),
-        ]
+        return [OutputPreviewState.clear_output_preview] + self._yield_prs_init_events()
 
     def switch_tab(self, tab_name: str):
         """Switch to a different tab in the right panel."""
@@ -2661,18 +2667,57 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         else:
             self.genome_build = "GRCh38"
 
+        # Always store the expected path so compute_selected_prs can re-check
+        # existence after normalization completes (path may not exist yet here).
         self.prs_initialized_for_file = parquet_path
+        self.prs_genotypes_path = parquet_path
+        self._prs_genotypes_lf = None
 
         if parquet_path and Path(parquet_path).exists():
             lf = pl.scan_parquet(parquet_path)
             self.set_prs_genotypes_lf(lf)
-            self.prs_genotypes_path = parquet_path
 
         self.prs_results = []
         self.selected_pgs_ids = []
         self.low_match_warning = False
 
         yield from self.initialize_prs()
+
+    def compute_selected_prs(self) -> Any:
+        """Guard against missing genotype data before delegating to the mixin.
+
+        The mixin calls ``compute_prs(vcf_path=..., genotypes_lf=None)`` when
+        no genotype data is available, which causes polars-bio to panic with a
+        Rust unwrap error on a missing file.  We intercept that case here and
+        surface a friendly message instead.
+
+        Also refreshes the genotypes LazyFrame if normalization completed after
+        the file was selected (``_prs_genotypes_lf`` is None but the parquet
+        now exists on disk).
+        """
+        import polars as pl
+
+        # Prefer already-loaded genotype data if available.
+        pre_genotypes = self._get_genotypes_lf()
+        if pre_genotypes is None:
+            # Re-hydrate LazyFrame if normalization completed after file selection.
+            path = self.prs_genotypes_path
+            if path and Path(path).exists():
+                self.set_prs_genotypes_lf(pl.scan_parquet(path))
+                pre_genotypes = self._get_genotypes_lf()
+
+        if pre_genotypes is None:
+            self.status_message = "Normalized VCF not found — run normalization first before computing PRS."
+            return
+
+        try:
+            yield from PRSComputeStateMixin.compute_selected_prs(self)
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            self.status_message = f"Network error — cannot download scoring file: {exc}"
+            self.prs_computing = False
+        except Exception as exc:
+            self.status_message = f"PRS computation failed: {exc}"
+            self.prs_computing = False
 
 
 # ============================================================================
