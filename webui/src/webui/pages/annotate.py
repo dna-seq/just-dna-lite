@@ -15,7 +15,14 @@ import reflex as rx
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.state import UploadState, OutputPreviewState, PRSState
 from reflex_mui_datagrid import lazyframe_grid
-from prs_ui import prs_section as _prs_section_component
+from prs_ui import (
+    prs_results_table,
+    prs_build_selector,
+    prs_ancestry_selector,
+    prs_scores_selector,
+    prs_compute_button,
+    prs_progress_section,
+)
 
 
 # ============================================================================
@@ -1106,6 +1113,26 @@ def _outputs_tab_menu() -> rx.Component:
             on_click=lambda: UploadState.switch_outputs_tab("reports"),
             style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
         ),
+        rx.el.a(
+            fomantic_icon("chart-bar", size=14, color=rx.cond(UploadState.outputs_active_tab == "prs", "#f2711c", "#888")),
+            " PRS",
+            rx.cond(
+                PRSState.prs_result_count > 0,
+                rx.el.span(
+                    PRSState.prs_result_count,
+                    class_name="ui mini circular orange label",
+                    style={"marginLeft": "6px"},
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.outputs_active_tab == "prs",
+                "active item",
+                "item",
+            ),
+            on_click=lambda: UploadState.switch_outputs_tab("prs"),
+            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
+        ),
         class_name="ui top attached tabular menu",
         style={"marginBottom": "0"},
     )
@@ -1156,6 +1183,37 @@ def _reports_content() -> rx.Component:
             ),
             rx.el.div(
                 "Generate a report after running the annotation pipeline",
+                style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.82rem"},
+            ),
+            style={"textAlign": "center", "padding": "20px 16px"},
+        ),
+    )
+
+
+def _prs_results_content() -> rx.Component:
+    """Content for the PRS sub-tab — full PRS results table with filter/sort/interpretation."""
+    return rx.cond(
+        PRSState.prs_result_count > 0,
+        rx.el.div(
+            rx.theme(
+                prs_results_table(PRSState),
+                has_background=False,
+            ),
+            style={
+                "maxHeight": "520px",
+                "overflowY": "auto",
+                "overflowX": "hidden",
+                "padding": "8px",
+            },
+        ),
+        rx.el.div(
+            fomantic_icon("chart-bar", size=30, color="#ccc"),
+            rx.el.div(
+                "No PRS results yet",
+                style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+            ),
+            rx.el.div(
+                "Compute PRS scores using the Polygenic Risk Scores panel above",
                 style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.82rem"},
             ),
             style={"textAlign": "center", "padding": "20px 16px"},
@@ -1298,7 +1356,7 @@ def outputs_section() -> rx.Component:
         rx.cond(
             UploadState.outputs_expanded,
             rx.cond(
-                UploadState.has_output_files,
+                UploadState.has_output_files | (PRSState.prs_result_count > 0),
                 # Tabbed content + inline preview
                 rx.el.div(
                     _outputs_tab_menu(),
@@ -1307,6 +1365,7 @@ def outputs_section() -> rx.Component:
                             UploadState.outputs_active_tab,
                             ("data", _data_files_content()),
                             ("reports", _reports_content()),
+                            ("prs", _prs_results_content()),
                             _data_files_content(),  # default
                         ),
                         class_name="ui bottom attached segment",
@@ -1371,13 +1430,13 @@ def quality_filter_stats_banner() -> rx.Component:
                     UploadState.norm_filters_active,
                     rx.el.span(
                         UploadState.norm_rows_removed.to(str),
-                        " removed (",
+                        " quality filtered (",
                         UploadState.norm_removed_pct,
                         "%)",
                         class_name="ui mini orange label",
                     ),
                     rx.el.span(
-                        "0 removed",
+                        "0 quality filtered",
                         class_name="ui mini label",
                     ),
                 ),
@@ -2025,9 +2084,72 @@ def right_panel_run_view() -> rx.Component:
                     rx.cond(
                         PRSState.prs_expanded,
                         rx.el.div(
-                            rx.theme(
-                                _prs_section_component(PRSState),
-                                has_background=False,
+                            rx.cond(
+                                PRSState.prs_results.length() > 0,
+                                rx.el.div(
+                                    rx.el.button(
+                                        fomantic_icon("folder-output", size=12),
+                                        " View results in Outputs tab",
+                                        on_click=UploadState.view_prs_in_outputs,
+                                        class_name="ui mini teal button",
+                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
+                                    ),
+                                    rx.el.a(
+                                        fomantic_icon("external-link", size=12),
+                                        " Dagster",
+                                        href=PRSState.prs_dagster_url,
+                                        target="_blank",
+                                        class_name="ui mini orange basic button",
+                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
+                                    ),
+                                    rx.el.button(
+                                        fomantic_icon("redo", size=12),
+                                        " Recompute",
+                                        on_click=PRSState.recompute_prs_from_scratch,
+                                        disabled=PRSState.prs_computing,
+                                        class_name="ui mini basic button",
+                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
+                                    ),
+                                    style={"marginBottom": "10px"},
+                                ),
+                            ),
+                            rx.el.div(
+                                rx.theme(
+                                    rx.vstack(
+                                        rx.hstack(
+                                            prs_build_selector(PRSState),
+                                            rx.separator(orientation="vertical", size="2"),
+                                            prs_ancestry_selector(PRSState),
+                                            spacing="4",
+                                            align="center",
+                                            wrap="wrap",
+                                        ),
+                                        prs_scores_selector(PRSState),
+                                        prs_compute_button(PRSState),
+                                        prs_progress_section(PRSState),
+                                        rx.cond(
+                                            PRSState.prs_result_count > 0,
+                                            rx.button(
+                                                rx.icon("table", size=14),
+                                                "View Results in Outputs  ↓",
+                                                on_click=UploadState.view_prs_in_outputs,
+                                                color_scheme="teal",
+                                                variant="outline",
+                                                size="2",
+                                                width="100%",
+                                            ),
+                                        ),
+                                        width="100%",
+                                        spacing="4",
+                                    ),
+                                    has_background=False,
+                                ),
+                                style={
+                                    "maxHeight": "600px",
+                                    "overflowY": "auto",
+                                    "overflowX": "hidden",
+                                    "paddingRight": "4px",
+                                },
                             ),
                             style={"marginTop": "12px"},
                         ),
@@ -2037,9 +2159,9 @@ def right_panel_run_view() -> rx.Component:
                     style={"padding": "16px", "marginBottom": "16px"},
                     id="segment-prs",
                 ),
-                # Section 1: Outputs (top) - only shown when there are output files
+                # Section 1: Outputs (top) - shown when files or PRS results exist
                 rx.cond(
-                    UploadState.has_output_files,
+                    UploadState.has_output_files | (PRSState.prs_result_count > 0),
                     rx.el.div(
                         outputs_section(),
                         class_name="ui teal segment",

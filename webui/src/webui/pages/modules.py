@@ -350,13 +350,26 @@ def editing_slot() -> rx.Component:
     )
 
 
-def _api_key_field(label: str, name: str, placeholder: rx.Var) -> rx.Component:
-    """A single masked API key input row."""
+def _key_status_badge(configured: rx.Var) -> rx.Component:
+    """Small ✓/✗ badge showing whether a key is currently saved."""
+    return rx.cond(
+        configured,
+        rx.el.span("✓", style={"color": "#21ba45", "fontWeight": "700", "marginLeft": "5px", "fontSize": "0.85rem"}),
+        rx.el.span("✗", style={"color": "#db2828", "fontWeight": "700", "marginLeft": "5px", "fontSize": "0.85rem"}),
+    )
+
+
+def _api_key_field(label: str, name: str, placeholder: rx.Var, configured: rx.Var) -> rx.Component:
+    """A single masked API key input row with configured status indicator."""
     return rx.el.div(
-        rx.el.label(
-            label,
-            html_for=name,
-            style={"fontSize": "0.78rem", "color": "#666", "marginBottom": "3px", "display": "block"},
+        rx.el.div(
+            rx.el.label(
+                label,
+                html_for=name,
+                style={"fontSize": "0.78rem", "color": "#555", "fontWeight": "500"},
+            ),
+            _key_status_badge(configured),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "3px"},
         ),
         rx.el.input(
             id=name,
@@ -379,40 +392,80 @@ def _api_key_field(label: str, name: str, placeholder: rx.Var) -> rx.Component:
 
 
 def _settings_pane() -> rx.Component:
-    """Collapsible API key settings at the bottom of the left panel."""
-    return rx.el.details(
-        rx.el.summary(
-            fomantic_icon("settings", size=14, color="#888"),
-            rx.el.span(
-                " API Keys",
-                style={"fontSize": "0.85rem", "fontWeight": "600", "marginLeft": "4px", "color": "#888"},
-            ),
-            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "userSelect": "none"},
-        ),
-        rx.el.form(
+    """API key settings — Reflex-controlled collapsible, open by default."""
+    return rx.el.div(
+        # Header / toggle row
+        rx.el.div(
             rx.el.div(
-                _api_key_field("Gemini (required)", "gemini_key", AgentState.settings_gemini_placeholder),
-                _api_key_field("OpenAI (optional, adds GPT researcher)", "openai_key", AgentState.settings_openai_placeholder),
-                _api_key_field("Anthropic (optional, adds Claude researcher)", "anthropic_key", AgentState.settings_anthropic_placeholder),
-                rx.el.button(
-                    fomantic_icon("save", size=13),
-                    " Save",
-                    type="submit",
-                    class_name="ui mini button",
-                    style={"width": "100%", "marginTop": "4px", "boxSizing": "border-box"},
+                fomantic_icon("key", size=14, color=rx.cond(AgentState.gemini_key_configured, "#888", "#e67e22")),
+                rx.el.span(
+                    " API Keys",
+                    style={"fontSize": "0.85rem", "fontWeight": "600", "marginLeft": "4px",
+                           "color": rx.cond(AgentState.gemini_key_configured, "#888", "#e67e22")},
                 ),
-                style={"paddingTop": "10px", "width": "100%", "boxSizing": "border-box", "overflow": "hidden"},
+                rx.cond(
+                    ~AgentState.gemini_key_configured,
+                    rx.el.span(
+                        " — Gemini key required",
+                        style={"fontSize": "0.75rem", "color": "#e67e22", "marginLeft": "4px"},
+                    ),
+                ),
+                style={"display": "flex", "alignItems": "center", "flex": "1"},
             ),
-            on_submit=AgentState.save_api_keys,
-            reset_on_submit=True,
+            fomantic_icon(
+                rx.cond(AgentState.settings_expanded, "chevron-up", "chevron-down"),
+                size=14, color="#aaa",
+            ),
+            on_click=AgentState.toggle_settings,
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "cursor": "pointer",
+                "userSelect": "none",
+                "padding": "8px 12px",
+                "border": rx.cond(AgentState.gemini_key_configured, "1px solid #e8e8e8", "1px solid #f5cba7"),
+                "borderRadius": rx.cond(AgentState.settings_expanded, "4px 4px 0 0", "4px"),
+                "backgroundColor": rx.cond(AgentState.gemini_key_configured, "#fafafa", "#fff8f0"),
+            },
         ),
-        style={
-            "padding": "8px 12px",
-            "border": "1px solid #e8e8e8",
-            "borderRadius": "4px",
-            "backgroundColor": "#fafafa",
-            "marginTop": "4px",
-        },
+        # Collapsible body
+        rx.cond(
+            AgentState.settings_expanded,
+            rx.el.form(
+                rx.el.div(
+                    _api_key_field(
+                        "Gemini (required)",
+                        "gemini_key",
+                        AgentState.settings_gemini_placeholder,
+                        AgentState.gemini_key_configured,
+                    ),
+                    _api_key_field(
+                        "OpenAI (optional — adds GPT researcher)",
+                        "openai_key",
+                        AgentState.settings_openai_placeholder,
+                        AgentState.openai_key_configured,
+                    ),
+                    _api_key_field(
+                        "Anthropic (optional — adds Claude researcher)",
+                        "anthropic_key",
+                        AgentState.settings_anthropic_placeholder,
+                        AgentState.anthropic_key_configured,
+                    ),
+                    rx.el.button(
+                        fomantic_icon("save", size=13),
+                        " Save to .env",
+                        type="submit",
+                        class_name="ui mini primary button",
+                        style={"width": "100%", "marginTop": "4px", "boxSizing": "border-box"},
+                    ),
+                    style={"padding": "10px 12px 12px", "width": "100%", "boxSizing": "border-box"},
+                ),
+                on_submit=AgentState.save_api_keys,
+                reset_on_submit=True,
+            ),
+            rx.fragment(),
+        ),
+        style={"marginTop": "4px"},
     )
 
 

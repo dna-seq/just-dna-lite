@@ -23,7 +23,7 @@ from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
-from just_dna_pipelines.annotation.resources import get_user_output_dir
+from just_dna_pipelines.annotation.resources import get_user_output_dir, get_user_input_dir
 from just_dna_pipelines.module_config import build_module_metadata_dict, _load_config
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
@@ -330,78 +330,78 @@ class UploadState(LazyFrameGridMixin, rx.State):
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of VCF files and register them in Dagster."""
         self.uploading = True
-        
-        auth_state = await self.get_state(AuthState)
-        self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
-        
-        root = Path(__file__).resolve().parents[3]
-        # Align with Dagster's expected input directory
-        upload_dir = root / "data" / "input" / "users" / self.safe_user_id
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
         new_files = []
-        instance = get_dagster_instance()
-        
-        for file in files:
-            if not file.filename:
-                continue
-                
-            # Save the file
-            content = await file.read()
-            if not content:
-                continue
-                
-            file_path = upload_dir / file.filename
-            file_path.write_bytes(content)
-            
-            # Register in Dagster
-            sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-            partition_key = f"{self.safe_user_id}/{sample_name}"
-            upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-            
-            # 1. Add partition if missing
-            from just_dna_pipelines.annotation.assets import user_vcf_partitions
-            existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
-            if partition_key not in existing:
-                instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
-            
-            # 2. Materialize user_vcf_source (the source asset)
-            instance.report_runless_asset_event(
-                AssetMaterialization(
-                    asset_key="user_vcf_source",
-                    partition=partition_key,
-                    metadata={
-                        "path": str(file_path.absolute()),
-                        "size_bytes": len(content),
-                        "uploaded_via": "webui",
-                        "upload_date": upload_date,
-                    }
-                )
-            )
-            
-            # Move re-uploaded files to front (newest first)
-            if file.filename in self.files:
-                self.files.remove(file.filename)
-            self.files.insert(0, file.filename)
-            new_files.append(file.filename)
-            
-            # Update status
-            self.asset_statuses[partition_key] = {
-                "source": "materialized",
-                "annotated": "uploaded"
-            }
-        
-        # Normalize each uploaded VCF to parquet (lightweight, synchronous)
-        for file in files:
-            if not file.filename:
-                continue
-            sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-            pk = f"{self.safe_user_id}/{sample_name}"
-            fp = upload_dir / file.filename
-            if fp.exists():
-                self._normalize_vcf_sync(instance, fp, pk)
+        try:
+            auth_state = await self.get_state(AuthState)
+            self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
 
-        self.uploading = False
+            upload_dir = get_user_input_dir() / self.safe_user_id
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
+            instance = get_dagster_instance()
+
+            for file in files:
+                if not file.filename:
+                    continue
+
+                # Save the file
+                content = await file.read()
+                if not content:
+                    continue
+
+                file_path = upload_dir / file.filename
+                file_path.write_bytes(content)
+
+                # Register in Dagster
+                sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+                partition_key = f"{self.safe_user_id}/{sample_name}"
+                upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                # 1. Add partition if missing
+                from just_dna_pipelines.annotation.assets import user_vcf_partitions
+                existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
+                if partition_key not in existing:
+                    instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+
+                # 2. Materialize user_vcf_source (the source asset)
+                instance.report_runless_asset_event(
+                    AssetMaterialization(
+                        asset_key="user_vcf_source",
+                        partition=partition_key,
+                        metadata={
+                            "path": str(file_path.absolute()),
+                            "size_bytes": len(content),
+                            "uploaded_via": "webui",
+                            "upload_date": upload_date,
+                        }
+                    )
+                )
+
+                # Move re-uploaded files to front (newest first)
+                if file.filename in self.files:
+                    self.files.remove(file.filename)
+                self.files.insert(0, file.filename)
+                new_files.append(file.filename)
+
+                # Update status
+                self.asset_statuses[partition_key] = {
+                    "source": "materialized",
+                    "annotated": "uploaded"
+                }
+
+            # Normalize each uploaded VCF to parquet (lightweight, synchronous)
+            for file in files:
+                if not file.filename:
+                    continue
+                sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+                pk = f"{self.safe_user_id}/{sample_name}"
+                fp = upload_dir / file.filename
+                if fp.exists():
+                    self._normalize_vcf_sync(instance, fp, pk)
+        except Exception as exc:
+            yield rx.toast.error(f"Upload failed: {exc}")
+        finally:
+            self.uploading = False
         if new_files:
             for ev in self.select_file(new_files[-1]):
                 yield ev
@@ -422,107 +422,108 @@ class UploadState(LazyFrameGridMixin, rx.State):
             return
             
         self.uploading = True
-        
-        auth_state = await self.get_state(AuthState)
-        self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
-        
-        root = Path(__file__).resolve().parents[3]
-        upload_dir = root / "data" / "input" / "users" / self.safe_user_id
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
         new_files = []
-        instance = get_dagster_instance()
-        
-        for file in files:
-            if not file.filename:
-                continue
-                
-            content = await file.read()
-            if not content:
-                continue
-                
-            file_path = upload_dir / file.filename
-            file_path.write_bytes(content)
-            
-            sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-            partition_key = f"{self.safe_user_id}/{sample_name}"
-            upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-            
-            # Add partition if missing
-            from just_dna_pipelines.annotation.assets import user_vcf_partitions
-            existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
-            if partition_key not in existing:
-                instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
-            
-            # Build complete metadata dict with form values
-            metadata: Dict[str, Any] = {
-                "path": MetadataValue.path(str(file_path.absolute())),
-                "size_bytes": MetadataValue.int(len(content)),
-                "uploaded_via": MetadataValue.text("webui"),
-                "upload_date": MetadataValue.text(upload_date),
-                "species": MetadataValue.text(self.new_sample_species),
-                "reference_genome": MetadataValue.text(self.new_sample_reference_genome),
-                "sex": MetadataValue.text(self.new_sample_sex),
-                "tissue": MetadataValue.text(self.new_sample_tissue),
-            }
-            
-            # Add optional fields only if provided
-            if self.new_sample_subject_id.strip():
-                metadata["subject_id"] = MetadataValue.text(self.new_sample_subject_id.strip())
-            if self.new_sample_study_name.strip():
-                metadata["study_name"] = MetadataValue.text(self.new_sample_study_name.strip())
-            if self.new_sample_notes.strip():
-                metadata["notes"] = MetadataValue.text(self.new_sample_notes.strip())
-            
-            # Materialize user_vcf_source with all metadata
-            instance.report_runless_asset_event(
-                AssetMaterialization(
-                    asset_key="user_vcf_source",
-                    partition=partition_key,
-                    metadata=metadata,
-                )
-            )
-            
-            # Move re-uploaded files to front (newest first)
-            if file.filename in self.files:
-                self.files.remove(file.filename)
-            self.files.insert(0, file.filename)
-            new_files.append(file.filename)
-            
-            # Store in local file_metadata for immediate UI access (full replace, not merge)
-            self.file_metadata[file.filename] = {
-                "filename": file.filename,
-                "sample_name": sample_name,
-                "upload_date": upload_date,
-                "species": self.new_sample_species,
-                "reference_genome": self.new_sample_reference_genome,
-                "sex": self.new_sample_sex,
-                "tissue": self.new_sample_tissue,
-                "subject_id": self.new_sample_subject_id.strip() if self.new_sample_subject_id else "",
-                "study_name": self.new_sample_study_name.strip() if self.new_sample_study_name else "",
-                "notes": self.new_sample_notes.strip() if self.new_sample_notes else "",
-                "size_mb": round(len(content) / (1024 * 1024), 2),
-                "path": str(file_path),
-                "custom_fields": {},
-            }
-            
-            # Update status
-            self.asset_statuses[partition_key] = {
-                "source": "materialized",
-                "annotated": "uploaded"
-            }
-        
-        # Normalize each uploaded VCF to parquet (lightweight, synchronous)
-        for file in files:
-            if not file.filename:
-                continue
-            sn = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-            pk = f"{self.safe_user_id}/{sn}"
-            fp = upload_dir / file.filename
-            if fp.exists():
-                self._normalize_vcf_sync(instance, fp, pk)
+        try:
+            auth_state = await self.get_state(AuthState)
+            self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
 
-        self.uploading = False
+            upload_dir = get_user_input_dir() / self.safe_user_id
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
+            instance = get_dagster_instance()
+
+            for file in files:
+                if not file.filename:
+                    continue
+
+                content = await file.read()
+                if not content:
+                    continue
+
+                file_path = upload_dir / file.filename
+                file_path.write_bytes(content)
+
+                sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+                partition_key = f"{self.safe_user_id}/{sample_name}"
+                upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                # Add partition if missing
+                from just_dna_pipelines.annotation.assets import user_vcf_partitions
+                existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
+                if partition_key not in existing:
+                    instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+
+                # Build complete metadata dict with form values
+                metadata: Dict[str, Any] = {
+                    "path": MetadataValue.path(str(file_path.absolute())),
+                    "size_bytes": MetadataValue.int(len(content)),
+                    "uploaded_via": MetadataValue.text("webui"),
+                    "upload_date": MetadataValue.text(upload_date),
+                    "species": MetadataValue.text(self.new_sample_species),
+                    "reference_genome": MetadataValue.text(self.new_sample_reference_genome),
+                    "sex": MetadataValue.text(self.new_sample_sex),
+                    "tissue": MetadataValue.text(self.new_sample_tissue),
+                }
+
+                # Add optional fields only if provided
+                if self.new_sample_subject_id.strip():
+                    metadata["subject_id"] = MetadataValue.text(self.new_sample_subject_id.strip())
+                if self.new_sample_study_name.strip():
+                    metadata["study_name"] = MetadataValue.text(self.new_sample_study_name.strip())
+                if self.new_sample_notes.strip():
+                    metadata["notes"] = MetadataValue.text(self.new_sample_notes.strip())
+
+                # Materialize user_vcf_source with all metadata
+                instance.report_runless_asset_event(
+                    AssetMaterialization(
+                        asset_key="user_vcf_source",
+                        partition=partition_key,
+                        metadata=metadata,
+                    )
+                )
+
+                # Move re-uploaded files to front (newest first)
+                if file.filename in self.files:
+                    self.files.remove(file.filename)
+                self.files.insert(0, file.filename)
+                new_files.append(file.filename)
+
+                # Store in local file_metadata for immediate UI access (full replace, not merge)
+                self.file_metadata[file.filename] = {
+                    "filename": file.filename,
+                    "sample_name": sample_name,
+                    "upload_date": upload_date,
+                    "species": self.new_sample_species,
+                    "reference_genome": self.new_sample_reference_genome,
+                    "sex": self.new_sample_sex,
+                    "tissue": self.new_sample_tissue,
+                    "subject_id": self.new_sample_subject_id.strip() if self.new_sample_subject_id else "",
+                    "study_name": self.new_sample_study_name.strip() if self.new_sample_study_name else "",
+                    "notes": self.new_sample_notes.strip() if self.new_sample_notes else "",
+                    "size_mb": round(len(content) / (1024 * 1024), 2),
+                    "path": str(file_path),
+                    "custom_fields": {},
+                }
+
+                # Update status
+                self.asset_statuses[partition_key] = {
+                    "source": "materialized",
+                    "annotated": "uploaded"
+                }
+
+            # Normalize each uploaded VCF to parquet (lightweight, synchronous)
+            for file in files:
+                if not file.filename:
+                    continue
+                sn = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
+                pk = f"{self.safe_user_id}/{sn}"
+                fp = upload_dir / file.filename
+                if fp.exists():
+                    self._normalize_vcf_sync(instance, fp, pk)
+        except Exception as exc:
+            yield rx.toast.error(f"Upload failed: {exc}")
+        finally:
+            self.uploading = False
         
         if new_files:
             self._reset_new_sample_form()
@@ -594,7 +595,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         partition_key = f"{self.safe_user_id}/{sample_name}"
         
         root = Path(__file__).resolve().parents[3]
-        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        vcf_path = get_user_input_dir() / self.safe_user_id / filename
         
         instance = get_dagster_instance()
         
@@ -630,12 +631,15 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.asset_statuses[partition_key]["annotated"] = "failed"
             yield rx.toast.error(f"Annotation failed for {sample_name}")
 
-    def toggle_module(self, module: str):
+    def toggle_module(self, module: str) -> Any:
         """Toggle a module on/off in the selection."""
         self.last_run_success = False
         if module in self.selected_modules:
             self.selected_modules = [m for m in self.selected_modules if m != module]
         else:
+            if module not in MODULE_INFOS:
+                yield rx.toast.error(f"Module '{module}' not found in registry — it may have been removed")
+                return
             self.selected_modules = self.selected_modules + [module]
 
     def select_all_modules(self):
@@ -704,7 +708,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         partition_key = f"{self.safe_user_id}/{sample_name}"
         
         root = Path(__file__).resolve().parents[3]
-        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        vcf_path = get_user_input_dir() / self.safe_user_id / filename
         
         instance = get_dagster_instance()
         
@@ -925,7 +929,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             return
             
         root = Path(__file__).resolve().parents[3]
-        file_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        file_path = get_user_input_dir() / self.safe_user_id / filename
         
         if not file_path.exists():
             return
@@ -1052,7 +1056,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             return False
 
         root = Path(__file__).resolve().parents[3]
-        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
         if not vcf_path.exists():
             return False
 
@@ -1118,7 +1122,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 pass  # fall through to raw VCF
 
         root = Path(__file__).resolve().parents[3]
-        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
         if not vcf_path.exists():
             self._clear_vcf_preview()
             self.vcf_preview_error = f"VCF file not found: {vcf_path.name}"
@@ -1607,7 +1611,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
             return
         
         sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
-        root = Path(__file__).resolve().parents[3]
         partition_key = f"{self.safe_user_id}/{sample_name}"
 
         # Fetch Dagster materialization timestamps for relevant assets
@@ -1616,7 +1619,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         report_mat = mat_info.get("user_longevity_report", {})
         
         # Load parquet data files from modules/ directory
-        output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+        output_dir = get_user_output_dir() / self.safe_user_id / sample_name / "modules"
         
         files: list[dict] = []
         if output_dir.exists():
@@ -1645,7 +1648,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         
         # Also scan sample root for Ensembl annotation parquets (*_annotated_duckdb.parquet)
         ensembl_mat = mat_info.get("user_annotated_vcf_duckdb", {})
-        sample_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name
+        sample_dir = get_user_output_dir() / self.safe_user_id / sample_name
         if sample_dir.exists():
             for f in sample_dir.glob("*_annotated_duckdb.parquet"):
                 files.append({
@@ -1663,7 +1666,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.output_files = files
         
         # Load HTML report files from reports/ directory
-        reports_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "reports"
+        reports_dir = get_user_output_dir() / self.safe_user_id / sample_name / "reports"
         
         reports: list[dict] = []
         if reports_dir.exists():
@@ -1754,7 +1757,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
             
         root = Path(__file__).resolve().parents[3]
-        file_path = root / "data" / "input" / "users" / self.safe_user_id / filename
+        file_path = get_user_input_dir() / self.safe_user_id / filename
         
         if file_path.exists():
             try:
@@ -2007,7 +2010,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     # Find output path if successful
                     if result.success:
                         root = Path(__file__).resolve().parents[3]
-                        output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+                        output_dir = get_user_output_dir() / self.safe_user_id / sample_name / "modules"
                         if output_dir.exists():
                             r["output_path"] = str(output_dir)
                 updated_runs.append(r)
@@ -2066,7 +2069,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         partition_key = f"{self.safe_user_id}/{sample_name}"
 
         root = Path(__file__).resolve().parents[3]
-        vcf_path = root / "data" / "input" / "users" / self.safe_user_id / self.selected_file
+        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
 
         has_hf_modules = bool(self.selected_modules)
         has_ensembl = self.include_ensembl
@@ -2089,7 +2092,24 @@ class UploadState(LazyFrameGridMixin, rx.State):
             job_name = "annotate_and_report_job"
         
         modules_to_use = self.selected_modules.copy() if has_hf_modules else []
-        
+
+        # Validate: drop any selected modules no longer in the registry (deleted/renamed)
+        if modules_to_use:
+            missing = [m for m in modules_to_use if m not in MODULE_INFOS]
+            if missing:
+                yield rx.toast.warning(
+                    f"Skipping {len(missing)} module(s) not found in registry: {', '.join(missing)}"
+                )
+                modules_to_use = [m for m in modules_to_use if m in MODULE_INFOS]
+            if not modules_to_use and not has_ensembl:
+                yield rx.toast.error(
+                    "No valid modules found — all selected modules are missing from the registry. "
+                    "Re-select modules or check your module configuration."
+                )
+                self.running = False
+                return
+            has_hf_modules = bool(modules_to_use)
+
         file_info = self.file_metadata.get(self.selected_file, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
 
@@ -2261,7 +2281,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     if run.status == DagsterRunStatus.SUCCESS:
                         sample_name = r.get("sample_name", "")
                         root = Path(__file__).resolve().parents[3]
-                        output_dir = root / "data" / "output" / "users" / self.safe_user_id / sample_name / "modules"
+                        output_dir = get_user_output_dir() / self.safe_user_id / sample_name / "modules"
                         if output_dir.exists():
                             r["output_path"] = str(output_dir)
             updated_runs.append(r)
@@ -2340,8 +2360,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.vcf_preview_expanded = not self.vcf_preview_expanded
 
     def switch_outputs_tab(self, tab_name: str):
-        """Switch between 'data' and 'reports' sub-tabs in outputs section."""
+        """Switch between sub-tabs in outputs section."""
         self.outputs_active_tab = tab_name
+
+    def view_prs_in_outputs(self):
+        """Expand the Outputs section and switch to the PRS tab."""
+        self.outputs_expanded = True
+        self.outputs_active_tab = "prs"
 
     def toggle_run_history(self):
         """Toggle the run history section expanded/collapsed."""
@@ -2436,9 +2461,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
         if cleaned > 0:
             self._add_log(f"🧹 Deleted {cleaned} orphaned NOT_STARTED run(s) from Dagster database")
         
-        root = Path(__file__).resolve().parents[3]
-        user_dir = root / "data" / "input" / "users" / self.safe_user_id
-        
+        user_dir = get_user_input_dir() / self.safe_user_id
+
         if not user_dir.exists():
             return
 
@@ -2555,9 +2579,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
             
             # Check for output if successful
             if run.status == DagsterRunStatus.SUCCESS and sample_name:
-                root = Path(__file__).resolve().parents[3]
                 user_name = hf_config.get("user_name") or duckdb_config.get("user_name", self.safe_user_id)
-                output_dir = root / "data" / "output" / "users" / user_name / sample_name / "modules"
+                output_dir = get_user_output_dir() / user_name / sample_name / "modules"
                 if output_dir.exists():
                     run_info["output_path"] = str(output_dir)
             
@@ -2641,7 +2664,14 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 # ============================================================================
 
 from prs_ui import PRSComputeStateMixin
+from prs_ui.state import _catalog as _prs_catalog
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
+from just_prs.prs import compute_prs as _prs_compute_prs
+from just_prs.quality import (
+    format_classification as _prs_format_classification,
+    format_effect_size as _prs_format_effect_size,
+    interpret_prs_result as _prs_interpret_prs_result,
+)
 
 
 class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
@@ -2660,10 +2690,27 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     status_message: str = ""
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
+    prs_computation_id: str = ""  # UUID of active background task; used to cancel superseded runs
+    _prs_skip_checkpoint: bool = False  # set by recompute_prs_from_scratch
 
     def toggle_prs_expanded(self) -> None:
         """Toggle the PRS section open/closed."""
         self.prs_expanded = not self.prs_expanded
+
+    def recompute_prs_from_scratch(self) -> Any:
+        """Ignore checkpoint and recompute all selected PRS scores from scratch."""
+        self._prs_skip_checkpoint = True
+        return PRSState.compute_selected_prs
+
+    @rx.var
+    def prs_dagster_url(self) -> str:
+        """Dagster Assets UI URL for the prs_results materialization of the current sample."""
+        parquet_path = self.prs_initialized_for_file
+        if not parquet_path:
+            return ""
+        p = Path(parquet_path)
+        partition_key = f"{p.parent.parent.name}/{p.parent.name}"
+        return f"{get_dagster_web_url()}/assets/prs_results?partition={partition_key}"
 
     def initialize_prs_for_file(self, parquet_path: str, genome_build: str) -> Any:
         """Initialize PRS state for a newly selected VCF file.
@@ -2671,6 +2718,12 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         Sets the genotypes LazyFrame from the normalized parquet (preferred
         input method for PRSComputeStateMixin) and loads PGS Catalog scores
         for the appropriate genome build.
+
+        On same-file re-init (e.g. page refresh that reconnects to the same
+        Reflex state), existing ``prs_results`` are preserved so the user
+        doesn't lose their results on reload.  When switching to a different
+        file, results are cleared and the Dagster store is queried for any
+        prior computation for the new sample.
         """
         import polars as pl
 
@@ -2678,6 +2731,8 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             self.genome_build = "GRCh37"
         else:
             self.genome_build = "GRCh38"
+
+        same_file = (parquet_path == self.prs_initialized_for_file)
 
         # Always store the expected path so compute_selected_prs can re-check
         # existence after normalization completes (path may not exist yet here).
@@ -2689,47 +2744,315 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             lf = pl.scan_parquet(parquet_path)
             self.set_prs_genotypes_lf(lf)
 
-        self.prs_results = []
-        self.selected_pgs_ids = []
-        self.low_match_warning = False
+        if not same_file:
+            # Switching to a different file — clear stale results.
+            self.prs_results = []
+            self.selected_pgs_ids = []
+            self.low_match_warning = False
 
         yield from self.initialize_prs()
 
-    def compute_selected_prs(self) -> Any:
-        """Guard against missing genotype data before delegating to the mixin.
+        # If no results in memory (either new file or server restart), try to
+        # restore from the Dagster prs_results materialization for this sample.
+        if not self.prs_results and parquet_path:
+            p = Path(parquet_path)
+            partition_key = f"{p.parent.parent.name}/{p.parent.name}"
+            self._load_prs_results_from_dagster(partition_key)
 
-        The mixin calls ``compute_prs(vcf_path=..., genotypes_lf=None)`` when
-        no genotype data is available, which causes polars-bio to panic with a
-        Rust unwrap error on a missing file.  We intercept that case here and
-        surface a friendly message instead.
 
-        Also refreshes the genotypes LazyFrame if normalization completed after
-        the file was selected (``_prs_genotypes_lf`` is None but the parquet
-        now exists on disk).
+    @rx.event(background=True)
+    async def compute_selected_prs(self) -> None:
+        """Compute PRS as a background task, decoupled from the WebSocket.
+
+        Running as a background task means the computation survives browser
+        refreshes: Reflex reconnects the same client token to the same
+        server-side state instance, and the task continues updating it via
+        ``async with self`` locks.  Results are also persisted to Dagster so
+        they can be restored even after a server restart.
+
+        Synchronous CPU/IO work (compute_prs, catalog lookups, EBI FTP
+        downloads) is offloaded to the default ThreadPoolExecutor via
+        run_in_executor to avoid blocking the event loop.
         """
+        import asyncio
+        import json
+        import uuid
         import polars as pl
 
-        # Prefer already-loaded genotype data if available.
-        pre_genotypes = self._get_genotypes_lf()
-        if pre_genotypes is None:
-            # Re-hydrate LazyFrame if normalization completed after file selection.
-            path = self.prs_genotypes_path
-            if path and Path(path).exists():
-                self.set_prs_genotypes_lf(pl.scan_parquet(path))
-                pre_genotypes = self._get_genotypes_lf()
+        # ── Phase 1: snapshot state, validate, set computing flag ─────────────
+        async with self:
+            if not self.selected_pgs_ids:
+                self.status_message = "No PGS scores selected. Load and select scores above."
+                return
 
-        if pre_genotypes is None:
-            self.status_message = "Normalized VCF not found — run normalization first before computing PRS."
+            # Re-hydrate LazyFrame if normalization completed after file selection.
+            pre_genotypes = self._get_genotypes_lf()
+            if pre_genotypes is None:
+                path = self.prs_genotypes_path
+                if path and Path(path).exists():
+                    self.set_prs_genotypes_lf(pl.scan_parquet(path))
+                    pre_genotypes = self._get_genotypes_lf()
+
+            if pre_genotypes is None:
+                self.status_message = "Normalized VCF not found — run normalization first before computing PRS."
+                return
+
+            # Snapshot immutable inputs before releasing the lock.
+            pgs_ids = list(self.selected_pgs_ids)
+            genome_build = self.genome_build
+            cache = Path(self.cache_dir) / "scores"
+            ancestry = self.selected_ancestry
+            parquet_path = self.prs_initialized_for_file
+            genotypes_lf = pre_genotypes
+            skip_checkpoint = self._prs_skip_checkpoint
+            self._prs_skip_checkpoint = False  # consume the flag
+
+            # UUID guard: lets a newer run supersede this one if the user
+            # clicks Compute again before this one finishes.
+            computation_id = str(uuid.uuid4())
+            self.prs_computation_id = computation_id
+
+            total = len(pgs_ids)
+            self.prs_computing = True
+            self.prs_progress = 0
+            self.prs_results = []
+            self.low_match_warning = False
+            self.status_message = f"Computing PRS for {total} score(s)..."
+
+        # Derive partition key from the parquet path (outside state lock).
+        # Path: .../data/output/users/{safe_user_id}/{sample_name}/user_vcf_normalized.parquet
+        p = Path(parquet_path) if parquet_path else None
+        partition_key = f"{p.parent.parent.name}/{p.parent.name}" if p else ""
+
+        # ── Phase 0 (checkpoint): load already-computed results from Dagster ──
+        # If a previous run was interrupted, skip those PGS IDs and resume from
+        # where it left off.  Results are written to Dagster after EACH new score
+        # so the checkpoint is always as fresh as possible.
+        # Skipped when recompute_prs_from_scratch was called.
+        cached: dict[str, dict] = {}
+        if partition_key and not skip_checkpoint:
+            try:
+                chk_instance = get_dagster_instance()
+                chk_rec = chk_instance.fetch_materializations(
+                    records_filter=AssetRecordsFilter(
+                        asset_key=AssetKey("prs_results"),
+                        asset_partitions=[partition_key],
+                    ),
+                    limit=1,
+                )
+                if chk_rec.records:
+                    mat = chk_rec.records[0].asset_materialization
+                    if mat and mat.metadata:
+                        rm = mat.metadata.get("results")
+                        if rm and hasattr(rm, "data"):
+                            rows = rm.data.get("rows", []) if isinstance(rm.data, dict) else []
+                            cached = {row["pgs_id"]: row for row in rows}
+            except Exception:
+                pass  # checkpoint unavailable — compute from scratch
+
+        # Preserve order: cached results come first (in selection order), then
+        # we compute only the ones that are missing.
+        results: list[dict] = [cached[pid] for pid in pgs_ids if pid in cached]
+        to_compute = [pid for pid in pgs_ids if pid not in cached]
+        already_done = len(results)
+        any_low_match = any(r.get("match_rate", 100) < 10 for r in results)
+
+        # Show cached results immediately in the UI and report resume status.
+        if results or to_compute:
+            async with self:
+                if self.prs_computation_id != computation_id:
+                    return
+                self.prs_results = list(results)
+                if already_done and to_compute:
+                    self.status_message = (
+                        f"Resuming: {already_done}/{total} already computed, "
+                        f"computing {len(to_compute)} remaining..."
+                    )
+                    self.prs_progress = round(already_done / total * 100)
+
+        if not to_compute:
+            # All results already cached — nothing left to compute.
+            async with self:
+                if self.prs_computation_id != computation_id:
+                    return
+                self.prs_computing = False
+                self.prs_progress = 100
+                self.prs_results = results
+                self.low_match_warning = any_low_match
+                self.status_message = f"Restored {total} PRS result(s) from checkpoint"
             return
 
+        # ── Phase 2: heavy computation outside the state lock ──────────────────
+        loop = asyncio.get_running_loop()
+        dagster_instance = get_dagster_instance() if partition_key else None
+        error_msg = ""
+
         try:
-            yield from PRSComputeStateMixin.compute_selected_prs(self)
+            best_perf_df = await loop.run_in_executor(
+                None, lambda: _prs_catalog.best_performance().collect()
+            )
+
+            for i, pgs_id in enumerate(to_compute, start=1):
+                overall_i = already_done + i
+                async with self:
+                    if self.prs_computation_id != computation_id:
+                        return  # superseded by a newer run
+                    self.prs_progress = round(overall_i / total * 100)
+                    self.status_message = f"Computing {overall_i}/{total}: {pgs_id}..."
+
+                info = _prs_catalog.score_info_row(pgs_id)
+                trait = info["trait_reported"] if info else None
+
+                def _compute_one(pid=pgs_id, t=trait):
+                    return _prs_compute_prs(
+                        vcf_path=str(parquet_path) or "",
+                        scoring_file=pid,
+                        genome_build=genome_build,
+                        cache_dir=cache,
+                        pgs_id=pid,
+                        trait_reported=t,
+                        genotypes_lf=genotypes_lf,
+                    )
+
+                result = await loop.run_in_executor(None, _compute_one)
+
+                match_pct = round(result.match_rate * 100, 1)
+                match_color = "red" if match_pct < 10 else "orange" if match_pct < 50 else "green"
+
+                auroc_val: float | None = None
+                ancestry_str = ""
+                n_individuals: int | None = None
+                effect_size_str = ""
+                classification_str = ""
+                perf_rows = best_perf_df.filter(pl.col("pgs_id") == pgs_id)
+                if perf_rows.height > 0:
+                    row_p = perf_rows.row(0, named=True)
+                    effect_size_str = _prs_format_effect_size(row_p)
+                    classification_str = _prs_format_classification(row_p)
+                    auroc_val = row_p.get("auroc_estimate")
+                    ancestry_str = row_p.get("ancestry_broad") or ""
+                    n_individuals = row_p.get("n_individuals")
+
+                pct_value = result.percentile
+                pct_method = result.percentile_method or (
+                    "theoretical" if result.has_allele_frequencies else ""
+                )
+                if pct_value is None:
+                    pct_value, pct_method = _prs_catalog.percentile(
+                        result.score, pgs_id, ancestry=ancestry
+                    )
+
+                interp = _prs_interpret_prs_result(pct_value, result.match_rate, auroc_val)
+
+                row: dict = {
+                    "pgs_id": result.pgs_id,
+                    "trait": result.trait_reported or "",
+                    "score": round(result.score, 6),
+                    "percentile": f"{pct_value:.1f}" if pct_value is not None else "",
+                    "percentile_method": pct_method or "",
+                    "has_allele_frequencies": result.has_allele_frequencies,
+                    "match_rate": match_pct,
+                    "match_color": match_color,
+                    "variants_matched": result.variants_matched,
+                    "variants_total": result.variants_total,
+                    "effect_size": effect_size_str,
+                    "classification": classification_str,
+                    "auroc": f"{auroc_val:.3f}" if auroc_val is not None else "",
+                    "quality_label": interp["quality_label"],
+                    "quality_color": interp["quality_color"],
+                    "summary": interp["summary"],
+                    "ancestry": ancestry_str,
+                    "selected_ancestry": ancestry,
+                    "n_individuals": n_individuals if n_individuals is not None else 0,
+                }
+
+                if result.match_rate < 0.1:
+                    any_low_match = True
+                results.append(row)
+
+                # Push each new result to the UI immediately.
+                async with self:
+                    if self.prs_computation_id != computation_id:
+                        return
+                    self.prs_results = list(results)
+
+                # Write checkpoint to Dagster after every new result so a crash
+                # at score N only loses score N, not the entire run.
+                if dagster_instance:
+                    try:
+                        dagster_instance.report_runless_asset_event(
+                            AssetMaterialization(
+                                asset_key="prs_results",
+                                partition=partition_key,
+                                metadata={
+                                    "results": MetadataValue.json({"rows": results}),
+                                    "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
+                                    "genome_build": MetadataValue.text(genome_build),
+                                    "ancestry": MetadataValue.text(ancestry or ""),
+                                    "row_count": MetadataValue.int(len(results)),
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass  # checkpoint failure is non-fatal
+
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            self.status_message = f"Network error — cannot download scoring file: {exc}"
-            self.prs_computing = False
+            error_msg = f"Network error — cannot download scoring file: {exc}"
         except Exception as exc:
-            self.status_message = f"PRS computation failed: {exc}"
-            self.prs_computing = False
+            error_msg = f"PRS computation failed: {exc}"
+
+        # ── Phase 3: write final state ─────────────────────────────────────────
+        superseded = False
+        async with self:
+            if self.prs_computation_id != computation_id:
+                superseded = True
+            else:
+                self.prs_computing = False
+                self.prs_progress = 100
+                if error_msg:
+                    # Partial results (from checkpoint + this run so far) stay visible.
+                    self.status_message = f"{error_msg} — {len(results)}/{total} completed"
+                    self.low_match_warning = any_low_match
+                else:
+                    self.prs_results = results
+                    self.low_match_warning = any_low_match
+                    self.status_message = f"Computed {len(results)} PRS score(s)"
+
+
+    def _load_prs_results_from_dagster(self, partition_key: str) -> None:
+        """Restore PRS results from the latest Dagster materialization for this partition.
+
+        Called from ``initialize_prs_for_file`` when the selected file already
+        has a prior result (e.g. after a server restart or cross-session restore).
+        """
+        if not partition_key:
+            return
+        try:
+            instance = get_dagster_instance()
+            result = instance.fetch_materializations(
+                records_filter=AssetRecordsFilter(
+                    asset_key=AssetKey("prs_results"),
+                    asset_partitions=[partition_key],
+                ),
+                limit=1,
+            )
+            if not result.records:
+                return
+            mat = result.records[0].asset_materialization
+            if not mat or not mat.metadata:
+                return
+            results_meta = mat.metadata.get("results")
+            if not results_meta or not hasattr(results_meta, "data"):
+                return
+            data = results_meta.data
+            rows = data.get("rows", []) if isinstance(data, dict) else []
+            if rows:
+                self.prs_results = rows
+                count_meta = mat.metadata.get("row_count")
+                n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
+                self.status_message = f"Restored {n} PRS result(s) from previous session"
+        except Exception:
+            pass  # non-fatal; UI simply shows no prior results
 
 
 # ============================================================================
@@ -2772,7 +3095,26 @@ class AgentState(rx.State):
     slot_adding: bool = False
     slot_replace_pending_name: str = ""   # module name queued for confirm-replace
 
+    # -- API key settings UI --------------------------------------------------
+    settings_expanded: bool = True   # open by default so first-time users see it
+
+    def toggle_settings(self):
+        self.settings_expanded = not self.settings_expanded
+
     # -- API key settings -----------------------------------------------------
+
+    @rx.var
+    def gemini_key_configured(self) -> bool:
+        """True when a Gemini/Google API key is present in the environment."""
+        return bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+    @rx.var
+    def openai_key_configured(self) -> bool:
+        return bool(os.getenv("OPENAI_API_KEY"))
+
+    @rx.var
+    def anthropic_key_configured(self) -> bool:
+        return bool(os.getenv("ANTHROPIC_API_KEY"))
 
     @rx.var
     def settings_gemini_placeholder(self) -> str:
@@ -2813,7 +3155,9 @@ class AgentState(rx.State):
                 lines.append(f"{env_var}={value}")
         if changed:
             env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            yield rx.toast.success(f"Saved: {', '.join(changed)}")
+            # Collapse settings panel after a successful save
+            self.settings_expanded = False
+            yield rx.toast.success(f"Saved to .env: {', '.join(changed)}")
         else:
             yield rx.toast.info("No keys entered — nothing saved.")
 
@@ -3219,15 +3563,20 @@ class AgentState(rx.State):
                         {"type": event_type, "label": label, "detail": detail, "call_id": call_id},
                     ]
 
-        runner = run_team_async if use_team else run_agent_async
-        response = await runner(
-            message=msg_to_send,
-            file_paths=attachment_paths,
-            model_id=None,
-            spec_output_dir=spec_output,
-            on_status=_on_status,
-            on_event=_on_event,
-        )
+        response = None
+        error_msg = ""
+        try:
+            runner = run_team_async if use_team else run_agent_async
+            response = await runner(
+                message=msg_to_send,
+                file_paths=attachment_paths,
+                model_id=None,
+                spec_output_dir=spec_output,
+                on_status=_on_status,
+                on_event=_on_event,
+            )
+        except Exception as exc:
+            error_msg = str(exc)
 
         found_spec_dir = ""
         if spec_output.exists():
@@ -3248,9 +3597,13 @@ class AgentState(rx.State):
             found_spec_dir = str(persist_dir)
 
         async with self:
+            agent_reply = (
+                f"An error occurred: {error_msg}" if error_msg
+                else (response or "Agent returned no response.")
+            )
             self.agent_messages = [
                 *self.agent_messages,
-                {"role": "agent", "content": response or "Agent returned no response."},
+                {"role": "agent", "content": agent_reply},
             ]
             self.agent_processing = False
             self.agent_status = ""
