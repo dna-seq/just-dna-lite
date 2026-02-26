@@ -62,7 +62,7 @@ REFERENCE_GENOMES: Dict[str, List[str]] = {
 
 # Sex options (biological sex for genomic analysis)
 SEX_OPTIONS: List[str] = [
-    "N/A",      # Not specified/applicable
+    "N/A",      # Sample tissue/applicable
     "Male",
     "Female",
     "Other",
@@ -70,7 +70,7 @@ SEX_OPTIONS: List[str] = [
 
 # Tissue source options (common sample sources)
 TISSUE_OPTIONS: List[str] = [
-    "Not specified",
+    "Sample tissue",
     "Saliva",
     "Blood",
     "Buccal swab",
@@ -209,7 +209,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # ============================================================
     new_sample_subject_id: str = ""
     new_sample_sex: str = "N/A"
-    new_sample_tissue: str = "Not specified"
+    new_sample_tissue: str = "Sample tissue"
     new_sample_species: str = "Homo sapiens"
     new_sample_reference_genome: str = "GRCh38"
     new_sample_study_name: str = ""
@@ -315,7 +315,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         """Reset new sample form to defaults."""
         self.new_sample_subject_id = ""
         self.new_sample_sex = "N/A"
-        self.new_sample_tissue = "Not specified"
+        self.new_sample_tissue = "Sample tissue"
         self.new_sample_species = "Homo sapiens"
         self.new_sample_reference_genome = "GRCh38"
         self.new_sample_study_name = ""
@@ -953,7 +953,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             # User-editable fields (required fields have defaults)
             "subject_id": "",  # Required - subject/patient identifier
             "sex": "N/A",  # Required - biological sex
-            "tissue": "Not specified",  # Required - sample tissue source
+            "tissue": "Sample tissue",  # Required - sample tissue source
             # Optional fields
             "study_name": "",
             "notes": "",
@@ -1528,8 +1528,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
     def current_tissue(self) -> str:
         """Get tissue source for the currently selected file."""
         if not self.selected_file:
-            return "Not specified"
-        return self.file_metadata.get(self.selected_file, {}).get("tissue", "Not specified")
+            return "Sample tissue"
+        return self.file_metadata.get(self.selected_file, {}).get("tissue", "Sample tissue")
 
     @rx.var
     def species_options(self) -> List[str]:
@@ -2772,9 +2772,58 @@ class AgentState(rx.State):
     slot_adding: bool = False
     slot_replace_pending_name: str = ""   # module name queued for confirm-replace
 
+    # -- API key settings -----------------------------------------------------
+
+    @rx.var
+    def settings_gemini_placeholder(self) -> str:
+        return "Already configured — paste to update" if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") else "Paste Gemini API key…"
+
+    @rx.var
+    def settings_openai_placeholder(self) -> str:
+        return "Already configured — paste to update" if os.getenv("OPENAI_API_KEY") else "Paste OpenAI API key… (optional)"
+
+    @rx.var
+    def settings_anthropic_placeholder(self) -> str:
+        return "Already configured — paste to update" if os.getenv("ANTHROPIC_API_KEY") else "Paste Anthropic API key… (optional)"
+
+    def save_api_keys(self, form_data: dict) -> None:
+        """Write submitted API keys into os.environ and persist to .env."""
+        key_map = {
+            "gemini_key": "GEMINI_API_KEY",
+            "openai_key": "OPENAI_API_KEY",
+            "anthropic_key": "ANTHROPIC_API_KEY",
+        }
+        env_path = Path(__file__).resolve().parents[3] / ".env"
+        lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+        changed = []
+        for field, env_var in key_map.items():
+            value = (form_data.get(field) or "").strip()
+            if not value:
+                continue
+            os.environ[env_var] = value
+            changed.append(env_var)
+            updated = False
+            for i, line in enumerate(lines):
+                stripped = line.lstrip("# \t")
+                if stripped.startswith(f"{env_var}="):
+                    lines[i] = f"{env_var}={value}"
+                    updated = True
+                    break
+            if not updated:
+                lines.append(f"{env_var}={value}")
+        if changed:
+            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            yield rx.toast.success(f"Saved: {', '.join(changed)}")
+        else:
+            yield rx.toast.info("No keys entered — nothing saved.")
+
     def set_agent_input(self, value: str) -> None:
         """Explicit setter for agent_input (avoids deprecation warning)."""
         self.agent_input = value
+
+    def set_agent_use_team(self, value: bool) -> None:
+        """Explicit setter for agent_use_team (avoids deprecation warning)."""
+        self.agent_use_team = value
 
     def _reset_agent_input(self) -> None:
         """Clear chat input and remount uncontrolled textarea."""
@@ -3137,7 +3186,10 @@ class AgentState(rx.State):
             f"\n\nWrite the spec files to: {spec_output}/<module_name>/ "
             f"using the write_spec_files tool. "
             f"Then call validate_spec on the resulting directory. "
-            f"Finally, call write_module_md to document the module."
+            f"Then call write_module_md to document the module. "
+            f"Then call generate_logo with the module name and a vivid visual description "
+            f"matching the module's theme and color — the logo.png will be shown as the "
+            f"module's thumbnail in the annotation browser UI."
         )
 
         from just_dna_pipelines.agents.module_creator import run_agent_async, run_team_async

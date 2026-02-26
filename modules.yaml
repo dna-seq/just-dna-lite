@@ -48,17 +48,11 @@ module_metadata:
     report_title: Pharmacogenomics
     icon: pill
     color: '#a333c8'
-  longevity_2025:
-    title: Longevity 2025
-    description: Rare protein-altering variants from Leiden Longevity Study, SIRT6
-      variants, and high-impact multimorbidity (mvARD) variants from Dinh et al. (2025).
-    report_title: Familial Longevity & Healthy Aging (2025)
-    icon: heart-pulse
-    color: '#21ba45'
   multimorbidity_aging:
-    title: Multimorbidity & Aging (mvARD)
+    title: Longevity & ARD Risks 2025
     description: Genetics of multivariate age-related disease risk (mvARD) covering
-      heart disease, stroke, hypertension, cholesterol, and diabetes.
-    report_title: Multimorbidity & Aging (mvARD)
+      heart disease, stroke, hypertension, cholesterol, and diabetes. Updated 2025
+      with rare longevity variants.
+    report_title: Longevity & ARD Risks 2025
     icon: heart-pulse
     color: '#db2828'

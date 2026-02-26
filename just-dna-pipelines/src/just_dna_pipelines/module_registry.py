@@ -137,7 +137,7 @@ def register_custom_module(
 
     # Copy source spec files alongside compiled parquets so the module can be
     # loaded back into the editing slot for further editing.
-    _SPEC_SUFFIXES = {".yaml", ".csv", ".md"}
+    _SPEC_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".jpg", ".jpeg"}
     for f in spec_dir.iterdir():
         if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
             shutil.copy2(f, output_dir / f.name)

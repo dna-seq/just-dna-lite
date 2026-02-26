@@ -350,6 +350,72 @@ def editing_slot() -> rx.Component:
     )
 
 
+def _api_key_field(label: str, name: str, placeholder: rx.Var) -> rx.Component:
+    """A single masked API key input row."""
+    return rx.el.div(
+        rx.el.label(
+            label,
+            html_for=name,
+            style={"fontSize": "0.78rem", "color": "#666", "marginBottom": "3px", "display": "block"},
+        ),
+        rx.el.input(
+            id=name,
+            name=name,
+            type="password",
+            placeholder=placeholder,
+            auto_complete="off",
+            style={
+                "width": "100%",
+                "padding": "5px 8px",
+                "border": "1px solid #ddd",
+                "borderRadius": "4px",
+                "fontSize": "0.82rem",
+                "boxSizing": "border-box",
+                "fontFamily": "monospace",
+            },
+        ),
+        style={"marginBottom": "8px"},
+    )
+
+
+def _settings_pane() -> rx.Component:
+    """Collapsible API key settings at the bottom of the left panel."""
+    return rx.el.details(
+        rx.el.summary(
+            fomantic_icon("settings", size=14, color="#888"),
+            rx.el.span(
+                " API Keys",
+                style={"fontSize": "0.85rem", "fontWeight": "600", "marginLeft": "4px", "color": "#888"},
+            ),
+            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "userSelect": "none"},
+        ),
+        rx.el.form(
+            rx.el.div(
+                _api_key_field("Gemini (required)", "gemini_key", AgentState.settings_gemini_placeholder),
+                _api_key_field("OpenAI (optional, adds GPT researcher)", "openai_key", AgentState.settings_openai_placeholder),
+                _api_key_field("Anthropic (optional, adds Claude researcher)", "anthropic_key", AgentState.settings_anthropic_placeholder),
+                rx.el.button(
+                    fomantic_icon("save", size=13),
+                    " Save",
+                    type="submit",
+                    class_name="ui mini button",
+                    style={"width": "100%", "marginTop": "4px", "boxSizing": "border-box"},
+                ),
+                style={"paddingTop": "10px", "width": "100%", "boxSizing": "border-box", "overflow": "hidden"},
+            ),
+            on_submit=AgentState.save_api_keys,
+            reset_on_submit=True,
+        ),
+        style={
+            "padding": "8px 12px",
+            "border": "1px solid #e8e8e8",
+            "borderRadius": "4px",
+            "backgroundColor": "#fafafa",
+            "marginTop": "4px",
+        },
+    )
+
+
 # ============================================================================
 # LEFT PANEL — Sources + Editing Slot
 # ============================================================================
@@ -378,6 +444,9 @@ def modules_left_panel() -> rx.Component:
             class_name="ui segment",
             style={"padding": "12px", "marginBottom": "10px", "border": "1px solid #c5daf5", "backgroundColor": "#f4f8fe"},
         ),
+
+        # Settings (collapsed by default)
+        _settings_pane(),
 
         id="modules-left-panel",
     )

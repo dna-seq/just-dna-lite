@@ -30,11 +30,17 @@ cd just-dna-lite
 cp .env.template .env
 ```
 
-Open `.env` and set at minimum:
+Open `.env` in any text editor (the file starts with a dot, so it may be hidden in your file manager — opening it from the terminal is the easiest option):
 
 ```bash
-GEMINI_API_KEY=your_gemini_api_key_here   # required for AI module creation
+# Linux / macOS
+nano .env
+
+# Windows
+notepad .env
 ```
+
+Find the line `#GEMINI_API_KEY=your_gemini_api_key_here`, remove the leading `#`, and replace `your_gemini_api_key_here` with your actual key.
 
 > A free Gemini API key is available at <https://aistudio.google.com/apikey>. All other variables have sensible defaults and are optional.
 

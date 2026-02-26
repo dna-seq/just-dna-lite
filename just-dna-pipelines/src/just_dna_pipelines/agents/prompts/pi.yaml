@@ -218,7 +218,14 @@ instructions: |
      populated from researcher PMIDs — do not leave it empty if PMIDs exist.
   7. **Call validate_spec.** If invalid, fix errors and re-validate.
   8. **Call write_module_md** to document the module.
-  9. Present a summary of the created module.
+  9. **Call generate_logo** with the module name and a vivid visual description
+     that reflects the module's health/genetics theme, dominant color, and key
+     symbolism (e.g. "Flat minimalist icon of a glowing double helix wrapped
+     around a heart, deep purple and teal gradient, white background, clean
+     vector style."). The logo.png is displayed as the module's thumbnail in the
+     annotation browser UI — always call this step. If the tool returns an error,
+     note it in the summary and continue.
+  10. Present a summary of the created module.
 
   ### Scenario B — Editing an existing module (module already in editing slot)
   When the user provides an existing module (module_spec.yaml + variants.csv +
@@ -249,9 +256,12 @@ instructions: |
   8. **Call validate_spec.** If invalid, fix and re-validate.
   9. **Call write_module_md** — preserve existing content and append a changelog
      entry describing what changed and why.
-  10. Keep the same module name, icon, color, and other metadata unless the user
+  10. **Call generate_logo** only if the user asked for a new logo or no logo
+      exists yet. Keep the existing logo otherwise. The logo.png is shown as the
+      module's thumbnail in the annotation browser UI.
+  11. Keep the same module name, icon, color, and other metadata unless the user
       explicitly asks to change them.
-  11. Present a summary of changes (e.g. "Added 3 variants for gene X, corrected
+  12. Present a summary of changes (e.g. "Added 3 variants for gene X, corrected
       weight for rs123, bumped to v2").
 
   ## External Knowledge (via team members)

@@ -336,7 +336,29 @@ def _build_reviewer(
 # Shared tool builder (used by both team PI and solo agent)
 # ---------------------------------------------------------------------------
 
-def _build_pi_tools(output_dir: Path) -> List[Any]:
+def _generate_logo_image(module_name: str, prompt: str, output_dir: Path, api_key: str) -> str:
+    """Generate a module logo via a small agno Agent with GeminiTools (Imagen 3)."""
+    from agno.tools.models.gemini import GeminiTools
+
+    logo_agent = Agent(
+        model=Gemini(id="gemini-2.0-flash", api_key=api_key, vertexai=False),
+        tools=[GeminiTools(api_key=api_key)],
+    )
+    try:
+        response = logo_agent.run(f"Generate an image: {prompt}")
+    except Exception as exc:
+        return f"Logo generation failed: {exc}"
+
+    if not (response and response.images):
+        return "Logo generation returned no image."
+
+    logo_path = output_dir / module_name / "logo.png"
+    logo_path.parent.mkdir(parents=True, exist_ok=True)
+    logo_path.write_bytes(response.images[0].content)
+    return f"Logo saved to {logo_path}"
+
+
+def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
     """Return the list of PI tool functions bound to *output_dir*."""
 
     def write_spec_files(
@@ -405,7 +427,22 @@ def _build_pi_tools(output_dir: Path) -> List[Any]:
         md_path.write_text(markdown_content, encoding="utf-8")
         return f"MODULE.md written to {md_path} ({len(markdown_content)} chars)"
 
-    return [write_spec_files, validate_spec, register_module, write_module_md]
+    def generate_logo(module_name: str, prompt: str) -> str:
+        """Generate a square logo image for the module using Gemini image generation.
+
+        The logo is saved as logo.png inside the module's spec directory.
+        Call this after write_module_md as the final step.
+
+        Args:
+            module_name: Machine name of the module (same as in module_spec.yaml).
+            prompt: Visual description for the logo — include style, dominant colors,
+                    symbolic elements, and the module's health/genetics theme.
+                    Example: "Minimalist flat icon of a DNA helix intertwined with a heart,
+                    deep purple gradient, white background, clean vector style."
+        """
+        return _generate_logo_image(module_name, prompt, output_dir, api_key)
+
+    return [write_spec_files, validate_spec, register_module, write_module_md, generate_logo]
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +478,7 @@ def create_module_team(
         model=Gemini(id=resolved_model, api_key=api_key, vertexai=False),
         members=researchers + [reviewer],
         mode="coordinate",
-        tools=_build_pi_tools(output_dir),
+        tools=_build_pi_tools(output_dir, api_key),
         instructions=spec.get("instructions", ""),
         show_members_responses=team_cfg.get("show_members_responses", True),
         markdown=team_cfg.get("markdown", True),
@@ -483,7 +520,7 @@ def create_module_agent_solo(
     return Agent(
         name=spec.get("name", "ModuleCreator"),
         model=Gemini(id=resolved_model, api_key=api_key, vertexai=False),
-        tools=_build_pi_tools(output_dir) + [biocontext],
+        tools=_build_pi_tools(output_dir, api_key) + [biocontext],
         instructions=spec.get("instructions", ""),
         markdown=agent_cfg.get("markdown", True),
         debug_mode=agent_cfg.get("debug_mode", False),

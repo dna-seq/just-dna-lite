@@ -76,7 +76,7 @@ instructions: |
 
   | Column     | Required | Type   | Description |
   |------------|----------|--------|-------------|
-  | rsid       | yes      | string | dbSNP ID, e.g. rs1801133 |
+  | rsid       | yes*     | string | dbSNP ID, e.g. rs1801133. May be blank if chrom/start/ref/alts are provided — the compiler resolves it at build time. |
   | chrom      | no       | string | Chromosome without "chr" prefix, e.g. 1, X |
   | start      | no       | int    | 1-based genomic position (GRCh38) |
   | ref        | no       | string | Reference allele |
@@ -116,13 +116,17 @@ instructions: |
   - Magnitude guide: 0.1–0.3 weak, 0.4–0.8 moderate, 0.9–1.2 strong, 1.3–1.5 very strong.
     Reserve extremes (>1.3) for well-established, replicated findings.
 
-  ## 3. studies.csv (optional)
+  ## 3. studies.csv
 
+  **Required whenever you have collected PMIDs** (which you always should).
   One row per **(rsid, pmid)** combination:
 
   ```
   rsid,pmid,population,p_value,conclusion,study_design
   ```
+
+  Populate this from any PMIDs found in attached material or retrieved via
+  EuropePMC. Omit only if no PMIDs were found at all.
 
   ## 1-Shot Example: Methylation & Folate Module
 
@@ -175,27 +179,47 @@ instructions: |
   There are two scenarios:
 
   ### Scenario A — Creating a new module (no existing module in editing slot)
-  1. Analyze the input (paper, CSV, or text) to identify relevant genetic variants.
-  2. For each variant, determine rsid, gene, genotypes, and clinical significance.
-  3. Assign appropriate weights, states, and conclusions per genotype.
-  4. Write the spec files to the provided output directory.
-  5. Call validate_module_spec to check for errors.
-  6. If validation fails, fix the files and re-validate.
-  7. Present a summary of the created module.
+  1. Analyze the input (paper, CSV, or text). Extract all variants — if a source
+     provides only genomic coordinates (no rsid), record them and leave rsid blank;
+     **do not skip the variant**. Resolution happens automatically at compile time.
+  2. For each variant: confirm rsid OR GRCh38 coordinates, gene symbol, all
+     clinically relevant genotypes (ref/ref, ref/alt, alt/alt), weights, states,
+     and conclusions.
+  3. Collect PMIDs — from attached material first, EuropePMC otherwise
+     (max 3 queries, top 3-5 results). Never invent PMIDs.
+  4. Call `write_spec_files` with variants_csv_content and studies_csv_content
+     (studies populated from collected PMIDs — do not leave empty if PMIDs exist).
+  5. Call `validate_spec` with the spec directory path returned by write_spec_files.
+     If invalid, fix errors and re-validate.
+  6. Call `write_module_md` to document the module (purpose, data sources, design
+     decisions, creation date). Include citations if input contained papers.
+  7. Call `generate_logo` with the module name and a vivid visual description
+     matching the module's theme and color. The logo.png is displayed as the module's
+     thumbnail in the annotation browser UI — always call this step. If the tool
+     returns an error, note it in the summary and continue.
+  8. Present a summary of the created module.
 
   ### Scenario B — Editing an existing module (module already in editing slot)
-  When the user provides an existing module (module_spec.yaml + variants.csv + optional
-  studies.csv) as context, you are editing that module, not creating from scratch.
+  When the user provides an existing module (module_spec.yaml + variants.csv +
+  optional studies.csv) as context, you are editing that module, not creating
+  from scratch.
 
   1. Read the existing module files provided in context carefully.
-  2. Follow the user's instructions: they may ask to add new variants, fix errors,
-     change weights, update conclusions, add a new gene, remove entries, etc.
+  2. Follow the user's instructions: add new variants, fix errors, change weights,
+     update conclusions, add a new gene, remove entries, etc.
   3. Produce the COMPLETE updated module (all files), not just the diff.
      Include ALL existing variants that should be kept, plus any additions/changes.
-  4. Keep the same module name, icon, color, and other metadata unless the user
+  4. Call `write_spec_files` — pass all files in full, including studies_csv_content
+     with all PMIDs (existing + any new ones).
+  5. Call `validate_spec`. If invalid, fix and re-validate.
+  6. Call `write_module_md` — preserve existing content and append a changelog
+     entry describing what changed and why.
+  7. Call `generate_logo` only if the user asked for a new logo or none exists yet.
+     The logo.png is shown as the module's thumbnail in the annotation browser UI.
+  8. Keep the same module name, icon, color, and other metadata unless the user
      explicitly asks to change them.
-  5. Write the updated spec files, validate, and present a summary of changes
-     (e.g. "Added 3 variants for gene X, corrected weight for rs123").
+  9. Present a summary of changes (e.g. "Added 3 variants for gene X, corrected
+     weight for rs123, bumped to v2").
 
   ## BioContext KB — External Knowledge Tools
 
@@ -263,10 +287,13 @@ instructions: |
   ## Rules
 
   - Use ONLY real, verified rsids. Do NOT invent rsid numbers.
+  - If the source provides only genomic coordinates (no rsid), include the variant
+    with rsid blank and populate chrom/start/ref/alts — the compiler resolves the
+    rsid automatically at build time. Never exclude a variant solely because it lacks an rsid.
+  - If genomic positions (chrom, start, ref, alts) are unknown, omit them — the compiler
+    can resolve them from rsid via Ensembl.
   - Genotypes must be biologically valid for the variant.
   - Conclusions must be factual and cite evidence when possible.
   - Weight magnitudes: use -1.5 to +1.5 range. Reserve extremes for well-established variants.
   - Always include the wild-type (reference) genotype with weight 0 and state "neutral".
-  - If genomic positions (chrom, start, ref, alts) are unknown, omit them — the compiler
-    can resolve from rsid via Ensembl.
   - Write CSV files with proper quoting (conclusions often contain commas).
