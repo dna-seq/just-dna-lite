@@ -18,10 +18,17 @@ from webui.state import UploadState, AgentState
 # ============================================================================
 
 def _custom_module_item(name: rx.Var[str]) -> rx.Component:
-    """Single custom module entry with a remove button."""
+    """Single custom module entry with load-to-slot and remove buttons."""
     return rx.el.div(
         fomantic_icon("dna", size=14, color="#a333c8"),
         rx.el.span(name, style={"flex": "1", "marginLeft": "6px", "fontSize": "0.85rem"}),
+        rx.el.button(
+            fomantic_icon("edit", size=12, color="#a333c8"),
+            on_click=AgentState.load_custom_module_to_slot(name),
+            class_name="ui mini icon button",
+            style={"padding": "3px 6px", "background": "none", "border": "none", "cursor": "pointer"},
+            title="Load into editing slot",
+        ),
         rx.el.button(
             fomantic_icon("circle-x", size=12, color="#db2828"),
             on_click=UploadState.remove_custom_module(name),
@@ -101,16 +108,33 @@ def repo_source_card(repo: rx.Var[dict]) -> rx.Component:
 def _slot_empty_state() -> rx.Component:
     """Shown when the editing slot is empty."""
     return rx.el.div(
-        fomantic_icon("inbox", size=28, color="#ccc"),
         rx.el.div(
-            "No module loaded",
-            style={"color": "#999", "fontSize": "0.9rem", "marginTop": "6px"},
+            fomantic_icon("inbox", size=28, color="#ccc"),
+            rx.el.div(
+                "No module loaded",
+                style={"color": "#999", "fontSize": "0.9rem", "marginTop": "6px"},
+            ),
+            style={"textAlign": "center", "padding": "14px 8px 10px"},
         ),
+        # Info callout
         rx.el.div(
-            "Upload files or use the agent to create a module",
-            style={"color": "#bbb", "fontSize": "0.78rem", "marginTop": "2px"},
+            rx.el.i("", class_name="info circle icon", style={"color": "#a333c8", "opacity": "0.7", "marginRight": "6px", "flexShrink": "0"}),
+            rx.el.span(
+                "Just start chatting — the agent will create a module and load it here automatically. "
+                "Upload an existing module here to edit or use it for annotation. "
+                "Use the button below to register a module as an annotation source",
+                style={"fontSize": "0.78rem", "color": "#7a6a8a", "lineHeight": "1.4"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "flex-start",
+                "backgroundColor": "#f3eeff",
+                "border": "1px solid #d6c4e8",
+                "borderRadius": "6px",
+                "padding": "8px 10px",
+                "marginTop": "4px",
+            },
         ),
-        style={"textAlign": "center", "padding": "18px 8px"},
     )
 
 
@@ -234,15 +258,15 @@ def _slot_button_bar() -> rx.Component:
 
 
 def _register_button() -> rx.Component:
-    """Standalone Register button between slot and module sources — visual 'push up'."""
+    """Standalone Register button between slot and module sources — visual 'push down'."""
     return rx.el.div(
         rx.el.button(
             rx.cond(
                 AgentState.slot_adding,
                 rx.el.i("", class_name="spinner loading icon"),
                 rx.fragment(
-                    fomantic_icon("arrow up", size=14),
-                    " Register",
+                    fomantic_icon("arrow down", size=14),
+                    " Register Module as source",
                 ),
             ),
             on_click=AgentState.add_slot_module,
@@ -264,6 +288,50 @@ def editing_slot() -> rx.Component:
                 style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
             ),
             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+        ),
+        # Confirm-replace banner (shown when a custom module is selected while slot is occupied)
+        rx.cond(
+            AgentState.slot_replace_pending_name != "",
+            rx.el.div(
+                rx.el.div(
+                    "Replace ",
+                    rx.el.strong(AgentState.slot_module_name),
+                    rx.cond(
+                        AgentState.slot_version > 0,
+                        rx.el.span(
+                            " v", AgentState.slot_version.to(str),
+                            style={"color": "#a333c8", "fontWeight": "500"},
+                        ),
+                        rx.fragment(),
+                    ),
+                    " with ",
+                    rx.el.strong(AgentState.slot_replace_pending_name),
+                    "?",
+                    style={"fontSize": "0.82rem", "color": "#555"},
+                ),
+                rx.el.div(
+                    rx.el.button(
+                        "Replace",
+                        on_click=AgentState.confirm_replace_slot,
+                        class_name="ui mini red button",
+                        style={"marginRight": "6px"},
+                    ),
+                    rx.el.button(
+                        "Cancel",
+                        on_click=AgentState.cancel_replace_slot,
+                        class_name="ui mini button",
+                    ),
+                    style={"marginTop": "6px"},
+                ),
+                style={
+                    "backgroundColor": "#fff8f0",
+                    "border": "1px solid #f0c070",
+                    "borderRadius": "6px",
+                    "padding": "8px 10px",
+                    "marginBottom": "8px",
+                },
+            ),
+            rx.fragment(),
         ),
         # Content: empty or populated
         rx.cond(
@@ -287,38 +355,29 @@ def editing_slot() -> rx.Component:
 # ============================================================================
 
 def modules_left_panel() -> rx.Component:
-    """Left panel: module sources, editing slot."""
+    """Left panel: editing slot (top), then module sources (bottom)."""
     return rx.el.div(
-        # Header
-        rx.el.div(
-            fomantic_icon("boxes", size=22, color="#a333c8"),
-            rx.el.span(
-                " Module Manager",
-                style={"fontSize": "1.15rem", "fontWeight": "600", "marginLeft": "8px"},
-            ),
-            style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
-        ),
+
+        # Editing Slot — fixed at top so sources list growth doesn't push it down
+        editing_slot(),
+
+        # Register button — pushes slot contents down into module sources
+        _register_button(),
 
         # Module Sources section
         rx.el.div(
             rx.el.div(
-                fomantic_icon("database", size=16, color="#767676"),
+                fomantic_icon("database", size=16, color="#2185d0"),
                 rx.el.span(
                     " Module Sources",
-                    style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px", "color": "#555"},
+                    style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px", "color": "#2185d0"},
                 ),
                 style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
             ),
             rx.foreach(UploadState.repo_info_list, repo_source_card),
             class_name="ui segment",
-            style={"padding": "12px", "marginBottom": "10px"},
+            style={"padding": "12px", "marginBottom": "10px", "border": "1px solid #c5daf5", "backgroundColor": "#f4f8fe"},
         ),
-
-        # Register button — pushes slot contents up into module sources
-        _register_button(),
-
-        # Editing Slot
-        editing_slot(),
 
         id="modules-left-panel",
     )
@@ -328,13 +387,69 @@ def modules_left_panel() -> rx.Component:
 # AGENT CHAT COMPONENTS
 # ============================================================================
 
-def agent_message_bubble(msg: rx.Var[dict]) -> rx.Component:
-    """Render a single chat message (user or agent)."""
-    is_user = msg["role"].to(str) == "user"
-    return rx.el.div(
+_EVENT_LABEL_STYLE: dict = {
+    "fontSize": "0.78rem",
+    "color": "#7c6c9a",
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "5px",
+}
+
+_EVENT_DETAIL_STYLE: dict = {
+    "fontSize": "0.72rem",
+    "background": "#f0e8ff",
+    "color": "#4a3a6a",
+    "padding": "6px 8px",
+    "borderRadius": "4px",
+    "overflowX": "auto",
+    "whiteSpace": "pre-wrap",
+    "wordBreak": "break-word",
+    "marginTop": "4px",
+    "maxHeight": "160px",
+    "overflowY": "auto",
+}
+
+
+def agent_event_item(event: rx.Var[dict]) -> rx.Component:
+    """Render a single agent run event — collapsible when it has detail.
+
+    Done events (type ends with _done) show a green check icon; active/info
+    events show a cog or info-circle icon.
+    """
+    label = event["label"].to(str)
+    detail = event["detail"].to(str)
+    ev_type = event["type"].to(str)
+    is_done = ev_type.contains("_done")
+    is_tool = ev_type.contains("tool")
+
+    icon = rx.cond(
+        is_done,
+        rx.el.i("", class_name="check circle icon", style={"color": "#21ba45", "fontSize": "0.75rem"}),
         rx.cond(
-            is_user,
-            rx.el.div(
+            is_tool,
+            rx.el.i("", class_name="cog icon", style={"opacity": "0.7", "fontSize": "0.75rem"}),
+            rx.el.i("", class_name="info circle icon", style={"opacity": "0.5", "fontSize": "0.75rem"}),
+        ),
+    )
+
+    return rx.cond(
+        detail != "",
+        rx.el.details(
+            rx.el.summary(icon, label, style={**_EVENT_LABEL_STYLE, "cursor": "pointer"}),
+            rx.el.pre(detail, style=_EVENT_DETAIL_STYLE),
+            style={"marginBottom": "3px"},
+        ),
+        rx.el.div(icon, label, style={**_EVENT_LABEL_STYLE, "marginBottom": "3px"}),
+    )
+
+
+def agent_message_bubble(msg: rx.Var[dict]) -> rx.Component:
+    """Render a single chat message (user, agent, or status)."""
+    role = msg["role"].to(str)
+    return rx.el.div(
+        rx.match(
+            role,
+            ("user", rx.el.div(
                 msg["content"].to(str),
                 style={
                     "backgroundColor": "#00b5ad",
@@ -347,7 +462,25 @@ def agent_message_bubble(msg: rx.Var[dict]) -> rx.Component:
                     "marginLeft": "auto",
                     "whiteSpace": "pre-wrap",
                 },
-            ),
+            )),
+            ("status", rx.el.div(
+                rx.el.i("", class_name="info circle icon", style={"marginRight": "6px", "opacity": "0.7"}),
+                msg["content"].to(str),
+                style={
+                    "backgroundColor": "#f8f4ff",
+                    "color": "#7c6c9a",
+                    "padding": "6px 12px",
+                    "borderRadius": "8px",
+                    "maxWidth": "90%",
+                    "fontSize": "0.8rem",
+                    "lineHeight": "1.3",
+                    "marginRight": "auto",
+                    "fontStyle": "italic",
+                    "border": "1px solid #e8dff5",
+                    "display": "flex",
+                    "alignItems": "center",
+                },
+            )),
             rx.el.div(
                 rx.markdown(msg["content"].to(str)),
                 style={
@@ -376,7 +509,11 @@ def agent_chat_panel() -> rx.Component:
         rx.el.div(
             fomantic_icon("dna", size=22, color="#fff"),
             rx.el.span(
-                " Module Creator Agent",
+                rx.cond(
+                    AgentState.agent_use_team,
+                    " Module Creator Team",
+                    " Module Creator",
+                ),
                 style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "8px", "color": "#fff", "flex": "1"},
             ),
             rx.el.button(
@@ -402,15 +539,46 @@ def agent_chat_panel() -> rx.Component:
         rx.el.div(
             rx.foreach(AgentState.agent_messages, agent_message_bubble),
             rx.cond(
-                AgentState.agent_processing,
+                AgentState.agent_processing | (AgentState.agent_events.length() > 0),
                 rx.el.div(
-                    rx.el.div(
-                        rx.el.i("", class_name="spinner loading icon", style={"fontSize": "1.2rem", "color": "#a333c8"}),
-                        rx.el.span(
-                            " Agent is thinking... this may take a minute.",
-                            style={"marginLeft": "8px", "color": "#888", "fontSize": "0.9rem"},
+                    # Status row: spinner while running, checkmark when done
+                    rx.cond(
+                        AgentState.agent_processing,
+                        rx.el.div(
+                            rx.el.i("", class_name="spinner loading icon", style={"fontSize": "1.2rem", "color": "#a333c8"}),
+                            rx.el.span(
+                                rx.cond(
+                                    AgentState.agent_status != "",
+                                    AgentState.agent_status,
+                                    "Agent is thinking... this may take a minute.",
+                                ),
+                                style={"marginLeft": "8px", "color": "#888", "fontSize": "0.9rem"},
+                            ),
+                            style={"display": "flex", "alignItems": "center"},
                         ),
-                        style={"display": "flex", "alignItems": "center"},
+                        rx.el.div(
+                            rx.el.i("", class_name="check circle icon", style={"fontSize": "1rem", "color": "#21ba45"}),
+                            rx.el.span(
+                                "Run complete — expand entries to inspect",
+                                style={"marginLeft": "6px", "color": "#5a7a5a", "fontSize": "0.85rem"},
+                            ),
+                            style={"display": "flex", "alignItems": "center"},
+                        ),
+                    ),
+                    # Events list
+                    rx.cond(
+                        AgentState.agent_events.length() > 0,
+                        rx.el.div(
+                            rx.foreach(AgentState.agent_events, agent_event_item),
+                            style={
+                                "marginTop": "10px",
+                                "paddingTop": "8px",
+                                "borderTop": "1px solid #e8dff5",
+                                "maxHeight": "260px",
+                                "overflowY": "auto",
+                            },
+                        ),
+                        rx.fragment(),
                     ),
                     style={
                         "padding": "14px",
@@ -430,7 +598,7 @@ def agent_chat_panel() -> rx.Component:
                         style={"color": "#888", "marginTop": "10px", "fontSize": "1rem", "fontWeight": "500"},
                     ),
                     rx.el.div(
-                        "Attach a research paper (PDF) or data file (CSV) with the ",
+                        "Attach up to 5 files (PDF/CSV/MD/TXT) with the ",
                         fomantic_icon("paperclip", size=14, color="#aaa"),
                         " button, then tell the agent what module to create.",
                         style={"color": "#aaa", "marginTop": "6px", "fontSize": "0.85rem", "maxWidth": "340px", "lineHeight": "1.4"},
@@ -452,12 +620,38 @@ def agent_chat_panel() -> rx.Component:
 
         # Input bar with attach + file chip + send
         rx.el.div(
+            # Mode toggle
             rx.el.div(
-                # Attach button (upload trigger)
+                rx.el.label(
+                    rx.el.input(
+                        type="checkbox",
+                        checked=AgentState.agent_use_team,
+                        on_change=AgentState.set_agent_use_team,
+                        disabled=AgentState.agent_processing,
+                        style={"marginRight": "6px", "cursor": "pointer", "accentColor": "#a333c8"},
+                    ),
+                    rx.cond(
+                        AgentState.agent_use_team,
+                        "Research team (multi-agent)",
+                        "Single agent",
+                    ),
+                    style={
+                        "fontSize": "0.8rem",
+                        "color": "#888",
+                        "cursor": "pointer",
+                        "userSelect": "none",
+                        "display": "flex",
+                        "alignItems": "center",
+                    },
+                ),
+                style={"marginBottom": "6px"},
+            ),
+            # Attachment row — separate from input so textarea gets full width
+            rx.el.div(
                 rx.upload(
                     rx.el.div(
                         fomantic_icon("paperclip", size=16, color=rx.cond(
-                            AgentState.agent_uploaded_file != "", "#a333c8", "#888",
+                            AgentState.agent_uploaded_files.length() > 0, "#a333c8", "#888",
                         )),
                         rx.el.span(
                             "Attach",
@@ -466,7 +660,7 @@ def agent_chat_panel() -> rx.Component:
                                 "fontWeight": "500",
                                 "marginLeft": "4px",
                                 "color": rx.cond(
-                                    AgentState.agent_uploaded_file != "", "#a333c8", "#888",
+                                    AgentState.agent_uploaded_files.length() > 0, "#a333c8", "#888",
                                 ),
                             },
                         ),
@@ -475,21 +669,20 @@ def agent_chat_panel() -> rx.Component:
                             "alignItems": "center",
                             "cursor": "pointer",
                             "padding": "0 10px",
-                            "height": "40px",
+                            "height": "32px",
                             "border": "1px solid #ddd",
                             "borderRadius": "6px",
                             "backgroundColor": rx.cond(
-                                AgentState.agent_uploaded_file != "", "#faf6ff", "#fff",
+                                AgentState.agent_uploaded_files.length() > 0, "#faf6ff", "#fff",
                             ),
                             "boxSizing": "border-box",
                             "whiteSpace": "nowrap",
-                            "marginRight": "6px",
-                            "flex": "0 0 auto",
+                            "flexShrink": "0",
                         },
                         title="Attach PDF, CSV, or text file",
                     ),
                     id="agent_file_upload",
-                    multiple=False,
+                    multiple=True,
                     accept={
                         "application/pdf": [".pdf"],
                         "text/csv": [".csv"],
@@ -497,51 +690,96 @@ def agent_chat_panel() -> rx.Component:
                         "text/plain": [".txt"],
                     },
                     on_drop=AgentState.upload_agent_file(rx.upload_files(upload_id="agent_file_upload")),
-                    style={
-                        "display": "contents",
-                    },
+                    style={"display": "contents"},
                 ),
-                # Attached file chip
                 rx.cond(
-                    AgentState.agent_uploaded_file != "",
+                    AgentState.agent_uploaded_files.length() > 0,
                     rx.el.div(
-                        fomantic_icon("file-text", size=12, color="#a333c8"),
-                        rx.el.span(
-                            AgentState.agent_uploaded_file,
-                            style={"fontSize": "0.78rem", "color": "#a333c8", "marginLeft": "3px", "fontWeight": "500"},
+                        rx.foreach(
+                            AgentState.agent_uploaded_files,
+                            lambda fname: rx.el.div(
+                                fomantic_icon("file-text", size=12, color="#a333c8"),
+                                rx.el.span(
+                                    fname,
+                                    style={
+                                        "fontSize": "0.78rem",
+                                        "color": "#a333c8",
+                                        "marginLeft": "3px",
+                                        "fontWeight": "500",
+                                        # Ellipsis on long names; flex:1 + minWidth:0 allows shrink
+                                        "flex": "1",
+                                        "minWidth": "0",
+                                        "overflow": "hidden",
+                                        "textOverflow": "ellipsis",
+                                        "whiteSpace": "nowrap",
+                                    },
+                                ),
+                                rx.el.button(
+                                    fomantic_icon("circle-x", size=11, color="#999"),
+                                    on_click=AgentState.remove_agent_file(fname),
+                                    style={
+                                        "background": "none",
+                                        "border": "none",
+                                        "cursor": "pointer",
+                                        "padding": "0 0 0 4px",
+                                        "display": "flex",
+                                        "alignItems": "center",
+                                        "flexShrink": "0",  # never clip the × button
+                                    },
+                                ),
+                                style={
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "padding": "0 6px 0 8px",
+                                    "border": "1px solid #d6c4e8",
+                                    "borderRadius": "12px",
+                                    "backgroundColor": "#faf6ff",
+                                    "height": "32px",
+                                    "boxSizing": "border-box",
+                                    "maxWidth": "200px",
+                                },
+                            ),
                         ),
                         rx.el.button(
-                            fomantic_icon("circle-x", size=11, color="#999"),
+                            "Clear all",
                             on_click=AgentState.clear_agent_file,
                             style={
-                                "background": "none",
-                                "border": "none",
+                                "height": "32px",
+                                "padding": "0 10px",
+                                "border": "1px solid #ddd",
+                                "borderRadius": "6px",
+                                "backgroundColor": "#fff",
+                                "fontSize": "0.82rem",
+                                "fontWeight": "500",
+                                "color": "#888",
                                 "cursor": "pointer",
-                                "padding": "0 0 0 4px",
-                                "display": "flex",
-                                "alignItems": "center",
+                                "flexShrink": "0",
+                                "boxSizing": "border-box",
                             },
                         ),
                         style={
                             "display": "flex",
                             "alignItems": "center",
-                            "padding": "0 8px",
-                            "marginRight": "6px",
-                            "border": "1px solid #d6c4e8",
-                            "borderRadius": "12px",
-                            "backgroundColor": "#faf6ff",
-                            "flexShrink": "0",
-                            "maxWidth": "180px",
-                            "overflow": "hidden",
-                            "height": "40px",
-                            "boxSizing": "border-box",
+                            "gap": "6px",
+                            "flexWrap": "wrap",
                         },
                     ),
                     rx.fragment(),
                 ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "marginBottom": "8px",
+                    "flexWrap": "wrap",
+                },
+            ),
+            # Textarea + Send row
+            rx.el.div(
                 rx.el.textarea(
                     id="agent-chat-input",
-                    value=AgentState.agent_input,
+                    key=AgentState._agent_input_key,
+                    default_value=AgentState.agent_input,
                     on_change=AgentState.set_agent_input,
                     placeholder="Describe the module you want to create...\n(Shift+Enter for new line)",
                     disabled=AgentState.agent_processing,
@@ -573,8 +811,8 @@ def agent_chat_panel() -> rx.Component:
                     disabled=AgentState.agent_processing | (AgentState.agent_input == ""),
                     class_name="ui purple button",
                     style={
-                        "marginLeft": "8px",
-                        "height": "39px",
+                        "marginLeft": "0",
+                        "height": "44px",
                         "boxSizing": "border-box",
                         "alignSelf": "flex-end",
                         "paddingTop": "0",
@@ -584,7 +822,7 @@ def agent_chat_panel() -> rx.Component:
                         "flexShrink": "0",
                     },
                 ),
-                style={"display": "flex", "alignItems": "flex-end", "gap": "0"},
+                style={"display": "flex", "alignItems": "flex-end", "gap": "12px"},
             ),
             rx.el.div(
                 "Enter to send \u00b7 Shift+Enter for new line",

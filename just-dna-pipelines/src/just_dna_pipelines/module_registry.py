@@ -135,6 +135,13 @@ def register_custom_module(
     if not result.success:
         return result
 
+    # Copy source spec files alongside compiled parquets so the module can be
+    # loaded back into the editing slot for further editing.
+    _SPEC_SUFFIXES = {".yaml", ".csv", ".md"}
+    for f in spec_dir.iterdir():
+        if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
+            shutil.copy2(f, output_dir / f.name)
+
     config_path = get_config_path()
     config = ModulesConfig.model_validate(
         yaml.safe_load(config_path.read_text()) or {}

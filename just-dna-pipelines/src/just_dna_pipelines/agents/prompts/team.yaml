@@ -1,0 +1,13 @@
+name: ModuleCreatorTeam
+description: "Multi-agent team that researches, drafts, reviews, and compiles annotation modules"
+
+model:
+  provider: google
+  default_id: gemini-3-pro-preview
+  env_override: GEMINI_MODEL   # env var to override PI model ID at runtime
+
+team:
+  mode: coordinate
+  show_members_responses: true
+  markdown: true
+  debug_mode: true

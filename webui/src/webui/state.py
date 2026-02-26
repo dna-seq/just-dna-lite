@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 import os
+import queue
 import shutil
 import asyncio
 import tempfile
 import time
+import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Optional
 
 import httpx
+import polars as pl
 import reflex as rx
 from reflex.event import EventSpec
 from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
+from just_dna_pipelines.agents.module_creator import read_spec_meta, bump_spec_version
+from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
+from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
-from just_dna_pipelines.module_config import build_module_metadata_dict
 from just_dna_pipelines.annotation.resources import get_user_output_dir
+from just_dna_pipelines.module_config import build_module_metadata_dict, _load_config
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
     register_custom_module,
@@ -26,8 +32,6 @@ from just_dna_pipelines.module_registry import (
     list_custom_modules,
     refresh_module_registry,
 )
-from just_dna_pipelines.annotation.assets import user_vcf_partitions
-from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 
 
@@ -667,6 +671,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.selected_modules = [
             m for m in self.selected_modules if m in self.available_modules
         ]
+
+    def refresh_module_registry_state(self):
+        """Public event: re-sync UI state from the module globals.
+
+        Yielded by AgentState after registration so the sources list updates
+        without relying on cross-state proxy mutation.
+        """
+        self._refresh_module_ui_state()
 
     def toggle_ensembl(self):
         """Toggle Ensembl variation annotation on/off."""
@@ -2725,6 +2737,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 # ============================================================================
 
 _AGENT_UPLOADS_DIR = Path("data/agent_uploads")
+_MAX_AGENT_ATTACHMENTS = 5
 
 
 class AgentState(rx.State):
@@ -2739,9 +2752,14 @@ class AgentState(rx.State):
     # -- Chat state -----------------------------------------------------------
     agent_messages: List[Dict[str, str]] = []
     agent_processing: bool = False
+    agent_use_team: bool = True
+    agent_status: str = ""
+    agent_events: List[Dict[str, str]] = []
     agent_input: str = ""
-    agent_uploaded_file: str = ""
-    _agent_uploaded_path: str = ""
+    # Key used by the modules page textarea to remount on reset.
+    _agent_input_key: int = 0
+    agent_uploaded_files: List[str] = []
+    _agent_uploaded_paths: List[str] = []
 
     # -- Editing slot state ---------------------------------------------------
     _slot_spec_dir: str = ""
@@ -2752,10 +2770,16 @@ class AgentState(rx.State):
     slot_module_color: str = ""
     slot_version: int = 0
     slot_adding: bool = False
+    slot_replace_pending_name: str = ""   # module name queued for confirm-replace
 
     def set_agent_input(self, value: str) -> None:
         """Explicit setter for agent_input (avoids deprecation warning)."""
         self.agent_input = value
+
+    def _reset_agent_input(self) -> None:
+        """Clear chat input and remount uncontrolled textarea."""
+        self.agent_input = ""
+        self._agent_input_key = self._agent_input_key + 1
 
     # -- Slot computed vars ---------------------------------------------------
 
@@ -2917,6 +2941,51 @@ class AgentState(rx.State):
             f"Module **{self.slot_module_name}** loaded into editing slot (v{self.slot_version}).",
         )
 
+    def load_custom_module_to_slot(self, module_name: str) -> None:
+        """Load a registered custom module into the editing slot.
+
+        If the slot already has a module, set ``slot_replace_pending_name`` so
+        the UI can show a confirmation prompt instead of silently overwriting.
+        """
+        if self.slot_is_populated:
+            self.slot_replace_pending_name = module_name
+        else:
+            self._do_load_custom_module(module_name)
+
+    def confirm_replace_slot(self) -> None:
+        """Confirmed — replace current slot contents with the pending module."""
+        name = self.slot_replace_pending_name
+        self.slot_replace_pending_name = ""
+        if name:
+            self._do_load_custom_module(name)
+
+    def cancel_replace_slot(self) -> None:
+        """Cancel a pending slot-replace operation."""
+        self.slot_replace_pending_name = ""
+
+    def _do_load_custom_module(self, module_name: str) -> None:
+        """Copy spec files from the custom modules dir into a fresh generated dir
+        and populate the editing slot from there."""
+        src_dir = CUSTOM_MODULES_DIR / module_name
+        if not (src_dir / "module_spec.yaml").exists():
+            self._add_chat_message(
+                "agent",
+                f"Module **{module_name}** has no spec files — try re-registering it first.",
+            )
+            return
+        root = Path(__file__).resolve().parents[3]
+        dest_dir = root / "data" / "module_specs" / "generated" / module_name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        _SPEC_SUFFIXES = {".yaml", ".csv", ".md"}
+        for f in src_dir.iterdir():
+            if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
+                shutil.copy2(f, dest_dir / f.name)
+        self._populate_slot(dest_dir, source="upload")
+        self._add_chat_message(
+            "agent",
+            f"Module **{module_name}** loaded into editing slot (v{self.slot_version}).",
+        )
+
     async def add_slot_module(self) -> None:
         """Register the editing slot as a custom module."""
         if not self._slot_spec_dir:
@@ -2936,8 +3005,7 @@ class AgentState(rx.State):
                 f"Module **{name}** registered successfully! "
                 f"({variant_count} variants) — now available for annotation.",
             )
-            upload_state = await self.get_state(UploadState)
-            upload_state._refresh_module_ui_state()
+            yield UploadState.refresh_module_registry_state()
         else:
             self._add_chat_message(
                 "agent",
@@ -2959,22 +3027,63 @@ class AgentState(rx.State):
     # -- Agent file attachment ------------------------------------------------
 
     async def upload_agent_file(self, files: list[rx.UploadFile]) -> None:
-        """Save an uploaded PDF/CSV for the agent to use as context."""
+        """Save uploaded context files for the agent (up to 5 total)."""
         if not files:
             return
-        upload_file = files[0]
         _AGENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-        filename = upload_file.filename or "upload"
-        dest = _AGENT_UPLOADS_DIR / filename
-        data = await upload_file.read()
-        dest.write_bytes(data)
-        self.agent_uploaded_file = filename
-        self._agent_uploaded_path = str(dest)
+        remaining_slots = _MAX_AGENT_ATTACHMENTS - len(self._agent_uploaded_paths)
+        if remaining_slots <= 0:
+            self._add_chat_message(
+                "status",
+                f"Attachment limit reached ({_MAX_AGENT_ATTACHMENTS}). Remove one before adding more.",
+            )
+            return
+
+        added_count = 0
+        for upload_file in files:
+            if added_count >= remaining_slots:
+                break
+            filename = upload_file.filename or "upload"
+            dest = _AGENT_UPLOADS_DIR / filename
+            if dest.exists():
+                stem = dest.stem
+                suffix = dest.suffix
+                idx = 2
+                while True:
+                    candidate = _AGENT_UPLOADS_DIR / f"{stem}_{idx}{suffix}"
+                    if not candidate.exists():
+                        dest = candidate
+                        break
+                    idx += 1
+            data = await upload_file.read()
+            dest.write_bytes(data)
+            self.agent_uploaded_files = [*self.agent_uploaded_files, dest.name]
+            self._agent_uploaded_paths = [*self._agent_uploaded_paths, str(dest)]
+            added_count += 1
+
+        skipped_count = len(files) - added_count
+        if skipped_count > 0:
+            self._add_chat_message(
+                "status",
+                f"Added {added_count} attachment(s). Skipped {skipped_count} due to the {_MAX_AGENT_ATTACHMENTS}-file limit.",
+            )
 
     def clear_agent_file(self) -> None:
-        """Remove the attached file without clearing the chat."""
-        self.agent_uploaded_file = ""
-        self._agent_uploaded_path = ""
+        """Remove all attached files without clearing the chat."""
+        self.agent_uploaded_files = []
+        self._agent_uploaded_paths = []
+
+    def remove_agent_file(self, filename: str) -> None:
+        """Remove one attached file by displayed filename."""
+        if filename not in self.agent_uploaded_files:
+            return
+        idx = self.agent_uploaded_files.index(filename)
+        names = list(self.agent_uploaded_files)
+        paths = list(self._agent_uploaded_paths)
+        names.pop(idx)
+        paths.pop(idx)
+        self.agent_uploaded_files = names
+        self._agent_uploaded_paths = paths
 
     # -- Chat send ------------------------------------------------------------
 
@@ -2990,27 +3099,36 @@ class AgentState(rx.State):
             if not question:
                 return
             message = question
-            file_path = self._agent_uploaded_path
+            file_paths = list(self._agent_uploaded_paths)
             slot_context = self._build_slot_context()
             self.agent_messages = [
                 *self.agent_messages,
                 {"role": "user", "content": message},
             ]
-            self.agent_input = ""
+            self._reset_agent_input()
             self.agent_processing = True
+            self.agent_events = []
+            self.agent_status = ""
 
         spec_output = Path(tempfile.mkdtemp(prefix="module_spec_"))
 
         msg_to_send = message
-        if file_path:
-            suffix = Path(file_path).suffix.lower()
+        inline_blocks: List[str] = []
+        attachment_paths: List[Path] = []
+        for raw_path in file_paths:
+            path_obj = Path(raw_path)
+            if not path_obj.exists():
+                continue
+            suffix = path_obj.suffix.lower()
             if suffix in (".md", ".txt", ".csv"):
-                file_content = Path(file_path).read_text(encoding="utf-8")
-                msg_to_send = (
-                    f"Here is the input document ({Path(file_path).name}):\n\n"
-                    f"{file_content}\n\n{message}"
+                file_content = path_obj.read_text(encoding="utf-8")
+                inline_blocks.append(
+                    f"Here is the input document ({path_obj.name}):\n\n{file_content}"
                 )
-                file_path = ""
+            else:
+                attachment_paths.append(path_obj)
+        if inline_blocks:
+            msg_to_send = "\n\n".join([*inline_blocks, message])
 
         if slot_context:
             msg_to_send += slot_context
@@ -3022,14 +3140,41 @@ class AgentState(rx.State):
             f"Finally, call write_module_md to document the module."
         )
 
-        from just_dna_pipelines.agents.module_creator import run_agent_sync
+        from just_dna_pipelines.agents.module_creator import run_agent_async, run_team_async
 
-        response = await asyncio.to_thread(
-            run_agent_sync,
-            msg_to_send,
-            Path(file_path) if file_path else None,
-            None,
-            spec_output,
+        use_team = self.agent_use_team
+
+        async def _on_status(msg: str) -> None:
+            async with self:
+                self.agent_status = msg
+
+        async def _on_event(event_type: str, label: str, detail: str, call_id: str = "") -> None:
+            async with self:
+                self.agent_status = label
+                if call_id and event_type.endswith("_done"):
+                    # Merge into the matching start entry: rename label and
+                    # replace detail with the result (so the collapsible shows
+                    # the result rather than the original args).
+                    self.agent_events = [
+                        {**ev, "label": label, "detail": detail, "type": event_type}
+                        if ev.get("call_id") == call_id
+                        else ev
+                        for ev in self.agent_events
+                    ]
+                else:
+                    self.agent_events = [
+                        *self.agent_events,
+                        {"type": event_type, "label": label, "detail": detail, "call_id": call_id},
+                    ]
+
+        runner = run_team_async if use_team else run_agent_async
+        response = await runner(
+            message=msg_to_send,
+            file_paths=attachment_paths,
+            model_id=None,
+            spec_output_dir=spec_output,
+            on_status=_on_status,
+            on_event=_on_event,
         )
 
         found_spec_dir = ""
@@ -3056,6 +3201,9 @@ class AgentState(rx.State):
                 {"role": "agent", "content": response or "Agent returned no response."},
             ]
             self.agent_processing = False
+            self.agent_status = ""
+            # agent_events intentionally kept — user can inspect postmortem.
+            # They are cleared at the start of the next send_agent_message.
             if found_spec_dir:
                 self._populate_slot(Path(found_spec_dir), source="agent")
 
@@ -3065,9 +3213,11 @@ class AgentState(rx.State):
         """Reset the agent chat and editing slot to initial state."""
         self.agent_messages = []
         self.agent_processing = False
-        self.agent_input = ""
-        self.agent_uploaded_file = ""
-        self._agent_uploaded_path = ""
+        self.agent_status = ""
+        self.agent_events = []
+        self._reset_agent_input()
+        self.agent_uploaded_files = []
+        self._agent_uploaded_paths = []
         self._slot_spec_dir = ""
         self.slot_module_name = ""
         self.slot_module_title = ""

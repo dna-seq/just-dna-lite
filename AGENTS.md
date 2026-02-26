@@ -29,6 +29,7 @@ The recommended way to start the application is from the repo root:
 - **Type hints**: Mandatory for all Python code.
 - **Pathlib**: Always use for all file paths.
 - **No relative imports**: Always use absolute imports.
+- **No inline imports**: All imports must be at the module top level. Never use `from X import Y` inside functions or methods. The only exception is guarded `try/except ImportError` for optional dependencies at module level.
 - **Polars**: Prefer over Pandas. Use lazyframes (`scan_parquet`) and streaming (`sink_parquet`) for efficiency.
 - **Memory efficient joins**: Pre-filter dataframes before joining to avoid materialization.
 - **Data Pattern**: Use `data/input`, `data/interim`, `data/output`.

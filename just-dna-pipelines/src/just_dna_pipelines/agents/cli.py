@@ -1,17 +1,23 @@
 """
-CLI commands for the module creator agent.
+CLI commands for the module creator agent team.
 
 Mounted into the main pipelines CLI as ``uv run pipelines agent ...``.
 """
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
+from agno.media import File as AgnoFile
 from rich.console import Console
+
+from just_dna_pipelines.agents.module_creator import create_module_team, _describe_team
+from just_dna_pipelines.module_registry import register_custom_module
+
+MAX_ATTACHMENTS = 5
 
 app = typer.Typer(
     name="agent",
-    help="AI agent for creating annotation modules from papers and variant data.",
+    help="AI agent team for creating annotation modules from papers and variant data.",
     no_args_is_help=True,
 )
 
@@ -25,10 +31,10 @@ def create_module(
         "--text", "-t",
         help="Freeform text instructions for the agent.",
     ),
-    input_file: Optional[Path] = typer.Option(
+    input_file: Optional[List[Path]] = typer.Option(
         None,
         "--file", "-f",
-        help="Path to a PDF, CSV, or Markdown file with variant data.",
+        help="Path to an input file (repeat up to 5 times): PDF/CSV/Markdown/TXT.",
     ),
     output_dir: Optional[Path] = typer.Option(
         None,
@@ -38,7 +44,7 @@ def create_module(
     model: Optional[str] = typer.Option(
         None,
         "--model", "-m",
-        help="Gemini model ID. Default: GEMINI_MODEL env var or gemini-2.5-flash.",
+        help="Gemini model ID for PI. Default: GEMINI_MODEL env var or gemini-3-pro-preview.",
     ),
     register: bool = typer.Option(
         False,
@@ -47,11 +53,13 @@ def create_module(
     ),
 ) -> None:
     """
-    Run the AI agent to create an annotation module from freeform input.
+    Run the AI agent team to create an annotation module from freeform input.
+
+    The team consists of researcher agents (using all available LLM API keys),
+    a reviewer with Google Search fact-checking, and a PI that synthesizes
+    findings into the final module.
 
     Provide either --text with instructions, --file with a document, or both.
-    The agent will parse the input, generate a module spec, validate it,
-    and optionally register it.
 
     Examples:
 
@@ -67,29 +75,37 @@ def create_module(
         # Auto-register after creation
         uv run pipelines agent create-module --file input.md --register
     """
-    if not input_text and not input_file:
+    input_files: List[Path] = list(input_file or [])
+
+    if not input_text and not input_files:
         console.print("[red]Error: provide --text and/or --file[/red]")
         raise typer.Exit(1)
 
-    if input_file and not input_file.exists():
-        console.print(f"[red]Error: file not found: {input_file}[/red]")
+    if len(input_files) > MAX_ATTACHMENTS:
+        console.print(f"[red]Error: at most {MAX_ATTACHMENTS} files are supported[/red]")
         raise typer.Exit(1)
+
+    for path in input_files:
+        if not path.exists():
+            console.print(f"[red]Error: file not found: {path}[/red]")
+            raise typer.Exit(1)
 
     resolved_output = output_dir or Path("data/module_specs/agent_output")
     resolved_output.mkdir(parents=True, exist_ok=True)
 
     message_parts = []
-    if input_file:
-        suffix = input_file.suffix.lower()
+    attached_files: List[Path] = []
+    for path in input_files:
+        suffix = path.suffix.lower()
         if suffix in (".md", ".txt", ".csv"):
-            file_content = input_file.read_text(encoding="utf-8")
+            file_content = path.read_text(encoding="utf-8")
             message_parts.append(
-                f"Here is the input document ({input_file.name}):\n\n{file_content}"
+                f"Here is the input document ({path.name}):\n\n{file_content}"
             )
-            input_file = None  # text files go inline, not as Gemini file attachment
         else:
+            attached_files.append(path)
             message_parts.append(
-                f"I've attached a file: {input_file.name}. "
+                f"I've attached a file: {path.name}. "
                 "Please analyze it and create an annotation module."
             )
 
@@ -104,33 +120,30 @@ def create_module(
 
     full_message = "\n\n".join(message_parts)
 
-    console.print("[bold]Module Creator Agent[/bold]")
-    console.print(f"  Model  : [cyan]{model or 'default'}[/cyan]")
-    console.print(f"  Output : [cyan]{resolved_output}[/cyan]")
-    if input_file:
-        console.print(f"  File   : [cyan]{input_file}[/cyan]")
-    console.print()
-
-    from just_dna_pipelines.agents.module_creator import create_module_agent
-
-    agent = create_module_agent(
+    team = create_module_team(
         model_id=model,
         spec_output_dir=resolved_output,
     )
 
-    console.print("[bold green]Running agent...[/bold green]\n")
+    console.print("[bold]Module Creator Team[/bold]")
+    console.print(f"  PI Model : [cyan]{model or 'default'}[/cyan]")
+    console.print(f"  Output   : [cyan]{resolved_output}[/cyan]")
+    console.print(f"  Team     : [cyan]{_describe_team(team)}[/cyan]")
+    if input_files:
+        console.print(f"  Files    : [cyan]{', '.join(str(path) for path in input_files)}[/cyan]")
+    console.print()
 
-    kwargs: dict = {"show_tool_calls": True}
-    if input_file:
-        from agno.media import File
-        kwargs["files"] = [File(filepath=input_file)]
+    console.print("[bold green]Running team...[/bold green]\n")
 
-    agent.print_response(full_message, **kwargs)
+    kwargs: dict = {"show_tool_calls": True, "stream": True}
+    if attached_files:
+        kwargs["files"] = [AgnoFile(filepath=path) for path in attached_files]
+
+    team.print_response(full_message, **kwargs)
 
     if register:
         spec_dirs = [d for d in resolved_output.iterdir() if d.is_dir() and (d / "module_spec.yaml").exists()]
         if spec_dirs:
-            from just_dna_pipelines.module_registry import register_custom_module
             for spec_dir in spec_dirs:
                 console.print(f"\n[bold]Registering: {spec_dir.name}[/bold]")
                 result = register_custom_module(spec_dir)

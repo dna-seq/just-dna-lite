@@ -55,3 +55,10 @@ module_metadata:
     report_title: Familial Longevity & Healthy Aging (2025)
     icon: heart-pulse
     color: '#21ba45'
+  multimorbidity_aging:
+    title: Multimorbidity & Aging (mvARD)
+    description: Genetics of multivariate age-related disease risk (mvARD) covering
+      heart disease, stroke, hypertension, cholesterol, and diabetes.
+    report_title: Multimorbidity & Aging (mvARD)
+    icon: heart-pulse
+    color: '#db2828'

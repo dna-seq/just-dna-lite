@@ -170,11 +170,19 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
     if not spec_dir.is_dir():
         raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}")
 
+    from just_dna_pipelines.module_registry import CUSTOM_MODULES_DIR
+
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in sorted(spec_dir.iterdir()):
             if f.is_file():
                 zf.write(f, f.name)
+        # Include compiled parquets if the module has been registered
+        compiled_dir = CUSTOM_MODULES_DIR / spec_name
+        if compiled_dir.is_dir():
+            for f in sorted(compiled_dir.iterdir()):
+                if f.is_file() and f.suffix == ".parquet":
+                    zf.write(f, f.name)
     buf.seek(0)
 
     zip_filename = f"{spec_name}_v{v}.zip" if v > 0 else f"{spec_name}.zip"
