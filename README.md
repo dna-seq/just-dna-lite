@@ -4,52 +4,81 @@
 # just-dna-lite
 </div>
 
-Personal genomics workflows (pipelines + UI) for turning VCFs into annotated Parquet outputs.
+You have a DNA file (VCF) from a sequencing service. This tool takes that file, cross-references it against curated databases of genetic research, and tells you what your variants mean — from longevity markers to metabolic traits. Everything runs locally on your machine. Your genome never leaves your computer.
 
-## Project Structure
-
-This repository is a uv workspace with two member projects:
-
-- `webui/`: Pure-Python [Reflex](https://reflex.dev/) Web UI.
-- `just-dna-pipelines/`: Declarative [Dagster](https://dagster.io/) pipeline library and CLI.
-
-Shared, repo-level folders live at the workspace root (e.g., `data/`, `docs/`, `logs/`, `notebooks/`).
-
-### Why Dagster & Reflex?
-
-We selected these tools to prioritize **data lineage** and **developer velocity**:
-
-- **[Dagster](https://dagster.io/) for Pipelines**: Unlike traditional task-based orchestrators, Dagster treats data as the first-class citizen. It uses **Software-Defined Assets (SDA)** to model what data should exist rather than just how to run code. This gives us automatic lineage (knowing exactly which reference version produced a user result), built-in storage management, and easy engine swapping (e.g., Polars vs DuckDB).
-  - *See [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md) for a deep dive into our pipeline philosophy.*
-- **[Reflex](https://reflex.dev/) for Web UI**: We chose Reflex because it allows building a modern, reactive full-stack web application in **pure Python**. This eliminates the need for separate frontend/backend stacks (like React/FastAPI) and allows us to share models and logic directly between the UI and the pipelines. It perfectly fits our ["Chunky & Tactile"](docs/DESIGN.md) design system.
+Under the hood it is a Python monorepo combining a [Dagster](https://dagster.io/) data pipeline with a [Reflex](https://reflex.dev/) web UI. You upload a VCF, pick annotation modules, and get an annotated report.
 
 ## Getting Started
 
-### Prerequisites
+### 1. Install uv
 
-Ensure you have [uv](https://github.com/astral-sh/uv) installed.
-
-### Quick Start
-Install dependencies and start the full stack (Web UI + Dagster):
+[uv](https://github.com/astral-sh/uv) is the only system-level dependency.
 
 ```bash
+# Linux / macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### 2. Clone and configure
+
+```bash
+git clone https://github.com/dna-seq/just-dna-lite.git
+cd just-dna-lite
+cp .env.template .env
+```
+
+Open `.env` and set at minimum:
+
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here   # required for AI module creation
+```
+
+> A free Gemini API key is available at <https://aistudio.google.com/apikey>. All other variables have sensible defaults and are optional.
+
+### 3. Start
+
+```bash
+cd just-dna-lite
 uv sync
 uv run start
 ```
 
-### Individual Components
+This launches the Web UI and the Dagster pipeline server together. Open the URL printed in the terminal.
 
-You can also run components separately:
+### Individual components
 
-- Dagster UI: `uv run dagster-ui`
-- Web UI: `uv run ui`
+Run components separately if needed:
+
+- Dagster UI only: `uv run dagster-ui`
+- Web UI only: `uv run ui`
 - CLI: `uv run pipelines --help`
 
-If you add files under `data/input/users/`, you can register them as Dagster partitions:
+To register VCF files placed under `data/input/users/` as Dagster partitions:
 
 ```bash
 uv run pipelines sync-vcf-partitions
 ```
+
+## AI Module Creation
+
+The **Module Manager** page lets you create and edit annotation modules through a chat interface powered by a multi-agent AI team (Google Gemini).
+
+Instead of hand-curating a CSV of SNP annotations, you describe what you want — or attach a research paper — and the agents do the literature review, extract variants with weights and conclusions, cross-check against each other for consensus, and write a validated module spec ready for annotation.
+
+### How it works
+
+1. Open **Module Manager** in the web UI.
+2. Optionally attach PDFs or CSVs (up to 5 files) with the paperclip button.
+3. Type what module you want (e.g. *"Create a longevity module based on the attached paper"*).
+4. The **Research Team** mode dispatches three independent researcher agents and a reviewer agent. Each researcher queries live biomedical databases (Ensembl, EuropePMC, Open Targets) and the reviewer checks consensus before anything is written.
+5. The finished module lands in the **Editing Slot**. Review it, then hit **Register Module as source** to compile it to Parquet and make it available for annotation immediately.
+
+You can also load any previously registered custom module back into the slot, edit it via chat, and re-register as a new version.
+
+> **Single agent mode** (uncheck *Research team*) skips the multi-agent pipeline and uses one agent directly — faster for quick edits or simple modules.
 
 ## Features
 
@@ -93,14 +122,6 @@ export JUST_DNA_PIPELINES_WORKERS="4"
 ```
 
 ## Development
-
-### Setup
-
-```bash
-git clone git@github.com:dna-seq/just-dna-lite.git
-cd just-dna-lite
-uv sync
-```
 
 On first run, `uv run start` / `uv run dagster-ui` will create `data/interim/dagster/dagster.yaml` if it doesn't exist.
 
