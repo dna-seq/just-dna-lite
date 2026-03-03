@@ -103,7 +103,7 @@ You can also load any previously registered custom module back into the slot, ed
   - **Custom Fields**: Add any metadata field with custom name (e.g., Batch ID, Sequencer, Library Prep)
 - **Run-Centric Layout**: View outputs, run history, and start new analyses in a unified interface.
 - **Real-time Monitoring**: Live status updates and log streaming from Dagster jobs.
-- **Output Downloads**: Download annotated parquet files directly from the browser.
+- **Output Downloads**: Download annotated parquet files, PRS results, and comprehensive PDF/HTML reports directly from the browser.
 
 ## Configuration
 
@@ -143,6 +143,8 @@ uv run pytest just-dna-pipelines/tests/
 
 ## Documentation
 
+- [Architecture Overview](docs/ARCHITECTURE.md) - How components fit together across the ecosystem
+- [AI Module Creation](docs/AI_MODULE_CREATION.md) - How the agentic architecture builds custom annotation modules
 - [Clean setup](docs/CLEAN_SETUP.md)
 - [Dagster guide](docs/DAGSTER_GUIDE.md)
 - [Performance & Engines](docs/DAGSTER_GUIDE.md#performance--engine-optimization)
