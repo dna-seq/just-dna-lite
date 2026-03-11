@@ -11,6 +11,8 @@ sources:
   kind: collection
 - url: /data/sources/just-dna-lite/data/output/modules
   kind: collection
+- url: /data/sources/just-dna-lite/data/interim/registered_modules
+  kind: collection
 module_metadata:
   longevitymap:
     title: Longevity Map
@@ -48,10 +50,10 @@ module_metadata:
     report_title: Pharmacogenomics
     icon: pill
     color: '#a333c8'
-  longevity_rare_variants:
-    title: Rare Longevity & Robustness
-    description: Rare variants in CGAS, SIRT6, and other genes linked to familial
-      longevity and physical robustness.
-    report_title: Longevity & Cellular Robustness
-    icon: zap
+  latest_longevity:
+    title: Latest Longevity
+    description: Latest rare and protective variants linked to extreme longevity and
+      frailty in 2025.
+    report_title: Latest Longevity Genetics
+    icon: heart-pulse
     color: '#21ba45'

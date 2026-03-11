@@ -214,11 +214,122 @@ def fomantic_stylesheets() -> rx.Component:
     )
 
 
+_WS_WATCHDOG_JS = """
+(function () {
+  'use strict';
+
+  /* Grace after last socket closes before we treat it as a real outage.
+     Reflex briefly closes+reopens sockets during normal reconnect cycles;
+     gaps shorter than this are ignored entirely. */
+  var CONFIRM_MS    = 5000;
+  /* If Reflex never comes back after a confirmed outage, force a reload. */
+  var FORCE_MS      = 30000;
+  /* Don't act until the page has had time to fully hydrate. */
+  var INIT_GRACE_MS = 8000;
+
+  var startedAt       = Date.now();
+  var everConnected   = false;   // true once we have seen at least one open socket
+  var confirmedOutage = false;   // true once CONFIRM_MS elapsed with no open socket
+  var confirmTimer    = null;
+  var forceTimer      = null;
+  var banner          = null;
+  var sockets         = [];
+  var _WS             = window.WebSocket;
+
+  /* ── WebSocket patch ───────────────────────────────────────── */
+  function PatchedWS(url, proto) {
+    var ws = (proto !== undefined) ? new _WS(url, proto) : new _WS(url);
+    sockets.push(ws);
+
+    ws.addEventListener('open', function () {
+      clearTimeout(confirmTimer); confirmTimer = null;
+
+      if (confirmedOutage) {
+        /* Reflex reconnected after a real outage → reload for fresh state */
+        clearTimeout(forceTimer);
+        window.location.reload();
+        return;
+      }
+      everConnected = true;
+      clearTimeout(forceTimer); forceTimer = null;
+      hideBanner();
+    });
+
+    ws.addEventListener('close', function () {
+      sockets = sockets.filter(function (s) { return s !== ws; });
+
+      /* only react after hydration and once we have seen a healthy connection */
+      if (!everConnected || confirmTimer || confirmedOutage) return;
+      if (Date.now() - startedAt < INIT_GRACE_MS) return;
+
+      var alive = sockets.some(function (s) {
+        return s.readyState === 0 || s.readyState === 1;
+      });
+      if (alive) return;
+
+      /* wait briefly — Reflex may reconnect on its own */
+      confirmTimer = setTimeout(function () {
+        confirmTimer = null;
+        var alive2 = sockets.some(function (s) {
+          return s.readyState === 0 || s.readyState === 1;
+        });
+        if (alive2) return;   /* recovered silently, nothing to do */
+
+        confirmedOutage = true;
+        showBanner();
+        forceTimer = setTimeout(function () { window.location.reload(); }, FORCE_MS);
+      }, CONFIRM_MS);
+    });
+
+    return ws;
+  }
+
+  PatchedWS.CONNECTING = 0; PatchedWS.OPEN = 1;
+  PatchedWS.CLOSING   = 2; PatchedWS.CLOSED = 3;
+  PatchedWS.prototype  = _WS.prototype;
+  window.WebSocket     = PatchedWS;
+
+  /* ── Banner ─────────────────────────────────────────────────── */
+  function showBanner() {
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.style.cssText =
+      'position:fixed;top:56px;left:0;right:0;z-index:99999;background:#c62828;' +
+      'color:#fff;text-align:center;padding:10px 16px;font-size:14px;' +
+      'font-family:sans-serif;cursor:pointer;letter-spacing:.3px';
+    banner.onclick = function () { window.location.reload(); };
+    document.body && document.body.appendChild(banner);
+    var secs = Math.ceil(FORCE_MS / 1000);
+    function tick() {
+      if (!banner) return;
+      banner.textContent =
+        'Connection lost \u2014 reloading in ' + secs + 's, or click to reload now';
+      secs--;
+      if (secs >= 0) setTimeout(tick, 1000);
+    }
+    tick();
+  }
+
+  function hideBanner() {
+    if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+    banner = null;
+  }
+})();
+"""
+
+
+def ws_watchdog() -> rx.Component:
+    """Client-side WebSocket watchdog: auto-reloads if the Reflex connection drops."""
+    return rx.script(_WS_WATCHDOG_JS)
+
+
 def template(*children: rx.Component) -> rx.Component:
     """Main page template with Fomantic UI styling."""
     return rx.el.div(
         # Load Fomantic UI directly
         fomantic_stylesheets(),
+        # Auto-reload on WebSocket disconnect
+        ws_watchdog(),
         # GitHub corner ribbon (top-right)
         github_corner(),
         topbar(),

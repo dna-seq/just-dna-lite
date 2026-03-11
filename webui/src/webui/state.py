@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import queue
 import shutil
@@ -18,7 +19,7 @@ import reflex as rx
 from reflex.event import EventSpec
 from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
-from just_dna_pipelines.agents.module_creator import read_spec_meta, bump_spec_version
+from just_dna_pipelines.agents.module_creator import read_spec_meta
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
@@ -33,6 +34,11 @@ from just_dna_pipelines.module_registry import (
     refresh_module_registry,
 )
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
+
+logger = logging.getLogger(__name__)
+
+_WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
+GENERATED_MODULES_DIR: Path = _WORKSPACE_ROOT / "data" / "output" / "generated_modules"
 
 
 # Module metadata with titles, descriptions, and icons
@@ -3196,11 +3202,10 @@ class AgentState(rx.State):
     @rx.var
     def slot_zip_url(self) -> str:
         """URL to download the slot spec as a zip (version appended to filename)."""
-        if not self._slot_spec_dir:
+        if not self._slot_spec_dir or not self.slot_module_name:
             return ""
         api_url = rx.config.get_config().api_url
-        name = Path(self._slot_spec_dir).name
-        return f"{api_url}/api/agent-spec-zip/{name}?v={self.slot_version}"
+        return f"{api_url}/api/agent-spec-zip/{self.slot_module_name}?v={self.slot_version}"
 
     @rx.var
     def slot_display_name(self) -> str:
@@ -3214,28 +3219,41 @@ class AgentState(rx.State):
             parts.append(f"(v{self.slot_version})")
         return " ".join(parts)
 
+    @rx.var
+    def slot_archive_logs(self) -> List[Dict[str, str]]:
+        """List of versioned log files across all version dirs for this module."""
+        if not self._slot_spec_dir or not self.slot_module_name:
+            return []
+        module_dir = GENERATED_MODULES_DIR / self.slot_module_name
+        if not module_dir.exists():
+            return []
+        api_url = rx.config.get_config().api_url
+        name = self.slot_module_name
+        logs = []
+        for vdir in sorted(module_dir.iterdir()):
+            if not vdir.is_dir() or not vdir.name.startswith("v"):
+                continue
+            for f in sorted(vdir.iterdir()):
+                if f.is_file() and f.suffix == ".log":
+                    logs.append({
+                        "name": f.name,
+                        "url": f"{api_url}/api/agent-log/{name}/{vdir.name}/{f.name}",
+                    })
+        return logs
+
     # -- Helpers --------------------------------------------------------------
 
     def _add_chat_message(self, role: str, content: str) -> None:
         """Append a message to the chat log."""
         self.agent_messages = [*self.agent_messages, {"role": role, "content": content}]
 
-    def _populate_slot(self, spec_dir: Path, source: str = "upload") -> None:
-        """Read module_spec.yaml from *spec_dir* and populate slot state.
-
-        If *source* is ``"agent"`` and the slot already held the same module
-        name, the version is auto-bumped.
-        """
-        from just_dna_pipelines.agents.module_creator import read_spec_meta, bump_spec_version
+    def _populate_slot(self, spec_dir: Path) -> None:
+        """Read module_spec.yaml from *spec_dir* and populate slot state."""
+        from just_dna_pipelines.agents.module_creator import read_spec_meta
 
         meta = read_spec_meta(spec_dir)
         if not meta.get("name"):
             return
-
-        new_version = int(meta.get("version", 1))
-        if source == "agent" and self.slot_module_name and self.slot_module_name == meta["name"]:
-            new_version = self.slot_version + 1
-            bump_spec_version(spec_dir, new_version)
 
         self._slot_spec_dir = str(spec_dir)
         self.slot_module_name = meta["name"]
@@ -3243,7 +3261,7 @@ class AgentState(rx.State):
         self.slot_module_description = meta.get("description", "")
         self.slot_module_icon = meta.get("icon", "database")
         self.slot_module_color = meta.get("color", "#6435c9")
-        self.slot_version = new_version
+        self.slot_version = int(meta.get("version", 1))
 
     def _build_slot_context(self) -> str:
         """Build a context block from the current slot files for the agent prompt."""
@@ -3253,6 +3271,10 @@ class AgentState(rx.State):
         if not d.exists():
             return ""
         parts = ["\n\n--- EXISTING MODULE IN EDITING SLOT (Scenario B) ---"]
+
+        all_files = sorted(f.name for f in d.iterdir() if f.is_file())
+        parts.append(f"\nFiles in spec directory: {', '.join(all_files)}")
+
         for fname in ("module_spec.yaml", "variants.csv", "studies.csv", "MODULE.md"):
             fpath = d / fname
             if fpath.exists():
@@ -3316,19 +3338,18 @@ class AgentState(rx.State):
             shutil.rmtree(tmp_path, ignore_errors=True)
             return
 
-        # Persist to data/module_specs/generated/<name>/
         from just_dna_pipelines.agents.module_creator import read_spec_meta
         meta = read_spec_meta(tmp_path)
         module_name = meta.get("name", "uploaded_module")
-        root = Path(__file__).resolve().parents[3]
-        persist_dir = root / "data" / "module_specs" / "generated" / module_name
+        version = int(meta.get("version", 1))
+        persist_dir = GENERATED_MODULES_DIR / module_name / f"v{version}"
         persist_dir.mkdir(parents=True, exist_ok=True)
         for fp in tmp_path.iterdir():
             if fp.is_file():
                 shutil.copy2(fp, persist_dir / fp.name)
         shutil.rmtree(tmp_path, ignore_errors=True)
 
-        self._populate_slot(persist_dir, source="upload")
+        self._populate_slot(persist_dir)
         self._add_chat_message(
             "agent",
             f"Module **{self.slot_module_name}** loaded into editing slot (v{self.slot_version}).",
@@ -3357,8 +3378,8 @@ class AgentState(rx.State):
         self.slot_replace_pending_name = ""
 
     def _do_load_custom_module(self, module_name: str) -> None:
-        """Copy spec files from the custom modules dir into a fresh generated dir
-        and populate the editing slot from there."""
+        """Copy spec files from the registered modules dir into a versioned
+        generated dir and populate the editing slot from there."""
         src_dir = CUSTOM_MODULES_DIR / module_name
         if not (src_dir / "module_spec.yaml").exists():
             self._add_chat_message(
@@ -3366,14 +3387,16 @@ class AgentState(rx.State):
                 f"Module **{module_name}** has no spec files — try re-registering it first.",
             )
             return
-        root = Path(__file__).resolve().parents[3]
-        dest_dir = root / "data" / "module_specs" / "generated" / module_name
+        from just_dna_pipelines.agents.module_creator import read_spec_meta
+        meta = read_spec_meta(src_dir)
+        version = int(meta.get("version", 1))
+        dest_dir = GENERATED_MODULES_DIR / module_name / f"v{version}"
         dest_dir.mkdir(parents=True, exist_ok=True)
-        _SPEC_SUFFIXES = {".yaml", ".csv", ".md"}
+        _SPEC_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".log"}
         for f in src_dir.iterdir():
             if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
                 shutil.copy2(f, dest_dir / f.name)
-        self._populate_slot(dest_dir, source="upload")
+        self._populate_slot(dest_dir)
         self._add_chat_message(
             "agent",
             f"Module **{module_name}** loaded into editing slot (v{self.slot_version}).",
@@ -3526,19 +3549,13 @@ class AgentState(rx.State):
         if slot_context:
             msg_to_send += slot_context
 
-        msg_to_send += (
-            f"\n\nWrite the spec files to: {spec_output}/<module_name>/ "
-            f"using the write_spec_files tool. "
-            f"Then call validate_spec on the resulting directory. "
-            f"Then call write_module_md to document the module. "
-            f"Then call generate_logo with the module name and a vivid visual description "
-            f"matching the module's theme and color — the logo.png will be shown as the "
-            f"module's thumbnail in the annotation browser UI."
-        )
-
-        from just_dna_pipelines.agents.module_creator import run_agent_async, run_team_async
+        from just_dna_pipelines.agents.module_creator import run_agent_async, run_team_async, RunLog
 
         use_team = self.agent_use_team
+        run_log = RunLog()
+        run_log.log(f"User message: {message}")
+        if file_paths:
+            run_log.log(f"Attached files: {file_paths}")
 
         async def _on_status(msg: str) -> None:
             async with self:
@@ -3574,9 +3591,12 @@ class AgentState(rx.State):
                 spec_output_dir=spec_output,
                 on_status=_on_status,
                 on_event=_on_event,
+                run_log=run_log,
+                current_version=self.slot_version,
             )
         except Exception as exc:
             error_msg = str(exc)
+            run_log.log(f"ERROR: {error_msg}")
 
         found_spec_dir = ""
         if spec_output.exists():
@@ -3585,11 +3605,13 @@ class AgentState(rx.State):
                     found_spec_dir = str(d)
                     break
 
-        # Persist and populate the slot
+        # Persist to data/output/generated_modules/{name}/v{X}/
         if found_spec_dir:
-            root = Path(__file__).resolve().parents[3]
-            module_name = Path(found_spec_dir).name
-            persist_dir = root / "data" / "module_specs" / "generated" / module_name
+            from just_dna_pipelines.agents.module_creator import read_spec_meta
+            meta = read_spec_meta(Path(found_spec_dir))
+            module_name = meta.get("name") or Path(found_spec_dir).name
+            version = int(meta.get("version", 1))
+            persist_dir = GENERATED_MODULES_DIR / module_name / f"v{version}"
             persist_dir.mkdir(parents=True, exist_ok=True)
             for f in Path(found_spec_dir).iterdir():
                 if f.is_file():
@@ -3601,6 +3623,7 @@ class AgentState(rx.State):
                 f"An error occurred: {error_msg}" if error_msg
                 else (response or "Agent returned no response.")
             )
+            run_log.log(f"Agent reply length: {len(agent_reply)} chars")
             self.agent_messages = [
                 *self.agent_messages,
                 {"role": "agent", "content": agent_reply},
@@ -3610,7 +3633,30 @@ class AgentState(rx.State):
             # agent_events intentionally kept — user can inspect postmortem.
             # They are cleared at the start of the next send_agent_message.
             if found_spec_dir:
-                self._populate_slot(Path(found_spec_dir), source="agent")
+                self._populate_slot(Path(found_spec_dir))
+
+            # Write versioned run log to the module's spec directory
+            self._write_run_log(run_log, found_spec_dir, error_msg)
+
+    # -- Run log persistence ---------------------------------------------------
+
+    def _write_run_log(self, run_log: Any, found_spec_dir: str, error_msg: str) -> None:
+        """Write the run log into the module's versioned directory.
+
+        Successful runs: ``<module_dir>/v<N>.log``
+        Failed runs (no spec produced): ``data/output/generated_modules/_logs/<timestamp>.log``
+        """
+        if found_spec_dir:
+            log_path = Path(found_spec_dir) / f"v{self.slot_version}.log"
+        else:
+            fallback_dir = GENERATED_MODULES_DIR / "_logs"
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_path = fallback_dir / f"failed_{ts}.log"
+            run_log.log(f"No module spec produced — writing log to fallback: {log_path}")
+
+        log_path.write_text(run_log.text(), encoding="utf-8")
+        logger.info("Run log written to %s", log_path)
 
     # -- Clear chat -----------------------------------------------------------
 

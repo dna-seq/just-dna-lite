@@ -162,27 +162,23 @@ async def download_agent_spec_file(spec_name: str, filename: str) -> FileRespons
 
 @api.get("/api/agent-spec-zip/{spec_name}")
 async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingResponse:
-    """Download all generated spec files as a single zip archive."""
+    """Download generated spec files as a zip (excluding auto-generated parquets)."""
     if ".." in spec_name or "/" in spec_name:
         raise HTTPException(status_code=400, detail="Invalid spec name")
 
-    spec_dir = WORKSPACE_ROOT / "data" / "module_specs" / "generated" / spec_name
+    module_dir = WORKSPACE_ROOT / "data" / "output" / "generated_modules" / spec_name
+    if v > 0:
+        spec_dir = module_dir / f"v{v}"
+    else:
+        spec_dir = module_dir
     if not spec_dir.is_dir():
-        raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}")
-
-    from just_dna_pipelines.module_registry import CUSTOM_MODULES_DIR
+        raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}/v{v}")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in sorted(spec_dir.iterdir()):
-            if f.is_file():
+            if f.is_file() and f.suffix != ".parquet":
                 zf.write(f, f.name)
-        # Include compiled parquets if the module has been registered
-        compiled_dir = CUSTOM_MODULES_DIR / spec_name
-        if compiled_dir.is_dir():
-            for f in sorted(compiled_dir.iterdir()):
-                if f.is_file() and f.suffix == ".parquet":
-                    zf.write(f, f.name)
     buf.seek(0)
 
     zip_filename = f"{spec_name}_v{v}.zip" if v > 0 else f"{spec_name}.zip"
@@ -190,6 +186,27 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
         buf,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
+    )
+
+
+@api.get("/api/agent-log/{spec_name}/{version_dir}/{log_name}")
+async def download_agent_run_log(spec_name: str, version_dir: str, log_name: str) -> FileResponse:
+    """Download a versioned run log from a module's generated directory."""
+    for part in (spec_name, version_dir, log_name):
+        if ".." in part or "/" in part:
+            raise HTTPException(status_code=400, detail="Invalid path")
+
+    log_path = (
+        WORKSPACE_ROOT / "data" / "output" / "generated_modules"
+        / spec_name / version_dir / log_name
+    )
+    if not log_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Log not found: {spec_name}/{version_dir}/{log_name}")
+
+    return FileResponse(
+        path=str(log_path),
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{spec_name}_{log_name}"'},
     )
 
 

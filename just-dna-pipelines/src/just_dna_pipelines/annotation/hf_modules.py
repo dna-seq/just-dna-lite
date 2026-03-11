@@ -6,6 +6,7 @@ Discovers available annotation modules by scanning configured sources
 Sources are configured in modules.yaml (see module_config.py).
 """
 
+import re
 from enum import Enum
 from typing import Optional
 
@@ -196,6 +197,7 @@ def _discover_fsspec_source(source: Source) -> dict[str, ModuleInfo]:
         return module_infos
 
     # Collection: scan subfolders
+    _VERSION_RE = re.compile(r"^v(\d+)$")
     entries = fs.ls(base_path, detail=True) if base_path else fs.ls("", detail=True)
     for entry in entries:
         entry_type = entry.get("type", "")
@@ -203,9 +205,29 @@ def _discover_fsspec_source(source: Source) -> dict[str, ModuleInfo]:
             folder_name = entry["name"].split("/")[-1]
             if folder_name in module_infos:
                 continue
+            # Try flat layout first: {name}/weights.parquet
             info = _probe_module_at_path(fs, entry["name"], protocol, folder_name, source.url, source.url)
             if info:
                 module_infos[folder_name] = info
+                continue
+            # Versioned layout: {name}/v{N}/weights.parquet — find highest
+            try:
+                sub_entries = fs.ls(entry["name"], detail=True)
+            except Exception:
+                continue
+            best_version = -1
+            best_path: Optional[str] = None
+            for sub in sub_entries:
+                if sub.get("type") == "directory":
+                    sub_name = sub["name"].split("/")[-1]
+                    m = _VERSION_RE.match(sub_name)
+                    if m and int(m.group(1)) > best_version:
+                        best_version = int(m.group(1))
+                        best_path = sub["name"]
+            if best_path:
+                info = _probe_module_at_path(fs, best_path, protocol, folder_name, source.url, source.url)
+                if info:
+                    module_infos[folder_name] = info
 
     return module_infos
 

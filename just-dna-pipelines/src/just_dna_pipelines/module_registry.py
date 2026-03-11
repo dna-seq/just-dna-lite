@@ -39,7 +39,7 @@ from just_dna_pipelines.module_config import (
 )
 
 _project_root = _find_project_root() or Path.cwd()
-CUSTOM_MODULES_DIR: Path = _project_root / "data" / "output" / "modules"
+CUSTOM_MODULES_DIR: Path = _project_root / "data" / "interim" / "registered_modules"
 
 
 def _read_spec_metadata(spec_dir: Path) -> Optional[ModuleSpecConfig]:
@@ -137,7 +137,9 @@ def register_custom_module(
 
     # Copy source spec files alongside compiled parquets so the module can be
     # loaded back into the editing slot for further editing.
-    _SPEC_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".jpg", ".jpeg"}
+    # Exclude parquets
+    # (already written by compile_module).
+    _SPEC_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".jpg", ".jpeg", ".log"}
     for f in spec_dir.iterdir():
         if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
             shutil.copy2(f, output_dir / f.name)

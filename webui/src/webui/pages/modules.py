@@ -200,6 +200,40 @@ def _slot_populated_state() -> rx.Component:
             ),
             style={"marginBottom": "2px"},
         ),
+        # Archive logs
+        rx.cond(
+            AgentState.slot_archive_logs.length() > 0,
+            rx.el.div(
+                fomantic_icon("history", size=11, color="#888"),
+                rx.el.span(" Logs: ", style={"fontSize": "0.72rem", "color": "#888", "marginRight": "4px"}),
+                rx.foreach(
+                    AgentState.slot_archive_logs,
+                    lambda log: rx.el.a(
+                        log["name"].to(str),
+                        href=log["url"].to(str),
+                        target="_blank",
+                        style={
+                            "fontSize": "0.72rem",
+                            "color": "#6435c9",
+                            "textDecoration": "none",
+                            "marginRight": "6px",
+                            "padding": "1px 5px",
+                            "border": "1px solid #d6c4e8",
+                            "borderRadius": "3px",
+                            "backgroundColor": "#f8f5ff",
+                        },
+                    ),
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "flexWrap": "wrap",
+                    "gap": "2px",
+                    "marginTop": "4px",
+                },
+            ),
+            rx.fragment(),
+        ),
     )
 
 
@@ -624,9 +658,197 @@ def agent_message_bubble(msg: rx.Var[dict]) -> rx.Component:
     )
 
 
+def _module_manager_readme() -> rx.Component:
+    """Collapsible how-it-works guide rendered above the agent chat."""
+    _section_head = lambda text: rx.el.div(
+        text,
+        style={"fontWeight": "600", "fontSize": "0.82rem", "color": "#6435c9",
+               "marginTop": "12px", "marginBottom": "4px"},
+    )
+    _row = lambda icon, text: rx.el.div(
+        fomantic_icon(icon, size=13, color="#a333c8"),
+        rx.el.span(text, style={"marginLeft": "6px", "fontSize": "0.82rem", "color": "#444", "lineHeight": "1.4"}),
+        style={"display": "flex", "alignItems": "flex-start", "marginBottom": "5px"},
+    )
+    _badge = lambda text, color: rx.el.span(
+        text,
+        style={
+            "display": "inline-block", "fontSize": "0.73rem", "fontWeight": "600",
+            "padding": "1px 7px", "borderRadius": "10px",
+            "backgroundColor": color + "22", "color": color,
+            "border": f"1px solid {color}55", "marginRight": "4px",
+        },
+    )
+
+    body = rx.el.div(
+        # ── Quick start ─────────────────────────────────────────────────────────
+        _section_head("Quick start"),
+        _row("zap", "Just type a description and press Send — the agent researches, writes, and validates the module for you."),
+        _row("paperclip", "Attach a paper (PDF) or existing data (CSV/MD/TXT) to ground the module in real evidence."),
+        _row("edit", "The finished module lands in the Editing Slot on the left. Review it, then click Register."),
+
+        # ── Two modes ───────────────────────────────────────────────────────────
+        _section_head("Two creation modes"),
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    _badge("Single agent", "#2185d0"),
+                    rx.el.span("One Gemini Pro agent — faster, lower cost.",
+                               style={"fontSize": "0.8rem", "color": "#555"}),
+                    style={"marginBottom": "4px"},
+                ),
+                rx.el.div(
+                    _badge("Research team", "#a333c8"),
+                    rx.el.span("PI + up to 3 independent Researchers (Gemini / GPT / Claude) + Reviewer — higher accuracy through cross-model consensus. Requires Gemini key; OpenAI/Anthropic keys add extra researchers.",
+                               style={"fontSize": "0.8rem", "color": "#555"}),
+                ),
+                style={"padding": "8px 10px", "backgroundColor": "#f8f6ff",
+                       "border": "1px solid #e0d4f5", "borderRadius": "6px"},
+            ),
+            style={"marginBottom": "6px"},
+        ),
+        rx.el.div(
+            "Toggle the ",
+            rx.el.strong("Research team"),
+            " checkbox below the input bar to switch modes.",
+            style={"fontSize": "0.78rem", "color": "#888", "marginBottom": "10px"},
+        ),
+
+        # ── Team flow ────────────────────────────────────────────────────────────
+        _section_head("Research team flow"),
+        rx.el.ol(
+            rx.el.li("PI delegates research to all Researchers in parallel", style={"fontSize": "0.8rem", "marginBottom": "3px"}),
+            rx.el.li("Each Researcher independently finds variants + PMIDs using BioContext MCP", style={"fontSize": "0.8rem", "marginBottom": "3px"}),
+            rx.el.li("PI synthesises consensus — variants confirmed by ≥2 researchers are included", style={"fontSize": "0.8rem", "marginBottom": "3px"}),
+            rx.el.li("Reviewer checks integrity: rsid format, genotype sorting, weight consistency, PMID validity", style={"fontSize": "0.8rem", "marginBottom": "3px"}),
+            rx.el.li("PI fixes errors, writes final module files, generates logo", style={"fontSize": "0.8rem"}),
+            style={"paddingLeft": "18px", "margin": "0 0 6px 0", "color": "#555"},
+        ),
+
+        # ── Editing slot workflow ───────────────────────────────────────────────
+        _section_head("Editing slot workflow"),
+        rx.el.div(
+            rx.el.span("Chat → module auto-loads", style={"fontSize": "0.8rem", "color": "#555"}),
+            rx.el.span(" → ", style={"color": "#bbb", "margin": "0 4px"}),
+            rx.el.span("Upload existing module", style={"fontSize": "0.8rem", "color": "#555"}),
+            rx.el.span(" → ", style={"color": "#bbb", "margin": "0 4px"}),
+            rx.el.span("Register as source", style={"fontSize": "0.8rem", "fontWeight": "600", "color": "#6435c9"}),
+            style={"display": "flex", "alignItems": "center", "flexWrap": "wrap",
+                   "padding": "6px 10px", "backgroundColor": "#f4f8fe",
+                   "border": "1px solid #c5daf5", "borderRadius": "6px", "marginBottom": "6px"},
+        ),
+        _row("upload", "Upload: drag-drop module_spec.yaml + variants.csv (or a .zip containing both) into the slot."),
+        _row("arrow down", "Register: compiles CSVs to Parquet, adds the module to modules.yaml, refreshes discovery immediately."),
+        _row("download", ".zip: download the raw spec files at any time — useful for version control or sharing."),
+
+        # ── Module file format ──────────────────────────────────────────────────
+        _section_head("Module file format (variants.csv columns)"),
+        rx.el.div(
+            rx.el.table(
+                rx.el.thead(
+                    rx.el.tr(
+                        rx.el.th("Column", style={"textAlign": "left", "padding": "3px 8px", "fontSize": "0.77rem", "color": "#888", "fontWeight": "600"}),
+                        rx.el.th("Required", style={"textAlign": "left", "padding": "3px 8px", "fontSize": "0.77rem", "color": "#888", "fontWeight": "600"}),
+                        rx.el.th("Description", style={"textAlign": "left", "padding": "3px 8px", "fontSize": "0.77rem", "color": "#888", "fontWeight": "600"}),
+                    ),
+                ),
+                rx.el.tbody(
+                    *[
+                        rx.el.tr(
+                            rx.el.td(rx.el.code(col, style={"fontSize": "0.76rem"}), style={"padding": "2px 8px"}),
+                            rx.el.td(req, style={"padding": "2px 8px", "fontSize": "0.77rem", "color": "#888"}),
+                            rx.el.td(desc, style={"padding": "2px 8px", "fontSize": "0.77rem", "color": "#555"}),
+                            style={"borderBottom": "1px solid #f0f0f0"},
+                        )
+                        for col, req, desc in [
+                            ("rsid", "yes*", "dbSNP ID (rs…). Blank only if chrom/start/ref/alts provided."),
+                            ("genotype", "yes", "Slash-separated alleles, alphabetically sorted (e.g. A/G)."),
+                            ("weight", "yes", "Float. Negative = risk, positive = protective, 0 = neutral. Range −1.2 … +1.2."),
+                            ("state", "yes", "risk | protective | neutral. Must match weight sign."),
+                            ("conclusion", "yes", "Clinical interpretation (≤50 words)."),
+                            ("gene", "yes", "HGNC gene symbol."),
+                            ("phenotype", "optional", "Trait name (free text)."),
+                            ("category", "optional", "Grouping label shown in report."),
+                        ]
+                    ],
+                ),
+                style={"borderCollapse": "collapse", "width": "100%"},
+            ),
+            style={"overflowX": "auto", "border": "1px solid #eee", "borderRadius": "4px", "marginBottom": "6px"},
+        ),
+
+        # ── Module sources ──────────────────────────────────────────────────────
+        _section_head("Module sources"),
+        _row("database", "Sources are configured in modules.yaml. Each source is a Hugging Face repo, local path, GitHub repo, or HTTP URL."),
+        _row("folder-open", "Custom (locally registered) modules appear under the purple Custom Modules entry in the left panel."),
+        _row("edit", "Click the pencil icon next to a custom module to load it back into the editing slot for iterative editing."),
+        _row("circle-x", "Click the × icon to unregister and remove a custom module."),
+
+        # ── API keys ─────────────────────────────────────────────────────────────
+        _section_head("API keys"),
+        rx.el.div(
+            rx.el.div(
+                _badge("Gemini", "#e67e22"),
+                rx.el.span(" Required. Powers the PI, Researcher 1, and Reviewer.", style={"fontSize": "0.8rem", "color": "#555"}),
+                style={"marginBottom": "3px"},
+            ),
+            rx.el.div(
+                _badge("OpenAI", "#2185d0"),
+                rx.el.span(" Optional. Adds a GPT researcher for cross-model diversity.", style={"fontSize": "0.8rem", "color": "#555"}),
+                style={"marginBottom": "3px"},
+            ),
+            rx.el.div(
+                _badge("Anthropic", "#6435c9"),
+                rx.el.span(" Optional. Adds a Claude researcher.", style={"fontSize": "0.8rem", "color": "#555"}),
+            ),
+            style={"padding": "8px 10px", "backgroundColor": "#fffaf5",
+                   "border": "1px solid #f5cba7", "borderRadius": "6px"},
+        ),
+
+        style={"padding": "0 2px 8px 2px"},
+    )
+
+    return rx.el.details(
+        rx.el.summary(
+            fomantic_icon("book-open", size=14, color="#6435c9"),
+            rx.el.span(
+                " How it works",
+                style={"fontSize": "0.85rem", "fontWeight": "600", "color": "#6435c9", "marginLeft": "5px"},
+            ),
+            rx.el.span(
+                " — click to expand",
+                style={"fontSize": "0.75rem", "color": "#aaa", "marginLeft": "6px"},
+            ),
+            style={
+                "display": "flex", "alignItems": "center", "cursor": "pointer",
+                "padding": "8px 12px", "userSelect": "none",
+                "borderRadius": "6px",
+                "backgroundColor": "#f8f5ff",
+            },
+        ),
+        rx.el.div(
+            body,
+            style={
+                "padding": "8px 12px 4px",
+                "border": "1px solid #e0d4f5",
+                "borderTop": "none",
+                "borderRadius": "0 0 6px 6px",
+                "backgroundColor": "#fdfaff",
+            },
+        ),
+        style={
+            "border": "1px solid #e0d4f5",
+            "borderRadius": "6px",
+            "marginBottom": "14px",
+        },
+    )
+
+
 def agent_chat_panel() -> rx.Component:
     """Full chat panel for the Module Creator agent."""
     return rx.el.div(
+        # How-it-works readme (collapsible)
+        _module_manager_readme(),
         # Header
         rx.el.div(
             fomantic_icon("dna", size=22, color="#fff"),

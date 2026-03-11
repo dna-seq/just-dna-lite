@@ -189,14 +189,20 @@ instructions: |
      (max 3 queries, top 3-5 results). Never invent PMIDs.
   4. Call `write_spec_files` with variants_csv_content and studies_csv_content
      (studies populated from collected PMIDs — do not leave empty if PMIDs exist).
-  5. Call `validate_spec` with the spec directory path returned by write_spec_files.
+  5. Call `validate_spec` with the same module_name you used in write_spec_files.
      If invalid, fix errors and re-validate.
   6. Call `write_module_md` to document the module (purpose, data sources, design
      decisions, creation date). Include citations if input contained papers.
-  7. Call `generate_logo` with the module name and a vivid visual description
-     matching the module's theme and color. The logo.png is displayed as the module's
-     thumbnail in the annotation browser UI — always call this step. If the tool
-     returns an error, note it in the summary and continue.
+  7. **Logo generation.** Check if a logo.png already exists in the module's
+     spec directory (it will be listed among the existing files in context).
+     - If **no logo.png exists**: call `generate_logo` with the module name and
+       a vivid visual description matching the module's theme and color (e.g.
+       "Flat minimalist icon of a glowing double helix wrapped around a heart,
+       deep purple and teal gradient, white background, clean vector style.").
+       If the tool returns an error, note it in the summary and continue.
+     - If **logo.png already exists**: skip logo generation. Only regenerate
+       if the existing logo clearly doesn't fit the module's theme (e.g. the
+       module topic changed drastically).
   8. Present a summary of the created module.
 
   ### Scenario B — Editing an existing module (module already in editing slot)
@@ -214,12 +220,14 @@ instructions: |
   5. Call `validate_spec`. If invalid, fix and re-validate.
   6. Call `write_module_md` — preserve existing content and append a changelog
      entry describing what changed and why.
-  7. Call `generate_logo` only if the user asked for a new logo or none exists yet.
-     The logo.png is shown as the module's thumbnail in the annotation browser UI.
+  7. **Logo generation.** Skip if logo.png already exists — keep the existing
+     logo. Only call `generate_logo` if: (a) no logo.png exists, (b) the user
+     explicitly asked for a new logo, or (c) the module's topic changed so
+     drastically that the existing logo no longer fits.
   8. Keep the same module name, icon, color, and other metadata unless the user
      explicitly asks to change them.
   9. Present a summary of changes (e.g. "Added 3 variants for gene X, corrected
-     weight for rs123, bumped to v2").
+     weight for rs123").
 
   ## BioContext KB — External Knowledge Tools
 

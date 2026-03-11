@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -37,8 +38,10 @@ from agno.models.openai import OpenAIResponses
 from agno.team.mode import TeamMode
 from agno.team.team import Team, TeamRunEvent
 from agno.tools.mcp import MCPTools
+from agno.utils.log import configure_agno_logging
+import agno.utils.log as _agno_log_module
 
-from just_dna_pipelines.module_registry import register_custom_module, validate_module_spec
+from just_dna_pipelines.module_registry import validate_module_spec
 
 load_dotenv()
 
@@ -50,6 +53,94 @@ StatusCallback = Callable[[str], None]
 # call_id links a _done event back to its corresponding start event so the
 # UI can merge them in-place rather than appending a separate row.
 EventCallback = Callable[[str, str, str, str], Any]
+
+
+# ---------------------------------------------------------------------------
+# Run log — persistent textual record of each agent/team run
+# ---------------------------------------------------------------------------
+
+class RunLog:
+    """Collects timestamped log entries during an agent/team run.
+
+    Used to produce a human-readable log file that accompanies each module
+    version in the archive (``v1.log``, ``v2.log``, …).  Captures:
+    - Status messages (spinner labels)
+    - Structured events (tool calls, delegations, results)
+    - Agno framework debug output (via ``_LogCapture`` handler)
+    """
+
+    def __init__(self) -> None:
+        self._entries: List[str] = []
+        self._start = datetime.now()
+
+    def log(self, message: str) -> None:
+        """Append a timestamped message."""
+        elapsed = datetime.now() - self._start
+        ts = f"[{elapsed.total_seconds():7.1f}s]"
+        self._entries.append(f"{ts} {message}")
+
+    def log_event(self, event_type: str, label: str, detail: str = "") -> None:
+        """Log a structured agent event (tool call, delegation, etc.)."""
+        prefix = "  DONE " if event_type.endswith("_done") else "  >> "
+        self.log(f"{prefix}{label}")
+        if detail:
+            for line in detail.split("\n")[:30]:
+                self._entries.append(f"            {line}")
+
+    def text(self) -> str:
+        """Return the full log as a single string."""
+        header = (
+            f"Agent Run Log — {self._start.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"{'=' * 60}\n"
+        )
+        return header + "\n".join(self._entries) + "\n"
+
+
+class _LogCapture(logging.Handler):
+    """Logging handler that redirects log records to a ``RunLog``."""
+
+    def __init__(self, run_log: RunLog) -> None:
+        super().__init__()
+        self.run_log = run_log
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.run_log.log(f"[{record.name}] {record.getMessage()}")
+
+
+def _setup_agno_log_capture(run_log: RunLog) -> Callable[[], None]:
+    """Redirect all Agno internal logging to a ``RunLog`` via ``configure_agno_logging``.
+
+    Returns a cleanup function that restores the original loggers.
+    """
+    original_logger = _agno_log_module.logger
+    original_agent = _agno_log_module.agent_logger
+    original_team = _agno_log_module.team_logger
+
+    handler = _LogCapture(run_log)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("[%(name)s] %(message)s")
+    handler.setFormatter(formatter)
+
+    def _make_logger(name: str) -> logging.Logger:
+        lg = logging.getLogger(f"agno_run_log.{name}")
+        lg.handlers.clear()
+        lg.addHandler(handler)
+        lg.setLevel(logging.DEBUG)
+        lg.propagate = False
+        return lg
+
+    configure_agno_logging(
+        custom_default_logger=_make_logger("default"),
+        custom_agent_logger=_make_logger("agent"),
+        custom_team_logger=_make_logger("team"),
+    )
+
+    def _restore() -> None:
+        _agno_log_module.logger = original_logger
+        _agno_log_module.agent_logger = original_agent
+        _agno_log_module.team_logger = original_team
+
+    return _restore
 
 
 def _fmt_detail(obj: Any, max_chars: int = 2000) -> str:
@@ -182,7 +273,7 @@ def _write_spec_files(
         (spec_dir / "studies.csv").write_text(studies_csv_content, encoding="utf-8")
         files_written.append("studies.csv")
 
-    return f"Spec files written to {spec_dir}: {', '.join(files_written)}"
+    return f"Spec files written ({module_name}/): {', '.join(files_written)}"
 
 
 def _validate_spec(spec_dir: str) -> str:
@@ -199,19 +290,6 @@ def _validate_spec(spec_dir: str) -> str:
         )
     return f"INVALID. Errors: {result.errors}. Warnings: {result.warnings or 'none'}"
 
-
-def _register_module(spec_dir: str) -> str:
-    """Compile and register a module (writes parquet, updates modules.yaml)."""
-    result = register_custom_module(Path(spec_dir))
-    if result.success:
-        stats = result.stats or {}
-        return (
-            f"SUCCESS. Module '{stats.get('module_name', '?')}' registered. "
-            f"Output: {result.output_dir}. "
-            f"Weights: {stats.get('weights_rows', '?')} rows, "
-            f"Annotations: {stats.get('annotations_rows', '?')} rows."
-        )
-    return f"FAILED. Errors: {result.errors}. Warnings: {result.warnings or 'none'}"
 
 
 def read_spec_meta(spec_dir: Path) -> Dict[str, Any]:
@@ -337,29 +415,32 @@ def _build_reviewer(
 # ---------------------------------------------------------------------------
 
 def _generate_logo_image(module_name: str, prompt: str, output_dir: Path, api_key: str) -> str:
-    """Generate a module logo via a small agno Agent with GeminiTools (Imagen 3)."""
-    from agno.tools.models.gemini import GeminiTools
+    """Generate a module logo via Gemini native image generation (NanoBanana)."""
+    from agno.tools.nano_banana import NanoBananaTools
 
-    logo_agent = Agent(
-        model=Gemini(id="gemini-2.0-flash", api_key=api_key, vertexai=False),
-        tools=[GeminiTools(api_key=api_key)],
-    )
+    nb = NanoBananaTools(api_key=api_key, aspect_ratio="1:1")
     try:
-        response = logo_agent.run(f"Generate an image: {prompt}")
+        result = nb.create_image(prompt)
     except Exception as exc:
         return f"Logo generation failed: {exc}"
 
-    if not (response and response.images):
-        return "Logo generation returned no image."
+    if not (result and result.images and result.images[0].content):
+        return f"Logo generation returned no image: {getattr(result, 'content', '')}"
 
     logo_path = output_dir / module_name / "logo.png"
     logo_path.parent.mkdir(parents=True, exist_ok=True)
-    logo_path.write_bytes(response.images[0].content)
-    return f"Logo saved to {logo_path}"
+    logo_path.write_bytes(result.images[0].content)
+    return f"Logo saved: {module_name}/logo.png"
 
 
-def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
-    """Return the list of PI tool functions bound to *output_dir*."""
+def _build_pi_tools(output_dir: Path, api_key: str, current_version: int = 0) -> List[Any]:
+    """Return the list of PI tool functions bound to *output_dir*.
+
+    Args:
+        current_version: Version currently in the editing slot (0 = new module).
+            The written version is always ``current_version + 1`` (or 1 for new).
+    """
+    next_version = max(current_version, 0) + 1
 
     def write_spec_files(
         module_name: str,
@@ -372,6 +453,8 @@ def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
         studies_csv_content: str = "",
     ) -> str:
         """Write module_spec.yaml and CSV files to the output directory.
+
+        The version number is assigned automatically (previous version + 1).
 
         Args:
             module_name: Machine name (lowercase, underscores only).
@@ -393,23 +476,16 @@ def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
             color=color,
             variants_csv_content=variants_csv_content,
             studies_csv_content=studies_csv_content,
+            version=next_version,
         )
 
-    def validate_spec(spec_dir: str) -> str:
-        """Validate a module spec directory for correctness (dry-run, no side effects).
+    def validate_spec(module_name: str) -> str:
+        """Validate the module spec for correctness (dry-run, no side effects).
 
         Args:
-            spec_dir: Path to the spec directory containing module_spec.yaml and CSV files.
+            module_name: Machine name of the module (same as passed to write_spec_files).
         """
-        return _validate_spec(spec_dir)
-
-    def register_module(spec_dir: str) -> str:
-        """Compile and register a validated module (writes parquet, updates config).
-
-        Args:
-            spec_dir: Path to the spec directory containing module_spec.yaml and CSV files.
-        """
-        return _register_module(spec_dir)
+        return _validate_spec(str(output_dir / module_name))
 
     def write_module_md(module_name: str, markdown_content: str) -> str:
         """Write or update the MODULE.md documentation file for a module.
@@ -425,7 +501,7 @@ def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
         md_path = output_dir / module_name / "MODULE.md"
         md_path.parent.mkdir(parents=True, exist_ok=True)
         md_path.write_text(markdown_content, encoding="utf-8")
-        return f"MODULE.md written to {md_path} ({len(markdown_content)} chars)"
+        return f"MODULE.md written ({module_name}/MODULE.md, {len(markdown_content)} chars)"
 
     def generate_logo(module_name: str, prompt: str) -> str:
         """Generate a square logo image for the module using Gemini image generation.
@@ -442,7 +518,7 @@ def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
         """
         return _generate_logo_image(module_name, prompt, output_dir, api_key)
 
-    return [write_spec_files, validate_spec, register_module, write_module_md, generate_logo]
+    return [write_spec_files, validate_spec, write_module_md, generate_logo]
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +528,7 @@ def _build_pi_tools(output_dir: Path, api_key: str) -> List[Any]:
 def create_module_team(
     model_id: Optional[str] = None,
     spec_output_dir: Optional[Path] = None,
+    current_version: int = 0,
 ) -> Team:
     """Create an Agno Team for module creation.
 
@@ -459,6 +536,7 @@ def create_module_team(
         model_id: Override Gemini model ID for the PI (else env / YAML default).
         spec_output_dir: Base directory for writing spec files.
             Defaults to a temp directory.
+        current_version: Version currently in the editing slot (0 = new module).
 
     Returns:
         Configured Agno Team ready to process module creation requests.
@@ -478,7 +556,7 @@ def create_module_team(
         model=Gemini(id=resolved_model, api_key=api_key, vertexai=False),
         members=researchers + [reviewer],
         mode="coordinate",
-        tools=_build_pi_tools(output_dir, api_key),
+        tools=_build_pi_tools(output_dir, api_key, current_version),
         instructions=spec.get("instructions", ""),
         show_members_responses=team_cfg.get("show_members_responses", True),
         markdown=team_cfg.get("markdown", True),
@@ -495,6 +573,7 @@ def create_module_team(
 def create_module_agent_solo(
     model_id: Optional[str] = None,
     spec_output_dir: Optional[Path] = None,
+    current_version: int = 0,
 ) -> Agent:
     """Create a single Agno Agent for module creation (no sub-team).
 
@@ -505,6 +584,7 @@ def create_module_agent_solo(
     Args:
         model_id: Override Gemini model ID (else env / YAML default).
         spec_output_dir: Base directory for writing spec files.
+        current_version: Version currently in the editing slot (0 = new module).
 
     Returns:
         Configured Agno Agent ready to process module creation requests.
@@ -520,7 +600,7 @@ def create_module_agent_solo(
     return Agent(
         name=spec.get("name", "ModuleCreator"),
         model=Gemini(id=resolved_model, api_key=api_key, vertexai=False),
-        tools=_build_pi_tools(output_dir, api_key) + [biocontext],
+        tools=_build_pi_tools(output_dir, api_key, current_version) + [biocontext],
         instructions=spec.get("instructions", ""),
         markdown=agent_cfg.get("markdown", True),
         debug_mode=agent_cfg.get("debug_mode", False),
@@ -530,9 +610,10 @@ def create_module_agent_solo(
 def create_module_agent(
     model_id: Optional[str] = None,
     spec_output_dir: Optional[Path] = None,
+    current_version: int = 0,
 ) -> Team:
     """Backward-compatible alias for create_module_team()."""
-    return create_module_team(model_id=model_id, spec_output_dir=spec_output_dir)
+    return create_module_team(model_id=model_id, spec_output_dir=spec_output_dir, current_version=current_version)
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +672,8 @@ async def run_agent_async(
     spec_output_dir: Optional[Path] = None,
     on_status: Optional[StatusCallback] = None,
     on_event: Optional[EventCallback] = None,
+    run_log: Optional[RunLog] = None,
+    current_version: int = 0,
 ) -> str:
     """Run the solo module creator agent with agno event streaming.
 
@@ -603,11 +686,15 @@ async def run_agent_async(
         on_status: Optional callback for plain progress label updates.
         on_event: Optional callback for structured tool-call events
             ``(event_type, label, detail, call_id)``.
+        run_log: Optional RunLog to collect a persistent textual record of the run.
+        current_version: Version currently in the editing slot (0 = new module).
 
     Returns:
         Agent response text (markdown).
     """
     async def _emit(msg: str) -> None:
+        if run_log:
+            run_log.log(msg)
         if on_status:
             result = on_status(msg)
             if asyncio.iscoroutine(result):
@@ -616,48 +703,64 @@ async def run_agent_async(
     async def _emit_event(
         event_type: str, label: str, detail: str = "", call_id: str = ""
     ) -> None:
+        if run_log:
+            run_log.log_event(event_type, label, detail)
         await _emit(label)
         if on_event:
             result = on_event(event_type, label, detail, call_id)
             if asyncio.iscoroutine(result):
                 await result
 
-    await _emit("Preparing agent...")
-    agent = create_module_agent_solo(model_id=model_id, spec_output_dir=spec_output_dir)
-    await _emit("Agent ready")
+    # Redirect all Agno internal logging to the run log
+    restore_logging: Optional[Callable[[], None]] = None
+    if run_log:
+        restore_logging = _setup_agno_log_capture(run_log)
+        run_log.log(f"Mode: solo agent | output_dir: {spec_output_dir}")
 
-    kwargs: Dict[str, Any] = {}
-    attachment_files = _build_attachment_files(file_path=file_path, file_paths=file_paths)
-    if attachment_files:
-        kwargs["files"] = attachment_files
+    try:
+        await _emit("Preparing agent...")
+        agent = create_module_agent_solo(model_id=model_id, spec_output_dir=spec_output_dir, current_version=current_version)
+        if run_log:
+            run_log.log(f"Agent model: {agent.model.id if agent.model else '?'}")
+        await _emit("Agent ready")
 
-    content_chunks: List[str] = []
+        kwargs: Dict[str, Any] = {}
+        attachment_files = _build_attachment_files(file_path=file_path, file_paths=file_paths)
+        if attachment_files:
+            kwargs["files"] = attachment_files
+            if run_log:
+                run_log.log(f"Attachments: {[str(f.filepath) for f in attachment_files]}")
 
-    async for event in agent.arun(message, stream=True, stream_events=True, **kwargs):
-        if event.event == RunEvent.run_started:
-            await _emit("Agent run started")
+        content_chunks: List[str] = []
 
-        elif event.event == RunEvent.run_completed:
-            await _emit("Agent run completed")
+        async for event in agent.arun(message, stream=True, stream_events=True, **kwargs):
+            if event.event == RunEvent.run_started:
+                await _emit("Agent run started")
 
-        elif event.event == RunEvent.tool_call_started:
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            args = event.tool.tool_args if event.tool else {}
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            await _emit_event("tool_pi", tool_name, _fmt_detail(args), cid)
+            elif event.event == RunEvent.run_completed:
+                await _emit("Agent run completed")
 
-        elif event.event == RunEvent.tool_call_completed:
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            result = event.tool.result if event.tool else None
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            await _emit_event("tool_pi_done", f"{tool_name} \u2713", _fmt_detail(result), cid)
+            elif event.event == RunEvent.tool_call_started:
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                args = event.tool.tool_args if event.tool else {}
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                await _emit_event("tool_pi", tool_name, _fmt_detail(args), cid)
 
-        elif event.event == RunEvent.run_content:
-            if event.content:
-                content_chunks.append(event.content)
+            elif event.event == RunEvent.tool_call_completed:
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                result = event.tool.result if event.tool else None
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                await _emit_event("tool_pi_done", f"{tool_name} \u2713", _fmt_detail(result), cid)
 
-    await _emit("Agent finished. Processing results...")
-    return "".join(content_chunks)
+            elif event.event == RunEvent.run_content:
+                if event.content:
+                    content_chunks.append(event.content)
+
+        await _emit("Agent finished. Processing results...")
+        return "".join(content_chunks)
+    finally:
+        if restore_logging:
+            restore_logging()
 
 
 async def run_team_async(
@@ -668,6 +771,8 @@ async def run_team_async(
     spec_output_dir: Optional[Path] = None,
     on_status: Optional[StatusCallback] = None,
     on_event: Optional[EventCallback] = None,
+    run_log: Optional[RunLog] = None,
+    current_version: int = 0,
 ) -> str:
     """Run the module creator team with agno event streaming.
 
@@ -684,11 +789,15 @@ async def run_team_async(
         on_status: Optional callback for plain progress label updates.
         on_event: Optional callback for structured tool-call events
             ``(event_type, label, detail, call_id)``.
+        run_log: Optional RunLog to collect a persistent textual record of the run.
+        current_version: Version currently in the editing slot (0 = new module).
 
     Returns:
         Team response text (markdown).
     """
     async def _emit(msg: str) -> None:
+        if run_log:
+            run_log.log(msg)
         if on_status:
             result = on_status(msg)
             if asyncio.iscoroutine(result):
@@ -697,6 +806,8 @@ async def run_team_async(
     async def _emit_event(
         event_type: str, label: str, detail: str = "", call_id: str = ""
     ) -> None:
+        if run_log:
+            run_log.log_event(event_type, label, detail)
         await _emit(label)
         if on_event:
             result = on_event(event_type, label, detail, call_id)
@@ -712,59 +823,74 @@ async def run_team_async(
             return "PI \u2192 all members"
         return f"PI: {tool_name}"
 
-    await _emit("Assembling research team...")
-    team = create_module_team(model_id=model_id, spec_output_dir=spec_output_dir)
-    await _emit(f"Team ready: {_describe_team(team)}")
+    # Redirect all Agno internal logging to the run log
+    restore_logging: Optional[Callable[[], None]] = None
+    if run_log:
+        restore_logging = _setup_agno_log_capture(run_log)
+        run_log.log(f"Mode: research team | output_dir: {spec_output_dir}")
 
-    kwargs: Dict[str, Any] = {}
-    attachment_files = _build_attachment_files(file_path=file_path, file_paths=file_paths)
-    if attachment_files:
-        kwargs["files"] = attachment_files
+    try:
+        await _emit("Assembling research team...")
+        team = create_module_team(model_id=model_id, spec_output_dir=spec_output_dir, current_version=current_version)
+        if run_log:
+            run_log.log(f"PI model: {team.model.id if team.model else '?'}")
+            run_log.log(f"Team: {_describe_team(team)}")
+        await _emit(f"Team ready: {_describe_team(team)}")
 
-    content_chunks: List[str] = []
+        kwargs: Dict[str, Any] = {}
+        attachment_files = _build_attachment_files(file_path=file_path, file_paths=file_paths)
+        if attachment_files:
+            kwargs["files"] = attachment_files
+            if run_log:
+                run_log.log(f"Attachments: {[str(f.filepath) for f in attachment_files]}")
 
-    async for event in team.arun(message, stream=True, stream_events=True, **kwargs):
-        if event.event == TeamRunEvent.run_started:
-            await _emit("Team run started")
+        content_chunks: List[str] = []
 
-        elif event.event == TeamRunEvent.run_completed:
-            await _emit("Team run completed")
+        async for event in team.arun(message, stream=True, stream_events=True, **kwargs):
+            if event.event == TeamRunEvent.run_started:
+                await _emit("Team run started")
 
-        elif event.event == TeamRunEvent.tool_call_started:
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            args = event.tool.tool_args if event.tool else {}
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            label = _pi_tool_label(tool_name, args)
-            await _emit_event("tool_pi", label, _fmt_detail(args), cid)
+            elif event.event == TeamRunEvent.run_completed:
+                await _emit("Team run completed")
 
-        elif event.event == TeamRunEvent.tool_call_completed:
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            args = event.tool.tool_args if event.tool else {}
-            result = event.tool.result if event.tool else None
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            label = _pi_tool_label(tool_name, args)
-            await _emit_event("tool_pi_done", f"{label} \u2713", _fmt_detail(result), cid)
+            elif event.event == TeamRunEvent.tool_call_started:
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                args = event.tool.tool_args if event.tool else {}
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                label = _pi_tool_label(tool_name, args)
+                await _emit_event("tool_pi", label, _fmt_detail(args), cid)
 
-        elif event.event == RunEvent.tool_call_started:
-            agent_name = getattr(event, "agent_name", None) or getattr(event, "agent_id", None) or "agent"
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            args = event.tool.tool_args if event.tool else {}
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            await _emit_event("tool_member", f"{agent_name}: {tool_name}", _fmt_detail(args), cid)
+            elif event.event == TeamRunEvent.tool_call_completed:
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                args = event.tool.tool_args if event.tool else {}
+                result = event.tool.result if event.tool else None
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                label = _pi_tool_label(tool_name, args)
+                await _emit_event("tool_pi_done", f"{label} \u2713", _fmt_detail(result), cid)
 
-        elif event.event == RunEvent.tool_call_completed:
-            agent_name = getattr(event, "agent_name", None) or getattr(event, "agent_id", None) or "agent"
-            tool_name = event.tool.tool_name if event.tool else "unknown"
-            result = event.tool.result if event.tool else None
-            cid = (event.tool.tool_call_id or "") if event.tool else ""
-            await _emit_event("tool_member_done", f"{agent_name}: {tool_name} \u2713", _fmt_detail(result), cid)
+            elif event.event == RunEvent.tool_call_started:
+                agent_name = getattr(event, "agent_name", None) or getattr(event, "agent_id", None) or "agent"
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                args = event.tool.tool_args if event.tool else {}
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                await _emit_event("tool_member", f"{agent_name}: {tool_name}", _fmt_detail(args), cid)
 
-        elif event.event == TeamRunEvent.run_content:
-            if event.content:
-                content_chunks.append(event.content)
-        else:
-            if event.event.startswith("Team"):
-                await _emit(f"Last team run event: {event.event}")
+            elif event.event == RunEvent.tool_call_completed:
+                agent_name = getattr(event, "agent_name", None) or getattr(event, "agent_id", None) or "agent"
+                tool_name = event.tool.tool_name if event.tool else "unknown"
+                result = event.tool.result if event.tool else None
+                cid = (event.tool.tool_call_id or "") if event.tool else ""
+                await _emit_event("tool_member_done", f"{agent_name}: {tool_name} \u2713", _fmt_detail(result), cid)
 
-    await _emit("Team finished. Processing results...")
-    return "".join(content_chunks)
+            elif event.event == TeamRunEvent.run_content:
+                if event.content:
+                    content_chunks.append(event.content)
+            else:
+                if event.event.startswith("Team"):
+                    await _emit(f"Last team run event: {event.event}")
+
+        await _emit("Team finished. Processing results...")
+        return "".join(content_chunks)
+    finally:
+        if restore_logging:
+            restore_logging()
