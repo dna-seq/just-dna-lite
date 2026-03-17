@@ -5,13 +5,11 @@ description = "Reflex Web UI for just-dna-lite"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "reflex>=0.8.27",
+  "reflex>=0.8.28",
   "just-dna-pipelines",
-  "granian>=2.7.1",
-  "fastapi>=0.129.0",
-  "reflex-mui-datagrid>=0.1.10",
-  "prs-ui>=0.1.4",
-  "just-prs>=0.3.6",
+  "granian>=2.7.2",
+  "fastapi>=0.135.1",
+  "prs-ui>=0.2.2"
 ]
 
 [tool.uv.sources]
@@ -29,5 +27,5 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-  "ruff>=0.14.6",
+  "ruff>=0.15.6",
 ]

@@ -17,11 +17,7 @@ from webui.state import UploadState, OutputPreviewState, PRSState
 from reflex_mui_datagrid import lazyframe_grid
 from prs_ui import (
     prs_results_table,
-    prs_build_selector,
-    prs_ancestry_selector,
-    prs_scores_selector,
-    prs_compute_button,
-    prs_progress_section,
+    prs_section,
 )
 
 
@@ -1117,9 +1113,9 @@ def _outputs_tab_menu() -> rx.Component:
             fomantic_icon("chart-bar", size=14, color=rx.cond(UploadState.outputs_active_tab == "prs", "#f2711c", "#888")),
             " PRS",
             rx.cond(
-                PRSState.prs_result_count > 0,
+                PRSState.prs_results.length() > 0,
                 rx.el.span(
-                    PRSState.prs_result_count,
+                    PRSState.prs_results.length(),
                     class_name="ui mini circular orange label",
                     style={"marginLeft": "6px"},
                 ),
@@ -1193,7 +1189,7 @@ def _reports_content() -> rx.Component:
 def _prs_results_content() -> rx.Component:
     """Content for the PRS sub-tab — full PRS results table with filter/sort/interpretation."""
     return rx.cond(
-        PRSState.prs_result_count > 0,
+        PRSState.prs_results.length() > 0,
         rx.el.div(
             rx.theme(
                 prs_results_table(PRSState),
@@ -1356,7 +1352,7 @@ def outputs_section() -> rx.Component:
         rx.cond(
             UploadState.outputs_expanded,
             rx.cond(
-                UploadState.has_output_files | (PRSState.prs_result_count > 0),
+                UploadState.has_output_files | (PRSState.prs_results.length() > 0),
                 # Tabbed content + inline preview
                 rx.el.div(
                     _outputs_tab_menu(),
@@ -2102,54 +2098,19 @@ def right_panel_run_view() -> rx.Component:
                                         class_name="ui mini orange basic button",
                                         style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
                                     ),
-                                    rx.el.button(
-                                        fomantic_icon("redo", size=12),
-                                        " Recompute",
-                                        on_click=PRSState.recompute_prs_from_scratch,
-                                        disabled=PRSState.prs_computing,
-                                        class_name="ui mini basic button",
-                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
-                                    ),
                                     style={"marginBottom": "10px"},
                                 ),
                             ),
-                            rx.el.div(
-                                rx.theme(
-                                    rx.vstack(
-                                        rx.hstack(
-                                            prs_build_selector(PRSState),
-                                            rx.separator(orientation="vertical", size="2"),
-                                            prs_ancestry_selector(PRSState),
-                                            spacing="4",
-                                            align="center",
-                                            wrap="wrap",
-                                        ),
-                                        prs_scores_selector(PRSState),
-                                        prs_compute_button(PRSState),
-                                        prs_progress_section(PRSState),
-                                        rx.cond(
-                                            PRSState.prs_result_count > 0,
-                                            rx.button(
-                                                rx.icon("table", size=14),
-                                                "View Results in Outputs  ↓",
-                                                on_click=UploadState.view_prs_in_outputs,
-                                                color_scheme="teal",
-                                                variant="outline",
-                                                size="2",
-                                                width="100%",
-                                            ),
-                                        ),
-                                        width="100%",
-                                        spacing="4",
-                                    ),
-                                    has_background=False,
+                            prs_section(PRSState),
+                            rx.cond(
+                                PRSState.prs_results.length() > 0,
+                                rx.el.button(
+                                    fomantic_icon("eye", size=14),
+                                    " View Results in Outputs tab",
+                                    on_click=UploadState.view_prs_in_outputs,
+                                    class_name="ui small teal basic button",
+                                    style={"display": "inline-flex", "alignItems": "center", "gap": "6px", "marginTop": "12px", "width": "100%", "justifyContent": "center"},
                                 ),
-                                style={
-                                    "maxHeight": "600px",
-                                    "overflowY": "auto",
-                                    "overflowX": "hidden",
-                                    "paddingRight": "4px",
-                                },
                             ),
                             style={"marginTop": "12px"},
                         ),
@@ -2161,7 +2122,7 @@ def right_panel_run_view() -> rx.Component:
                 ),
                 # Section 1: Outputs (top) - shown when files or PRS results exist
                 rx.cond(
-                    UploadState.has_output_files | (PRSState.prs_result_count > 0),
+                    UploadState.has_output_files | (PRSState.prs_results.length() > 0),
                     rx.el.div(
                         outputs_section(),
                         class_name="ui teal segment",

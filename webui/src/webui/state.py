@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Optional
 
-import httpx
 import polars as pl
 import reflex as rx
 from reflex.event import EventSpec
@@ -2670,25 +2669,15 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 # ============================================================================
 
 from prs_ui import PRSComputeStateMixin
-from prs_ui.state import _catalog as _prs_catalog
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
-from just_prs.prs import compute_prs as _prs_compute_prs
-from just_prs.quality import (
-    format_classification as _prs_format_classification,
-    format_effect_size as _prs_format_effect_size,
-    interpret_prs_result as _prs_interpret_prs_result,
-)
 
 
 class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
-    """PRS computation state with its own LazyFrameGridMixin for the PGS scores grid.
+    """PRS computation state — delegates entirely to PRSComputeStateMixin.
 
-    Inherits ``PRSComputeStateMixin`` for PRS computation logic (score loading,
-    selection, batch compute, quality assessment, CSV export) and
-    ``LazyFrameGridMixin`` for the MUI DataGrid that displays PGS Catalog scores.
-
-    The host app (``UploadState``) calls ``PRSState.initialize_prs_for_file``
-    when a file is selected, passing the normalized parquet path and genome build.
+    The mixin handles score loading, selection, batch compute, quality
+    assessment, percentile lookup, DataGrid rows/columns, and CSV export.
+    This class only adds: Dagster checkpoint/restore and UI toggle state.
     """
 
     genome_build: str = "GRCh38"
@@ -2696,21 +2685,12 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     status_message: str = ""
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
-    prs_computation_id: str = ""  # UUID of active background task; used to cancel superseded runs
-    _prs_skip_checkpoint: bool = False  # set by recompute_prs_from_scratch
 
     def toggle_prs_expanded(self) -> None:
-        """Toggle the PRS section open/closed."""
         self.prs_expanded = not self.prs_expanded
-
-    def recompute_prs_from_scratch(self) -> Any:
-        """Ignore checkpoint and recompute all selected PRS scores from scratch."""
-        self._prs_skip_checkpoint = True
-        return PRSState.compute_selected_prs
 
     @rx.var
     def prs_dagster_url(self) -> str:
-        """Dagster Assets UI URL for the prs_results materialization of the current sample."""
         parquet_path = self.prs_initialized_for_file
         if not parquet_path:
             return ""
@@ -2719,318 +2699,92 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         return f"{get_dagster_web_url()}/assets/prs_results?partition={partition_key}"
 
     def initialize_prs_for_file(self, parquet_path: str, genome_build: str) -> Any:
-        """Initialize PRS state for a newly selected VCF file.
+        """Initialize PRS for a newly selected VCF file.
 
-        Sets the genotypes LazyFrame from the normalized parquet (preferred
-        input method for PRSComputeStateMixin) and loads PGS Catalog scores
-        for the appropriate genome build.
-
-        On same-file re-init (e.g. page refresh that reconnects to the same
-        Reflex state), existing ``prs_results`` are preserved so the user
-        doesn't lose their results on reload.  When switching to a different
-        file, results are cleared and the Dagster store is queried for any
-        prior computation for the new sample.
+        Sets genotypes LazyFrame and loads PGS Catalog scores.  On file
+        switch, clears stale results and tries to restore from Dagster.
         """
         import polars as pl
 
-        if genome_build in ("GRCh37", "hg19"):
-            self.genome_build = "GRCh37"
-        else:
-            self.genome_build = "GRCh38"
+        self.genome_build = "GRCh37" if genome_build in ("GRCh37", "hg19") else "GRCh38"
 
         same_file = (parquet_path == self.prs_initialized_for_file)
-
-        # Always store the expected path so compute_selected_prs can re-check
-        # existence after normalization completes (path may not exist yet here).
         self.prs_initialized_for_file = parquet_path
         self.prs_genotypes_path = parquet_path
         self._prs_genotypes_lf = None
 
         if parquet_path and Path(parquet_path).exists():
-            lf = pl.scan_parquet(parquet_path)
-            self.set_prs_genotypes_lf(lf)
+            self.set_prs_genotypes_lf(pl.scan_parquet(parquet_path))
 
         if not same_file:
-            # Switching to a different file — clear stale results.
             self.prs_results = []
+            self.prs_results_rows = []
+            self.prs_results_columns = []
+            self.prs_results_column_groups = []
             self.selected_pgs_ids = []
             self.low_match_warning = False
 
         yield from self.initialize_prs()
 
-        # If no results in memory (either new file or server restart), try to
-        # restore from the Dagster prs_results materialization for this sample.
         if not self.prs_results and parquet_path:
             p = Path(parquet_path)
             partition_key = f"{p.parent.parent.name}/{p.parent.name}"
             self._load_prs_results_from_dagster(partition_key)
 
+    def compute_selected_prs(self) -> Any:
+        """Delegate to mixin's compute_selected_prs, then checkpoint to Dagster.
 
-    @rx.event(background=True)
-    async def compute_selected_prs(self) -> None:
-        """Compute PRS as a background task, decoupled from the WebSocket.
-
-        Running as a background task means the computation survives browser
-        refreshes: Reflex reconnects the same client token to the same
-        server-side state instance, and the task continues updating it via
-        ``async with self`` locks.  Results are also persisted to Dagster so
-        they can be restored even after a server restart.
-
-        Synchronous CPU/IO work (compute_prs, catalog lookups, EBI FTP
-        downloads) is offloaded to the default ThreadPoolExecutor via
-        run_in_executor to avoid blocking the event loop.
+        The mixin populates prs_results, prs_results_rows, prs_results_columns,
+        risk_level, risk_hint, reference_status, per-population percentiles —
+        everything the prs_results_table component needs.
         """
-        import asyncio
-        import json
-        import uuid
         import polars as pl
 
-        # ── Phase 1: snapshot state, validate, set computing flag ─────────────
-        async with self:
-            if not self.selected_pgs_ids:
-                self.status_message = "No PGS scores selected. Load and select scores above."
-                return
+        # Re-hydrate LazyFrame if normalization finished after file selection
+        if self._get_genotypes_lf() is None:
+            path = self.prs_genotypes_path
+            if path and Path(path).exists():
+                self.set_prs_genotypes_lf(pl.scan_parquet(path))
 
-            # Re-hydrate LazyFrame if normalization completed after file selection.
-            pre_genotypes = self._get_genotypes_lf()
-            if pre_genotypes is None:
-                path = self.prs_genotypes_path
-                if path and Path(path).exists():
-                    self.set_prs_genotypes_lf(pl.scan_parquet(path))
-                    pre_genotypes = self._get_genotypes_lf()
-
-            if pre_genotypes is None:
-                self.status_message = "Normalized VCF not found — run normalization first before computing PRS."
-                return
-
-            # Snapshot immutable inputs before releasing the lock.
-            pgs_ids = list(self.selected_pgs_ids)
-            genome_build = self.genome_build
-            cache = Path(self.cache_dir) / "scores"
-            ancestry = self.selected_ancestry
-            parquet_path = self.prs_initialized_for_file
-            genotypes_lf = pre_genotypes
-            skip_checkpoint = self._prs_skip_checkpoint
-            self._prs_skip_checkpoint = False  # consume the flag
-
-            # UUID guard: lets a newer run supersede this one if the user
-            # clicks Compute again before this one finishes.
-            computation_id = str(uuid.uuid4())
-            self.prs_computation_id = computation_id
-
-            total = len(pgs_ids)
-            self.prs_computing = True
-            self.prs_progress = 0
-            self.prs_results = []
-            self.low_match_warning = False
-            self.status_message = f"Computing PRS for {total} score(s)..."
-
-        # Derive partition key from the parquet path (outside state lock).
-        # Path: .../data/output/users/{safe_user_id}/{sample_name}/user_vcf_normalized.parquet
-        p = Path(parquet_path) if parquet_path else None
-        partition_key = f"{p.parent.parent.name}/{p.parent.name}" if p else ""
-
-        # ── Phase 0 (checkpoint): load already-computed results from Dagster ──
-        # If a previous run was interrupted, skip those PGS IDs and resume from
-        # where it left off.  Results are written to Dagster after EACH new score
-        # so the checkpoint is always as fresh as possible.
-        # Skipped when recompute_prs_from_scratch was called.
-        cached: dict[str, dict] = {}
-        if partition_key and not skip_checkpoint:
-            try:
-                chk_instance = get_dagster_instance()
-                chk_rec = chk_instance.fetch_materializations(
-                    records_filter=AssetRecordsFilter(
-                        asset_key=AssetKey("prs_results"),
-                        asset_partitions=[partition_key],
-                    ),
-                    limit=1,
-                )
-                if chk_rec.records:
-                    mat = chk_rec.records[0].asset_materialization
-                    if mat and mat.metadata:
-                        rm = mat.metadata.get("results")
-                        if rm and hasattr(rm, "data"):
-                            rows = rm.data.get("rows", []) if isinstance(rm.data, dict) else []
-                            cached = {row["pgs_id"]: row for row in rows}
-            except Exception:
-                pass  # checkpoint unavailable — compute from scratch
-
-        # Preserve order: cached results come first (in selection order), then
-        # we compute only the ones that are missing.
-        results: list[dict] = [cached[pid] for pid in pgs_ids if pid in cached]
-        to_compute = [pid for pid in pgs_ids if pid not in cached]
-        already_done = len(results)
-        any_low_match = any(r.get("match_rate", 100) < 10 for r in results)
-
-        # Show cached results immediately in the UI and report resume status.
-        if results or to_compute:
-            async with self:
-                if self.prs_computation_id != computation_id:
-                    return
-                self.prs_results = list(results)
-                if already_done and to_compute:
-                    self.status_message = (
-                        f"Resuming: {already_done}/{total} already computed, "
-                        f"computing {len(to_compute)} remaining..."
-                    )
-                    self.prs_progress = round(already_done / total * 100)
-
-        if not to_compute:
-            # All results already cached — nothing left to compute.
-            async with self:
-                if self.prs_computation_id != computation_id:
-                    return
-                self.prs_computing = False
-                self.prs_progress = 100
-                self.prs_results = results
-                self.low_match_warning = any_low_match
-                self.status_message = f"Restored {total} PRS result(s) from checkpoint"
+        if self._get_genotypes_lf() is None:
+            self.status_message = "Normalized VCF not found — run normalization first."
             return
 
-        # ── Phase 2: heavy computation outside the state lock ──────────────────
-        loop = asyncio.get_running_loop()
-        dagster_instance = get_dagster_instance() if partition_key else None
-        error_msg = ""
+        gen = PRSComputeStateMixin.compute_selected_prs(self)
+        if gen is not None:
+            yield from gen
 
+        self._checkpoint_prs_to_dagster()
+
+    def _checkpoint_prs_to_dagster(self) -> None:
+        """Persist current PRS results to Dagster for cross-session restore."""
+        import json
+        parquet_path = self.prs_initialized_for_file
+        if not parquet_path or not self.prs_results:
+            return
+        p = Path(parquet_path)
+        partition_key = f"{p.parent.parent.name}/{p.parent.name}"
+        pgs_ids = [r.get("pgs_id", "") for r in self.prs_results]
         try:
-            best_perf_df = await loop.run_in_executor(
-                None, lambda: _prs_catalog.best_performance().collect()
-            )
-
-            for i, pgs_id in enumerate(to_compute, start=1):
-                overall_i = already_done + i
-                async with self:
-                    if self.prs_computation_id != computation_id:
-                        return  # superseded by a newer run
-                    self.prs_progress = round(overall_i / total * 100)
-                    self.status_message = f"Computing {overall_i}/{total}: {pgs_id}..."
-
-                info = _prs_catalog.score_info_row(pgs_id)
-                trait = info["trait_reported"] if info else None
-
-                def _compute_one(pid=pgs_id, t=trait):
-                    return _prs_compute_prs(
-                        vcf_path=str(parquet_path) or "",
-                        scoring_file=pid,
-                        genome_build=genome_build,
-                        cache_dir=cache,
-                        pgs_id=pid,
-                        trait_reported=t,
-                        genotypes_lf=genotypes_lf,
-                    )
-
-                result = await loop.run_in_executor(None, _compute_one)
-
-                match_pct = round(result.match_rate * 100, 1)
-                match_color = "red" if match_pct < 10 else "orange" if match_pct < 50 else "green"
-
-                auroc_val: float | None = None
-                ancestry_str = ""
-                n_individuals: int | None = None
-                effect_size_str = ""
-                classification_str = ""
-                perf_rows = best_perf_df.filter(pl.col("pgs_id") == pgs_id)
-                if perf_rows.height > 0:
-                    row_p = perf_rows.row(0, named=True)
-                    effect_size_str = _prs_format_effect_size(row_p)
-                    classification_str = _prs_format_classification(row_p)
-                    auroc_val = row_p.get("auroc_estimate")
-                    ancestry_str = row_p.get("ancestry_broad") or ""
-                    n_individuals = row_p.get("n_individuals")
-
-                pct_value = result.percentile
-                pct_method = result.percentile_method or (
-                    "theoretical" if result.has_allele_frequencies else ""
+            instance = get_dagster_instance()
+            instance.report_runless_asset_event(
+                AssetMaterialization(
+                    asset_key="prs_results",
+                    partition=partition_key,
+                    metadata={
+                        "results": MetadataValue.json({"rows": self.prs_results}),
+                        "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
+                        "genome_build": MetadataValue.text(self.genome_build),
+                        "ancestry": MetadataValue.text(self.selected_ancestry or ""),
+                        "row_count": MetadataValue.int(len(self.prs_results)),
+                    },
                 )
-                if pct_value is None:
-                    pct_value, pct_method = _prs_catalog.percentile(
-                        result.score, pgs_id, ancestry=ancestry
-                    )
-
-                interp = _prs_interpret_prs_result(pct_value, result.match_rate, auroc_val)
-
-                row: dict = {
-                    "pgs_id": result.pgs_id,
-                    "trait": result.trait_reported or "",
-                    "score": round(result.score, 6),
-                    "percentile": f"{pct_value:.1f}" if pct_value is not None else "",
-                    "percentile_method": pct_method or "",
-                    "has_allele_frequencies": result.has_allele_frequencies,
-                    "match_rate": match_pct,
-                    "match_color": match_color,
-                    "variants_matched": result.variants_matched,
-                    "variants_total": result.variants_total,
-                    "effect_size": effect_size_str,
-                    "classification": classification_str,
-                    "auroc": f"{auroc_val:.3f}" if auroc_val is not None else "",
-                    "quality_label": interp["quality_label"],
-                    "quality_color": interp["quality_color"],
-                    "summary": interp["summary"],
-                    "ancestry": ancestry_str,
-                    "selected_ancestry": ancestry,
-                    "n_individuals": n_individuals if n_individuals is not None else 0,
-                }
-
-                if result.match_rate < 0.1:
-                    any_low_match = True
-                results.append(row)
-
-                # Push each new result to the UI immediately.
-                async with self:
-                    if self.prs_computation_id != computation_id:
-                        return
-                    self.prs_results = list(results)
-
-                # Write checkpoint to Dagster after every new result so a crash
-                # at score N only loses score N, not the entire run.
-                if dagster_instance:
-                    try:
-                        dagster_instance.report_runless_asset_event(
-                            AssetMaterialization(
-                                asset_key="prs_results",
-                                partition=partition_key,
-                                metadata={
-                                    "results": MetadataValue.json({"rows": results}),
-                                    "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
-                                    "genome_build": MetadataValue.text(genome_build),
-                                    "ancestry": MetadataValue.text(ancestry or ""),
-                                    "row_count": MetadataValue.int(len(results)),
-                                },
-                            )
-                        )
-                    except Exception:
-                        pass  # checkpoint failure is non-fatal
-
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            error_msg = f"Network error — cannot download scoring file: {exc}"
-        except Exception as exc:
-            error_msg = f"PRS computation failed: {exc}"
-
-        # ── Phase 3: write final state ─────────────────────────────────────────
-        superseded = False
-        async with self:
-            if self.prs_computation_id != computation_id:
-                superseded = True
-            else:
-                self.prs_computing = False
-                self.prs_progress = 100
-                if error_msg:
-                    # Partial results (from checkpoint + this run so far) stay visible.
-                    self.status_message = f"{error_msg} — {len(results)}/{total} completed"
-                    self.low_match_warning = any_low_match
-                else:
-                    self.prs_results = results
-                    self.low_match_warning = any_low_match
-                    self.status_message = f"Computed {len(results)} PRS score(s)"
-
+            )
+        except Exception:
+            pass
 
     def _load_prs_results_from_dagster(self, partition_key: str) -> None:
-        """Restore PRS results from the latest Dagster materialization for this partition.
-
-        Called from ``initialize_prs_for_file`` when the selected file already
-        has a prior result (e.g. after a server restart or cross-session restore).
-        """
+        """Restore PRS results from the latest Dagster materialization."""
         if not partition_key:
             return
         try:
@@ -3054,11 +2808,12 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             rows = data.get("rows", []) if isinstance(data, dict) else []
             if rows:
                 self.prs_results = rows
+                self._build_prs_results_grid()
                 count_meta = mat.metadata.get("row_count")
                 n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
                 self.status_message = f"Restored {n} PRS result(s) from previous session"
         except Exception:
-            pass  # non-fatal; UI simply shows no prior results
+            pass
 
 
 # ============================================================================

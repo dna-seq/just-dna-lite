@@ -5,12 +5,12 @@ description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "typer>=0.23.1",
+  "typer>=0.24.1",
   "just-dna-pipelines",
   "webui",
   "pyyaml>=6.0.3",
-  "dagster-dg-cli>=1.12.14",
-  "google-genai>=1.66.0",
+  "dagster-dg-cli>=1.12.19",
+  "google-genai>=1.67.0",
   "pillow>=12.1.1",
 ]
 
@@ -20,7 +20,7 @@ webui = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "ipykernel>=6.29.5",
+    "ipykernel>=7.2.0",
 ]
 
 [project.scripts]
