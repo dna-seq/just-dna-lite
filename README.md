@@ -54,6 +54,26 @@ uv run start
 
 This launches the Web UI and the Dagster pipeline server together. Open the URL printed in the terminal.
 
+### macOS Apple Silicon: using Nix (optional)
+
+If you're on an Apple Silicon Mac (M1/M2/M3/M4) and run into architecture issues (e.g. Polars CPU warnings, wrong native bindings), the included [Nix flake](https://nix.dev/concepts/flakes) provides Python, Node.js, and uv at the correct architecture automatically.
+
+```bash
+# Install Nix (one-time, ~2 minutes)
+sh <(curl -L https://nixos.org/nix/install)
+# Restart your terminal, then enable flakes:
+mkdir -p ~/.config/nix
+echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+# Enter the dev environment and start as usual
+cd just-dna-lite
+nix develop
+uv sync
+uv run start
+```
+
+Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
+
 ### Individual components
 
 Run components separately if needed:
