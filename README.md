@@ -10,7 +10,7 @@
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
-Upload your genome, pick what you want to know, get results in minutes. Other annotation tools can take hours. just-dna-lite runs locally on Polars and DuckDB, so your whole VCF gets normalized, annotated, and reported while you're still making coffee. Your data never leaves your machine.
+Upload your genome file, pick what you want to know, get results in minutes. Other annotation tools can take hours. just-dna-lite runs entirely on your machine — your data gets normalized, annotated, and reported while you're still making coffee. Nothing leaves your computer.
 
 The starting point here is that you have the right to look at your own genome without anyone filtering what you see. Consumer genomics tools like Nebula or Dante do show you a lot, but what they surface is ultimately a semi-arbitrary curatorial decision by their teams — interesting findings they picked, weighted toward things that are engaging or easy to explain. Clinical genomics is highly curated too, but for a different reason: it only shows findings where there's strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the PGS Catalog, your complete variant table cross-referenced against Ensembl. What you do with that is your decision.
 
@@ -20,18 +20,21 @@ The tool ships with annotation modules for longevity, coronary artery disease, l
 
 **5,000+ Polygenic Risk Scores** from the [PGS Catalog](https://www.pgscatalog.org/) are available out of the box. Pick any score, click compute, and get your result with percentile ranking against 1000 Genomes reference populations (AFR, AMR, EAS, EUR, SAS). No command line, no scripting, just a few clicks. Under the hood, scoring runs via [just-prs](https://github.com/dna-seq/just-prs) using DuckDB (12.3× faster than PLINK2) or Polars (5.7× faster), with Pearson r = 0.9999 concordance against PLINK2 across 100 PGS IDs on a 4.66M-variant WGS. See the [full benchmark →](https://github.com/dna-seq/just-prs/blob/main/docs/benchmarks.md)
 
-**AI Module Creator.** Got a research paper about a trait that interests you? Describe it in plain text, or upload the PDF directly. The tool has two modes:
+**AI Module Creator.** Got a research paper about a trait that interests you? Describe it in plain text, or upload the PDF directly. Powered by the Agno agentic framework, the tool supports major cloud models (Gemini, GPT, Claude) as well as local OpenAI-compatible models for complete privacy. It has two modes:
 
-- **Simple mode** — a single Gemini Pro agent queries biomedical databases (EuropePMC, Open Targets, BioRxiv), extracts variants with effect weights, validates the output, and writes the module. Takes roughly 2 minutes.
-- **Research team mode** — a PI agent dispatches up to three independent Researcher agents (Gemini + GPT + Claude Sonnet, if you configure those keys) in parallel, each querying the literature separately. The PI synthesizes by majority vote — variants confirmed by ≥2 researchers are high confidence, weights where researchers disagree are taken as the median — then a Reviewer agent fact-checks the draft before the PI writes the final module. Takes roughly 7–8 minutes and produces deeper coverage.
+- **Simple mode** — a single Gemini Pro agent queries EuropePMC, Open Targets, and BioRxiv, extracts variants with per-genotype weights, validates the spec, and writes the module. Typical runtime: ~2 minutes for a single paper (documented: 107 seconds, 12 variant rows, 4 genes, no manual edits).
+- **Research team mode** — a PI agent dispatches up to three Researcher agents (Gemini + GPT + Claude Sonnet) in parallel, each independently querying the literature. The PI synthesises by majority vote (variants need ≥2 researchers to confirm; weight disagreements use the median), then a Reviewer agent fact-checks via Google Search before the PI writes the final module. Typical runtime: ~7–8 minutes; documented runs produced 34–49 variant rows across 8–13 genes with no manual edits.
 
-Both modes output the same thing: a `module_spec.yaml` + `variants.csv` loaded into an editing slot for review, then one click to register it into the annotation pipeline. In documented test runs, all three scenarios produced ready-to-register modules with no manual edits required.
+Both modes output `module_spec.yaml` + `variants.csv` loaded into an editing slot for review, then one click to register. You can iterate by sending follow-up messages in the same chat. [Full walkthrough with real examples and timing logs →](docs/AI_MODULE_WALKTHROUGH.md)
 
 **Self-exploration.** Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
 
 ## Quick start
 
 You need a VCF file from whole genome (WGS) or whole exome (WES) sequencing aligned to GRCh38, and Python 3.13+. If you sequenced through [Nebula Genomics](https://nebula.org/), [Dante Labs](https://www.dantelabs.com/), [TruDiagnostic](https://trudiagnostic.com/), or a clinical lab, you should have a `.vcf` or `.vcf.gz` file. That's what you need. (23andMe and AncestryDNA produce microarray data, not VCFs. Microarray support is on the roadmap.)
+
+**Don't have your genome sequenced yet?**
+You can use any public genome to try out the tool. For example, some of our authors have open-sourced their genomes — you can download [Anton Kulaga's genome here](https://zenodo.org/records/18370498) and see what you discover! You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
 
 First, install [uv](https://github.com/astral-sh/uv) (a fast Python package manager):
 
@@ -54,7 +57,7 @@ uv run start
 
 Open the URL printed in the terminal (usually `http://localhost:3000`). Upload your VCF and start exploring.
 
-To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
+To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Since the agents are built on the Agno framework, you can also configure local OpenAI-compatible models (like Ollama or vLLM) if you want to keep everything completely local. Everything else works without any API keys.
 
 ## How it works
 
@@ -150,6 +153,7 @@ uv run pytest just-dna-pipelines/tests/ # Pipeline tests only
 - [Understanding Your Genome: Science vs Clinical Grade](docs/SCIENCE_LITERACY.md) — what heritability means, why PRS are linear models, when to act on a finding (and when not to)
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [AI Module Creation](docs/AI_MODULE_CREATION.md) — DSL spec, compiler, registry API, Agno agent (solo + team), module discovery
+- [AI Module Walkthrough](docs/AI_MODULE_WALKTHROUGH.md) — three real end-to-end examples with timing logs, agent outputs, and generated module files
 - [Dagster Pipeline Guide](docs/DAGSTER_GUIDE.md)
 - [Annotation Modules](docs/HF_MODULES.md)
 - [Configuration & Setup](docs/CLEAN_SETUP.md)
