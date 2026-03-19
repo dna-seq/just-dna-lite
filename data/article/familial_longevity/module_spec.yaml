@@ -1,0 +1,17 @@
+schema_version: "1.0"
+
+module:
+  name: familial_longevity
+  version: 1
+  title: "Familial Longevity & cGAS-STING Signalling"
+  description: "Rare protective variants in cGAS and other genes associated with familial longevity and delayed cellular senescence."
+  report_title: "Familial Longevity & Cellular Senescence"
+  icon: heart-pulse
+  color: "#00b5ad"
+
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+  priority: medium
+
+genome_build: GRCh38

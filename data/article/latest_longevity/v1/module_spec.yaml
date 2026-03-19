@@ -1,0 +1,17 @@
+schema_version: "1.0"
+
+module:
+  name: latest_longevity
+  version: 1
+  title: "Latest Longevity"
+  description: "Latest rare and protective variants linked to extreme longevity and frailty in 2025."
+  report_title: "Latest Longevity Genetics"
+  icon: heart-pulse
+  color: "#21ba45"
+
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+  priority: medium
+
+genome_build: GRCh38

@@ -1,0 +1,17 @@
+rsid,pmid,population,p_value,conclusion,study_design
+rs200818241,41427385,European,0.05,"A reduced-function mutation in cGAS dampens the cGAS-STING pathway and delays senescence in long-lived families.",Cohort
+rs758447806,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs535256255,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs151230291,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs141426527,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs372893802,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs61745123,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs1209730474,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs143389605,41427385,European,0.05,"Rare variant identified under linkage peaks in multigenerational long-lived families.",Cohort
+rs146711285,41427385,European,0.05,"Rare variant identified in multiple independent sibships in multigenerational long-lived families.",Cohort
+rs117385980,41249831,Mixed,0.073,"T allele shows inverse association with advanced age, depleted in individuals over 80.",Case-control
+rs964184,41500000,European,5e-8,"Identified as a pleiotropic mvARD lead SNP inversely correlated with extreme longevity.",GWAS
+rs12740374,41500000,European,5e-8,"Identified as a pleiotropic mvARD lead SNP inversely correlated with extreme longevity.",GWAS
+rs7310615,41500000,European,5e-8,"Identified as a pleiotropic mvARD lead SNP inversely correlated with extreme longevity.",GWAS
+rs28601761,41500000,European,5e-8,"Identified as a pleiotropic mvARD lead SNP inversely correlated with extreme longevity.",GWAS
+rs6547692,41500000,European,5e-8,"Identified as a pleiotropic mvARD lead SNP inversely correlated with extreme longevity.",GWAS

@@ -1,0 +1,13 @@
+rsid,chrom,start,ref,alts,genotype,weight,state,conclusion,priority,gene,phenotype,category
+rs200818241,6,74135164,T,A,T/T,0,neutral,"Normal cGAS-STING activation; typical cellular senescence rates.",high,CGAS,Familial longevity,Immunity & Senescence
+rs200818241,6,74135164,T,A,A/T,0.8,protective,"Heterozygous for the rare D452V missense variant. Dampens cGAS-STING signalling, delays cellular senescence, and is associated with familial longevity.",high,CGAS,Familial longevity,Immunity & Senescence
+rs200818241,6,74135164,T,A,A/A,1.2,significant,"Homozygous for the rare D452V missense variant. Significantly reduces cGAS protein stability and dampens cGAS-STING signalling, extending cellular lifespan.",high,CGAS,Familial longevity,Immunity & Senescence
+rs146711285,19,6754168,G,C,G/G,0,neutral,"Normal SH2D3A function.",medium,SH2D3A,Familial longevity,Longevity & Healthspan
+rs146711285,19,6754168,G,C,C/G,0.6,protective,"Heterozygous for the rare SH2D3A longevity variant. Associated with familial longevity.",medium,SH2D3A,Familial longevity,Longevity & Healthspan
+rs146711285,19,6754168,G,C,C/C,1.0,protective,"Homozygous for the rare SH2D3A longevity variant. Linked to an extended lifespan.",medium,SH2D3A,Familial longevity,Longevity & Healthspan
+rs1209730474,6,88231192,A,T,A/A,0,neutral,"Normal RARS2 function.",medium,RARS2,Familial longevity,Longevity & Healthspan
+rs1209730474,6,88231192,A,T,A/T,0.5,protective,"Heterozygous for the rare RARS2 variant, found in long-lived families.",medium,RARS2,Familial longevity,Longevity & Healthspan
+rs1209730474,6,88231192,A,T,T/T,1.0,protective,"Homozygous for the rare RARS2 variant, strongly linked to familial longevity.",medium,RARS2,Familial longevity,Longevity & Healthspan
+rs535256255,1,153750649,C,T,C/C,0,neutral,"Normal SLC27A3 function.",medium,SLC27A3,Familial longevity,Longevity & Healthspan
+rs535256255,1,153750649,C,T,C/T,0.5,protective,"Heterozygous for the rare SLC27A3 variant, associated with familial longevity.",medium,SLC27A3,Familial longevity,Longevity & Healthspan
+rs535256255,1,153750649,C,T,T/T,1.0,protective,"Homozygous for the rare SLC27A3 variant, linked to longevity in multiple families.",medium,SLC27A3,Familial longevity,Longevity & Healthspan

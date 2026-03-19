@@ -1,0 +1,49 @@
+rsid,genotype,weight,state,conclusion,gene,phenotype,category
+rs200818241,T/T,0,neutral,"Normal cGAS protein stability and canonical cGAS-STING pathway activation.",CGAS,Longevity,Familial Longevity
+rs200818241,A/T,0.8,protective,"Reduced-function mutation; decreases cGAS stability, attenuates cGAS-STING activation, and delays cellular senescence. Associated with familial longevity.",CGAS,Longevity,Familial Longevity
+rs200818241,A/A,1.2,protective,"Homozygous reduced-function mutation; expected to strongly dampen cGAS-STING signaling and senescence, though very rare in humans.",CGAS,Longevity,Familial Longevity
+rs758447806,T/T,0,neutral,"Normal NUP210L function.",NUP210L,Longevity,Familial Longevity
+rs758447806,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families, associated with ancestral longevity.",NUP210L,Longevity,Familial Longevity
+rs758447806,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",NUP210L,Longevity,Familial Longevity
+rs535256255,T/T,0,neutral,"Normal SLC27A3 function.",SLC27A3,Longevity,Familial Longevity
+rs535256255,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",SLC27A3,Longevity,Familial Longevity
+rs535256255,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",SLC27A3,Longevity,Familial Longevity
+rs151230291,T/T,0,neutral,"Normal SLC27A3 function.",SLC27A3,Longevity,Familial Longevity
+rs151230291,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",SLC27A3,Longevity,Familial Longevity
+rs151230291,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",SLC27A3,Longevity,Familial Longevity
+rs141426527,T/T,0,neutral,"Normal CD1A function.",CD1A,Longevity,Familial Longevity
+rs141426527,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",CD1A,Longevity,Familial Longevity
+rs141426527,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",CD1A,Longevity,Familial Longevity
+rs372893802,T/T,0,neutral,"Normal IBTK function.",IBTK,Longevity,Familial Longevity
+rs372893802,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",IBTK,Longevity,Familial Longevity
+rs372893802,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",IBTK,Longevity,Familial Longevity
+rs61745123,A/A,0,neutral,"Normal IBTK function.",IBTK,Longevity,Familial Longevity
+rs61745123,A/C,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",IBTK,Longevity,Familial Longevity
+rs61745123,C/C,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",IBTK,Longevity,Familial Longevity
+rs1209730474,T/T,0,neutral,"Normal RARS2 function.",RARS2,Longevity,Familial Longevity
+rs1209730474,A/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",RARS2,Longevity,Familial Longevity
+rs1209730474,A/A,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",RARS2,Longevity,Familial Longevity
+rs143389605,C/C,0,neutral,"Normal RARS2 function.",RARS2,Longevity,Familial Longevity
+rs143389605,C/T,0.4,protective,"Rare missense variant identified in multigenerational long-lived families.",RARS2,Longevity,Familial Longevity
+rs143389605,T/T,0.4,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",RARS2,Longevity,Familial Longevity
+rs146711285,C/C,0,neutral,"Normal SH2D3A function.",SH2D3A,Longevity,Familial Longevity
+rs146711285,C/G,0.5,protective,"Rare missense variant present in multiple independent long-lived sibships, associated with familial longevity.",SH2D3A,Longevity,Familial Longevity
+rs146711285,G/G,0.5,alt,"Homozygous rare variant; effect unknown but potentially protective based on heterozygote data.",SH2D3A,Longevity,Familial Longevity
+rs117385980,C/C,0,neutral,"Normal SIRT6 function. Baseline likelihood of reaching extreme old age.",SIRT6,Longevity,Frailty and Longevity
+rs117385980,C/T,-0.5,risk,"Heterozygous stop-gained variant. Associated with an inverse relationship to advanced age (depleted in individuals over 80), suggesting a potential survival disadvantage for extreme longevity.",SIRT6,Longevity,Frailty and Longevity
+rs117385980,T/T,-1.0,risk,"Homozygous stop-gained variant. Likely deleterious for normal SIRT6 function, potentially resulting in early mortality or severe health impact.",SIRT6,Longevity,Frailty and Longevity
+rs964184,C/C,0,neutral,"Normal lipid profile; baseline risk for cardiometabolic multimorbidity.",ZNF259,Multimorbidity & Longevity,mvARD
+rs964184,C/G,-0.4,risk,"Heterozygous risk state; elevated triglycerides and increased risk of metabolic syndrome and myocardial infarction.",ZNF259,Multimorbidity & Longevity,mvARD
+rs964184,G/G,-0.8,risk,"Homozygous risk state; significantly elevated triglycerides, high risk of metabolic syndrome and myocardial infarction, reducing longevity.",ZNF259,Multimorbidity & Longevity,mvARD
+rs12740374,G/G,0.8,protective,"Homozygous protective state; significantly reduces LDL cholesterol levels, conferring a lower risk of atherosclerotic disease and promoting longevity.",SORT1,Multimorbidity & Longevity,mvARD
+rs12740374,G/T,0.4,protective,"Heterozygous protective state; increases SORT1 expression to clear LDL particles, conferring a lower risk of atherosclerotic disease.",SORT1,Multimorbidity & Longevity,mvARD
+rs12740374,T/T,0,neutral,"Normal SORT1 expression and baseline LDL cholesterol levels.",SORT1,Multimorbidity & Longevity,mvARD
+rs7310615,C/C,0,neutral,"Baseline genetic liability for hypertension and cardiovascular remodeling.",SH2B3,Multimorbidity & Longevity,mvARD
+rs7310615,C/T,0.4,protective,"Heterozygous protective state; associated with lower blood pressure and reduced systemic inflammation.",SH2B3,Multimorbidity & Longevity,mvARD
+rs7310615,T/T,0.8,protective,"Homozygous protective state; associated with significantly lower blood pressure and reduced systemic inflammation, supporting healthier aging.",SH2B3,Multimorbidity & Longevity,mvARD
+rs28601761,C/C,-0.6,risk,"Homozygous risk state; promotes metabolic dysfunction-associated steatotic liver disease (MASLD) and adverse cardiometabolic outcomes.",TRIB1,Multimorbidity & Longevity,mvARD
+rs28601761,C/G,-0.3,risk,"Heterozygous risk state; associated with increased non-HDL-C and hepatic fat content.",TRIB1,Multimorbidity & Longevity,mvARD
+rs28601761,G/G,0,neutral,"Normal lipid levels and baseline hepatic steatosis risk.",TRIB1,Multimorbidity & Longevity,mvARD
+rs6547692,C/C,0,neutral,"Normal lipid profile; baseline risk for gout and dyslipidemia.",GCKR,Multimorbidity & Longevity,mvARD
+rs6547692,C/T,-0.3,risk,"Heterozygous risk state; increases liver fat and triglycerides, elevating metabolic syndrome liability.",GCKR,Multimorbidity & Longevity,mvARD
+rs6547692,T/T,-0.6,risk,"Homozygous risk state; causes significant triglyceride elevation and hepatic fat accumulation, contributing to metabolic multimorbidity.",GCKR,Multimorbidity & Longevity,mvARD
