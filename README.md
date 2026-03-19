@@ -10,26 +10,52 @@
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
-**⚠️ MEDICAL DISCLAIMER & RESEARCH USE ONLY (RUO):** just-dna-lite is a bioinformatics research tool designed exclusively for academic studies (e.g., ROGEN, the Romanian Genomic Project), citizen science, and educational self-exploration. **It is NOT a medical device, is NOT intended for clinical diagnostic use, and does NOT provide medical advice.** The software and its modules (including AI-generated content) are provided "AS IS" without warranties of any kind. Our philosophy is to display *everything*—including PRS scores and community-generated AI modules that may attempt to predict disease probabilities. However, you must **never use this tool to make medical, diagnostic, or health-related decisions.** Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.
+**⚠️ MEDICAL DISCLAIMER & RESEARCH USE ONLY (RUO):** just-dna-lite is a bioinformatics research tool designed exclusively for academic studies (e.g., ROGEN, the Romanian Genomic Project), citizen science, and educational self-exploration. **It is NOT a medical device, is NOT intended for clinical diagnostic use, and does NOT provide medical advice.** The software and its modules (including AI-generated content) are provided "AS IS" without warranties of any kind. 
+
+Our philosophy is to display *everything*—including PRS scores and community-generated AI modules that may attempt to predict disease probabilities. However, you must **never use this tool to make medical, diagnostic, or health-related decisions.** Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.
 
 Upload your genome file, pick what you want to know, get results in minutes. Other annotation tools can take hours. just-dna-lite runs entirely on your machine — your data gets normalized, annotated, and reported while you're still making coffee. Nothing leaves your computer.
 
 The starting point here is that you have the right to look at your own genome without anyone filtering what you see. In the spirit of global open health data initiatives (such as the [European Health Data Space (EHDS)](https://digital-strategy.ec.europa.eu/en/policies/electronic-health-records) and similar frameworks worldwide), we believe individuals should have immediate, open access to their digital health data. Consumer genomics tools like Nebula or Dante do show you a lot, but what they surface is ultimately a semi-arbitrary curatorial decision by their teams — interesting findings they picked, weighted toward things that are engaging or easy to explain. Clinical genomics is highly curated too, but for a different reason: it only shows findings where there's strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the PGS Catalog, your complete variant table cross-referenced against Ensembl. What you do with that is your decision.
 
-## What's inside
+## Genomic Annotations
 
-The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance, and pharmacogenomics (PharmGKB). These are a starting point. The real idea is that modules are easy to create and the list will grow fast.
+### Built-in Modules
+
+The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance, and pharmacogenomics (PharmGKB). These modules were created with the expert curation of geneticist Olga Borysova and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
+
+### Polygenic Risk Scores (PRS)
 
 **5,000+ Polygenic Risk Scores** from the [PGS Catalog](https://www.pgscatalog.org/) are available out of the box. Pick any score, click compute, and get your result with percentile ranking against 1000 Genomes reference populations (AFR, AMR, EAS, EUR, SAS). No command line, no scripting, just a few clicks. Under the hood, scoring runs via [just-prs](https://github.com/dna-seq/just-prs) using DuckDB (12.3× faster than PLINK2) or Polars (5.7× faster), with Pearson r = 0.9999 concordance against PLINK2 across 100 PGS IDs on a 4.66M-variant WGS. See the [full benchmark →](https://github.com/dna-seq/just-prs/blob/main/docs/benchmarks.md)
 
-**AI Module Creator.** Got a research paper about a trait that interests you? Describe it in plain text, or upload the PDF directly. Powered by the Agno agentic framework, the tool supports major cloud models (Gemini, GPT, Claude) as well as local OpenAI-compatible models for complete privacy. It has two modes:
+### AI Module Creator
 
-- **Simple mode** — a single Gemini Pro agent queries EuropePMC, Open Targets, and BioRxiv, extracts variants with per-genotype weights, validates the spec, and writes the module. Typical runtime: ~2 minutes for a single paper (documented: 107 seconds, 12 variant rows, 4 genes, no manual edits).
-- **Research team mode** — a PI agent dispatches up to three Researcher agents (Gemini + GPT + Claude Sonnet) in parallel, each independently querying the literature. The PI synthesises by majority vote (variants need ≥2 researchers to confirm; weight disagreements use the median), then a Reviewer agent fact-checks via Google Search before the PI writes the final module. Typical runtime: ~7–8 minutes; documented runs produced 34–49 variant rows across 8–13 genes with no manual edits.
+Annotation modules in just-dna-lite are curated SNP filter sets containing variants, per-genotype weights, states, and literature evidence. Building these by hand is labour-intensive. To solve this, just-dna-lite includes an **AI Module Creator**—an agentic pipeline that turns arbitrary input (a research article PDF, CSV dump, or free-text description) into a valid, deployable annotation module.
 
-Both modes output `module_spec.yaml` + `variants.csv` loaded into an editing slot for review, then one click to register. You can iterate by sending follow-up messages in the same chat. [Full walkthrough with real examples and timing logs →](docs/AI_MODULE_WALKTHROUGH.md)
+Got a research paper about a trait that interests you? Just upload the PDF and ask the AI to build a module. Powered by the Agno agentic framework, the tool supports major cloud models (Gemini, GPT, Claude) as well as local OpenAI-compatible models (like Ollama or vLLM) for complete privacy. 
 
-**Self-exploration.** Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
+<div>
+  <img src="images/just_dna_lite_AI_module_builder_step_I.jpg" alt="AI Module Builder Step 1: Prompting the AI to create a module" width="49%">
+  <img src="images/just_dna_lite_AI_module_builder_step_II.jpg" alt="AI Module Builder Step 2: Reviewing and registering the generated module" width="49%">
+</div>
+
+It operates in two modes:
+
+- **Simple mode (Solo Agent)** — a single agent handles everything. It queries biomedical databases (EuropePMC, Open Targets, BioRxiv) using the BioContext MCP, extracts variants with per-genotype weights, validates the spec, and writes the module. If validation fails, the agent self-corrects and retries.
+  - *Best for:* Single well-defined papers, quick iteration, simple trait panels.
+  - *Typical runtime:* ~2 minutes for a single paper.
+
+- **Research team mode (Multi-Agent Swarm)** — a coordinated team of agents. A Principal Investigator (PI) agent dispatches up to three Researcher agents (e.g., Gemini, GPT, and Claude Sonnet) in parallel, each independently querying the literature. This model diversity reduces systematic blind spots. The PI synthesises the findings by consensus (variants need ≥2 researchers to confirm; weight disagreements use the median). A Reviewer agent then fact-checks the data via Google Search before the PI writes the final module.
+  - *Best for:* Complex topics spanning multiple papers, large variant sets, cross-model validation.
+  - *Typical runtime:* ~7–8 minutes.
+
+Both modes output a deterministic DSL specification (`module_spec.yaml` + `variants.csv` + `studies.csv`), which the compiler validates and turns into Parquet tables. The drafted module is loaded into an editing slot for your review. You can manually edit the files, iterate by sending follow-up messages to the AI in the same chat, and then register the module with one click so it becomes instantly available in your local app.
+
+[Full walkthrough with real examples and timing logs →](docs/AI_MODULE_WALKTHROUGH.md)
+
+### Self-exploration
+
+Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
 
 ## Quick start
 
