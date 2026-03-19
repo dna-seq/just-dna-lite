@@ -1925,25 +1925,31 @@ def no_file_selected_message() -> rx.Component:
         
         # RUO Warning Banner
         rx.el.div(
+            fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginBottom": "8px"}),
             rx.el.div(
-                fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginRight": "16px"}),
-                rx.el.div(
-                    rx.el.div(
-                        rx.el.strong("Research Use Only (RUO)"),
-                        style={"fontSize": "1.05rem", "color": "#db2828", "marginBottom": "4px"}
-                    ),
-                    rx.el.div(
-                        "This tool is for research, educational, and self-exploration purposes only. "
-                        "While we display all available data and scores, ",
-                        rx.el.strong("you must not use this tool for diagnostic or medical decisions. "),
-                        "Always consult a healthcare professional for clinical interpretation.",
-                        style={"fontSize": "0.9rem", "color": "#444", "lineHeight": "1.4"}
-                    ),
-                ),
-                style={"display": "flex", "alignItems": "center", "textAlign": "left"}
+                rx.el.strong("Research Use Only (RUO)"),
+                style={"fontSize": "1.1rem", "color": "#db2828", "marginBottom": "6px"}
+            ),
+            rx.el.div(
+                "This tool is for research, educational, and self-exploration purposes only. "
+                "The genetic modules and Polygenic Risk Scores (PRS) here are ",
+                rx.el.strong("not clinically validated"),
+                ". You must not use this tool for diagnostic or medical decisions. "
+                "Any findings of interest require independent confirmation using clinically validated "
+                "genomic analysis or orthogonal methods like PCR. "
+                "Always consult a healthcare professional for clinical interpretation.",
+                style={"fontSize": "0.95rem", "color": "#444", "lineHeight": "1.4"}
             ),
             class_name="ui red message",
-            style={"maxWidth": "900px", "margin": "0 auto 40px auto"}
+            style={
+                "maxWidth": "800px", 
+                "margin": "0 auto 40px auto", 
+                "textAlign": "center",
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "center",
+                "padding": "16px 24px"
+            }
         ),
         
         # Two-column layout for Info vs Workflow
