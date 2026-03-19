@@ -32,14 +32,7 @@ The tool ships with annotation modules for longevity, coronary artery disease, l
 
 Annotation modules in just-dna-lite are curated SNP filter sets containing variants, per-genotype weights, states, and literature evidence. Building these by hand is labour-intensive. To solve this, just-dna-lite includes an **AI Module Creator**—an agentic pipeline that turns arbitrary input (a research article PDF, CSV dump, or free-text description) into a valid, deployable annotation module.
 
-Got a research paper about a trait that interests you? Just upload the PDF and ask the AI to build a module. Powered by the Agno agentic framework, the tool supports major cloud models (Gemini, GPT, Claude) as well as local OpenAI-compatible models (like Ollama or vLLM) for complete privacy. 
-
-<div>
-  <img src="images/just_dna_lite_AI_module_builder_step_I.jpg" alt="AI Module Builder Step 1: Prompting the AI to create a module" width="49%">
-  <img src="images/just_dna_lite_AI_module_builder_step_II.jpg" alt="AI Module Builder Step 2: Reviewing and registering the generated module" width="49%">
-</div>
-
-It operates in two modes:
+Got a research paper about a trait that interests you? Just upload the PDF and ask the AI to build a module. Powered by the Agno agentic framework, the tool supports Gemini, GPT, and Claude. It operates in two modes:
 
 - **Simple mode (Solo Agent)** — a single agent handles everything. It queries biomedical databases (EuropePMC, Open Targets, BioRxiv) using the BioContext MCP, extracts variants with per-genotype weights, validates the spec, and writes the module. If validation fails, the agent self-corrects and retries.
   - *Best for:* Single well-defined papers, quick iteration, simple trait panels.
@@ -56,6 +49,19 @@ Both modes output a deterministic DSL specification (`module_spec.yaml` + `varia
 ### Self-exploration
 
 Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
+
+## Creating a Module with the AI Team
+
+Got a research paper about a trait that interests you? Upload the PDF, describe what you want, and the AI team does the rest — querying EuropePMC, Open Targets, and BioRxiv, extracting variants with per-genotype weights, validating the spec, and writing all module files in one uninterrupted run. No bioinformatics knowledge needed.
+
+<div>
+  <img src="images/just_dna_lite_AI_module_builder_step_I.jpg" alt="Step 1: open Module Manager, attach your paper, describe the module, click Send" width="960">
+  <img src="images/just_dna_lite_AI_module_builder_step_II.jpg" alt="Step 2: module auto-loaded with all files generated; register as annotation source in one click" width="960">
+</div>
+
+The module lands in the editing slot automatically with its name, description, and all generated files: `module_spec.yaml` and `variants.csv` (the core spec), `studies.csv` (literature references), `MODULE.md` (human-readable summary), an AI-generated `logo.png`, and a timestamped log for each creation or edit run. Review the files, then click **Register Module as source** — the module appears immediately in the Annotation tab's module list. Re-run the annotation job on your sample and the report will include the new module automatically. You can iterate by sending follow-up messages in the same chat — the team reads the existing module and extends it to a new version, adding a fresh log entry for each revision.
+
+Simple mode runs in about 2 minutes. Research team mode takes 7–8 minutes: a PI (Principal Investigator) agent dispatches Researcher agents in parallel, then a Reviewer fact-checks via Google Search before the PI writes the final module. With only a Gemini key you get one Researcher; adding an OpenAI key brings in a GPT researcher, and adding an Anthropic key adds Claude Sonnet — up to three researchers running simultaneously, each independently querying the literature and reporting findings back to the PI. Having multiple models report independently and requiring cross-model agreement (the PI only retains variants confirmed by at least two researchers, using the median weight on disagreements) greatly reduces hallucination and increases the reliability of the resulting module. Both modes require a free Gemini API key.
 
 ## Quick start
 
@@ -110,7 +116,7 @@ uv run start
 
 Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
 
-To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Since the agents are built on the Agno framework, you can also configure local OpenAI-compatible models (like Ollama or vLLM) if you want to keep everything completely local. Everything else works without any API keys.
+To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
 
 ## How it works
 
