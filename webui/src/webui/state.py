@@ -1720,6 +1720,27 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "needs_materialization": ensembl_mat.get("needs_materialization", True),
                 })
 
+        # Scan vcf_exports/ directory for exported VCF files
+        vcf_export_mat = mat_info.get("user_vcf_exports", {})
+        vcf_dir = get_user_output_dir() / self.safe_user_id / sample_name / "vcf_exports"
+        if vcf_dir.exists():
+            for f in vcf_dir.iterdir():
+                if not f.is_file():
+                    continue
+                if not (f.name.endswith(".vcf") or f.name.endswith(".vcf.gz") or f.name.endswith(".vcf.bgz")):
+                    continue
+                module = f.stem.replace("_annotated", "").replace(".vcf", "")
+                files.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    "module": module,
+                    "type": "vcf_export",
+                    "sample_name": sample_name,
+                    "materialized_at": vcf_export_mat.get("materialized_at", ""),
+                    "needs_materialization": vcf_export_mat.get("needs_materialization", True),
+                })
+
         files.sort(key=lambda x: (x["module"], x["type"]))
         self.output_files = files
         

@@ -27,6 +27,7 @@ from just_dna_pipelines.annotation.hf_assets import (
     hf_module_source_assets,
 )
 from just_dna_pipelines.annotation.report_assets import user_longevity_report
+from just_dna_pipelines.annotation.vcf_export_assets import user_vcf_exports
 from just_dna_pipelines.annotation.jobs import (
     annotate_vcf_job, 
     annotate_vcf_duckdb_job,
@@ -68,25 +69,38 @@ generate_longevity_report_job = define_asset_job(
     hooks={resource_summary_hook},
 )
 
-# Job for full pipeline: normalize + annotate + report
+# Job for VCF export only (depends on module annotations + normalized VCF)
+export_vcf_job = define_asset_job(
+    name="export_vcf_job",
+    selection=AssetSelection.assets("user_vcf_exports"),
+    description="Export annotated parquets to VCF format (per-module + combined).",
+    tags={"export": "vcf", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
+# Job for full pipeline: normalize + annotate + report + VCF export
 annotate_and_report_job = define_asset_job(
     name="annotate_and_report_job",
-    selection=AssetSelection.assets("quality_filters_config", "user_vcf_normalized", "user_hf_module_annotations", "user_longevity_report"),
-    description="Full pipeline: normalize VCF, annotate with HF modules, and generate longevity report.",
+    selection=AssetSelection.assets(
+        "quality_filters_config", "user_vcf_normalized",
+        "user_hf_module_annotations", "user_longevity_report",
+        "user_vcf_exports",
+    ),
+    description="Full pipeline: normalize VCF, annotate with HF modules, generate longevity report, and export VCFs.",
     tags={"annotation": "hf_modules", "report": "longevity", "multi-user": "true"},
     hooks={resource_summary_hook},
 )
 
-# Job for full pipeline with Ensembl: normalize + HF modules + Ensembl DuckDB + report
+# Job for full pipeline with Ensembl: normalize + HF modules + Ensembl DuckDB + report + VCF export
 annotate_all_job = define_asset_job(
     name="annotate_all_job",
     selection=AssetSelection.assets(
         "quality_filters_config", "user_vcf_normalized",
         "user_hf_module_annotations", "user_annotated_vcf_duckdb",
         "ensembl_duckdb", "ensembl_annotations",
-        "user_longevity_report",
+        "user_longevity_report", "user_vcf_exports",
     ),
-    description="Full pipeline: normalize VCF, annotate with HF modules + Ensembl (DuckDB), generate report.",
+    description="Full pipeline: normalize VCF, annotate with HF modules + Ensembl (DuckDB), generate report, and export VCFs.",
     tags={"annotation": "all", "multi-user": "true"},
     hooks={resource_summary_hook},
 )
@@ -142,10 +156,10 @@ def _build_definitions() -> Definitions:
         jobs=[annotate_with_hf_modules_job],
     )
     
-    # 4. Report generation assets (depend on module annotation outputs)
+    # 4. Report generation and VCF export assets (depend on module annotation outputs)
     _reports = Definitions(
-        assets=[user_longevity_report],
-        jobs=[generate_longevity_report_job, annotate_and_report_job, annotate_all_job, annotate_ensembl_only_job],
+        assets=[user_longevity_report, user_vcf_exports],
+        jobs=[generate_longevity_report_job, export_vcf_job, annotate_and_report_job, annotate_all_job, annotate_ensembl_only_job],
     )
     
     # 5. Discover and merge module definitions from data/modules/
