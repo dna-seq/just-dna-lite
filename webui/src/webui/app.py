@@ -136,6 +136,35 @@ async def download_output_file(user_id: str, sample_name: str, filename: str) ->
     )
 
 
+@api.get("/api/download-vcf/{user_id}/{sample_name}/{filename}")
+async def download_vcf_export(user_id: str, sample_name: str, filename: str) -> FileResponse:
+    """Download an exported VCF file from the user's vcf_exports directory.
+
+    Path: /api/download-vcf/{user_id}/{sample_name}/{filename}
+    Example: /api/download-vcf/anonymous/sample1/longevitymap_annotated.vcf.gz
+    """
+    if ".." in user_id or ".." in sample_name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid path components")
+
+    allowed_extensions = (".vcf", ".vcf.gz", ".vcf.bgz")
+    if not any(filename.endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=400, detail="Only VCF files can be downloaded")
+
+    file_path = USER_OUTPUT_DIR / user_id / sample_name / "vcf_exports" / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/octet-stream",
+    )
+
+
 @api.get("/api/agent-spec/{spec_name}/{filename}")
 async def download_agent_spec_file(spec_name: str, filename: str) -> FileResponse:
     """Serve generated spec files (module_spec.yaml, variants.csv, studies.csv)."""

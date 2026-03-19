@@ -220,3 +220,17 @@ class ReportConfig(Config):
     sample_name: Optional[str] = None  # Override partition-derived sample name
     modules: Optional[list[str]] = None  # Specific modules to include (None = all available)
     output_path: Optional[str] = None  # Custom output path (default: data/output/users/{partition}/reports/)
+
+
+class VcfExportConfig(Config):
+    """Configuration for exporting annotated parquets to VCF format.
+
+    The VCF export asset depends on ``user_hf_module_annotations`` and
+    ``user_vcf_normalized``.  It produces per-module VCF files, optionally
+    an Ensembl-annotated VCF, and a combined VCF with all annotations
+    packed into INFO fields.
+    """
+    user_name: Optional[str] = None
+    sample_name: Optional[str] = None
+    modules: Optional[list[str]] = None  # Specific modules to export (None = all available)
+    compression: str = "gz"  # gz, bgz, or none
