@@ -1,5 +1,7 @@
 # Understanding What Your Genome Can and Cannot Tell You
 
+> **⚠️ MEDICAL DISCLAIMER:** The information provided in this document and by the just-dna-lite software is for educational, citizen science, and research purposes only. It is **not** medical advice, and the software is **not** a diagnostic tool. Never make health or medical decisions based on the output of this tool. Always consult a qualified healthcare professional or genetic counselor for clinical interpretation of your genomic data.
+
 This tool is a research instrument. It is not a diagnostic device. That distinction matters enormously, and this page exists to make sure you understand *why* — not because of legal caution, but because the biology genuinely demands it.
 
 ---

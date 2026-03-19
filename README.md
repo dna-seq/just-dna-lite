@@ -10,11 +10,11 @@
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
-**⚠️ Research Use Only (RUO):** just-dna-lite is a research tool designed for everything from academic studies (for example, we are using it actively in ROGEN, the Romanian Genomic Project) to citizen science and personal self-exploration. Our philosophy is to display *everything*—including PRS scores and community-generated AI modules that may attempt to predict disease probabilities. We believe you have the right to access and explore all of your genomic data, provided you **do not use this tool for any diagnostic or medical decisions.**
+**⚠️ MEDICAL DISCLAIMER & RESEARCH USE ONLY (RUO):** just-dna-lite is a bioinformatics research tool designed exclusively for academic studies (e.g., ROGEN, the Romanian Genomic Project), citizen science, and educational self-exploration. **It is NOT a medical device, is NOT intended for clinical diagnostic use, and does NOT provide medical advice.** The software and its modules (including AI-generated content) are provided "AS IS" without warranties of any kind. Our philosophy is to display *everything*—including PRS scores and community-generated AI modules that may attempt to predict disease probabilities. However, you must **never use this tool to make medical, diagnostic, or health-related decisions.** Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.
 
 Upload your genome file, pick what you want to know, get results in minutes. Other annotation tools can take hours. just-dna-lite runs entirely on your machine — your data gets normalized, annotated, and reported while you're still making coffee. Nothing leaves your computer.
 
-The starting point here is that you have the right to look at your own genome without anyone filtering what you see. Under the new [European Health Data Space (EHDS) regulation](https://digital-strategy.ec.europa.eu/en/policies/electronic-health-records), this is increasingly recognized as a fundamental right—individuals must have immediate, free access to their digital health data. Consumer genomics tools like Nebula or Dante do show you a lot, but what they surface is ultimately a semi-arbitrary curatorial decision by their teams — interesting findings they picked, weighted toward things that are engaging or easy to explain. Clinical genomics is highly curated too, but for a different reason: it only shows findings where there's strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the PGS Catalog, your complete variant table cross-referenced against Ensembl. What you do with that is your decision.
+The starting point here is that you have the right to look at your own genome without anyone filtering what you see. In the spirit of global open health data initiatives (such as the [European Health Data Space (EHDS)](https://digital-strategy.ec.europa.eu/en/policies/electronic-health-records) and similar frameworks worldwide), we believe individuals should have immediate, open access to their digital health data. Consumer genomics tools like Nebula or Dante do show you a lot, but what they surface is ultimately a semi-arbitrary curatorial decision by their teams — interesting findings they picked, weighted toward things that are engaging or easy to explain. Clinical genomics is highly curated too, but for a different reason: it only shows findings where there's strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the PGS Catalog, your complete variant table cross-referenced against Ensembl. What you do with that is your decision.
 
 ## What's inside
 
@@ -78,7 +78,7 @@ All outputs are Parquet files. Open them in Polars, Pandas, DuckDB, R, or anythi
 
 Genomics has a gap between what sounds precise and what's actually known. Here's the short version before you start digging.
 
-*(Note: just-dna-lite is a bioinformatics research tool for personal self-exploration. It is not a medical device, diagnostic tool, or a substitute for professional medical advice. Always consult a healthcare provider or genetic counselor for clinical interpretation).*
+> **⚠️ IMPORTANT LIABILITY NOTICE:** just-dna-lite is a bioinformatics research tool for personal self-exploration and research purposes only. It is **not** a medical device, diagnostic tool, or a substitute for professional medical advice. By using this tool, you acknowledge that the developers, contributors, and affiliated institutions accept **zero liability** for any physical, psychological, or financial harm resulting from the interpretation of these results. Always consult a healthcare provider or certified genetic counselor for clinical interpretation.
 
 ### What to do when you see something scary
 
@@ -184,9 +184,23 @@ GRCh38 VCF files (WGS and WES) are fully supported, along with PRS and AI-assist
 - [prepare-annotations](https://github.com/dna-seq/prepare-annotations) — upstream pipeline for Ensembl and module annotation data
 - [Just-DNA-Seq](https://just-dna.life/) — the original project
 
-## License
+## Funding and Support
+
+This project is open source and intended for users worldwide. One of its core developers, [Anton Kulaga](https://github.com/antonkulaga), is funded through the **[ROGEN (Romanian Genomic) consortium](https://rogen.umfcd.ro/)**, and some parts of this roadmap are being developed with future ROGEN research use in mind.
+
+ROGEN recruitment and data collection are still ongoing, so the points below should be read as research targets and planned directions rather than completed outcomes. The broader goal is to contribute to the understanding of the genetic landscape of European populations while building methods that remain useful for users and researchers in Romania and beyond. Current priorities of the consortium include:
+
+1. **Risk-stratified prevention:** Romanian-calibrated PRSes and aging clocks as future tools for more cost-effective prevention programs.
+2. **Reducing health inequities:** Better imputation panels and ancestry-aware models for under-represented populations.
+3. **Gene-environment insights:** Analyses of interactions between genetics and factors such as diet, smoking, air pollution, occupational exposures, and pathogen burdens.
+4. **Reproducible public-health research:** Privacy-preserving analyses aligned with international research and regulatory norms for priorities such as cardiovascular risk, diabetes, and dementia.
+5. **Clinical translation:** Locally calibrated models that could eventually help inform clinical guidelines once properly validated.
+
+## License and Disclaimer
 
 AGPL v3. See [LICENSE](LICENSE).
+
+**LIMITATION OF LIABILITY:** The software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors, contributors, or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software.
 
 ## Contributors
 

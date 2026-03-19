@@ -172,10 +172,10 @@ def topbar() -> rx.Component:
                 style={"display": "flex", "alignItems": "center", "textDecoration": "none"},
             ),
             rx.el.div(
-                "Research Use Only",
+                "Medical Disclaimer / RUO",
                 class_name="ui small red label",
                 style={"margin": "0"},
-                title="This tool is for research and educational purposes only. Do not use for diagnostic or medical decisions.",
+                title="This tool is not a medical device. For research and educational purposes only. Do not use for diagnostic or medical decisions.",
             ),
             style={"display": "flex", "alignItems": "center", "flex": "0 0 auto"},
         ),

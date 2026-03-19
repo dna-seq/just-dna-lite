@@ -1925,27 +1925,38 @@ def no_file_selected_message() -> rx.Component:
         
         # RUO Warning Banner
         rx.el.div(
-            fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginBottom": "8px"}),
             rx.el.div(
-                rx.el.strong("Research Use Only (RUO)"),
-                style={"fontSize": "1.1rem", "color": "#db2828", "marginBottom": "6px"}
+                fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginBottom": "8px"}),
+                rx.el.div(
+                    rx.el.strong("Medical Disclaimer & Research Use Only (RUO)"),
+                    style={"fontSize": "1.1rem", "color": "#db2828", "marginBottom": "6px"},
+                ),
+                rx.el.div(
+                    "This tool is for research, educational, and self-exploration purposes only. "
+                    "It is ",
+                    rx.el.strong("not a medical device"),
+                    " and provides no medical advice. "
+                    "The genetic modules and Polygenic Risk Scores (PRS) here are ",
+                    rx.el.strong("not clinically validated"),
+                    ". You must never use this tool for diagnostic or medical decisions. "
+                    "Interesting findings should be re-tested with clinically validated methods "
+                    "such as PCR or other orthogonal confirmation in a certified lab.",
+                    style={"fontSize": "0.95rem", "color": "#444", "lineHeight": "1.45"},
+                ),
+                class_name="ui red message",
+                style={
+                    "maxWidth": "840px",
+                    "width": "100%",
+                    "textAlign": "center",
+                    "margin": "0",
+                },
             ),
-            rx.el.div(
-                "This tool is for research, educational, and self-exploration purposes only. "
-                "The genetic modules and Polygenic Risk Scores (PRS) here are ",
-                rx.el.strong("not clinically validated"),
-                ". You must not use this tool for diagnostic or medical decisions. "
-                "Any findings of interest require independent confirmation using clinically validated "
-                "genomic analysis or orthogonal methods like PCR. "
-                "Always consult a healthcare professional for clinical interpretation.",
-                style={"fontSize": "0.95rem", "color": "#444", "lineHeight": "1.4"}
-            ),
-            class_name="ui red message",
             style={
-                "maxWidth": "800px", 
-                "margin": "0 auto 40px auto", 
-                "textAlign": "center",
-            }
+                "display": "flex",
+                "justifyContent": "center",
+                "width": "100%",
+                "marginBottom": "40px",
+            },
         ),
         
         # Two-column layout for Info vs Workflow
@@ -1967,7 +1978,7 @@ def no_file_selected_message() -> rx.Component:
                         fomantic_icon("eye", size=20, color="#fbbd08", style={"marginRight": "12px"}),
                         rx.el.div(
                             rx.el.strong("Unfiltered access"),
-                            rx.el.div("We display everything from the latest research, but nothing is clinically validated.", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.div("We show the full research view, not a pre-filtered clinical summary.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
@@ -1976,16 +1987,16 @@ def no_file_selected_message() -> rx.Component:
                         fomantic_icon("rocket", size=20, color="#21ba45", style={"marginRight": "12px"}),
                         rx.el.div(
                             rx.el.strong("Speed & Iteration"),
-                            rx.el.div("AI-powered module creation prioritizing rapid development over manual curation.", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.div("We optimize for rapid exploration and fast module creation, not clinical-style validation cycles.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
                     ),
                     rx.el.div(
-                        fomantic_icon("file-text", size=20, color="#767676", style={"marginRight": "12px"}),
+                        fomantic_icon("warning sign", size=20, color="#767676", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Parquet-native"),
-                            rx.el.div("Outputs are ready for Pandas, Polars, DuckDB, or R.", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.strong("Scientific realism"),
+                            rx.el.div("Modules, PRS, and especially AI-generated content can be wrong, incomplete, or clinically irrelevant.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start"}
