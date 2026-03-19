@@ -1920,7 +1920,43 @@ def no_file_selected_message() -> rx.Component:
         ),
         rx.el.p(
             "Next-generation personal genomics platform — lite, fast, and OakVar-free.",
-            style={"fontSize": "1.2rem", "color": "#555", "fontStyle": "italic", "marginBottom": "40px"},
+            style={"fontSize": "1.2rem", "color": "#555", "fontStyle": "italic", "marginBottom": "20px"},
+        ),
+        
+        # RUO Warning Banner
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginBottom": "8px"}),
+                rx.el.div(
+                    rx.el.strong("Medical Disclaimer & Research Use Only (RUO)"),
+                    style={"fontSize": "1.1rem", "color": "#db2828", "marginBottom": "6px"},
+                ),
+                rx.el.div(
+                    "This tool is for research, educational, and self-exploration purposes only. "
+                    "It is ",
+                    rx.el.strong("not a medical device"),
+                    " and provides no medical advice. "
+                    "The genetic modules and Polygenic Risk Scores (PRS) here are ",
+                    rx.el.strong("not clinically validated"),
+                    ". You must never use this tool for diagnostic or medical decisions. "
+                    "Interesting findings should be re-tested with clinically validated methods "
+                    "such as PCR or other orthogonal confirmation in a certified lab.",
+                    style={"fontSize": "0.95rem", "color": "#444", "lineHeight": "1.45"},
+                ),
+                class_name="ui red message",
+                style={
+                    "maxWidth": "840px",
+                    "width": "100%",
+                    "textAlign": "center",
+                    "margin": "0",
+                },
+            ),
+            style={
+                "display": "flex",
+                "justifyContent": "center",
+                "width": "100%",
+                "marginBottom": "40px",
+            },
         ),
         
         # Two-column layout for Info vs Workflow
@@ -1930,37 +1966,37 @@ def no_file_selected_message() -> rx.Component:
                 rx.el.h3("Core Philosophy", class_name="ui large header", style={"textAlign": "left", "marginBottom": "20px"}),
                 rx.el.div(
                     rx.el.div(
-                        fomantic_icon("database", size=20, color="#2185d0", style={"marginRight": "12px"}),
+                        fomantic_icon("lock", size=20, color="#2185d0", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Data as first-class citizen"),
-                            rx.el.div("Software-Defined Assets with Dagster for automatic lineage tracking", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.strong("Your data, your call"),
+                            rx.el.div("Runs entirely on your machine. Nothing leaves your computer.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
                     ),
                     rx.el.div(
-                        fomantic_icon("zap", size=20, color="#fbbd08", style={"marginRight": "12px"}),
+                        fomantic_icon("eye", size=20, color="#fbbd08", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Fast Engines"),
-                            rx.el.div("Polars (default) or DuckDB (streaming, low memory)", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.strong("Unfiltered access"),
+                            rx.el.div("We show the full research view, not a pre-filtered clinical summary.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
                     ),
                     rx.el.div(
-                        fomantic_icon("terminal", size=20, color="#21ba45", style={"marginRight": "12px"}),
+                        fomantic_icon("rocket", size=20, color="#21ba45", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Pure Python Stack"),
-                            rx.el.div("Reflex for Web UI, no React/JS needed", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.strong("Speed & Iteration"),
+                            rx.el.div("We optimize for rapid exploration and fast module creation, not clinical-style validation cycles.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
                     ),
                     rx.el.div(
-                        fomantic_icon("file-text", size=20, color="#767676", style={"marginRight": "12px"}),
+                        fomantic_icon("warning sign", size=20, color="#767676", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Parquet-native"),
-                            rx.el.div("VCF → annotated Parquet outputs", style={"fontSize": "0.9rem", "color": "#666"}),
+                            rx.el.strong("Scientific realism"),
+                            rx.el.div("Modules, PRS, and especially AI-generated content can be wrong, incomplete, or clinically irrelevant.", style={"fontSize": "0.9rem", "color": "#666"}),
                             style={"flex": "1"}
                         ),
                         style={"display": "flex", "alignItems": "start"}

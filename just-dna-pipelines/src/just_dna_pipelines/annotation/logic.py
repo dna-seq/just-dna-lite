@@ -233,7 +233,7 @@ def annotate_vcf_with_duckdb(
             user_dir = get_user_output_dir() / user_name
             
         user_dir.mkdir(parents=True, exist_ok=True)
-        final_output_path = user_dir / f"{vcf_path.stem}_annotated_duckdb.parquet"
+        final_output_path = user_dir / f"{vcf_path.stem}_ensembl_annotated.parquet"
         logger.info(f"DuckDB output for user '{user_name}': {final_output_path}")
     
     with resource_tracker("Annotate VCF with DuckDB") as tracker:

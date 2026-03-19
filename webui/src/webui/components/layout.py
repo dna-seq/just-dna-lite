@@ -166,10 +166,16 @@ def topbar() -> rx.Component:
                 ),
                 rx.el.span(
                     "just-dna-lite",
-                    style={"fontSize": "1.3rem", "fontWeight": "600", "color": "#333"},
+                    style={"fontSize": "1.3rem", "fontWeight": "600", "color": "#333", "marginRight": "12px"},
                 ),
                 href="/",
                 style={"display": "flex", "alignItems": "center", "textDecoration": "none"},
+            ),
+            rx.el.div(
+                "Medical Disclaimer / RUO",
+                class_name="ui small red label",
+                style={"margin": "0"},
+                title="This tool is not a medical device. For research and educational purposes only. Do not use for diagnostic or medical decisions.",
             ),
             style={"display": "flex", "alignItems": "center", "flex": "0 0 auto"},
         ),

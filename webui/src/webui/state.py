@@ -180,6 +180,38 @@ class AuthState(rx.State):
         return rx.toast.info("Logged out")
 
 
+_RSID_DBSNP_BASE_URL = "https://www.ncbi.nlm.nih.gov/snp/"
+
+
+def _inject_rsid_link_renderer(state_instance: Any) -> None:
+    """Patch lf_grid_columns so rsid/id columns become clickable dbSNP links.
+
+    Uses the built-in ``cellRendererType: "url"`` renderer so that rsid values
+    become ``<a>`` links to the NCBI dbSNP variant page, opening in a new tab.
+    Applied to columns named ``rsid`` or ``id``.
+    """
+    cols = state_instance.lf_grid_columns
+    if not cols:
+        return
+
+    updated = False
+    new_cols = []
+    for col in cols:
+        if col.get("field") in ("rsid", "id"):
+            col = dict(col)
+            col["cellRendererType"] = "url"
+            col["cellRendererConfig"] = {
+                "baseUrl": _RSID_DBSNP_BASE_URL,
+                "target": "_blank",
+                "color": "#1a73e8",
+            }
+            updated = True
+        new_cols.append(col)
+
+    if updated:
+        state_instance.lf_grid_columns = new_cols
+
+
 class UploadState(LazyFrameGridMixin, rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
@@ -1120,6 +1152,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 lf = pl.scan_parquet(str(normalized))
                 for _ in self.set_lazyframe(lf, {}, chunk_size=300):
                     pass
+                _inject_rsid_link_renderer(self)
                 self.preview_source_label = f"{self.selected_file} (normalized)"
                 self.vcf_preview_loading = False
                 return
@@ -1138,6 +1171,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             descriptions = extract_vcf_descriptions(lazy_vcf)
             for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
                 pass
+            _inject_rsid_link_renderer(self)
             self.preview_source_label = f"{vcf_path.name} (raw VCF fallback)"
         except Exception as e:
             self._clear_vcf_preview()
@@ -1651,11 +1685,11 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "needs_materialization": annotations_mat.get("needs_materialization", True),
                 })
         
-        # Also scan sample root for Ensembl annotation parquets (*_annotated_duckdb.parquet)
+        # Also scan sample root for Ensembl annotation parquets (*_ensembl_annotated.parquet)
         ensembl_mat = mat_info.get("user_annotated_vcf_duckdb", {})
         sample_dir = get_user_output_dir() / self.safe_user_id / sample_name
         if sample_dir.exists():
-            for f in sample_dir.glob("*_annotated_duckdb.parquet"):
+            for f in sample_dir.glob("*_ensembl_annotated.parquet"):
                 files.append({
                     "name": f.name,
                     "path": str(f),
@@ -2645,6 +2679,7 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 
         lf, descriptions = scan_file(path)
         yield from self.set_lazyframe(lf, descriptions, chunk_size=300)
+        _inject_rsid_link_renderer(self)
 
         self.output_preview_label = path.name
         self.output_preview_loading = False
