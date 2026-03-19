@@ -650,3 +650,79 @@ Avoid these patterns:
 - **Hardcoded colors that don't match a Fomantic named color** — always use the 5-color DNA palette
 - **Using `#2185d0` for all accent colors** — match `accent_color` to the parent segment's Fomantic color
 - **Using orange** (`#f2711c`) — not in our palette; use `yellow` for warnings or `red` for errors
+
+## 10. Web UI Architecture
+
+The web UI uses a 2-panel run-centric layout:
+
+```
+webui/
+├── src/webui/
+│   ├── components/
+│   │   └── layout.py          # Navbar, two_column_layout, fomantic_icon
+│   ├── pages/
+│   │   ├── annotate.py        # 2-panel run-centric layout
+│   │   ├── index.py           # Main landing page (aliases annotate)
+│   │   └── analysis.py        # Analysis page (placeholder)
+│   ├── state.py               # UploadState + OutputPreviewState + PRSState + AgentState
+│   └── app.py                 # Reflex app setup, routing & download API endpoint
+└── rxconfig.py                # Configuration & Fomantic UI CDN
+```
+
+### Right panel layout (top to bottom)
+
+```
+┌─────────────────────────────────────┐
+│  Input VCF Preview (violet segment) │  ← Inspect input data
+│  - Server-side data grid (UploadSt) │
+│  - Filtering, sorting, scroll-load  │
+├─────────────────────────────────────┤
+│  PRS Section                        │  ← Polygenic Risk Scores
+│  - prs_section(PRSState) from prs-ui│
+├─────────────────────────────────────┤
+│  Outputs (teal segment)             │  ← Results
+│  - File list with download buttons  │
+│  - Inline output preview grid       │
+├─────────────────────────────────────┤
+│  Run History (green segment)        │  ← Context
+│  - Latest run highlighted (blue)    │
+│  - Re-run/Modify buttons on latest  │
+├─────────────────────────────────────┤
+│  New Analysis (blue segment)        │  ← Action
+│  - Module selection grid with logos │
+│  - Start Analysis button            │
+└─────────────────────────────────────┘
+```
+
+### UI ↔ Dagster integration
+
+The Web UI connects to Dagster via the Python API (not HTTP). Both run in the same process when using `uv run start`.
+
+| UI reads from Dagster | API call | When |
+|------|-------------|-------------|
+| Run history | `instance.get_run_records(filters=...)` | On page load |
+| Run status | `instance.get_run_by_id(run_id)` | Every 3s while running |
+| Run logs | `instance.all_logs(run_id)` | Every 3s while running |
+| Asset materializations | `instance.fetch_materializations(...)` | On page load |
+
+| UI writes to Dagster | API call | Triggered by |
+|--------|-------------|--------------|
+| Register partition | `instance.add_dynamic_partitions(...)` | File upload |
+| Create + submit run | `instance.create_run_for_job(...)` | Start Analysis button |
+| Execute in-process | `job_def.execute_in_process(...)` | Fallback if daemon unavailable |
+
+### Download API
+
+File downloads are served via FastAPI endpoint at `{backend_api_url}/api/download/{user_id}/{sample_name}/{filename}`, mounted via `api_transformer` in `rx.App()`.
+
+### Sample metadata
+
+Each uploaded VCF has metadata (species, reference genome, subject ID, study name, notes, custom key-value fields) stored in `UploadState.file_metadata`.
+
+### Key design decisions
+
+1. Run-centric layout over tab-based: shows the relationship between input files, runs, and outputs in a single scroll
+2. Input first, then results: VCF preview at the top, then outputs, then context (runs), then actions (new analysis)
+3. Two independent data grids: Input VCF and output files use separate `LazyFrameGridMixin` state classes, each with its own cache
+4. Output preview inline in Outputs section (not a modal), hidden until user clicks the eye icon
+5. Fomantic checkboxes use raw HTML structure with `ui checkbox` classes to avoid `rx.checkbox` styling conflicts

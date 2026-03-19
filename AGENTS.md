@@ -987,3 +987,34 @@ Key principles:
 - **CSS Flexbox** for layouts (not Fomantic grid)
 - **Oversized icons** (min 2rem), **large buttons**, **generous spacing**
 - **Semantic colors**: `success` (benign), `error` (pathogenic), `info` (VUS)
+
+---
+
+## Learned User Preferences
+
+- When writing READMEs or user-facing docs, put screenshots/images at the very top so users see the interface before reading any text
+- Write in natural, human prose. Avoid AI-typical patterns: em-dash overuse, bolded-keyword-per-bullet lists, marketing voice, triads, rhetorical questions as section openers, and filler transitions like "Furthermore" or "Additionally"
+- Don't overpromise features that aren't implemented yet (e.g., don't mention 23andMe/microarray support as if it works)
+- When a dependency comes from PyPI (like `prs-ui`), fix bugs in the consuming project (`just-dna-lite`) if possible; if the upstream library needs changes, produce a copy-pasteable prompt for the upstream project instead of patching locally
+- The user expects docs (AGENTS.md, DAGSTER_GUIDE.md) to be updated whenever code is refactored. Don't finish a refactor without updating related documentation
+- Don't use symlinks as a solution for data layout problems. Prefer fsspec-based access patterns that work on both Linux and Windows
+- Avoid `subprocess` complexity for CLI commands that can be exposed through the uv workspace `[project.scripts]` mechanism
+- When HuggingFace data is involved, cache it in the project's own cache directory (not HF's internal blob store). Use fsspec/HfFileSystem for downloads, not `snapshot_download`
+- The user strongly prefers concise READMEs that answer "what, how, where's more" and link to docs/ for architecture and configuration details
+- If folders in a path don't exist, the code should create them automatically rather than expecting users to mkdir
+- When AI-generated documentation content is hallucinated or doesn't reflect real code (e.g., "where to contribute" sections), the user considers it worse than no documentation
+
+## Learned Workspace Facts
+
+- This is a multi-root uv workspace: `just-dna-lite` (main project) and `just-prs` (read-only reference). The `just-prs` folder is read-only; never modify files there
+- Images for the README live in `images/` at the project root. The logo also exists at `webui/assets/just_dna_seq.jpg` but the canonical location for README images is `images/`
+- Markdown image syntax (`![alt](url)`) does not render inside HTML `<div>` blocks in VS Code preview or GitHub. Use `<img>` tags instead when images are inside `<div align="center">`
+- `PRSComputeStateMixin` from `prs-ui` provides `prs_results: list[dict]` but no `prs_result_count` var. Use `PRSState.prs_results.length()` for Reflex reactive counts
+- The `prs_section(PRSState)` component from prs-ui is the correct single entry point for PRS UI. Don't manually compose sub-components unless you need a custom layout
+- When overriding `compute_selected_prs` in just-dna-lite's `PRSState`, always delegate to the mixin's method first, then add Dagster checkpointing. The mixin handles `_build_prs_results_grid()` and all result field population
+- The VCF normalization step renames `start` to `pos` (or vice versa depending on the polars-bio version). PRS computation code must account for which column name the normalized parquet actually uses
+- `uv lock -U` updates the lockfile to latest compatible versions but does NOT update `>=` specifiers in `pyproject.toml`. The user expects both to be bumped when asked to "update dependencies"
+- The project currently only supports VCF files from GRCh38. GRCh37, T2T, and microarray formats are on the roadmap but not implemented
+- Ensembl annotation assets (`user_annotated_vcf`, `user_annotated_vcf_duckdb`) must depend on `user_vcf_normalized`, not read the raw VCF. This dependency was broken in past refactors and caused pipeline failures
+- The `modules.yaml` `ensembl_source.repo_id` field controls which HF dataset is used for Ensembl data. It was added during a refactor to avoid hardcoding repo URLs
+- `rx.icon()` (Lucide) icons often fail in this Reflex setup. Use `fomantic_icon()` from `webui.components.layout` instead

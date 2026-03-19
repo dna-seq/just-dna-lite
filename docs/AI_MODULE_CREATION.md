@@ -2,7 +2,7 @@
 
 ## Vision
 
-Annotation modules in just-dna-lite are **curated SNP filter sets**: a geneticist selects
+Annotation modules in just-dna-lite are curated SNP filter sets: a geneticist selects
 variants, assigns per-genotype weights/states/conclusions, links literature evidence, and
 packages everything as three parquet tables (`weights`, `annotations`, `studies`).
 
@@ -150,17 +150,50 @@ output/my_module/
 This is directly compatible with the existing module discovery system — drop it into
 any configured source and it's auto-discovered.
 
+### Package layout
+
+```
+just-dna-pipelines/src/just_dna_pipelines/module_compiler/
+├── __init__.py      # Public API re-exports
+├── models.py        # Pydantic 2 models (DSL schema + result types)
+├── compiler.py      # validate_spec() + compile_module()
+└── cli.py           # Typer commands (module validate, module compile)
+```
+
+### Compilation pipeline
+
+**Validation** runs before any output is written. Errors are collected and returned as a list.
+
+Field-level (Pydantic): `rsid` matches `^rs\d+$`, `genotype` is alphabetically sorted slash-separated alleles, `state` is one of six valid enum values, `chrom` is 1-22/X/Y/MT, `pmid` is digits-only, `module.name` is lowercase alphanumeric + underscores.
+
+Cross-row: positional consistency (all rows for the same rsid share chrom/start), uniqueness of (rsid, genotype) and (rsid, pmid) pairs, and study rsid coverage warnings.
+
+Directional warnings (not errors): `state=risk` with positive weight, `state=protective` with negative weight.
+
+### Validation vs compilation
+
+| | `validate_spec()` | `compile_module()` |
+|-|--------------------|--------------------|
+| **Side effects** | None | Writes parquet files |
+| **On error** | `valid=False` + error list | `success=False` + error list |
+
+`compile_module` calls `validate_spec` internally — if validation fails, no output is produced.
+
+### Design decisions
+
+CSV is read via stdlib `csv.DictReader` (not Polars) because the `conclusion` field contains commas, quotes, and long text that Polars CSV inference can misparse. Each row is validated through Pydantic before being collected into a DataFrame.
+
+Validation collects all errors, never raises. When used as agent tools, the caller needs a complete error list to fix all issues in one pass.
+
+`annotations.parquet` has one row per rsid. When the same rsid appears with multiple genotypes, the first row's gene/phenotype/category wins. This matches the pipeline's expectation that annotations are variant-level, not genotype-level.
+
 ---
 
-## Agent Hooks — Python API & CLI
+## Module Registry — Python API & CLI
 
 The module registry exposes a complete API for programmatic module management.
-An AI agent that produces DSL spec files can compile, register, validate, and
-remove modules without any manual steps.
 
 ### Python API (`just_dna_pipelines.module_registry`)
-
-All functions are importable from `just_dna_pipelines.module_registry`:
 
 ```python
 from just_dna_pipelines.module_registry import (
@@ -180,72 +213,26 @@ from just_dna_pipelines.module_registry import (
 | `register_custom_module(spec_dir)` | Path to spec folder | `CompilationResult` (.success, .errors, .stats, .output_dir) | Writes parquet, updates modules.yaml, refreshes globals |
 | `unregister_custom_module(name)` | Module machine name | `bool` (True if removed) | Deletes parquet, updates modules.yaml, refreshes globals |
 | `list_custom_modules()` | — | `List[str]` of names | None |
-| `get_custom_module_specs()` | — | `Dict[str, Path]` | None |
 | `refresh_module_registry()` | — | `List[str]` of all modules | Reloads config, re-discovers modules |
-
-### Agent workflow (recommended)
-
-```python
-from pathlib import Path
-from just_dna_pipelines.module_registry import validate_module_spec, register_custom_module
-
-spec_dir = Path("data/module_specs/my_panel/")
-
-# 1. Write module_spec.yaml + variants.csv + studies.csv to spec_dir
-#    (agent creates these files)
-
-# 2. Validate (dry-run, no side effects)
-validation = validate_module_spec(spec_dir)
-if not validation.valid:
-    # Fix errors and retry
-    print(validation.errors)
-
-# 3. Register (compile + persist + refresh — module is immediately live)
-result = register_custom_module(spec_dir)
-if result.success:
-    print(f"Module registered: {result.stats['module_name']}")
-    print(f"  Variants: {result.stats['weights_rows']}")
-    print(f"  Output:   {result.output_dir}")
-else:
-    print(f"Failed: {result.errors}")
-```
 
 ### CLI (`uv run pipelines module ...`)
 
 ```bash
-# Validate a spec (no side effects)
 uv run pipelines module validate data/module_specs/my_panel/
-
-# Compile + register in one step (equivalent to UI "Add" button)
 uv run pipelines module register data/module_specs/my_panel/
-
-# Remove a custom module (equivalent to UI "Remove" button)
 uv run pipelines module unregister my_panel
-
-# List custom modules on disk
 uv run pipelines module list-custom
-
-# Compile only (writes parquet but does NOT register in modules.yaml)
 uv run pipelines module compile data/module_specs/my_panel/ -o data/output/modules/my_panel/
 ```
 
 ### What happens on `register`
 
-1. **Validates** the spec (Pydantic models, CSV rows, cross-row checks)
-2. **Compiles** to parquet in `data/output/modules/<module_name>/`
-3. **Ensures** a local collection source for `data/output/modules/` exists in `modules.yaml`
-4. **Adds** display metadata (title, description, icon, color) from `module_spec.yaml` to `modules.yaml`
-5. **Refreshes** the in-memory module discovery (`MODULE_INFOS`, `DISCOVERED_MODULES`)
-6. Module is **immediately selectable** in the web UI and CLI without restart
-
-### What happens on `unregister`
-
-1. **Deletes** the parquet directory `data/output/modules/<module_name>/`
-2. **Removes** display metadata from `modules.yaml`
-3. If no custom modules remain, **removes** the local collection source from `modules.yaml`
-4. **Refreshes** in-memory discovery
-
-### Idempotency
+1. Validates the spec (Pydantic models, CSV rows, cross-row checks)
+2. Compiles to parquet in `data/output/modules/<module_name>/`
+3. Ensures a local collection source for `data/output/modules/` exists in `modules.yaml`
+4. Adds display metadata (title, description, icon, color) from `module_spec.yaml` to `modules.yaml`
+5. Refreshes in-memory module discovery (`MODULE_INFOS`, `DISCOVERED_MODULES`)
+6. Module is immediately selectable in the web UI and CLI without restart
 
 `register_custom_module` is idempotent — calling it again for the same spec overwrites
 the existing parquet and refreshes metadata. This enables iterative development:
@@ -255,14 +242,14 @@ edit the DSL spec, re-register, check annotation results, repeat.
 
 ## Agent Design (Agno)
 
-### Architecture
+### Solo mode
 
 ```
 ┌────────────────────────────────────────────┐
 │              Module Creator Agent           │
 │                                            │
 │  System prompt: geneticist persona         │
-│  Model: GPT-4o / Claude                    │
+│  Model: Gemini Pro                         │
 │                                            │
 │  Tools:                                    │
 │  ├─ validate_module_spec → dry-run check   │
@@ -275,153 +262,95 @@ edit the DSL spec, re-register, check annotation results, repeat.
 └────────────────────────────────────────────┘
 ```
 
-### Agent workflow
+Workflow: parse input → identify variants → look up rsid details → assign per-genotype weights → find PubMed references → write spec files → validate → fix errors (loop up to 10 iterations) → register → module is live.
 
-1. Parse input (article, CSV, free text)
-2. Identify relevant genes and variants
-3. For each variant, look up rsid details (position, ref/alt alleles)
-4. Assign per-genotype weights, states, and conclusions
-5. Find supporting PubMed references
-6. Write `module_spec.yaml` + `variants.csv` + `studies.csv` to a spec directory
-7. Call `validate_module_spec(spec_dir)` to check for errors
-8. If errors → fix files and re-validate (loop)
-9. Call `register_custom_module(spec_dir)` to compile + deploy
-10. Module is live — can be used for annotation immediately
+### Team mode (research swarm)
 
-### Agent tools (Agno tool functions)
+The team has 3–5 agents depending on which API keys are configured:
 
-| Tool | Input | Output | Side effects |
-|------|-------|--------|-------------|
-| `validate_module_spec` | spec directory path | ValidationResult (valid/errors/warnings/stats) | None |
-| `register_custom_module` | spec dir | CompilationResult (success/errors/stats/output_dir) | Writes parquet, updates modules.yaml |
-| `unregister_custom_module` | module name | bool | Deletes parquet, updates modules.yaml |
-| `lookup_rsid` | rsid string | position, ref, alts, gene, frequency | Network call to dbSNP |
-| `search_pubmed` | query string | list of (pmid, title, abstract) | Network call to NCBI |
-| `diff_modules` | compiled dir + reference dir | column-by-column diff | Reads parquet |
+| Agent | Role | Model |
+|-------|------|-------|
+| PI (Principal Investigator) | Coordinator. Delegates tasks, synthesizes consensus, writes final module. | Gemini Pro |
+| Researcher 1 | Independent variant research via BioContext MCP. Always present. | Gemini Pro |
+| Researcher 2 | Same role, different LLM for diversity. Present if `OPENAI_API_KEY` is set. | GPT |
+| Researcher 3 | Same role, third perspective. Present if `ANTHROPIC_API_KEY` is set. | Claude Sonnet |
+| Reviewer | Quality review: variant integrity, provenance, weight consistency, PMID validity. | Gemini Flash |
 
----
+Team flow: PI delegates research to all Researchers in parallel → each returns a variant list → PI synthesizes consensus (variants confirmed by ≥2 researchers are included, weight disagreements use median) → PI sends draft to Reviewer → Reviewer returns ERRORS/WARNINGS/OK → PI fixes errors → writes and registers module.
 
-## Phases
+There are no human-approve/reject steps between phases. The PI orchestrates end-to-end. After completion, the user reviews the module in the editing slot and can iterate via chat.
 
-### Phase 1: DSL Schema ✅
-**Deliverable**: `just_dna_pipelines/module_compiler/models.py`
+### BioContext KB MCP
 
-- Pydantic 2 models for `ModuleSpecConfig`, `VariantRow`, `StudyRow`
-- CSV reader/validator
-- YAML reader/validator
-- Unit tests for validation (malformed inputs, missing columns, bad genotypes)
+Variant lookup and literature search use a hosted MCP server: BioContext KB (`https://biocontext-kb.fastmcp.app/mcp`), integrated via Agno's `MCPTools(url=...)`.
 
-### Phase 2: Reverse-Engineer Existing Module ✅
-**Deliverable**: `data/module_specs/vo2max/`
+Available databases: Ensembl, EuropePMC, UniProt, Open Targets, Reactome, Human Protein Atlas, KEGG, ClinicalTrials.gov, AlphaFold, InterPro, OLS, STRINGDb, bioRxiv, Google Scholar.
 
-- Read vo2max weights/annotations/studies from HuggingFace
-- Generate `module_spec.yaml`, `variants.csv`, `studies.csv`
-- This proves the DSL can represent real modules
+### Limitations
 
-### Phase 3: Compiler ✅
-**Deliverable**: `just_dna_pipelines/module_compiler/compiler.py`
-
-- `validate_spec(spec_dir) → ValidationResult`
-- `compile_module(spec_dir, output_dir) → CompilationResult`
-- rsid resolution via Ensembl DuckDB
-- Typer CLI commands: `module validate`, `module compile`
-
-### Phase 4: Round-Trip Test ✅
-**Deliverable**: `tests/test_module_compiler.py`
-
-- `existing_module → reverse → DSL → compile → diff → zero`
-- Validates the full chain is lossless
-- Uses vo2max as the reference module
-
-### Phase 5: Custom Module Registry ✅
-**Deliverable**: Module registry API + Web UI + CLI for managing custom modules
-
-- **`module_registry.py`**: Central API — `validate_module_spec`, `register_custom_module`, `unregister_custom_module`, `list_custom_modules`, `refresh_module_registry`
-- **Web UI**: Multi-file upload (module_spec.yaml + CSVs), "Remove" button on custom modules, live source display with module count
-- **CLI**: `module register`, `module unregister`, `module list-custom`
-- **Persistence**: Changes written to project-root `modules.yaml` (sources + display metadata)
-- **Discovery refresh**: In-memory `MODULE_INFOS`/`DISCOVERED_MODULES` mutated in-place so Reflex UI and CLI reflect changes without restart
-- **Agent hooks**: Python API documented for programmatic use (see above)
-
-### Phase 6: Agno Agent ✅
-**Deliverable**: `just_dna_pipelines/agents/module_creator.py` + `module_creator.yaml`
-
-- Declarative agent spec in YAML (system prompt, model config, agent settings)
-- Gemini 3 Pro via Agno (`agno.models.google.Gemini`, `vertexai=False`)
-- Tool wrappers: `write_spec_files`, `validate_spec`, `register_module`
-- CLI: `uv run pipelines agent create-module --file input.md`
-- Smoke test passes: mthfr_nad eval → 24 rows, 8 rsids, VALID
-
-### Phase 7 + 8: BioContext KB MCP ✅
-**Deliverable**: External biomedical knowledge via hosted MCP server
-
-Both variant lookup and literature search are solved by a single hosted MCP:
-**BioContext KB** (`https://biocontext-kb.fastmcp.app/mcp`), integrated via
-Agno's `MCPTools(url=...)`.
-
-Available databases: Ensembl, EuropePMC, UniProt, Open Targets, Reactome,
-Human Protein Atlas, KEGG, ClinicalTrials.gov, AlphaFold, InterPro, OLS,
-STRINGDb, Antibody Registry, PanglaoDb, PRIDE, Drugs@openFDA, bioRxiv,
-Google Scholar, grants.gov.
-
-Covers both original phase goals:
-- **Variant Recoder / rsid lookup** → Ensembl tools in BioContext KB
-- **PubMed / literature search** → EuropePMC tools in BioContext KB
-
-Plus additional capabilities (protein function via UniProt, pathways via
-Reactome/KEGG, clinical evidence via Open Targets/ClinicalTrials.gov) that
-improve module quality without any custom server code.
-
-**Caution**: STRING responses are very large context consumers — the agent
-prompt instructs to prefer UniProt/Reactome over STRINGDb and to use all
-external tool calls with moderation (only when genuinely needed).
-
-### Phase 9: Eval & Iteration ✎
-**Deliverable**: Pass rate on eval set
-
-- Run agent on freeform test inputs (CYP panel, MTHFR/NAD panel)
-- Compare agent output DSL to hand-crafted reference DSL
-- Measure: schema validity, variant coverage, weight directionality, study relevance
-- Iterate on system prompt and tool design
-
-### Phase 10: Per-Module Report Enhancement (deferred)
-**Deliverable**: Category-grouped reports for all modules
-
-Custom modules already appear in the combined longevity report as flat tables (the
-existing `build_module_report_data()` + "Other Modules" template section handles them).
-This works well enough for now. Future enhancement:
-
-- Extend DSL with optional `categories:` section in `module_spec.yaml` for
-  per-category titles and descriptions (like longevity pathway categories)
-- Compiler outputs `metadata.json` alongside parquets with category metadata
-- `build_module_report_data()` auto-groups by `category` column using metadata
-  for titles/descriptions, falling back to titlecased category names
-- Unify the longevity-specific and generic template paths so all modules get
-  the same category-grouped rendering
-- Longevity pathway categories (`LONGEVITY_CATEGORIES` dict) become just the
-  default metadata for the `longevitymap` module, not a special case
+- Max 5 file attachments per message (PDF, CSV, Markdown, plain text)
+- Each Researcher is limited to 9 tool calls to prevent context overflow
+- No human-in-the-loop between agent phases
+- Gemini key is required; OpenAI and Anthropic keys are optional (add researchers)
+- Only GRCh38 and GRCh37 genome builds
+- Only SNPs/indels (no structural or copy-number variants)
+- No persistent audit trail across page reloads
 
 ---
 
-## Eval Test Inputs
+## How modules are discovered and loaded
 
-Two reference panels serve as agent evaluation cases. Each has:
-- **Freeform input**: what a user/geneticist would provide (natural language)
-- **Reference DSL**: the expected structured output
+1. Configuration is read from `modules.yaml` at project root (or fallback inside the package)
+2. `discover_all_modules()` iterates over all configured sources
+3. For each source, the loader checks the protocol: `hf://` → HuggingFace, `github://` → GitHub, `s3://` → S3, `https://` → HTTP, `/absolute/path` → local filesystem
+4. Auto-detection: if `weights.parquet` exists at root → single module; otherwise scan subfolders for a collection
+5. Results stored in `MODULE_INFOS` and `DISCOVERED_MODULES` globals, populated at import time
+6. `refresh_modules()` re-reads config and re-discovers without process restart
 
-See:
+Modules are pure data (YAML + CSV). They have no Python dependencies. The annotation engine loads modules via Polars LazyFrame — no module code is executed. The pipeline joins `weights.parquet` against the normalized VCF using rsid or position matching and appends annotation columns.
+
+### Minimal "Hello World" module
+
+`module_spec.yaml`:
+```yaml
+schema_version: "1.0"
+module:
+  name: hello_world
+  version: 1
+  title: "Hello World"
+  description: "Minimal example module with one variant."
+  report_title: "Hello World Annotations"
+  icon: dna
+  color: "#21ba45"
+defaults:
+  curator: human
+  method: literature-review
+  priority: low
+genome_build: GRCh38
+```
+
+`variants.csv`:
+```csv
+rsid,genotype,weight,state,conclusion,gene,phenotype,category
+rs1801133,C/C,0,neutral,"Typical MTHFR activity.",MTHFR,Metabolism,Example
+rs1801133,C/T,-0.6,risk,"Reduced MTHFR activity.",MTHFR,Metabolism,Example
+rs1801133,T/T,-1.1,risk,"Severely reduced MTHFR activity.",MTHFR,Metabolism,Example
+```
+
+Register via web UI (upload files → click Register) or CLI (`uv run pipelines module register path/to/spec/`).
+
+---
+
+## Eval test inputs
+
+Two reference panels serve as agent evaluation cases:
 - `data/module_specs/evals/cyp_panel/` — Pharmacogenomics CYP panel
 - `data/module_specs/evals/mthfr_nad/` — Methylation & NAD+ metabolism panel
 
-### Evaluation criteria
+Evaluation criteria: schema validity (must pass), variant coverage, genotype completeness, weight directionality (risk=negative, protective=positive), state correctness, conclusion quality, study reference validity, gene/phenotype accuracy.
 
-| Criterion | Weight | What to check |
-|-----------|--------|---------------|
-| Schema validity | Must pass | Compiler validates without errors |
-| Variant coverage | High | All key rsids from input are present |
-| Genotype completeness | High | All clinically relevant genotypes covered per rsid |
-| Weight directionality | High | risk = negative, protective = positive (or justified) |
-| State correctness | Medium | States match clinical consensus |
-| Conclusion quality | Medium | Accurate, informative, no hallucinated claims |
-| Study references | Medium | PMIDs are real and relevant |
-| Gene/phenotype accuracy | High | Correct gene symbols and phenotype descriptions |
+---
+
+## Implementation status
+
+All phases are complete: DSL schema, reverse-engineering existing modules, compiler, round-trip testing, custom module registry (API + Web UI + CLI), Agno agent (solo + team), BioContext KB MCP integration. Remaining work: eval iteration on test inputs (Phase 9) and per-module report enhancement (Phase 10, deferred).
