@@ -1,0 +1,63 @@
+name: Nix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-nix:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04-arm]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/nix-cache
+          key: nix-${{ matrix.os }}-${{ hashFiles('flake.lock') }}
+          restore-keys: nix-${{ matrix.os }}-
+
+      - name: Import Nix cache
+        run: |
+          if [ -f /tmp/nix-cache/archive.nar ]; then
+            nix-store --import < /tmp/nix-cache/archive.nar || true
+          fi
+
+      - name: Build dev shell
+        run: nix develop --command true
+
+      - name: Export Nix cache
+        run: |
+          mkdir -p /tmp/nix-cache
+          nix-store --export $(nix-store -qR $(nix path-info .#devShells.$(nix eval --impure --expr 'builtins.currentSystem')-default)) > /tmp/nix-cache/archive.nar || true
+
+      - name: Install dependencies
+        run: nix develop --command bash -c "uv sync --dev"
+
+      - name: Check imports
+        run: |
+          nix develop --command bash -c "uv run python -c \"import just_dna_pipelines; print('just_dna_pipelines OK')\""
+          nix develop --command bash -c "uv run python -c \"import webui; print('webui OK')\""
+
+      - name: Check CLI
+        run: |
+          nix develop --command bash -c "uv run pipelines --help"
+
+      - name: Run tests
+        run: nix develop --command bash -c "uv run pytest just-dna-pipelines/tests/ -x -q --timeout=120"
