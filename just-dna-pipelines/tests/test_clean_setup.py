@@ -108,15 +108,15 @@ def test_documentation_updated():
     readme_content = readme.read_text()
     assert "automatically" in readme_content.lower()
     
-    # Check DAGSTER_MULTI_USER.md
-    dagster_doc = root / "docs" / "DAGSTER_MULTI_USER.md"
+    # Check CLEAN_SETUP.md
+    dagster_doc = root / "docs" / "CLEAN_SETUP.md"
     dagster_doc_content = dagster_doc.read_text()
     assert "automatically" in dagster_doc_content.lower()
     assert "dagster.yaml" in dagster_doc_content
-    
+
     print("✅ Documentation verification passed!")
     print("   ✓ README mentions automatic setup")
-    print("   ✓ DAGSTER_MULTI_USER.md documents configuration")
+    print("   ✓ CLEAN_SETUP.md documents configuration")
 
 
 if __name__ == "__main__":
