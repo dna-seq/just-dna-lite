@@ -91,8 +91,9 @@ def check_hf_authentication() -> None:
 # Run authentication check before anything else
 # check_hf_authentication()
 
-# Workspace root for non-user paths (generated modules, agent specs)
-WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
+from just_dna_pipelines.annotation.resources import get_generated_modules_dir
+
+_GENERATED_MODULES_DIR = get_generated_modules_dir()
 
 
 
@@ -123,12 +124,11 @@ async def download_output_file(user_id: str, sample_name: str, filename: str) ->
     file_path = get_user_output_dir() / user_id / sample_name / "modules" / filename
     
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+        raise HTTPException(status_code=404, detail=f"File not found: {filename} (looked at {file_path})")
     
     if not file_path.is_file():
-        raise HTTPException(status_code=400, detail="Path is not a file")
+        raise HTTPException(status_code=400, detail=f"Path is not a file: {file_path}")
     
-    # Return the file for download
     return FileResponse(
         path=str(file_path),
         filename=filename,
@@ -158,7 +158,7 @@ async def download_agent_spec_file(spec_name: str, filename: str) -> FileRespons
                     media_type="application/octet-stream",
                 )
 
-    raise HTTPException(status_code=404, detail=f"Spec file not found: {spec_name}/{filename}")
+    raise HTTPException(status_code=404, detail=f"Spec file not found: {spec_name}/{filename} (scanned {temp_root}/module_spec_*/)")
 
 
 @api.get("/api/agent-spec-zip/{spec_name}")
@@ -167,13 +167,13 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
     if ".." in spec_name or "/" in spec_name:
         raise HTTPException(status_code=400, detail="Invalid spec name")
 
-    module_dir = WORKSPACE_ROOT / "data" / "output" / "generated_modules" / spec_name
+    module_dir = _GENERATED_MODULES_DIR / spec_name
     if v > 0:
         spec_dir = module_dir / f"v{v}"
     else:
         spec_dir = module_dir
     if not spec_dir.is_dir():
-        raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}/v{v}")
+        raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}/v{v} (looked at {spec_dir})")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -197,12 +197,9 @@ async def download_agent_run_log(spec_name: str, version_dir: str, log_name: str
         if ".." in part or "/" in part:
             raise HTTPException(status_code=400, detail="Invalid path")
 
-    log_path = (
-        WORKSPACE_ROOT / "data" / "output" / "generated_modules"
-        / spec_name / version_dir / log_name
-    )
+    log_path = _GENERATED_MODULES_DIR / spec_name / version_dir / log_name
     if not log_path.is_file():
-        raise HTTPException(status_code=404, detail=f"Log not found: {spec_name}/{version_dir}/{log_name}")
+        raise HTTPException(status_code=404, detail=f"Log not found: {spec_name}/{version_dir}/{log_name} (looked at {log_path})")
 
     return FileResponse(
         path=str(log_path),
@@ -230,12 +227,11 @@ async def view_report_file(user_id: str, sample_name: str, filename: str) -> Fil
     file_path = get_user_output_dir() / user_id / sample_name / "reports" / filename
     
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"Report not found: {filename}")
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename} (looked at {file_path})")
     
     if not file_path.is_file():
-        raise HTTPException(status_code=400, detail="Path is not a file")
+        raise HTTPException(status_code=400, detail=f"Path is not a file: {file_path}")
     
-    # Return the HTML file for inline browser rendering (no Content-Disposition attachment)
     return FileResponse(
         path=str(file_path),
         media_type="text/html",
@@ -260,7 +256,7 @@ async def serve_module_logo(module_name: str) -> FileResponse:
 
     logo_path = Path(logo_path_str)
     if not logo_path.is_file():
-        raise HTTPException(status_code=404, detail=f"Logo file not found: {module_name}")
+        raise HTTPException(status_code=404, detail=f"Logo file not found: {module_name} (looked at {logo_path})")
 
     suffix = logo_path.suffix.lower()
     media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}

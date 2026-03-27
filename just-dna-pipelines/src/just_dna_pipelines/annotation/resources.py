@@ -145,6 +145,30 @@ def get_user_input_dir() -> Path:
     return get_workspace_root() / "data" / "input" / "users"
 
 
+def get_registered_modules_dir() -> Path:
+    """Get the directory for compiled/registered custom modules.
+
+    Resolution: ``JUST_DNA_PIPELINES_OUTPUT_DIR``/registered_modules
+    or ``{workspace}/data/interim/registered_modules``.
+    """
+    env_output = os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR")
+    if env_output:
+        return Path(env_output).resolve() / "registered_modules"
+    return get_workspace_root() / "data" / "interim" / "registered_modules"
+
+
+def get_generated_modules_dir() -> Path:
+    """Get the directory for agent-generated module specs (versioned).
+
+    Resolution: ``JUST_DNA_PIPELINES_OUTPUT_DIR``/generated_modules
+    or ``{workspace}/data/output/generated_modules``.
+    """
+    env_output = os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR")
+    if env_output:
+        return Path(env_output).resolve() / "generated_modules"
+    return get_workspace_root() / "data" / "output" / "generated_modules"
+
+
 def download_vcf_from_zenodo(
     zenodo_url: str,
     filename: Optional[str] = None,

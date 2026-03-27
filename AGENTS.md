@@ -62,9 +62,12 @@ This is the single source of truth for:
 
 **Modules are always auto-discovered** from the configured sources. The YAML only provides optional display overrides. Modules not listed in `module_metadata` get auto-generated defaults (titlecased name, generic icon, default color).
 
+**Read/write separation**: The repo-root `modules.yaml` is git-tracked and read-only (defaults). All runtime mutations (register/unregister custom modules) write to a working copy at `data/interim/modules.yaml` (gitignored). On first write the repo default is copied as seed. The loader checks working copy → repo root → package dir (first found wins).
+
 ### Key files
 
-- **`modules.yaml`**: Declares sources, Ensembl reference, quality filters, and optional metadata overrides
+- **`modules.yaml`** (project root): Git-tracked defaults — sources, Ensembl reference, quality filters, metadata overrides
+- **`data/interim/modules.yaml`**: Mutable working copy (gitignored) — written by register/unregister
 - **`module_config.py`**: Pydantic models (`Source`, `ModuleMetadata`, `EnsemblSource`, `ModulesConfig`), YAML loader, helper functions (`get_module_meta()`, `build_module_metadata_dict()`, etc.)
 - **`annotation/hf_modules.py`**: Discovery logic — scans sources via fsspec, builds `MODULE_INFOS` and `DISCOVERED_MODULES`
 
@@ -90,6 +93,7 @@ Each source can be a single module or a collection:
 
 ### Important patterns
 
+- **Never write to repo-root `modules.yaml`** — use `get_config_path()` which returns the working copy at `data/interim/modules.yaml`
 - **Never hardcode module lists or metadata in Python files** — always use `get_module_meta()` or `build_module_metadata_dict()` from `module_config`
 - **Never hardcode HF repo URLs** — use `DEFAULT_REPOS` or `MODULES_CONFIG.sources` from `module_config`
 - **Never hardcode Ensembl repo ID** — `EnsemblAnnotationsConfig.repo_id` defaults to `MODULES_CONFIG.ensembl_source.repo_id`
@@ -994,26 +998,24 @@ Key principles:
 
 - When writing READMEs or user-facing docs: put images at the top, place caveats after Quick Start, and keep intros concise while avoiding technical jargon (e.g., "VCF", "Polars", "DuckDB"). Move deep implementation details to `docs/`.
 - Write in natural, human prose avoiding AI-typical patterns (em-dashes, filler transitions, marketing voice). Never hallucinate documentation.
-- Don't overpromise unimplemented features (like 23andMe/microarray support).
+- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: ROGEN results are planned/future work, not finished outcomes.
 - Update related documentation (AGENTS.md, DAGSTER_GUIDE.md) immediately whenever code is refactored.
 - For upstream PyPI dependencies (like `prs-ui`), try to fix bugs locally or provide copy-paste prompts for upstream fixes rather than patching locally.
 - Use fsspec-based access patterns instead of symlinks. Cache HuggingFace data in the project's own cache using fsspec/HfFileSystem, never use `snapshot_download`.
-- Avoid `subprocess` complexity for CLI commands; use uv workspace `[project.scripts]` instead.
-- Automatically create missing directories in code rather than expecting users to `mkdir`.
-- The tool does not calculate heritability; advise users to look up heritability independently and explain low penetrance (risk variants don't guarantee trait manifestation).
+- Avoid `subprocess` complexity for CLI commands; use uv workspace `[project.scripts]` instead. Automatically create missing directories in code rather than expecting users to `mkdir`.
 - Output file names must reflect semantic content (e.g., `_ensembl_annotated.parquet`), not implementation details. Reports should be timestamped to avoid overwriting previous runs.
-- When fixing Reflex `dispatch is not a function` exceptions, remove the `.web` directory and restart the server to clear stale frontend caches.
 - When the user gives a minimal working example or pattern, wire it in directly instead of over-exploring alternatives.
+- Use global/inclusive framing in docs and UI: avoid EU-only language; users from any country should feel welcome. Reference EHDS as one example among international open health data initiatives.
+- When importing content from Notion into the repo, the repo copy becomes the source of truth. Use structured subfolders and an index document when the file count grows.
+- When describing the platform in papers/docs, frame it as a bioinformatics tool that *joins* VCF data against module databases to add annotations. Never imply the VCF already contains annotations or that the tool makes gene-disease inferences.
 
 ## Learned Workspace Facts
 
-- This is a multi-root uv workspace: `just-dna-lite` (main) and `just-prs` (read-only reference). Never modify files in `just-prs`.
+- This is a multi-root uv workspace: `just-dna-lite` (main) and `just-prs` (read-only reference). Never modify files in `just-prs`. `just-prs` was developed specifically for Just-DNA-Lite but released as a standalone library. Related repos: `just-dna-lite`, `just-prs`, `reflex-mui-datagrid`, `just-biomarkers`, `dna-seq`, `prepare-annotations`.
 - The AI Module Creator uses the Agno agentic framework, which allows configuring OpenAI API-compatible local models (e.g., Ollama or vLLM) for complete privacy.
 - Images for README live in `images/` at the project root. Use `<img>` tags (not markdown syntax) for images inside HTML `<div>` blocks.
 - `PRSComputeStateMixin` provides `prs_results` but no count var; use `PRSState.prs_results.length()` for counts. When overriding `compute_selected_prs`, always delegate to the mixin first.
-- The `prs_section(PRSState)` component from prs-ui is the correct single entry point for PRS UI.
 - VCF normalization renames `start` to `pos` (or vice versa); PRS computation must account for which column name the normalized parquet actually uses.
-- `uv lock -U` updates lockfile versions but not `pyproject.toml` specifiers. Use it to pull new upstream versions for transitive dependencies (e.g., when `pgenlib` became optional in `just-prs`).
 - Only GRCh38 VCF files are fully supported (GRCh37, T2T, and microarray are planned).
 - Ensembl annotation assets must depend on `user_vcf_normalized`, not raw VCFs. The `ensembl_source.repo_id` in `modules.yaml` controls the Ensembl HF dataset.
 - `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g. `arrow up`), not hyphenated Lucide-style.
@@ -1021,6 +1023,11 @@ Key principles:
 - `module_spec.yaml` structure: module name lives under `module.name`, not a top-level `name` key.
 - AI-generated module logos (via NanoBanana/Gemini) produce ~60% whitespace; `_autocrop_whitespace()` in `module_creator.py` handles this with tolerance-based near-white detection. Prompts must request edge-to-edge filling.
 - Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
-- Backend API port is auto-resolved at startup; never hardcode port 8000. Use `rx.config.get_config().api_url` or the `backend_api_url` state var for download/report URLs.
+- Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `rxconfig.py` persists the backend URL in `os.environ["API_URL"]`, and `backend_api_url` reads it so the browser constructs direct URLs to the backend (e.g. `http://localhost:8042/api/report/...`). Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
 - Long synchronous work in Reflex event handlers (e.g. `set_lazyframe` with large parquets) holds the state lock and freezes the UI. Use `run_in_executor` for heavy operations.
 - Reflex `rx.upload` wrapper is a real layout participant; CSS on the inner button alone is insufficient. Use `display: contents` on the upload wrapper to avoid phantom width.
+- Public genome example for demos: Anton Kulaga's VCF on Zenodo (record 18370498).
+- Nix flake (`flake.nix`) supports Apple Silicon Macs: `nix develop` provides correct Python, Node.js, and uv. Workflow: `nix develop` then `uv sync` then `uv run start`.
+- Only 5 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`. PharmGKB (drugs) has NOT been migrated from Generation 1.
+- HuggingFace `just-dna-seq` org hosts 6 datasets (`annotators`, `ensembl_variations`, `clinvar`, `pgs-catalog`, `prs-percentiles`, `polygenic_risk_scores`) and 1 model (`GenNet`).
+- The first preprint was rejected by bioRxiv ("inference drawn between gene(s) and disease(s)") and medRxiv; published on arXiv instead. To avoid repeat rejection, frame the manuscript as a bioinformatics methods/software paper, not a genomic medicine paper.

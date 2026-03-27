@@ -18,6 +18,7 @@ Architecture:
 Decoupled from the web UI -- usable from CLI, tests, or programmatically.
 """
 import asyncio
+import io
 import json
 import logging
 import os
@@ -29,6 +30,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
 from dotenv import load_dotenv
+from PIL import Image, ImageChops
 
 from agno.agent import Agent, RunEvent
 from agno.media import File as AgnoFile
@@ -38,6 +40,7 @@ from agno.models.openai import OpenAIResponses
 from agno.team.mode import TeamMode
 from agno.team.team import Team, TeamRunEvent
 from agno.tools.mcp import MCPTools
+from agno.tools.nano_banana import NanoBananaTools
 from agno.utils.log import configure_agno_logging
 import agno.utils.log as _agno_log_module
 
@@ -421,29 +424,25 @@ def _autocrop_whitespace(image_bytes: bytes, padding_frac: float = 0.05, toleran
     common in AI-generated images.  Adds a small relative padding around the
     detected content, crops, and returns re-encoded PNG bytes.  Returns the
     original bytes unchanged if no trimmable border is found.
+
+    Uses only PIL (no numpy dependency).
     """
-    import io
-
-    import numpy as np
-    from PIL import Image
-
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    arr = np.asarray(img)
 
-    mask = np.any(arr < (255 - tolerance), axis=2)
-    if not mask.any():
+    threshold = 255 - tolerance
+    bg = Image.new("RGB", img.size, (threshold, threshold, threshold))
+    diff = ImageChops.subtract(bg, img)
+
+    bbox = diff.getbbox()
+    if not bbox:
         return image_bytes
 
-    rows = np.any(mask, axis=1)
-    cols = np.any(mask, axis=0)
-    y0, y1 = int(np.argmax(rows)), int(arr.shape[0] - np.argmax(rows[::-1]))
-    x0, x1 = int(np.argmax(cols)), int(arr.shape[1] - np.argmax(cols[::-1]))
-
-    pad = int(max(arr.shape[:2]) * padding_frac)
+    x0, y0, x1, y1 = bbox
+    pad = int(max(img.size) * padding_frac)
     x0 = max(x0 - pad, 0)
     y0 = max(y0 - pad, 0)
-    x1 = min(x1 + pad, arr.shape[1])
-    y1 = min(y1 + pad, arr.shape[0])
+    x1 = min(x1 + pad, img.width)
+    y1 = min(y1 + pad, img.height)
 
     cropped = img.crop((x0, y0, x1, y1))
     buf = io.BytesIO()
@@ -453,8 +452,6 @@ def _autocrop_whitespace(image_bytes: bytes, padding_frac: float = 0.05, toleran
 
 def _generate_logo_image(module_name: str, prompt: str, output_dir: Path, api_key: str) -> str:
     """Generate a module logo via Gemini native image generation (NanoBanana)."""
-    from agno.tools.nano_banana import NanoBananaTools
-
     nb = NanoBananaTools(api_key=api_key, aspect_ratio="1:1")
     try:
         result = nb.create_image(prompt)
@@ -465,11 +462,15 @@ def _generate_logo_image(module_name: str, prompt: str, output_dir: Path, api_ke
         return f"Logo generation returned no image: {getattr(result, 'content', '')}"
 
     raw_bytes = result.images[0].content
-    cropped_bytes = _autocrop_whitespace(raw_bytes)
+    try:
+        final_bytes = _autocrop_whitespace(raw_bytes)
+    except Exception as exc:
+        logger.warning("Logo autocrop failed (%s), saving raw image", exc)
+        final_bytes = raw_bytes
 
     logo_path = output_dir / module_name / "logo.png"
     logo_path.parent.mkdir(parents=True, exist_ok=True)
-    logo_path.write_bytes(cropped_bytes)
+    logo_path.write_bytes(final_bytes)
     return f"Logo saved: {module_name}/logo.png"
 
 

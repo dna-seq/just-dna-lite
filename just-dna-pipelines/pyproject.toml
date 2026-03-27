@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-pipelines"
-version = "0.1.3"
+version = "0.1.4"
 description = "Genomic Database Management and Annotation Tool"
 readme = "README.md"
 authors = [
@@ -19,7 +19,9 @@ dependencies = [
     "google-genai>=1.67.0",
     "huggingface-hub>=1.7.1",
     "mcp>=1.26.0",
+    "numpy>=2.4.3",
     "openai>=2.29.0",
+    "pillow>=12.1.1",
     "polars-bio>=0.26.0",
     "pooch>=1.9.0",
     "psutil>=7.2.2",

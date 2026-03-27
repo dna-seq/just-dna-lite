@@ -29,17 +29,16 @@ from eliot import log_message
 
 from just_dna_pipelines.module_compiler import CompilationResult, ModuleSpecConfig, ValidationResult, validate_spec
 from just_dna_pipelines.module_compiler.compiler import compile_module
+from just_dna_pipelines.annotation.resources import get_registered_modules_dir
 from just_dna_pipelines.module_config import (
     ModuleMetadata,
     ModulesConfig,
     Source,
-    _find_project_root,
     get_config_path,
     save_config,
 )
 
-_project_root = _find_project_root() or Path.cwd()
-CUSTOM_MODULES_DIR: Path = _project_root / "data" / "interim" / "registered_modules"
+CUSTOM_MODULES_DIR: Path = get_registered_modules_dir()
 
 
 def _read_spec_metadata(spec_dir: Path) -> Optional[ModuleSpecConfig]:
@@ -176,25 +175,24 @@ def register_custom_module(
 
 
 def unregister_custom_module(module_name: str) -> bool:
-    """Remove a custom module's parquet, update modules.yaml, refresh discovery.
+    """Remove a custom module's files and config entries, then refresh discovery.
+
+    Handles stale entries gracefully: if the directory is already gone
+    (e.g. path scheme changed), still cleans up config and refreshes.
 
     Args:
         module_name: The machine name of the module to remove.
 
     Returns:
-        True if the module was found and removed, False otherwise.
+        True if any cleanup was performed (files or config), False if
+        the module was not found anywhere.
     """
-    module_dir = CUSTOM_MODULES_DIR / module_name
-    if not module_dir.exists():
-        log_message(
-            message_type="warning",
-            action="unregister_custom_module",
-            module_name=module_name,
-            message=f"Module directory does not exist: {module_dir}",
-        )
-        return False
+    cleaned_anything = False
 
-    shutil.rmtree(module_dir)
+    module_dir = CUSTOM_MODULES_DIR / module_name
+    if module_dir.exists():
+        shutil.rmtree(module_dir)
+        cleaned_anything = True
 
     config_path = get_config_path()
     if config_path.exists():
@@ -202,11 +200,24 @@ def unregister_custom_module(module_name: str) -> bool:
             yaml.safe_load(config_path.read_text()) or {}
         )
     else:
-        config = ModulesConfig()
+        from just_dna_pipelines.module_config import _load_config
+        config = _load_config()
 
-    config.module_metadata.pop(module_name, None)
+    if module_name in config.module_metadata:
+        config.module_metadata.pop(module_name)
+        cleaned_anything = True
+
     config = _remove_local_source_if_empty(config)
     save_config(config, config_path)
+
+    if not cleaned_anything:
+        log_message(
+            message_type="warning",
+            action="unregister_custom_module",
+            module_name=module_name,
+            message=f"Module not found in files or config: {module_name}",
+        )
+        return False
 
     refreshed = refresh_module_registry()
 

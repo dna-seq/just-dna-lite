@@ -50,10 +50,3 @@ module_metadata:
     report_title: Pharmacogenomics
     icon: pill
     color: '#a333c8'
-  longevity_variants_2026:
-    title: Longevity Variants 2026
-    description: Rare protective genetic variants associated with familial longevity
-      and shared genetic risks for age-related multimorbidity.
-    report_title: Familial Longevity Rare Variants
-    icon: heart-pulse
-    color: '#21ba45'

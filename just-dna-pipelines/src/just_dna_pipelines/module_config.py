@@ -4,9 +4,14 @@ Module configuration loader.
 Reads modules.yaml to determine which sources to scan for annotation modules
 and provides optional display metadata overrides for discovered modules.
 
-The file is searched in two locations (first found wins):
-  1. Project root (next to the workspace pyproject.toml) — easy for users to find/edit
-  2. Package directory (just_dna_pipelines/src/just_dna_pipelines/) — bundled fallback
+The file is searched in three locations (first found wins):
+  1. Working copy ``data/interim/modules.yaml`` (mutable, gitignored)
+  2. Project root ``modules.yaml`` (git-tracked, read-only defaults)
+  3. Package directory ``just_dna_pipelines/`` (bundled fallback)
+
+All writes (register/unregister custom modules) go to the working copy.
+On first write the repo default is copied as the seed so settings like
+quality_filters and ensembl_source carry over.
 
 Modules are always auto-discovered from sources. This config only controls
 which sources to scan and how modules are displayed in the UI, CLI, and
@@ -25,6 +30,7 @@ Override with kind: "module" or kind: "collection".
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
@@ -182,9 +188,16 @@ class ModulesConfig(BaseModel):
 
 
 def _find_project_root() -> Optional[Path]:
-    """Walk up from CWD looking for the workspace pyproject.toml with [tool.uv.workspace]."""
+    """Find the workspace root.
+
+    Resolution: ``JUST_DNA_PIPELINES_ROOT`` env var, then walk up from CWD
+    looking for a pyproject.toml with ``[tool.uv.workspace]``.
+    """
+    env_root = os.getenv("JUST_DNA_PIPELINES_ROOT")
+    if env_root:
+        return Path(env_root).resolve()
     candidate = Path.cwd()
-    for _ in range(10):  # safety limit
+    for _ in range(10):
         pyproject = candidate / "pyproject.toml"
         if pyproject.exists() and "[tool.uv.workspace]" in pyproject.read_text():
             return candidate
@@ -195,23 +208,59 @@ def _find_project_root() -> Optional[Path]:
     return None
 
 
-def _load_config() -> ModulesConfig:
+def _working_config_path() -> Optional[Path]:
+    """Return the path for the mutable working copy of modules.yaml.
+
+    Resolution order:
+      1. ``JUST_DNA_MODULES_YAML`` env var (absolute path)
+      2. ``data/interim/modules.yaml`` under the project root (gitignored)
+
+    Returns None when neither is available.
     """
-    Load modules.yaml, checking two locations in order:
+    env = os.getenv("JUST_DNA_MODULES_YAML")
+    if env:
+        return Path(env)
+    project_root = _find_project_root()
+    if project_root is None:
+        return None
+    return project_root / "data" / "interim" / "modules.yaml"
 
-    1. Project root (next to the workspace pyproject.toml) — easy for users to find/edit
-    2. Package directory (just_dna_pipelines/) — bundled fallback
 
-    The first file found wins. If neither exists, returns defaults.
+def _default_config_path() -> Optional[Path]:
+    """Return the path of the repo-shipped (read-only) modules.yaml.
+
+    Checks project root first, then falls back to the package directory.
+    """
+    project_root = _find_project_root()
+    if project_root is not None:
+        candidate = project_root / "modules.yaml"
+        if candidate.exists():
+            return candidate
+    pkg = Path(__file__).parent / "modules.yaml"
+    if pkg.exists():
+        return pkg
+    return None
+
+
+def _load_config() -> ModulesConfig:
+    """Load modules.yaml, checking three locations in order:
+
+    1. Working copy at ``data/interim/modules.yaml`` (mutable, gitignored)
+    2. Project root ``modules.yaml`` (git-tracked, read-only defaults)
+    3. Package directory ``modules.yaml`` (bundled fallback)
+
+    The first file found wins.  If none exist, returns defaults.
     """
     search_paths: list[Path] = []
 
-    # 1. Project root (preferred — user-facing)
+    working = _working_config_path()
+    if working is not None:
+        search_paths.append(working)
+
     project_root = _find_project_root()
     if project_root is not None:
         search_paths.append(project_root / "modules.yaml")
 
-    # 2. Package directory (bundled fallback)
     search_paths.append(Path(__file__).parent / "modules.yaml")
 
     for config_path in search_paths:
@@ -225,23 +274,24 @@ def _load_config() -> ModulesConfig:
 
 
 def get_config_path() -> Path:
-    """Return the project-root modules.yaml path (the user-facing config file).
+    """Return the writable modules.yaml path (working copy).
 
-    Falls back to the package-bundled copy if no project root is found.
+    All mutations (register/unregister) target this path, never the
+    git-tracked repo default.  Falls back to the package directory only
+    when no project root can be found.
     """
-    project_root = _find_project_root()
-    if project_root is not None:
-        return project_root / "modules.yaml"
+    working = _working_config_path()
+    if working is not None:
+        return working
     return Path(__file__).parent / "modules.yaml"
 
 
 def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
-    """Persist a ModulesConfig to modules.yaml using a merge strategy.
+    """Persist a ModulesConfig to the working copy using a merge strategy.
 
-    Reads the existing YAML as a raw dict, patches only the ``sources``
-    and ``module_metadata`` keys (preserving comments for other sections
-    like quality_filters), then writes back.  If the file does not exist
-    yet, a full dump is written.
+    On first write the repo default is copied as the seed so that
+    quality_filters, ensembl_source, etc. are preserved.  Only the
+    ``sources`` and ``module_metadata`` keys are patched.
     """
     target = path or get_config_path()
 
@@ -249,6 +299,11 @@ def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
     if target.exists():
         with open(target) as f:
             raw = yaml.safe_load(f) or {}
+    else:
+        default = _default_config_path()
+        if default is not None and default.exists():
+            with open(default) as f:
+                raw = yaml.safe_load(f) or {}
 
     sources_data = []
     for src in config.sources:
