@@ -161,6 +161,16 @@ uv run dagster-ui        # Dagster pipeline UI only
 uv run pipelines --help  # CLI tools
 ```
 
+### Optional: pre-download Ensembl annotations
+
+Cross-referencing your variants against [Ensembl](https://www.ensembl.org/) (for clinical significance labels and full variant metadata) requires the Ensembl variation database, which is roughly **14 GB**. This data is downloaded on demand the first time you run an Ensembl annotation job, but if you'd rather fetch it upfront while you have time and a stable connection, run:
+
+```bash
+uv run pipelines ensembl-setup
+```
+
+This pre-caches the data to `~/.cache/just-dna-pipelines/ensembl_variations/` so the annotation job starts immediately instead of waiting for the download.
+
 ## For bioinformaticians
 
 The project is a [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) with two packages: `just-dna-pipelines` (Dagster assets, VCF processing, annotation logic, CLI) and `webui` (Reflex web UI, pure Python).
