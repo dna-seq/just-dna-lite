@@ -150,7 +150,7 @@ async def download_vcf_export(user_id: str, sample_name: str, filename: str) -> 
     if not any(filename.endswith(ext) for ext in allowed_extensions):
         raise HTTPException(status_code=400, detail="Only VCF files can be downloaded")
 
-    file_path = USER_OUTPUT_DIR / user_id / sample_name / "vcf_exports" / filename
+    file_path = get_user_output_dir() / user_id / sample_name / "vcf_exports" / filename
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")

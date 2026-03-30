@@ -1,9 +1,14 @@
 """
 Logic for exporting annotated parquets back to VCF format.
 
-Uses polars-bio's write_vcf when possible (DataFrames that originated from
-scan_vcf retain coordinate-system metadata). For parquets read via
-scan_parquet (no metadata), falls back to manual VCF construction.
+Uses ``polars-bio``'s ``write_vcf`` for the core VCF structure (header,
+coordinate handling, compression).  Extra annotation columns are currently
+dropped by polars-bio (INFO always written as ``"."``) so we patch the
+output to inject ``##INFO`` header lines and fill the INFO column.
+
+Once polars-bio supports writing non-core columns into INFO
+(see https://github.com/biodatageeks/polars-bio/issues/312), the
+``_patch_vcf_info`` post-processing step can be removed entirely.
 """
 
 import gzip
@@ -16,6 +21,10 @@ import polars_bio as pb
 from eliot import start_action
 
 VCF_CORE_COLUMNS = {"chrom", "start", "end", "id", "ref", "alt", "qual", "filter"}
+
+# Columns that come from FORMAT fields or genotype computation —
+# never belong in the INFO field.
+_FORMAT_COLUMNS = {"genotype", "GT", "GQ", "DP", "AD", "VAF", "PL", "MIN_DP"}
 
 POLARS_TO_VCF_TYPE: dict[type, str] = {
     pl.Int8: "Integer",
@@ -37,131 +46,117 @@ def _polars_dtype_to_vcf_type(dtype: pl.DataType) -> str:
     return POLARS_TO_VCF_TYPE.get(type(dtype), "String")
 
 
-def _prepare_df_for_vcf(
-    lf: pl.LazyFrame,
-    annotation_columns: Optional[list[str]] = None,
-) -> tuple[pl.DataFrame, list[str]]:
-    """Prepare a LazyFrame for VCF export.
+def _detect_annotation_columns(
+    schema: pl.Schema,
+    explicit: Optional[list[str]] = None,
+) -> list[str]:
+    """Return the annotation column names that should go into INFO."""
+    if explicit is not None:
+        return explicit
+    return [
+        c for c in schema.names()
+        if c not in VCF_CORE_COLUMNS
+        and c not in _FORMAT_COLUMNS
+        and c != "rsid"
+    ]
 
-    - Renames ``rsid`` -> ``id`` (VCF convention)
-    - Detects annotation columns (non-core VCF columns)
-    - Packs annotation columns into a single ``INFO`` string column
-    - Drops annotation and non-VCF columns, keeps VCF core + INFO
 
-    Returns the collected DataFrame and the list of annotation field names
-    used in the INFO column.
+def _build_info_series(df: pl.DataFrame, annotation_cols: list[str]) -> pl.Series:
+    """Build a string Series of VCF INFO values from annotation columns.
+
+    Each row becomes ``KEY1=VAL1;KEY2=VAL2;...``.  Rows where every
+    annotation column is null produce ``"."``.
     """
-    schema = lf.collect_schema()
-    col_names = schema.names()
+    if not annotation_cols:
+        return pl.Series("_INFO", ["." for _ in range(len(df))])
 
-    rename_map: dict[str, str] = {}
-    if "rsid" in col_names and "id" not in col_names:
-        rename_map["rsid"] = "id"
-
-    if rename_map:
-        lf = lf.rename(rename_map)
-        col_names = [rename_map.get(c, c) for c in col_names]
-
-    if annotation_columns is None:
-        annotation_columns = [c for c in col_names if c not in VCF_CORE_COLUMNS]
-
-    if not annotation_columns:
-        return lf.collect(), []
-
-    info_parts: list[pl.Expr] = []
-    for col in annotation_columns:
-        dtype = schema.get(col if col not in rename_map.values() else col)
-        if dtype is None:
-            original = next((k for k, v in rename_map.items() if v == col), col)
-            dtype = schema.get(original)
-        info_parts.append(
+    parts: list[pl.Expr] = []
+    for col in annotation_cols:
+        parts.append(
             pl.concat_str(
                 [pl.lit(f"{col}="), pl.col(col).cast(pl.Utf8).fill_null(".")],
                 separator="",
             )
         )
 
-    lf = lf.with_columns(
-        pl.concat_str(info_parts, separator=";").alias("INFO")
+    info_df = df.select(
+        pl.concat_str(parts, separator=";").alias("_INFO")
     )
-
-    keep_cols = [c for c in ["chrom", "start", "end", "id", "ref", "alt", "qual", "filter"] if c in col_names or c in rename_map.values()]
-    keep_cols.append("INFO")
-    lf = lf.select(keep_cols)
-
-    return lf.collect(), annotation_columns
+    return info_df.get_column("_INFO")
 
 
-def _write_vcf_manual(
-    df: pl.DataFrame,
-    vcf_path: Path,
-    info_fields: list[tuple[str, str]],
-    compress: bool = True,
-) -> int:
-    """Write a DataFrame to VCF using manual string formatting.
+def _prepare_core_df(df: pl.DataFrame) -> pl.DataFrame:
+    """Prepare a DataFrame for ``pb.write_vcf()``.
 
-    Args:
-        df: DataFrame with VCF core columns + ``INFO`` string column.
-        vcf_path: Output path (.vcf or .vcf.gz).
-        info_fields: List of ``(field_name, vcf_type)`` for ##INFO header lines.
-        compress: Whether to gzip the output.
-
-    Returns:
-        Number of data rows written.
+    - Renames ``rsid`` -> ``id``
+    - Casts ``start`` / ``end`` to ``UInt32`` (required by polars-bio)
+    - Keeps only the columns polars-bio understands
     """
-    vcf_path.parent.mkdir(parents=True, exist_ok=True)
+    cols = df.columns
+    rename: dict[str, str] = {}
+    if "rsid" in cols and "id" not in cols:
+        rename["rsid"] = "id"
 
-    header_lines = [
-        "##fileformat=VCFv4.3",
-        f'##source=just-dna-pipelines-vcf-export {datetime.now().strftime("%Y-%m-%d")}',
+    if rename:
+        df = df.rename(rename)
+        cols = df.columns
+
+    cast_exprs: list[pl.Expr] = []
+    for c in cols:
+        if c in ("start", "end") and df.schema[c] != pl.UInt32:
+            cast_exprs.append(pl.col(c).cast(pl.UInt32))
+        else:
+            cast_exprs.append(pl.col(c))
+
+    df = df.select(cast_exprs)
+
+    keep = [c for c in ["chrom", "start", "end", "id", "ref", "alt", "qual", "filter"] if c in df.columns]
+    return df.select(keep)
+
+
+def _patch_vcf_info(
+    vcf_path: Path,
+    info_series: pl.Series,
+    info_fields: list[tuple[str, str]],
+) -> None:
+    """Patch a polars-bio-generated VCF to include annotation INFO values.
+
+    Reads the file, injects ``##INFO`` header lines, and replaces the
+    ``INFO`` column (which polars-bio writes as ``"."``) with actual values.
+
+    This function is the only custom VCF logic — remove it once polars-bio
+    natively supports writing INFO fields.
+    """
+    is_gz = vcf_path.name.endswith(".gz") or vcf_path.name.endswith(".bgz")
+    opener = gzip.open if is_gz else open
+
+    with opener(str(vcf_path), "rt") as fh:
+        lines = fh.readlines()
+
+    info_header_lines = [
+        f'##INFO=<ID={name},Number=1,Type={vtype},Description="{name} annotation">\n'
+        for name, vtype in info_fields
     ]
-    for field_name, vcf_type in info_fields:
-        header_lines.append(
-            f'##INFO=<ID={field_name},Number=1,Type={vcf_type},Description="{field_name} annotation">'
-        )
 
-    col_header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
-    header_lines.append(col_header)
-    header_text = "\n".join(header_lines) + "\n"
+    patched: list[str] = []
+    data_idx = 0
+    info_values = info_series.to_list()
 
-    schema_names = df.columns
-    has_end = "end" in schema_names
-    has_qual = "qual" in schema_names
-    has_filter = "filter" in schema_names
-    has_info = "INFO" in schema_names
+    for line in lines:
+        if line.startswith("#CHROM"):
+            patched.extend(info_header_lines)
+            patched.append(line)
+        elif line.startswith("#"):
+            patched.append(line)
+        else:
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) >= 8 and data_idx < len(info_values):
+                parts[7] = info_values[data_idx] if info_values[data_idx] is not None else "."
+                data_idx += 1
+            patched.append("\t".join(parts) + "\n")
 
-    select_cols = ["chrom", "start"]
-    if has_end:
-        select_cols.append("end")
-    select_cols.append("id")
-    select_cols.extend(["ref", "alt"])
-    if has_qual:
-        select_cols.append("qual")
-    if has_filter:
-        select_cols.append("filter")
-    if has_info:
-        select_cols.append("INFO")
-
-    row_df = df.select([
-        pl.col("chrom").cast(pl.Utf8).fill_null("."),
-        pl.col("start").cast(pl.Utf8),
-        pl.col("id").cast(pl.Utf8).fill_null("."),
-        pl.col("ref").cast(pl.Utf8).fill_null("."),
-        pl.col("alt").cast(pl.Utf8).fill_null("."),
-        (pl.col("qual").cast(pl.Utf8).fill_null(".") if has_qual else pl.lit(".")),
-        (pl.col("filter").cast(pl.Utf8).fill_null(".") if has_filter else pl.lit(".")),
-        (pl.col("INFO").fill_null(".") if has_info else pl.lit(".")),
-    ])
-
-    tsv_text = row_df.write_csv(separator="\t", include_header=False)
-
-    opener = gzip.open if compress else open
-    mode = "wt" if compress else "w"
-    with opener(str(vcf_path), mode) as fh:
-        fh.write(header_text)
-        fh.write(tsv_text)
-
-    return len(df)
+    with opener(str(vcf_path), "wt") as fh:
+        fh.writelines(patched)
 
 
 def export_parquet_to_vcf(
@@ -171,15 +166,14 @@ def export_parquet_to_vcf(
 ) -> tuple[Path, int]:
     """Export an annotated parquet to VCF format.
 
-    Tries ``pb.write_vcf()`` first (fast, preserves coordinate metadata).
-    Falls back to manual VCF construction if polars-bio fails (e.g. missing
-    coordinate metadata from a ``scan_parquet``-sourced DataFrame).
+    Uses ``pb.write_vcf()`` for the core VCF structure and patches the
+    INFO column with annotation values afterwards.
 
     Args:
         parquet_path: Input annotated parquet.
         vcf_path: Output VCF path (.vcf.gz for compressed).
-        annotation_columns: Columns to pack into INFO. If None, auto-detected
-            (all non-core VCF columns).
+        annotation_columns: Columns to pack into INFO. If ``None``,
+            auto-detected (all non-core VCF columns).
 
     Returns:
         ``(vcf_path, row_count)``
@@ -189,38 +183,26 @@ def export_parquet_to_vcf(
         parquet_path=str(parquet_path),
         vcf_path=str(vcf_path),
     ) as action:
-        lf = pl.scan_parquet(parquet_path)
-        schema = lf.collect_schema()
-
-        df, info_field_names = _prepare_df_for_vcf(lf, annotation_columns)
+        df = pl.read_parquet(parquet_path)
+        schema = df.schema
         row_count = len(df)
 
-        info_fields_typed = [
-            (name, _polars_dtype_to_vcf_type(schema.get(name, pl.Utf8)))
-            for name in info_field_names
-        ]
+        ann_cols = _detect_annotation_columns(schema, annotation_columns)
+        info_series = _build_info_series(df, ann_cols)
+        info_fields_typed = [(c, _polars_dtype_to_vcf_type(schema[c])) for c in ann_cols if c in schema]
 
-        try:
-            pb.write_vcf(df, str(vcf_path))
-            action.log(
-                message_type="info",
-                step="write_vcf_polars_bio",
-                rows=row_count,
-            )
-        except Exception as exc:
-            action.log(
-                message_type="warning",
-                step="write_vcf_fallback",
-                reason=str(exc),
-            )
-            compress = str(vcf_path).endswith(".gz")
-            _write_vcf_manual(df, vcf_path, info_fields_typed, compress=compress)
-            action.log(
-                message_type="info",
-                step="write_vcf_manual_complete",
-                rows=row_count,
-            )
+        core_df = _prepare_core_df(df)
+        pb.write_vcf(core_df, str(vcf_path))
 
+        if ann_cols:
+            _patch_vcf_info(vcf_path, info_series, info_fields_typed)
+
+        action.log(
+            message_type="info",
+            step="write_vcf_complete",
+            rows=row_count,
+            info_fields=len(ann_cols),
+        )
         return vcf_path, row_count
 
 
@@ -281,7 +263,8 @@ def export_combined_vcf(
             annotation_cols = [
                 c for c in mod_schema.names()
                 if c not in VCF_CORE_COLUMNS
-                and c not in {"rsid", "genotype", "GT", "GQ", "DP", "AD", "VAF", "PL", "MIN_DP"}
+                and c not in _FORMAT_COLUMNS
+                and c != "rsid"
                 and c not in available_join_cols
             ]
 
@@ -291,14 +274,9 @@ def export_combined_vcf(
             rename_map = {c: f"{module_name}_{c}" for c in annotation_cols}
             select_cols = mod_join_cols + annotation_cols
             mod_subset = mod_lf.select(select_cols).rename(rename_map)
-
             mod_subset = mod_subset.unique(subset=mod_join_cols)
 
-            base_lf = base_lf.join(
-                mod_subset,
-                on=mod_join_cols,
-                how="left",
-            )
+            base_lf = base_lf.join(mod_subset, on=mod_join_cols, how="left")
 
             action.log(
                 message_type="info",
@@ -316,7 +294,8 @@ def export_combined_vcf(
                 ens_annotation_cols = [
                     c for c in ens_schema.names()
                     if c not in VCF_CORE_COLUMNS
-                    and c not in {"rsid", "genotype", "GT", "GQ", "DP", "AD", "VAF", "PL", "MIN_DP"}
+                    and c not in _FORMAT_COLUMNS
+                    and c != "rsid"
                     and c not in available_join_cols
                 ]
                 if ens_annotation_cols:
@@ -330,28 +309,22 @@ def export_combined_vcf(
                         annotation_cols=list(ens_rename.values()),
                     )
 
-        schema = base_lf.collect_schema()
-        annotation_columns = [
-            c for c in schema.names()
-            if c not in VCF_CORE_COLUMNS
-            and c not in {"rsid", "genotype", "GT", "GQ", "DP", "AD", "VAF", "PL", "MIN_DP"}
-        ]
+        df = base_lf.collect()
+        schema = df.schema
+        ann_cols = _detect_annotation_columns(schema)
+        info_series = _build_info_series(df, ann_cols)
+        info_fields_typed = [(c, _polars_dtype_to_vcf_type(schema[c])) for c in ann_cols if c in schema]
 
-        df, info_field_names = _prepare_df_for_vcf(base_lf, annotation_columns)
-        row_count = len(df)
+        core_df = _prepare_core_df(df)
+        pb.write_vcf(core_df, str(vcf_path))
 
-        info_fields_typed = [
-            (name, _polars_dtype_to_vcf_type(schema.get(name, pl.Utf8)))
-            for name in info_field_names
-        ]
+        if ann_cols:
+            _patch_vcf_info(vcf_path, info_series, info_fields_typed)
 
-        try:
-            pb.write_vcf(df, str(vcf_path))
-            action.log(message_type="info", step="combined_write_vcf_polars_bio", rows=row_count)
-        except Exception as exc:
-            action.log(message_type="warning", step="combined_write_vcf_fallback", reason=str(exc))
-            compress = str(vcf_path).endswith(".gz")
-            _write_vcf_manual(df, vcf_path, info_fields_typed, compress=compress)
-            action.log(message_type="info", step="combined_write_vcf_manual", rows=row_count)
-
-        return vcf_path, row_count
+        action.log(
+            message_type="info",
+            step="combined_write_vcf_complete",
+            rows=len(df),
+            info_fields=len(ann_cols),
+        )
+        return vcf_path, len(df)
