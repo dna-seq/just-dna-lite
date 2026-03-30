@@ -1,0 +1,45 @@
+name: Nix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-nix:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04-arm]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build, install, and test
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            echo "--- uv sync ---"
+            uv sync --all-packages --dev
+
+            echo "--- import checks ---"
+            uv run python -c "import just_dna_pipelines; print(\"just_dna_pipelines OK\")"
+            uv run python -c "import webui; print(\"webui OK\")"
+
+            echo "--- CLI check ---"
+            uv run pipelines --help
+
+            echo "--- tests ---"
+            uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q
+          '

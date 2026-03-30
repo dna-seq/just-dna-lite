@@ -47,13 +47,13 @@ def test_dagster_config_not_overwritten():
         
         config_file = dagster_home / "dagster.yaml"
         
-        # Create a custom config
-        custom_content = "# Custom configuration\nauto_materialize:\n  enabled: false\n"
+        # Create a custom config (include telemetry to avoid patching)
+        custom_content = "# Custom configuration\nauto_materialize:\n  enabled: false\n\ntelemetry:\n  enabled: false\n"
         config_file.write_text(custom_content)
-        
+
         # Call initialization again
         _ensure_dagster_config(dagster_home)
-        
+
         # Verify custom config was not overwritten
         content = config_file.read_text()
         assert content == custom_content, "Existing config should not be overwritten"
