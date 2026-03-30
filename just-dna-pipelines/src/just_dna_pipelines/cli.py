@@ -533,13 +533,7 @@ def ensembl_setup(
 
     # ── Step 1: Download ──────────────────────────────────────────────────────
     console.print("[bold]Step 1/3: Download Ensembl parquet files[/bold]\n")
-    ctx = typer.Context(download_ensembl)
-    ctx.invoke(
-        download_ensembl,
-        repo_id=repo_id,
-        cache_dir=cache_dir,
-        force=force,
-    )
+    download_ensembl(repo_id=repo_id, cache_dir=cache_dir, force=force)
 
     # ── Step 2: Verify ────────────────────────────────────────────────────────
     console.print("\n[bold]Step 2/3: Verify cache integrity[/bold]\n")
