@@ -35,5 +35,5 @@ jobs:
       - name: Check CLI
         run: |
           uv run pipelines --help
-          uv run modules --help
+          uv run pipelines module --help
 
