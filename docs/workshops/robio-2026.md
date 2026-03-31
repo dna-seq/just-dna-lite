@@ -4,8 +4,8 @@
 **Repository:** [github.com/dna-seq/just-dna-lite](https://github.com/dna-seq/just-dna-lite)  
 **Instructors:** Anton Kulaga (core developer, Institute of Biochemistry of the Romanian Academy — IBAR) and Livia Zaharia (HEALES — Healthy Life Extension Society)  
 **Format:** Hands-on workshop — **offline (in-person)** · adaptable for online/hybrid  
-**Duration:** 90 minutes core workshop, or 110 minutes with the optional introductory block — see [Optional +20 min: Introduction to Genomics, Longevity, and Interpretation](#optional-20-min-introduction-to-genomics-longevity-and-interpretation)  
-**Audience:** Bioinformaticians, computational biologists, wetlab researchers, longevity researchers, and biology students. Experienced participants can jump straight into the core 90-minute session. For those with solid biology background but less exposure to genome file formats or quantitative genetics, an optional 20-minute introduction covers VCF structure and interpretation basics. No prior command-line experience is required — the web UI is the primary interface.  
+**Duration:** 2 hours (120 minutes, including a 15-minute break). The first 15 minutes are an optional introduction — experienced participants can skip it, making the hands-on portion 105 minutes.  
+**Audience:** Bioinformaticians, computational biologists, wetlab researchers, longevity researchers, and biology students. For those with solid biology background but less exposure to genome file formats or quantitative genetics, the optional 15-minute introduction covers VCF structure and interpretation basics. No prior command-line experience is required — the web UI is the primary interface.  
 **Platforms:** Linux · macOS · Windows · Windows (WSL) — requires Python 3.13+ and [uv](https://github.com/astral-sh/uv)  
 **What to bring:** Own laptop with the software pre-installed (see [Setup Instructions](#setup-instructions)). The Ensembl cache (~14 GB) must be downloaded before the workshop — instructors will have USB sticks as a fallback.  
 **Internet:** Required during the session for the AI Module Creator (LLM API calls) and PGS Catalog queries. Annotation against pre-cached modules and Ensembl works offline.  
@@ -30,19 +30,19 @@
 1. [Workshop Description](#workshop-description)
 2. [Learning Objectives](#learning-objectives)
 3. [Timetable](#timetable)
-4. [AI Module Creator — Practical Guidance](#ai-module-creator--practical-guidance-min-60--85)
+4. [AI Module Creator — Practical Guidance (min 60 – 85)](#ai-module-creator--practical-guidance-min-60--85)
 5. [Minimal Module Format](#minimal-module-format)
 6. [Setup Instructions](#setup-instructions)
 7. [Pre-workshop Cache Downloads (Instructor)](#pre-workshop-cache-downloads-instructor)
 8. [Optional Stretch Goals](#optional-stretch-goals)
 9. [Instructor Notes](#instructor-notes)
-10. [Optional +20 min: Introduction to Genomics, Longevity, and Interpretation](#optional-20-min-introduction-to-genomics-longevity-and-interpretation)
+10. [Optional 15 min: Introduction to Genomics, Longevity, and Interpretation](#optional-15-min-introduction-to-genomics-longevity-and-interpretation)
 
 ---
 
 ## Workshop Description
 
-A hands-on session where participants annotate a real whole-genome file using [just-dna-lite](https://github.com/dna-seq/just-dna-lite), an open-source genome annotation tool that runs locally through a web interface. Whole-genome sequencing produces a VCF (Variant Call Format) file — a large table listing every position where the sample's DNA differs from the reference genome. S. In the workshop, participants take that file and work through the full annotation flow: upload a VCF, normalize it, run built-in annotation modules (with a focus on longevity), inspect flagged variants against Ensembl and ClinVar, compute a polygenic risk score from the PGS Catalog, and build a new annotation module from a published paper using the AI Module Creator — an LLM-based agent that reads a GWAS or pharmacogenomics article, extracts variants and effect directions, and produces a ready-to-use module. All outputs are exported as Parquet for downstream analysis. Everything runs on the participant's own machine.
+A hands-on session where participants annotate a real whole-genome file using [just-dna-lite](https://github.com/dna-seq/just-dna-lite), an open-source genome annotation tool that runs locally through a web interface. Whole-genome sequencing produces a VCF (Variant Call Format) file — a large table listing every position where the sample's DNA differs from the reference genome. In the workshop, participants take that file and work through the full annotation flow: upload a VCF, normalize it, run built-in annotation modules (with a focus on longevity), inspect flagged variants against Ensembl and ClinVar, compute a polygenic risk score from the PGS Catalog, and build a new annotation module from a published paper using the AI Module Creator — an LLM-based agent that reads a GWAS or pharmacogenomics article, extracts variants and effect directions, and produces a ready-to-use module. All outputs are exported as Parquet for downstream analysis. Everything runs on the participant's own machine.
 
 Each participant leaves with a working local installation, the annotated outputs, and practical experience with interpreting these results — including their limitations, particularly in the longevity space where effect sizes are small and replication is still catching up. The scope is research-oriented; the workshop does not cover clinical interpretation or diagnostic workflows.
 
@@ -54,7 +54,7 @@ The workshop is useful across several participant profiles:
 - **AI/ML researchers** interested in how LLM agents are applied in bioinformatics — the AI Module Creator segment is a concrete example of automated literature extraction and structured data generation
 - **Students** in biology, bioinformatics, or computational biology who want to see what genome annotation looks like end to end
 
-![just-dna-lite annotation interface](../../images/just_dna_lite_annotations.jpg)
+<img src="../../images/just_dna_lite_annotations.jpg" alt="just-dna-lite annotation interface" width="690" />
 
 ---
 
@@ -74,21 +74,22 @@ By the end of this workshop, participants will be able to:
 
 ## Timetable
 
-> The core workshop is 90 minutes. The first row is an optional 20-minute introduction for participants who know biology but have not worked with VCF files or quantitative genetics before. Include or skip it based on the audience — the core session (min 0–90) is self-contained either way.
+> A 2-hour workshop (120 min total). The first 15 minutes are an optional introduction for participants who know biology but have not worked with VCF files or quantitative genetics before. Include or skip it based on the audience — the hands-on session (min 0–105) is self-contained either way.
 
 | Minutes | Segment | What happens |
 |---------|---------|--------------|
-| *OPTIONAL −20 – 0* | ***Intro to Genomics, Longevity, and Interpretation*** | *What a VCF file actually contains, why one genome produces millions of rows, how `just-dna-lite` converts it to Parquet for filtering and export. Brief orientation on longevity genetics (small effects, heterogeneous cohorts, survival bias) and on what heritability and PRS scores do and do not tell you. Not a basic genetics lecture — aimed at biologists and adjacent scientists who want shared context before the hands-on session. Full outline in [Optional +20 min](#optional-20-min-introduction-to-genomics-longevity-and-interpretation).* |
+| *OPTIONAL −15 – 0* | ***Intro to Genomics, Longevity, and Interpretation*** | *Anton presents: what a VCF file actually contains, why one genome produces millions of rows, how `just-dna-lite` converts it to Parquet for filtering and export. Brief orientation on longevity genetics (small effects, heterogeneous cohorts, survival bias) and on what heritability and PRS scores do and do not tell you. Meanwhile, Livia circulates to help participants who have setup or prerequisite issues (missing Ensembl cache, `.env` problems, install errors) so they are unblocked before the hands-on session starts. Full outline in [Optional 15 min](#optional-15-min-introduction-to-genomics-longevity-and-interpretation).* |
 | **min 0 – 10** | **Setup + VCF Upload** | Install check, upload Anton's (or Livia's) public VCF, watch the normalization job run. During upload, give a concise orientation to the file fields participants will actually use in the interface: chromosome/position, reference vs alternate allele, genotype, depth/quality, and why the app converts VCF to Parquet for filtering and export. |
 | **min 10 – 30** | **Built-in Modules + Report** | Run all five built-in modules (`longevitymap`, `coronary`, `lipidmetabolism`, `superhuman`, `vo2max`). Open the generated PDF report. Start with the longevity module to anchor the workshop in the host lab's research context, then compare how different modules present protective, risk, and performance-associated variants. Trace one reported hit back to the underlying Parquet row and source study. |
 | **min 30 – 45** | **Ensembl Variant Annotation** | Enable the Ensembl annotation job. Sort and filter the annotated table by `clinical_significance` to surface pathogenic or likely-pathogenic calls. Discuss penetrance vs. flagging: how many variants does a typical healthy genome carry that are labelled "pathogenic" in ClinVar? Compare the demo genome against 1000G background counts. |
-| **min 45 – 70** | **AI Module Creator** | Participants upload a PDF of a recent GWAS, longevity, or pharmacogenomics article (GRCh38, with a supplementary variant table). The AI Solo Agent queries EuropePMC and Open Targets (~2–3 min), extracts variants, and generates `variants.csv` + `module_spec.yaml`. Participants inspect the output, register the module, re-run annotation, and verify that at least one variant from their article appears in the new report section. |
-| **min 70 – 82** | **PRS in Practice** | Open the PRS section, pick one score from the PGS Catalog, compute it, and read the percentile output. Use this as the practical bridge to explain what a population-ranked score is and what it is not, without turning the core workshop into a theory lecture. |
-| **min 82 – 90** | **Q&A + Export** | Download the annotated Parquet, show a 3-line Polars query in the terminal, and close with discussion: what module would you build for longevity research, what would you validate before trusting it, and which findings deserve follow-up rather than immediate interpretation? |
+| **min 45 – 60** | **Break** | Coffee break (in-person) or Q&A break (online). Instructors circulate to help participants who hit setup issues, fell behind, or want to discuss results from the first half. Remaining participants can revisit their outputs or start browsing papers for the AI Module Creator segment. |
+| **min 60 – 85** | **AI Module Creator** | Participants upload a PDF of a recent GWAS, longevity, or pharmacogenomics article (GRCh38, with a supplementary variant table). The AI Solo Agent queries EuropePMC and Open Targets (~2–3 min), extracts variants, and generates `variants.csv` + `module_spec.yaml`. Participants inspect the output, register the module, re-run annotation, and verify that at least one variant from their article appears in the new report section. |
+| **min 85 – 97** | **PRS in Practice** | Open the PRS section, pick one score from the PGS Catalog, compute it, and read the percentile output. Use this as the practical bridge to explain what a population-ranked score is and what it is not, without turning the core workshop into a theory lecture. |
+| **min 97 – 105** | **Q&A + Export** | Download the annotated Parquet, show a 3-line Polars query in the terminal, and close with discussion: what module would you build for longevity research, what would you validate before trusting it, and which findings deserve follow-up rather than immediate interpretation? |
 
 ---
 
-## AI Module Creator — Practical Guidance (min 45 – 70)
+## AI Module Creator — Practical Guidance (min 60 – 85)
 
 Participants should bring (or will be provided) a recent article and its supplementary material that:
 
@@ -98,13 +99,13 @@ Participants should bring (or will be provided) a recent article and its supplem
 
 **Good candidate topics:** longevity, cardiovascular risk, metabolic traits, neurological conditions, pharmacogenomics (drug response), athletic performance. If participants do not bring their own article, instructors will provide a curated set of recent open-access papers.
 
-![AI Module Creator — Step 1: attach paper, describe module, click Send](../../images/just_dna_lite_AI_module_builder_step_I.jpg)
+<img src="../../images/just_dna_lite_AI_module_builder_step_I.jpg" alt="AI Module Creator — Step 1: attach paper, describe module, click Send" width="840" />
 
-![AI Module Creator — Step 2: module auto-loaded; register as annotation source in one click](../../images/just_dna_lite_AI_module_builder_step_II.jpg)
+<img src="../../images/just_dna_lite_AI_module_builder_step_II.jpg" alt="AI Module Creator — Step 2: module auto-loaded; register as annotation source in one click" width="840" />
 
 > **Timing:** Solo Agent takes ~2–3 minutes (~160 s observed in logs). Team mode (multi-agent consensus) takes **7+ minutes** per run — too long to fit in this slot.
 
-**Team mode kick-off strategy:** To demo multi-agent consensus, launch Team mode at the very start of the Built-in Modules segment (min 10) while participants read their first PDF report. By the time the AI Creator block starts (min 45) it will be done or nearly done. Do **not** start Team mode mid-slot and wait — it will consume the entire block.
+**Team mode kick-off strategy:** To demo multi-agent consensus, launch Team mode at the very start of the Built-in Modules segment (min 10) while participants read their first PDF report. By the time the AI Creator block starts (min 60) it will be done or nearly done. Do **not** start Team mode mid-slot and wait — it will consume the entire block.
 
 ---
 
@@ -278,6 +279,8 @@ For advanced participants or if time allows:
 
 ## Instructor Notes
 
+- **Instructor split during optional intro:** Anton leads the presentation; Livia walks the room helping anyone with setup problems (missing Ensembl cache, broken `.env`, install errors). This way no one is blocked when the hands-on session starts at min 0 and the intro time is not wasted for participants who already have everything working.
+
 - **Disclaimer first:** spend 2–3 minutes on what the numbers mean before participants see their first "pathogenic" flag. Key points: high heritability ≠ high penetrance; PRS is a rank, not a probability; most GWAS hits are tagging SNPs, not causal variants. Full explainer in [docs/SCIENCE_LITERACY.md](SCIENCE_LITERACY.md).
 
 - **Demo genomes:** Anton Kulaga's VCF from Zenodo is the primary shared sample so all participants see the same output during the walkthrough. Livia Zaharia's genome is available as a second demo sample (link to be provided before the conference). Participants can switch to their own VCF during hands-on time.
@@ -291,23 +294,23 @@ For advanced participants or if time allows:
 
 ---
 
-## Optional +20 min: Introduction to Genomics, Longevity, and Interpretation
+## Optional 15 min: Introduction to Genomics, Longevity, and Interpretation
 
-> **Default: optional.** Use this block when the audience includes wetlab biologists, longevity researchers, or other participants who know the biology well but do not routinely work with VCF files, GWAS outputs, or genomic interpretation pipelines. Add it before min 0 of the core timetable.
+> **Default: optional.** Use this block when the audience includes wetlab biologists, longevity researchers, or other participants who know the biology well but do not routinely work with VCF files, GWAS outputs, or genomic interpretation pipelines. Add it before min 0 of the hands-on timetable.
 
-### Part 1 — What is inside a genome file (~7 min)
+### Part 1 — What is inside a genome file (~5 min)
 
-- A whole-genome VCF is not a curated list of interesting mutations. It is a large table of variant calls — millions of rows — each with quality fields and sample-level genotypes.
+- A whole-genome VCF is a large table of variant calls — millions of rows — each with quality fields and sample-level genotypes.
 - For most biologists, the unfamiliar part is not what a SNP is, but what `REF`, `ALT`, `QUAL`, `FILTER`, and genotype fields mean in practice when deciding which calls to trust.
-- Walk through one real VCF line from the demo file. Show why one genome produces millions of rows, why raw VCF is awkward for exploration, and why `just-dna-lite` converts it to Parquet for filtering, joining, and export.
+- Walk through one real VCF line from the demo file. Show why one genome produces millions of rows and why `just-dna-lite` converts VCF to Parquet for filtering, joining, and export.
 
-### Part 2 — Longevity genetics context (~7 min)
+### Part 2 — Longevity genetics context (~5 min)
 
-- Longevity genetics is scientifically interesting precisely because it is difficult: effects are small, cohorts are heterogeneous, and survival bias is everywhere.
-- Studies mix lifespan, healthspan, parental longevity, exceptional survival, frailty resistance, lipid handling, and cardiovascular resilience. Even the loci that matter most — such as `APOE` — do not behave like simple destiny switches.
-- A longevity module is best understood as a compact research view over literature-backed associations, not a list of "long life genes."
+- Longevity genetics is difficult: effects are small, cohorts are heterogeneous, and survival bias is everywhere.
+- Studies mix lifespan, healthspan, parental longevity, exceptional survival, frailty resistance, lipid handling, and cardiovascular resilience. Even `APOE` does not behave like a simple destiny switch.
+- A longevity module is a compact research view over literature-backed associations, not a list of "long life genes."
 
-### Part 3 — Heritability, PRS, and determinism (~6 min)
+### Part 3 — Heritability, PRS, and determinism (~5 min)
 
 - A trait can be heritable without being fixed. Heritability describes variation in a population under particular environmental conditions; it does not tell a single person how much of their future is written in their genome.
 - A PRS is not a diagnosis and not a probability of disease. It is a ranking against a reference population.
