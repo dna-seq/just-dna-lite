@@ -271,7 +271,6 @@ For advanced participants or if time allows:
 - **HuggingFace module hosting:** push a manually created module to a HuggingFace dataset repo, add the URL to `modules.yaml`, and verify auto-discovery works for other participants.
 - **Ancestry-aware PRS:** compute the same score against all five 1000G superpopulations and discuss why European-trained scores behave differently on non-European samples.
 - **Longevity deep dive:** filter the `longevitymap` output Parquet to `state = protective` and `weight > 0.5`. Look up the top hit on LongevityMap.org and verify the cited study matches the weight direction in the module.
-- **PLINK2 validation:** download a PGS scoring file from pgscatalog.org, run `uv run pipelines compute-prs` and PLINK2 on the same VCF, plot the scores against each other — the r = 0.9999 concordance is a good conversation starter on trust and reproducibility.
 - **Pipeline monitoring:** open the Dagster UI, walk through the asset lineage graph, inspect CPU/RAM metadata on each materialized asset — introduce the concept of reproducible auditable pipelines vs. black-box scripts.
 - **Parquet export and custom analysis:** download the annotated Parquet and filter it with Polars or DuckDB; filter to `clinical_significance = pathogenic`, count how many variants the 1000G cohort carries in healthy samples, and run the penetrance reality check from the disclaimer segment.
 
@@ -289,20 +288,27 @@ For advanced participants or if time allows:
 
 - **Ensembl annotation segment:** pre-warm the Ensembl cache the day before (see [Pre-workshop Cache Downloads](#pre-workshop-cache-downloads-instructor)). Without the cache, the Ensembl job triggers a ~10–13 GB download mid-session, which will derail the timetable entirely.
 
-- **PLINK2 stretch goal** is most engaging for bioinformatics-adjacent participants; skip it for general audiences.
 
 ---
 
 ## Optional +20 min: Introduction to Genomics, Longevity, and Interpretation
 
-> **Default: optional.** Use this block when the audience includes wetlab biologists, longevity researchers, or other participants who know the biology well but do not routinely work with VCF files, GWAS outputs, or genomic interpretation pipelines. Add it before min 0 of the core timetable. Full background in [docs/SCIENCE_LITERACY.md](SCIENCE_LITERACY.md).
+> **Default: optional.** Use this block when the audience includes wetlab biologists, longevity researchers, or other participants who know the biology well but do not routinely work with VCF files, GWAS outputs, or genomic interpretation pipelines. Add it before min 0 of the core timetable.
 
-This is not a basic genetics lecture and not a primer for laypeople. It is a short practical introduction for biologists who want enough shared context to get more out of the hands-on session.
+### Part 1 — What is inside a genome file (~7 min)
 
-Start from the file itself. A real genome file is not a neat list of "interesting mutations"; it is a very large table of variant calls, quality fields, and sample-level genotypes. For many participants, the unfamiliar part is not what a SNP is, but what `REF`, `ALT`, `QUAL`, `FILTER`, or genotype fields actually mean in practice when you are staring at a VCF and trying to decide what is worth trusting. This is where the introduction should help. Explain why one genome produces millions of rows, why raw VCF is awkward for exploration, and why `just-dna-lite` converts that data into Parquet so it can be filtered, joined, exported, and inspected more like a normal dataset.
+- A whole-genome VCF is not a curated list of interesting mutations. It is a large table of variant calls — millions of rows — each with quality fields and sample-level genotypes.
+- For most biologists, the unfamiliar part is not what a SNP is, but what `REF`, `ALT`, `QUAL`, `FILTER`, and genotype fields mean in practice when deciding which calls to trust.
+- Walk through one real VCF line from the demo file. Show why one genome produces millions of rows, why raw VCF is awkward for exploration, and why `just-dna-lite` converts it to Parquet for filtering, joining, and export.
 
-Then move to longevity, because in this setting it should not feel like an afterthought. Longevity genetics is scientifically interesting precisely because it is difficult: effects are small, cohorts are heterogeneous, survival bias is everywhere, and the phenotype itself is slippery. Studies mix lifespan, healthspan, parental longevity, exceptional survival, frailty resistance, lipid handling, and cardiovascular resilience. Even the loci that matter most, such as `APOE`, do not behave like simple destiny switches. A longevity module is therefore best understood as a compact research view over literature-backed associations, not as a list of "long life genes."
+### Part 2 — Longevity genetics context (~7 min)
 
-This is also the right place to be explicit about genetic determinism. A trait can be heritable without being fixed. Heritability describes variation in a population under particular environmental conditions; it does not tell a single person how much of their future is written in their genome. In the same way, a PRS is not a diagnosis and not a probability of disease. It is a ranking against a reference population. Most common-trait findings in genomics, especially for aging and performance, are probabilistic and population-level. They are useful for comparison, stratification, and hypothesis generation, but they are rarely definitive on their own.
+- Longevity genetics is scientifically interesting precisely because it is difficult: effects are small, cohorts are heterogeneous, and survival bias is everywhere.
+- Studies mix lifespan, healthspan, parental longevity, exceptional survival, frailty resistance, lipid handling, and cardiovascular resilience. Even the loci that matter most — such as `APOE` — do not behave like simple destiny switches.
+- A longevity module is best understood as a compact research view over literature-backed associations, not a list of "long life genes."
 
-The introduction should end with one practical principle that carries through the whole workshop: a flagged result is the start of a conversation with the data, not the end of it. Some findings are clinically well established, especially certain Mendelian and pharmacogenomic variants. Most of what participants will see here, especially in longevity-oriented modules, lives in a different category: meaningful enough to inspect, not strong enough to treat as fate.
+### Part 3 — Heritability, PRS, and determinism (~6 min)
+
+- A trait can be heritable without being fixed. Heritability describes variation in a population under particular environmental conditions; it does not tell a single person how much of their future is written in their genome.
+- A PRS is not a diagnosis and not a probability of disease. It is a ranking against a reference population.
+- Most common-trait findings in genomics, especially for aging and performance, are probabilistic and population-level. Useful for comparison, stratification, and hypothesis generation — rarely definitive on their own.
