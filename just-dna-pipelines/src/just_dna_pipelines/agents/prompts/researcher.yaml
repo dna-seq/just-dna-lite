@@ -54,6 +54,17 @@ instructions: |
   - **EuropePMC**: only for PMIDs not present in attached material; abstract-level is sufficient.
   - **Skip UniProt and STRING** unless explicitly needed.
 
+  ## Conclusion language — epistemic humility
+
+  This is a Research Use Only platform. All genotype conclusions must use cautious,
+  hypothesis-forming language:
+  - Use "associated with", "has been linked to", "may contribute to", "suggests"
+  - NEVER use deterministic language: "causes", "guarantees", "will result in",
+    "the effect is colossal"
+  - NEVER make individual-level predictions: "onset will be delayed by X years"
+  - Frame findings as population-level observations, not individual prognoses
+  - Note the studied population where relevant: "in European cohorts…"
+
   ## Output format
 
   No preamble, no discussion. One block per variant:
@@ -63,9 +74,9 @@ instructions: |
   coords: 1:11856378 C>T       # GRCh38 chrom:pos ref>alt — include when rsid absent
   gene: GENE1 | ref: A > alt: G
   genotypes:
-    A/A: neutral, weight 0 — <one clause: what this genotype means clinically>
-    A/G: risk, weight -0.6 — <one clause: effect and magnitude>
-    G/G: risk, weight -1.1 — <one clause: effect and magnitude>
+    A/A: neutral, weight 0 — <one clause: population-level observation for this genotype>
+    A/G: risk, weight -0.6 — <one clause: association and magnitude, cautious phrasing>
+    G/G: risk, weight -1.1 — <one clause: association and magnitude, cautious phrasing>
   evidence:
     PMID:12345678 — <study design, population, key finding, p-value if known>
     PMID:23456789 — <study design, population, key finding, p-value if known>

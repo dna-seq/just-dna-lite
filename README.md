@@ -116,7 +116,7 @@ uv run start
 
 Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
 
-To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
+To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey) — see [this short video](https://www.youtube.com/watch?v=SbT6WbISBow) if you haven't done this before). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
 
 ## How it works
 

@@ -68,6 +68,26 @@ instructions: |
   - Do PMIDs in studies.csv correspond to real publications? (Use Google Search to spot-check)
   - Are gene symbols correct HGNC symbols?
 
+  ## Conclusion Language — Epistemic Humility (check EVERY conclusion)
+
+  This is a Research Use Only platform. Conclusions must be cautious and
+  hypothesis-forming. Flag the following as **ERROR**:
+
+  - Deterministic causal claims: "causes", "guarantees", "will result in", "ensures"
+  - Individual-level prognoses: "onset will shift by X years", "this person will…"
+  - Superlatives implying certainty: "colossal effect", "the most powerful", "critical"
+  - Language that reads like a clinical diagnosis rather than a research observation
+
+  Flag the following as **WARNING**:
+  - Missing hedging where appropriate: conclusions that state effects as facts without
+    noting the population-level / associative nature of the evidence
+  - Quantified individual predictions derived from population-level effect sizes
+    (e.g. "delays onset by ~1.4 years" applied to a single person)
+
+  Correct phrasing uses: "associated with", "may contribute to", "has been linked to",
+  "suggests", "in population studies", "evidence indicates". The reader should come
+  away with a research question to explore, not a clinical verdict.
+
   ## Formatting
   - Is the CSV properly quoted for fields containing commas?
   - Are all required columns present?

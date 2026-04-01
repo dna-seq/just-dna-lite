@@ -211,6 +211,63 @@ def _inject_rsid_link_renderer(state_instance: Any) -> None:
         state_instance.lf_grid_columns = new_cols
 
 
+def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_key: str) -> None:
+    """Ensure normalized parquet exists and is fresh — pure function, no Reflex state.
+
+    Checks the Dagster materialization hash against the current quality filter
+    config.  If stale or missing, runs the normalize_vcf_job in-process.
+    Safe to call from ``run_in_executor`` (no state lock needed).
+    """
+    from just_dna_pipelines.module_config import _load_config
+
+    current_hash = _load_config().quality_filters.config_hash()
+    sample_name = selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+    normalized_path = get_user_output_dir() / safe_user_id / sample_name / "user_vcf_normalized.parquet"
+
+    instance = get_dagster_instance()
+
+    needs_normalize = True
+    result = instance.fetch_materializations(
+        records_filter=AssetRecordsFilter(
+            asset_key=AssetKey("user_vcf_normalized"),
+            asset_partitions=[partition_key],
+        ),
+        limit=1,
+    )
+    if result.records:
+        mat = result.records[0].asset_materialization
+        if mat and mat.metadata:
+            h = mat.metadata.get("quality_filters_hash")
+            stored_hash = str(h.value) if h and hasattr(h, "value") else ""
+            if stored_hash == current_hash and normalized_path.exists():
+                needs_normalize = False
+
+    if not needs_normalize:
+        return
+
+    vcf_path = get_user_input_dir() / safe_user_id / selected_file
+    if not vcf_path.exists():
+        return
+
+    run_config = {
+        "ops": {
+            "user_vcf_normalized": {
+                "config": {"vcf_path": str(vcf_path.absolute())}
+            }
+        }
+    }
+    job_def = defs.resolve_job_def("normalize_vcf_job")
+    existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
+    if partition_key not in existing:
+        instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+
+    job_def.execute_in_process(
+        run_config=run_config,
+        instance=instance,
+        tags={"dagster/partition": partition_key, "source": "webui"},
+    )
+
+
 class UploadState(LazyFrameGridMixin, rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
@@ -425,15 +482,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "annotated": "uploaded"
                 }
 
-            # Normalize each uploaded VCF to parquet (lightweight, synchronous)
-            for file in files:
-                if not file.filename:
-                    continue
-                sample_name = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-                pk = f"{self.safe_user_id}/{sample_name}"
-                fp = upload_dir / file.filename
-                if fp.exists():
-                    self._normalize_vcf_sync(instance, fp, pk)
         except Exception as exc:
             yield rx.toast.error(f"Upload failed: {exc}")
         finally:
@@ -547,20 +595,11 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "annotated": "uploaded"
                 }
 
-            # Normalize each uploaded VCF to parquet (lightweight, synchronous)
-            for file in files:
-                if not file.filename:
-                    continue
-                sn = file.filename.replace(".vcf.gz", "").replace(".vcf", "")
-                pk = f"{self.safe_user_id}/{sn}"
-                fp = upload_dir / file.filename
-                if fp.exists():
-                    self._normalize_vcf_sync(instance, fp, pk)
         except Exception as exc:
             yield rx.toast.error(f"Upload failed: {exc}")
         finally:
             self.uploading = False
-        
+
         if new_files:
             self._reset_new_sample_form()
             for ev in self.select_file(new_files[-1]):
@@ -568,23 +607,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
             yield rx.toast.success(f"Added {len(new_files)} sample(s) with metadata")
         else:
             yield rx.toast.warning("No files were uploaded")
-
-    def _normalize_vcf_sync(self, instance: DagsterInstance, file_path: Path, partition_key: str) -> bool:
-        """Run normalize_vcf_job in-process so the preview shows normalized data.
-
-        Returns True on success, False on failure (logged but non-fatal).
-        """
-        run_config = {
-            "ops": {
-                "user_vcf_normalized": {
-                    "config": {
-                        "vcf_path": str(file_path.absolute()),
-                    }
-                }
-            }
-        }
-        result = self._execute_job_in_process(instance, "normalize_vcf_job", run_config, partition_key)
-        return result.success
 
     def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
         """
@@ -1078,41 +1100,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.norm_filters_hash = _str("quality_filters_hash")
         self.norm_stats_loaded = True
 
-    def _ensure_normalized_fresh(self) -> bool:
-        """Re-normalize if the parquet is stale (quality filters changed).
-
-        Compares the hash stored on the materialization against the current
-        config.  Returns True if re-normalization happened, False otherwise.
-        """
-        from just_dna_pipelines.module_config import _load_config
-
-        current_hash = _load_config().quality_filters.config_hash()
-
-        # If no stats loaded or hashes match, nothing to do
-        if not self.norm_stats_loaded:
-            # No previous materialization — need to normalize
-            pass
-        elif self.norm_filters_hash == current_hash:
-            return False
-
-        # Stale or missing — re-normalize
-        if not self.selected_file or not self.safe_user_id:
-            return False
-
-        root = Path(__file__).resolve().parents[3]
-        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
-        if not vcf_path.exists():
-            return False
-
-        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
-        partition_key = f"{self.safe_user_id}/{sample_name}"
-        instance = get_dagster_instance()
-
-        self._normalize_vcf_sync(instance, vcf_path, partition_key)
-        # Reload stats from the fresh materialization
-        self._load_norm_stats_from_dagster()
-        return True
-
     def _get_expected_normalized_parquet_path(self) -> Optional[Path]:
         """Return the canonical normalized parquet path regardless of whether it exists yet."""
         if not self.selected_file or not self.safe_user_id:
@@ -1133,58 +1120,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
         parquet_str = str(expected_parquet) if expected_parquet else ""
         ref_genome = self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
         return [PRSState.initialize_prs_for_file(parquet_str, ref_genome)]
-
-    def _load_vcf_preview_sync(self):
-        """Load normalized parquet for preview; fall back to raw VCF.
-
-        Also ensures the parquet is fresh (quality filters match current config)
-        and loads filter statistics from Dagster for UI display.
-        """
-        if not self.selected_file or not self.safe_user_id:
-            self._clear_vcf_preview()
-            return
-
-        self.vcf_preview_loading = True
-        self.vcf_preview_error = ""
-
-        # Load normalization stats and re-normalize if quality filters changed
-        self._load_norm_stats_from_dagster()
-        self._ensure_normalized_fresh()
-
-        import polars as pl
-
-        normalized = self._get_normalized_parquet_path()
-        if normalized is not None:
-            try:
-                lf = pl.scan_parquet(str(normalized))
-                for _ in self.set_lazyframe(lf, {}, chunk_size=300):
-                    pass
-                _inject_rsid_link_renderer(self)
-                self.preview_source_label = f"{self.selected_file} (normalized)"
-                self.vcf_preview_loading = False
-                return
-            except Exception:
-                pass  # fall through to raw VCF
-
-        root = Path(__file__).resolve().parents[3]
-        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
-        if not vcf_path.exists():
-            self._clear_vcf_preview()
-            self.vcf_preview_error = f"VCF file not found: {vcf_path.name}"
-            return
-
-        try:
-            lazy_vcf = prepare_vcf_for_module_annotation(vcf_path)
-            descriptions = extract_vcf_descriptions(lazy_vcf)
-            for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
-                pass
-            _inject_rsid_link_renderer(self)
-            self.preview_source_label = f"{vcf_path.name} (raw VCF fallback)"
-        except Exception as e:
-            self._clear_vcf_preview()
-            self.vcf_preview_error = str(e)
-        finally:
-            self.vcf_preview_loading = False
 
     def update_file_species(self, species: str):
         """Update species for the selected file and reset reference genome to default."""
@@ -1615,46 +1550,104 @@ class UploadState(LazyFrameGridMixin, rx.State):
         return REFERENCE_GENOMES.get(species, ["custom"])
 
     def select_file(self, filename: str):
-        """Select a file and pre-select modules from its latest run if available."""
+        """Select a file — quick state updates only, heavy loading is background."""
         self.selected_file = filename
-        # Reset success state on selection change
         self.last_run_success = False
-        # Reset expanded run
         self.expanded_run_id = ""
-        
-        # Load file metadata if not already loaded
+
         if filename not in self.file_metadata:
             self._load_file_metadata(filename)
-        
-        # Find the latest run for this file to pre-select modules
+
         file_runs = [r for r in self.runs if r.get("filename") == filename]
         if file_runs:
-            # Sort by started_at (ISO format strings) descending, handle None values
             file_runs.sort(key=lambda x: x.get("started_at") or "", reverse=True)
             latest_run = file_runs[0]
             if latest_run.get("modules"):
                 prev_modules = latest_run["modules"]
                 available = set(self.available_modules)
-                # Keep old selections that are still available
                 restored = [m for m in prev_modules if m in available]
-                # Auto-select modules discovered after the previous run
-                prev_set = set(prev_modules)
-                new_modules = sorted(available - prev_set)
+                new_modules = sorted(available - set(prev_modules))
                 self.selected_modules = restored + new_modules
-        
-        # Expand all sections by default when selecting a file
+
         self.vcf_preview_expanded = True
         self.outputs_expanded = True
         self.run_history_expanded = True
         self.new_analysis_expanded = True
-        
-        # Load VCF preview for the selected sample
-        self._load_vcf_preview_sync()
 
-        # Load output files for the selected sample
-        self._load_output_files_sync()
+        self.vcf_preview_loading = True
+        self.vcf_preview_error = ""
 
-        return [OutputPreviewState.clear_output_preview] + self._yield_prs_init_events()
+        return [
+            OutputPreviewState.clear_output_preview,
+            *self._yield_prs_init_events(),
+            UploadState.load_file_data_background,
+        ]
+
+    @rx.event(background=True)
+    async def load_file_data_background(self) -> None:
+        """Load VCF preview + output files in background (state lock released)."""
+        async with self:
+            selected_file = self.selected_file
+            safe_user_id = self.safe_user_id
+            if not selected_file or not safe_user_id:
+                self._clear_vcf_preview()
+                return
+
+        sample_name = selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{safe_user_id}/{sample_name}"
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: _ensure_normalized_parquet(safe_user_id, selected_file, partition_key),
+        )
+
+        async with self:
+            self._load_norm_stats_from_dagster()
+            self._load_vcf_into_grid()
+            self._load_output_files_sync()
+
+    def _load_vcf_into_grid(self) -> None:
+        """Load the normalized (or raw fallback) parquet into the LazyFrame grid.
+
+        Assumes norm stats are already loaded.  Must be called while holding
+        the state lock (inside ``async with self:``).
+        """
+        if not self.selected_file or not self.safe_user_id:
+            self._clear_vcf_preview()
+            return
+
+        normalized = self._get_normalized_parquet_path()
+        if normalized is not None:
+            try:
+                lf = pl.scan_parquet(str(normalized))
+                for _ in self.set_lazyframe(lf, {}, chunk_size=300):
+                    pass
+                _inject_rsid_link_renderer(self)
+                self.preview_source_label = f"{self.selected_file} (normalized)"
+                self.vcf_preview_loading = False
+                return
+            except Exception:
+                pass
+
+        vcf_path = get_user_input_dir() / self.safe_user_id / self.selected_file
+        if not vcf_path.exists():
+            self._clear_vcf_preview()
+            self.vcf_preview_error = f"VCF file not found: {vcf_path.name}"
+            return
+
+        try:
+            lazy_vcf = prepare_vcf_for_module_annotation(vcf_path)
+            descriptions = extract_vcf_descriptions(lazy_vcf)
+            for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
+                pass
+            _inject_rsid_link_renderer(self)
+            self.preview_source_label = f"{vcf_path.name} (raw VCF fallback)"
+        except Exception as e:
+            self._clear_vcf_preview()
+            self.vcf_preview_error = str(e)
+        finally:
+            self.vcf_preview_loading = False
 
     def switch_tab(self, tab_name: str):
         """Switch to a different tab in the right panel."""
@@ -2776,6 +2769,143 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 
 from prs_ui import PRSComputeStateMixin
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
+from just_prs.prs import compute_prs as _compute_prs_fn
+from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
+from just_prs.quality import (
+    format_effect_size as _format_effect_size,
+    format_classification as _format_classification,
+    interpret_prs_result as _interpret_prs_result,
+)
+
+_prs_catalog_instance: Optional[_PRSCatalog] = None
+
+
+def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
+    """Lazy singleton for the PRS catalog used in background computation."""
+    global _prs_catalog_instance
+    if _prs_catalog_instance is None:
+        _prs_catalog_instance = _PRSCatalog(cache_dir=Path(cache_dir))
+    return _prs_catalog_instance
+
+
+def _compute_single_prs(
+    pgs_id: str,
+    vcf_path: str,
+    genome_build: str,
+    cache_dir: Path,
+    genotypes_lf: Optional[pl.LazyFrame],
+    catalog: _PRSCatalog,
+    best_perf_df: pl.DataFrame,
+    ancestry: str,
+) -> Dict[str, Any]:
+    """Compute PRS for a single score — pure function, no Reflex state access.
+
+    Runs outside the Reflex state lock so the UI stays responsive.
+    """
+    info = catalog.score_info_row(pgs_id)
+    trait = info["trait_reported"] if info else None
+
+    result = _compute_prs_fn(
+        vcf_path=vcf_path,
+        scoring_file=pgs_id,
+        genome_build=genome_build,
+        cache_dir=cache_dir,
+        pgs_id=pgs_id,
+        trait_reported=trait,
+        genotypes_lf=genotypes_lf,
+    )
+
+    match_pct = round(result.match_rate * 100, 1)
+    if match_pct < 10:
+        match_color = "red"
+    elif match_pct < 50:
+        match_color = "orange"
+    else:
+        match_color = "green"
+
+    auroc_val: Optional[float] = None
+    ancestry_str = ""
+    n_individuals: Optional[int] = None
+    effect_size_str = ""
+    classification_str = ""
+    perf_rows = best_perf_df.filter(pl.col("pgs_id") == pgs_id)
+    if perf_rows.height > 0:
+        p = perf_rows.row(0, named=True)
+        effect_size_str = _format_effect_size(p)
+        classification_str = _format_classification(p)
+        auroc_val = p.get("auroc_estimate")
+        ancestry_str = p.get("ancestry_broad") or ""
+        n_individuals = p.get("n_individuals")
+
+    pct_value = result.percentile
+    pct_method = result.percentile_method or (
+        "theoretical" if result.has_allele_frequencies else ""
+    )
+    if pct_value is None:
+        pct_value, pct_method = catalog.percentile(
+            result.score, pgs_id, ancestry=ancestry
+        )
+
+    interp = _interpret_prs_result(pct_value, result.match_rate, auroc_val)
+
+    if pct_value is not None:
+        if pct_value >= 90:
+            risk_level, risk_level_color = "High predisposition", "red"
+        elif pct_value >= 75:
+            risk_level, risk_level_color = "Above average predisposition", "orange"
+        elif pct_value >= 25:
+            risk_level, risk_level_color = "Average predisposition", "gray"
+        else:
+            risk_level, risk_level_color = "Below average predisposition", "blue"
+    else:
+        risk_level, risk_level_color = "", "gray"
+
+    trait_name = result.trait_reported or pgs_id
+    pop_label = ancestry_str or ancestry or "the reference population"
+    if pct_value is not None:
+        pct_int = int(pct_value)
+        sfx = "th"
+        if pct_int % 100 not in (11, 12, 13):
+            sfx = {1: "st", 2: "nd", 3: "rd"}.get(pct_int % 10, "th")
+        risk_hint = (
+            f"Your PRS for {trait_name} is at the {pct_int}{sfx} percentile — "
+            f"{risk_level.lower()} compared to the {pop_label} reference population. "
+            "For standard PRS models, higher percentile = more genetic variants "
+            "associated with increased risk."
+        )
+    else:
+        risk_hint = (
+            f"No reference percentile is available for {trait_name}. "
+            "The raw score is model-specific and cannot be read as protective or risky "
+            "without a population reference. Try selecting a different ancestry or "
+            "checking whether a reference panel exists for this score."
+        )
+
+    return {
+        "pgs_id": result.pgs_id,
+        "trait": result.trait_reported or "",
+        "score": round(result.score, 6),
+        "percentile": f"{pct_value:.1f}" if pct_value is not None else "",
+        "percentile_method": pct_method or "",
+        "has_allele_frequencies": result.has_allele_frequencies,
+        "match_rate": match_pct,
+        "match_color": match_color,
+        "variants_matched": result.variants_matched,
+        "variants_total": result.variants_total,
+        "effect_size": effect_size_str,
+        "classification": classification_str,
+        "auroc": f"{auroc_val:.3f}" if auroc_val is not None else "",
+        "quality_label": interp["quality_label"],
+        "quality_color": interp["quality_color"],
+        "summary": interp["summary"],
+        "ancestry": ancestry_str,
+        "selected_ancestry": ancestry,
+        "n_individuals": n_individuals if n_individuals is not None else 0,
+        "risk_level": risk_level,
+        "risk_level_color": risk_level_color,
+        "risk_hint": risk_hint,
+        "_low_match": result.match_rate < 0.1,
+    }
 
 
 class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
@@ -2837,30 +2967,80 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             partition_key = f"{p.parent.parent.name}/{p.parent.name}"
             self._load_prs_results_from_dagster(partition_key)
 
-    def compute_selected_prs(self) -> Any:
-        """Delegate to mixin's compute_selected_prs, then checkpoint to Dagster.
+    @rx.event(background=True)
+    async def compute_selected_prs(self) -> None:
+        """Compute PRS in background so the UI stays responsive.
 
-        The mixin populates prs_results, prs_results_rows, prs_results_columns,
-        risk_level, risk_hint, reference_status, per-population percentiles —
-        everything the prs_results_table component needs.
+        Uses @rx.event(background=True) to release the Reflex state lock
+        during heavy compute_prs() calls.  Each score is computed in a
+        thread-pool executor; state is updated via brief ``async with self:``
+        blocks between iterations.
         """
-        import polars as pl
+        async with self:
+            if self._get_genotypes_lf() is None:
+                path = self.prs_genotypes_path
+                if path and Path(path).exists():
+                    self.set_prs_genotypes_lf(pl.scan_parquet(path))
 
-        # Re-hydrate LazyFrame if normalization finished after file selection
-        if self._get_genotypes_lf() is None:
-            path = self.prs_genotypes_path
-            if path and Path(path).exists():
-                self.set_prs_genotypes_lf(pl.scan_parquet(path))
+            if self._get_genotypes_lf() is None:
+                self.status_message = "Normalized VCF not found — run normalization first."
+                return
 
-        if self._get_genotypes_lf() is None:
-            self.status_message = "Normalized VCF not found — run normalization first."
-            return
+            selected_ids = list(self.selected_pgs_ids)
+            if not selected_ids:
+                self.status_message = "No PGS scores selected. Load and select scores above."
+                return
 
-        gen = PRSComputeStateMixin.compute_selected_prs(self)
-        if gen is not None:
-            yield from gen
+            genome_build = self.genome_build
+            cache_dir_str = self.cache_dir
+            vcf_path = self.prs_genotypes_path
+            genotypes_lf = self._get_genotypes_lf()
+            ancestry = self.selected_ancestry
 
-        self._checkpoint_prs_to_dagster()
+            total = len(selected_ids)
+            self.prs_computing = True
+            self.prs_progress = 0
+            self.prs_results = []
+            self.low_match_warning = False
+            self.status_message = f"Computing PRS for {total} score(s)..."
+
+        catalog = _get_prs_catalog(cache_dir_str)
+        cache_path = Path(cache_dir_str) / "scores"
+        best_perf_df = catalog.best_performance().collect()
+        results: List[Dict[str, Any]] = []
+        any_low_match = False
+
+        for i, pgs_id in enumerate(selected_ids, start=1):
+            async with self:
+                self.prs_progress = round(i / total * 100)
+                self.status_message = f"Computing {i}/{total}: {pgs_id}..."
+
+            loop = asyncio.get_event_loop()
+            row = await loop.run_in_executor(
+                None,
+                lambda pid=pgs_id: _compute_single_prs(
+                    pgs_id=pid,
+                    vcf_path=vcf_path,
+                    genome_build=genome_build,
+                    cache_dir=cache_path,
+                    genotypes_lf=genotypes_lf,
+                    catalog=catalog,
+                    best_perf_df=best_perf_df,
+                    ancestry=ancestry,
+                ),
+            )
+
+            if row.pop("_low_match", False):
+                any_low_match = True
+            results.append(row)
+
+        async with self:
+            self.prs_results = results
+            self.low_match_warning = any_low_match
+            self.prs_computing = False
+            self.prs_progress = 100
+            self.status_message = f"Computed {total} PRS score(s)"
+            self._checkpoint_prs_to_dagster()
 
     def _checkpoint_prs_to_dagster(self) -> None:
         """Persist current PRS results to Dagster for cross-session restore."""

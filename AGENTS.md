@@ -731,6 +731,49 @@ When making significant UI changes, follow this workflow:
 
 ### Critical Reflex Patterns
 
+**0. Use `@rx.event(background=True)` for heavy computation, NEVER synchronous generators:**
+
+Reflex generator event handlers (`yield`) hold the state lock for their **entire** execution. `yield` sends state deltas but does NOT release the lock — other events queue up and fire all at once when the generator finishes, making the UI completely unresponsive. This applies to both direct generators and `yield from` delegation to mixin generators.
+
+For any operation taking more than ~1 second (PRS computation, file processing, API calls), use `@rx.event(background=True)` with `async with self:` for state access:
+
+```python
+# BAD — holds state lock for entire loop, UI frozen during computation
+def compute_heavy_stuff(self) -> Any:
+    self.computing = True
+    yield  # sends update but does NOT release lock
+    for item in self.items:
+        result = expensive_function(item)  # blocks everything
+        self.progress += 1
+        yield  # UI appears frozen, events queue up
+    self.computing = False
+
+# GOOD — state lock released between iterations, UI stays responsive
+@rx.event(background=True)
+async def compute_heavy_stuff(self) -> None:
+    async with self:  # brief lock: read inputs, set computing=True
+        items = list(self.items)
+        self.computing = True
+
+    for i, item in enumerate(items):
+        async with self:  # brief lock: progress update
+            self.progress = i
+
+        # Heavy work runs WITHOUT state lock — UI responsive
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, expensive_function, item)
+
+    async with self:  # brief lock: store results
+        self.computing = False
+        self.results = results
+```
+
+Key rules:
+- `@rx.background` does NOT exist in Reflex 0.8.x — always use `@rx.event(background=True)`
+- Extract heavy work into pure functions (no `self` access) and run via `run_in_executor`
+- Snapshot all needed state vars into locals inside the first `async with self:` block
+- Keep `async with self:` blocks as brief as possible (only read/write state)
+
 **1. Use `fomantic_icon()` instead of `rx.icon()`:**
 
 Lucide icons (via `rx.icon()`) often fail to load or trigger terminal warnings in this environment. Use the `fomantic_icon()` helper from `webui.components.layout` instead. It maps common Lucide names to Fomantic UI equivalents.
@@ -812,6 +855,8 @@ rx.box(class="ui segment")
 - **Awaiting long-running tasks in event handlers** - Blocks entire UI; use `loop.run_in_executor()` for background execution
 - **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap"; use `run_in_executor()` instead
 - **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
+- **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
+- **Using `@rx.background`** - Does NOT exist in Reflex 0.8.x. Use `@rx.event(background=True)` instead.
 
 ### Fomantic UI + Reflex Gotchas
 

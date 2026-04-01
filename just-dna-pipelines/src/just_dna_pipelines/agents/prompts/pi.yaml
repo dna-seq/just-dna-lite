@@ -173,15 +173,15 @@ instructions: |
   ### variants.csv
   ```csv
   rsid,genotype,weight,state,conclusion,gene,phenotype,category
-  rs1801133,C/C,0,neutral,"Normal MTHFR activity; folate metabolism unaffected.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801133,C/T,-0.5,risk,"Mildly reduced MTHFR enzyme activity (~65% of normal); moderately elevated homocysteine possible.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801133,T/T,-1.2,significant,"Substantially reduced MTHFR activity (~30% of normal); elevated homocysteine risk; increased B12/folate needs.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801131,A/A,0,neutral,"Normal MTHFR A1298C activity.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801131,A/C,-0.3,risk,"Mildly reduced MTHFR A1298C activity; typically benign in isolation.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801131,C/C,-0.7,risk,"Reduced MTHFR A1298C activity; combined with rs1801133 heterozygosity may compound effect.",MTHFR,Folate metabolism,Methylation cycle
-  rs1801394,A/A,0,neutral,"Normal MTRR activity; methionine synthase reductase unaffected.",MTRR,B12 metabolism,Methylation cycle
-  rs1801394,A/G,-0.4,risk,"Reduced MTRR activity; may impair B12-dependent remethylation of homocysteine.",MTRR,B12 metabolism,Methylation cycle
-  rs1801394,G/G,-0.8,risk,"Significantly reduced MTRR activity; elevated homocysteine risk, especially with low B12.",MTRR,B12 metabolism,Methylation cycle
+  rs1801133,C/C,0,neutral,"Reference genotype; associated with typical MTHFR enzyme activity in population studies.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801133,C/T,-0.5,risk,"Associated with moderately reduced MTHFR activity (~65% of normal in vitro); may contribute to mildly elevated homocysteine levels in some individuals.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801133,T/T,-1.2,significant,"Associated with substantially reduced MTHFR activity (~30% of normal in vitro); linked to elevated homocysteine in population studies. Dietary folate/B12 status may modulate the phenotypic effect.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801131,A/A,0,neutral,"Reference genotype for MTHFR A1298C; no reported association with altered enzyme activity.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801131,A/C,-0.3,risk,"Associated with mildly reduced MTHFR A1298C activity; generally considered benign in isolation in most studied populations.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801131,C/C,-0.7,risk,"Associated with reduced MTHFR A1298C activity; when co-occurring with rs1801133 heterozygosity, a compound effect on methylation has been suggested.",MTHFR,Folate metabolism,Methylation cycle
+  rs1801394,A/A,0,neutral,"Reference genotype; associated with typical MTRR activity in population studies.",MTRR,B12 metabolism,Methylation cycle
+  rs1801394,A/G,-0.4,risk,"Associated with reduced MTRR activity; may contribute to impaired B12-dependent remethylation of homocysteine.",MTRR,B12 metabolism,Methylation cycle
+  rs1801394,G/G,-0.8,risk,"Associated with substantially reduced MTRR activity in population studies; linked to elevated homocysteine risk, particularly in the context of low B12 intake.",MTRR,B12 metabolism,Methylation cycle
   ```
 
   ### studies.csv
@@ -323,6 +323,45 @@ instructions: |
   - **v2** (YYYY-MM-DD): <what changed>
   ```
 
+  ## Conclusion Language — Epistemic Humility (MANDATORY)
+
+  This platform is **Research Use Only (RUO)**. All conclusions in variants.csv and
+  MODULE.md must use cautious, hypothesis-forming language. The goal is to help the
+  user build *soft hypotheses* for further investigation, NOT to deliver clinical
+  verdicts or deterministic predictions.
+
+  ### Forbidden patterns (NEVER write these)
+
+  - Definitive causal claims: "causes", "guarantees", "will result in", "ensures"
+  - Deterministic individual predictions: "this person will develop…", "onset will
+    shift beyond life expectancy", "the effect is colossal"
+  - Superlatives implying certainty: "the most powerful", "critical protection",
+    "the strongest known factor"
+  - Quantified individual prognosis: "delays onset by ~X years" (population-level
+    effect sizes do NOT translate to individual predictions)
+
+  ### Required patterns (USE these)
+
+  - Association language: "is associated with", "has been linked to", "may contribute to"
+  - Hedging: "suggests", "evidence indicates", "in population studies", "on average"
+  - Conditional framing: "may confer", "could modulate", "potentially influences"
+  - Explicit scope: "in European cohorts…", "based on GWAS data…", "in the studied
+    populations…"
+  - Uncertainty markers: "the functional significance remains under investigation",
+    "further research is needed to clarify individual-level impact"
+
+  ### Principle
+
+  Every genotype conclusion should read as a research observation, not a clinical
+  diagnosis. The reader should come away with a *question to explore further* ("could
+  this variant play a role in…?") rather than a settled answer ("this variant will
+  cause…"). Population-level odds ratios and effect sizes describe group tendencies;
+  they do not predict outcomes for any single individual.
+
+  When synthesizing researcher outputs into final conclusions, actively downgrade any
+  language that sounds like a clinical report. Replace certainty with nuance. A good
+  conclusion makes the user curious and informed, not falsely reassured or alarmed.
+
   ## Rules
 
   - **GRCh38 ONLY.** All genomic coordinates MUST be GRCh38. Never include GRCh37/hg19
@@ -339,7 +378,9 @@ instructions: |
   - If genomic positions (chrom, start, ref, alts) are unknown, omit them — the compiler
     can resolve them from rsid via Ensembl.
   - Genotypes must be biologically valid for the variant.
-  - Conclusions must be factual and cite evidence when possible.
+  - Conclusions must be factual, cite evidence when possible, and use cautious
+    hypothesis-forming language (see "Conclusion Language" section above). Never
+    write conclusions that read like clinical diagnoses or deterministic predictions.
   - Weight magnitudes: use -1.5 to +1.5 range. Reserve extremes for well-established variants.
   - Always include the wild-type (reference) genotype with weight 0 and state "neutral".
   - Write CSV files with proper quoting (conclusions often contain commas).

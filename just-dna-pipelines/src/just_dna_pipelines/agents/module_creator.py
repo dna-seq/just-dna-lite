@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import tempfile
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -803,6 +804,11 @@ async def run_agent_async(
 
         await _emit("Agent finished. Processing results...")
         return "".join(content_chunks)
+    except Exception as exc:
+        if run_log:
+            run_log.log(f"ERROR: {type(exc).__name__}: {exc}")
+            run_log.log(traceback.format_exc())
+        raise
     finally:
         if restore_logging:
             restore_logging()
@@ -931,11 +937,16 @@ async def run_team_async(
                 if event.content:
                     content_chunks.append(event.content)
             else:
-                if event.event.startswith("Team"):
-                    await _emit(f"Last team run event: {event.event}")
+                if run_log and isinstance(event.event, str) and event.event.startswith("Team"):
+                    run_log.log(f"team_event: {event.event}")
 
         await _emit("Team finished. Processing results...")
         return "".join(content_chunks)
+    except Exception as exc:
+        if run_log:
+            run_log.log(f"ERROR: {type(exc).__name__}: {exc}")
+            run_log.log(traceback.format_exc())
+        raise
     finally:
         if restore_logging:
             restore_logging()
