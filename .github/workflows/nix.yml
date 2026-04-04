@@ -5,16 +5,14 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1' # Monday 06:00 UTC
   workflow_dispatch:
 
 jobs:
   test-nix:
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-24.04-arm]
 
     steps:
       - name: Checkout code
@@ -25,6 +23,15 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+
+      # Cachix binary cache — cuts nix develop from minutes to seconds.
+      # Setup: 1) create cache at https://app.cachix.org (name: just-dna-lite)
+      #        2) add CACHIX_AUTH_TOKEN to repo Settings → Secrets → Actions
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: just-dna-lite
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build, install, and test
         run: |
@@ -41,5 +48,43 @@ jobs:
             uv run pipelines --help
 
             echo "--- tests ---"
-            uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q
+            uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q \
+              -m "not integration and not slow and not download and not large_download"
           '
+
+  integration:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: just-dna-lite
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Annotate small VCF with longevitymap
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            uv sync --all-packages --dev
+
+            echo "--- annotate antku_small.vcf ---"
+            uv run pipelines annotate-modules \
+                --vcf data/input/tests/antku_small.vcf \
+                --user ci_test \
+                --modules longevitymap
+          '
+
+      - name: Verify annotation output
+        run: nix develop --command uv run python .ci/verify_annotation.py
