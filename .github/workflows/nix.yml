@@ -28,6 +28,12 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: just-dna-lite
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
       - name: Build, install, and test
         run: |
           nix develop --command bash -c '
@@ -60,6 +66,12 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: just-dna-lite
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Annotate small VCF with longevitymap
         run: |
