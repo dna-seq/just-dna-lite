@@ -47,7 +47,7 @@ jobs:
           '
 
   integration:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-latest
     timeout-minutes: 30
 
@@ -72,24 +72,7 @@ jobs:
                 --vcf data/input/tests/antku_small.vcf \
                 --user ci_test \
                 --modules longevitymap
-
-            echo "--- verify output ---"
-            uv run python -c "
-import polars as pl
-from pathlib import Path
-
-parquets = list(Path(\"data/output/users/ci_test\").rglob(\"*_weights.parquet\"))
-assert len(parquets) >= 1, \"No weight parquet files found\"
-
-df = pl.read_parquet(parquets[0])
-assert df.height > 0, \"Empty annotation result\"
-assert \"chrom\" in df.columns
-assert \"start\" in df.columns
-assert \"genotype\" in df.columns
-print(f\"OK: {df.height} annotated variants in {parquets[0].name}\")
-
-manifest = Path(\"data/output/users/ci_test\").rglob(\"manifest.json\")
-assert any(manifest), \"No manifest.json found\"
-print(\"OK: manifest.json present\")
-"
           '
+
+      - name: Verify annotation output
+        run: nix develop --command uv run python .ci/verify_annotation.py
