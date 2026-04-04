@@ -49,7 +49,8 @@ jobs:
             uv run pipelines --help
 
             echo "--- tests ---"
-            uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q
+            uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q \
+              -m "not integration and not slow and not download and not large_download"
           '
 
   integration:
