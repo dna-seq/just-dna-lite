@@ -69,6 +69,7 @@ def real_vcf_path(tmp_path_factory) -> Path:
 # UNIT TESTS - Dynamic module discovery
 # ============================================================================
 
+@pytest.mark.integration
 class TestDynamicModuleDiscovery:
     """Test the dynamic module discovery system."""
     
@@ -135,6 +136,7 @@ class TestModuleTableUrl:
             assert f"/{table.value}.parquet" in url
 
 
+@pytest.mark.integration
 class TestHfModuleAnnotationConfig:
     """Test the HfModuleAnnotationConfig."""
     
