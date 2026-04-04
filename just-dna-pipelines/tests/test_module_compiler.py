@@ -340,6 +340,7 @@ class TestValidation:
 # ── Resolver tests (real Ensembl cache) ──────────────────────────────────────
 
 
+@pytest.mark.integration
 class TestResolver:
     """Test rsid <-> position resolution against real Ensembl data."""
 
@@ -466,6 +467,7 @@ def _make_spec_dir(
     return spec_dir
 
 
+@pytest.mark.integration
 class TestCompilation:
     """Compilation of eval specs. These specs have both rsid and positions,
     so resolution is a no-op and tests validate the core pipeline."""
@@ -607,6 +609,7 @@ class TestCompilation:
 # ── Compilation with resolution tests ─────────────────────────────────────────
 
 
+@pytest.mark.integration
 class TestCompileWithResolution:
     """Compilation using real Ensembl resolution — rsid-only and position-only specs."""
 
@@ -753,6 +756,7 @@ class TestCompileWithResolution:
 # ── Round-trip consistency tests ───────────────────────────────────────────────
 
 
+@pytest.mark.integration
 class TestRoundTrip:
     """Verify that compiling twice from the same spec produces identical output."""
 

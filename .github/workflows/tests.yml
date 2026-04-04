@@ -37,3 +37,8 @@ jobs:
           uv run pipelines --help
           uv run pipelines module --help
 
+      - name: Run unit tests
+        run: |
+          uv run --package just-dna-pipelines pytest just-dna-pipelines/tests/ -x -q \
+            -m "not integration and not slow and not download and not large_download"
+
