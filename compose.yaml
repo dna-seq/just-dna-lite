@@ -1,0 +1,48 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Just-DNA-Lite Compose File
+#
+# Usage:
+#   podman-compose up --build        # Build and start
+#   podman-compose up -d             # Start in background
+#   podman-compose down              # Stop and remove
+#   podman-compose logs -f           # Follow logs
+#
+# For docker:
+#   docker compose up --build
+#
+# Your VCF files and results:
+#   Put VCF files in:  ./my_genomes/
+#   Find results in:   ./my_results/
+#   Cache (Ensembl ~14GB, PRS scores) is persisted in a named volume.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  just-dna-lite:
+    build:
+      context: .
+      dockerfile: Containerfile
+    ports:
+      - "3000:3000"   # Web UI
+      - "3005:3005"   # Dagster pipeline dashboard
+      - "8000:8000"   # Backend API (internal)
+    volumes:
+      # Your VCF files — drop .vcf/.vcf.gz here, they appear in the upload list
+      - ./my_genomes:/app/data/input/users/default:rw
+      # Your results — reports, annotated parquets land here
+      - ./my_results:/app/data/output/users/default:rw
+      # Persistent cache & state (Ensembl, PRS, Dagster, modules config)
+      - just-dna-cache:/app/data/cache
+      - just-dna-state:/app/data/interim
+    environment:
+      - API_URL=${API_URL:-http://localhost:8000}
+      - JUST_DNA_PIPELINES_LOGIN=${JUST_DNA_PIPELINES_LOGIN:-none}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  just-dna-cache:
+  just-dna-state:

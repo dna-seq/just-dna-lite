@@ -1,0 +1,53 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime data (user uploads, outputs, dagster state)
+data/input/
+data/interim/
+data/output/
+data/module_specs/
+data/modules/generated/
+
+# Reflex build artifacts (rebuilt inside container)
+.web/
+.states/
+uploaded_files/
+
+# Dagster orphan directories
+storage/
+history/
+schedules/
+
+# Caches
+__pycache__/
+*.py[codz]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+
+# IDE / editor
+.cursor/
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+
+# Misc
+*.egg-info/
+dist/
+build/
+logs/
+*.log
+.tmp*
+tmp/
+notebooks/

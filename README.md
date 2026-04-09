@@ -116,6 +116,66 @@ uv run start
 
 Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
 
+### Run with Docker or Podman (no Python required)
+
+If you have Docker or Podman installed, you can run the whole stack without installing Python, uv, or any dependencies on your machine. A pre-built container image is published to GitHub Container Registry on every push to `main`.
+
+**Using the pre-built image (fastest):**
+
+```bash
+# Pull and run
+docker run -it --rm \
+  -p 3000:3000 -p 3005:3005 -p 8000:8000 \
+  -v ./my_genomes:/app/data/input/users/default \
+  -v ./my_results:/app/data/output/users/default \
+  -v just-dna-cache:/app/data/cache \
+  ghcr.io/dna-seq/just-dna-lite:latest
+```
+
+Put your `.vcf` or `.vcf.gz` files in the `my_genomes/` folder. After annotation, find your reports and Parquet files in `my_results/`. The Ensembl cache (~14 GB, downloaded on first use) and PRS scores are persisted in a named volume so they survive container restarts.
+
+**Using Docker Compose or Podman Compose:**
+
+```bash
+git clone https://github.com/dna-seq/just-dna-lite.git
+cd just-dna-lite
+
+# Docker
+docker compose up --build
+
+# Podman
+podman-compose up --build
+```
+
+The compose file automatically creates `my_genomes/` and `my_results/` folders in your project directory. Drop your VCF files in `my_genomes/`, run annotation through the UI at `http://localhost:3000`, and pick up your reports from `my_results/`.
+
+**Building from source:**
+
+```bash
+# Docker
+docker build -t just-dna-lite .
+
+# Podman
+podman build -t just-dna-lite .
+```
+
+**Ports:**
+
+| Port | Service |
+|------|---------|
+| 3000 | Web UI (main interface) |
+| 3005 | Dagster pipeline dashboard |
+| 8000 | Backend API (used internally) |
+
+**Environment variables** (pass via `-e` or `--env-file .env`):
+
+| Variable | Purpose |
+|----------|---------|
+| `HF_TOKEN` | HuggingFace token (for private datasets) |
+| `GEMINI_API_KEY` | Enables AI Module Creator |
+| `API_URL` | Override backend URL (for remote deployments) |
+| `JUST_DNA_PIPELINES_LOGIN` | `none` (default in container), `false` (email login), or `user:pass` |
+
 To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey) — see [this short video](https://www.youtube.com/watch?v=SbT6WbISBow) if you haven't done this before). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
 
 ## How it works

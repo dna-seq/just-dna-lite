@@ -24,6 +24,9 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      # Cachix binary cache — cuts nix develop from minutes to seconds.
+      # Setup: 1) create cache at https://app.cachix.org (name: just-dna-lite)
+      #        2) add CACHIX_AUTH_TOKEN to repo Settings → Secrets → Actions
       - name: Setup Cachix
         uses: cachix/cachix-action@v14
         with:

@@ -178,6 +178,13 @@ def start_dagster(
             help="Port for the Dagster UI.",
         ),
     ] = 3005,
+    host: Annotated[
+        str,
+        typer.Option(
+            "--host",
+            help="Host for the Dagster webserver. Use 0.0.0.0 in containers.",
+        ),
+    ] = "",
 ) -> None:
     """Start Dagster Dev (UI + Daemon) for the specified file."""
     root = _find_workspace_root(Path.cwd())
@@ -190,6 +197,8 @@ def start_dagster(
         dagster_file = Path.cwd() / file
         if not dagster_file.exists():
             raise typer.BadParameter(f"Dagster file not found: {file}")
+
+    dagster_host = host or os.getenv("DAGSTER_HOST", "127.0.0.1")
 
     # Set DAGSTER_HOME to data/interim/dagster
     dagster_home = os.getenv("DAGSTER_HOME", "data/interim/dagster")
@@ -204,15 +213,12 @@ def start_dagster(
     typer.echo(f"📁 Dagster home: {dagster_home}")
     _kill_port_owner(port)
     
-    typer.secho(f"\n💡 Dagster UI will be available at: http://localhost:{port}\n", fg=typer.colors.GREEN, bold=True)
+    typer.secho(f"\n💡 Dagster UI will be available at: http://{dagster_host}:{port}\n", fg=typer.colors.GREEN, bold=True)
     
-    # Use os.execvp to replace the current process with dg dev
-    # This ensures all output is properly forwarded and the process behaves correctly
-    # Use absolute path to dg in venv since execvp PATH behavior can be unreliable
     dg_path = Path(sys.executable).parent / "dg"
     os.execvp(
         str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file), "-p", str(port)]
+        ["dg", "dev", "-f", str(dagster_file), "-p", str(port), "-h", dagster_host]
     )
 
 
@@ -232,11 +238,17 @@ def start_all(
     dagster_port: Annotated[
         int, typer.Option("--dagster-port", help="Port for the Dagster UI.")
     ] = 3005,
+    dagster_host: Annotated[
+        str,
+        typer.Option("--dagster-host", help="Host for the Dagster webserver. Use 0.0.0.0 in containers."),
+    ] = "",
 ) -> None:
     """Start the full stack: Dagster (Pipelines) and Reflex UI."""
     root = _find_workspace_root(Path.cwd())
     if root is None:
         root = Path.cwd()
+
+    resolved_dagster_host = dagster_host or os.getenv("DAGSTER_HOST", "127.0.0.1")
 
     if granian:
         os.environ["REFLEX_USE_GRANIAN"] = "true"
@@ -266,7 +278,6 @@ def start_all(
     time.sleep(2)
 
     # 2. Start Dagster by REPLACING this process (exec)
-    # This ensures Dagster has full control of stdout/stderr and terminal signals.
     typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
     typer.echo(f"📁 Dagster home: {dagster_home}")
     dagster_file_path = root / dagster_file
@@ -297,14 +308,12 @@ def start_all(
     except Exception:
         pass
     
-    # This replaces the current process with dg dev
-    # Use absolute path to dg in venv since execvp PATH behavior can be unreliable
-    # Note: KeyboardInterrupt tracebacks from Dagster's internal watch_orphans.py scripts
-    # are normal behavior - those scripts don't have signal handlers and just exit via KeyboardInterrupt
+    # KeyboardInterrupt tracebacks from Dagster's internal watch_orphans.py scripts
+    # are normal behavior - those scripts don't have signal handlers
     dg_path = Path(sys.executable).parent / "dg"
     os.execvp(
         str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file_path), "-p", str(dagster_port)]
+        ["dg", "dev", "-f", str(dagster_file_path), "-p", str(dagster_port), "-h", resolved_dagster_host]
     )
 
 
