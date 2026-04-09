@@ -10,19 +10,19 @@
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
-**⚠️ MEDICAL DISCLAIMER & RESEARCH USE ONLY (RUO):** just-dna-lite is a bioinformatics research tool designed exclusively for academic studies (e.g., ROGEN, the Romanian Genomic Project), citizen science, and educational self-exploration. **It is NOT a medical device, is NOT intended for clinical diagnostic use, and does NOT provide medical advice.** The software and its modules (including AI-generated content) are provided "AS IS" without warranties of any kind. 
+<sub><i>Research Use Only (RUO): just-dna-lite is a bioinformatics research tool for academic studies, citizen science, and educational self-exploration. It is not a medical device, not intended for clinical diagnostic use, and does not provide medical advice. The software and its modules (including AI-generated content) are provided "as is" without warranties of any kind. Our philosophy is to display everything — including PRS scores and community-generated AI modules that may attempt to predict disease probabilities — but you must never use this tool to make medical, diagnostic, or health-related decisions. Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.</i></sub>
 
-Our philosophy is to display *everything*—including PRS scores and community-generated AI modules that may attempt to predict disease probabilities. However, you must **never use this tool to make medical, diagnostic, or health-related decisions.** Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.
+**Runs on your laptop.** Upload your genome file, pick what you want to know, get results in minutes. Installs in four commands, runs entirely on your machine, nothing leaves your computer.
 
-Upload your genome file, pick what you want to know, get results in minutes. Other annotation tools can take hours. just-dna-lite runs entirely on your machine — your data gets normalized, annotated, and reported while you're still making coffee. Nothing leaves your computer.
+> **Just want to try it?** Jump to [Quick start](#quick-start) — you'll be up and running in under five minutes.
 
-The starting point here is that you have the right to look at your own genome without anyone filtering what you see. In the spirit of global open health data initiatives (such as the [European Health Data Space (EHDS)](https://digital-strategy.ec.europa.eu/en/policies/electronic-health-records) and similar frameworks worldwide), we believe individuals should have immediate, open access to their digital health data. Consumer genomics tools like Nebula or Dante do show you a lot, but what they surface is ultimately a semi-arbitrary curatorial decision by their teams — interesting findings they picked, weighted toward things that are engaging or easy to explain. Clinical genomics is highly curated too, but for a different reason: it only shows findings where there's strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the PGS Catalog, your complete variant table cross-referenced against Ensembl. What you do with that is your decision.
+You have the right to look at your own genome without anyone filtering what you see. Consumer genomics tools surface findings their teams picked; clinical genomics only shows what has strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the [PGS Catalog](https://www.pgscatalog.org/), your complete variant table cross-referenced against [Ensembl](https://www.ensembl.org/), community-built annotation modules, and an AI assistant that can turn a research paper into a new genetic module in minutes. What you do with all of that is your decision.
 
 ## Genomic Annotations
 
 ### Built-in Modules
 
-The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance, and pharmacogenomics (PharmGKB). These modules were created with the expert curation of geneticist Olga Borysova and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
+The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance. These modules were created with the expert curation of geneticist Olga Borysova and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
 
 ### Polygenic Risk Scores (PRS)
 
@@ -65,17 +65,27 @@ Simple mode runs in about 2 minutes. Research team mode takes 7–8 minutes: a P
 
 ## Quick start
 
-You need a VCF file from whole genome (WGS) or whole exome (WES) sequencing aligned to GRCh38, and Python 3.13+. If you sequenced through a commercial provider or a clinical lab, you should have a `.vcf` or `.vcf.gz` file. That's what you need. (23andMe and AncestryDNA produce microarray data, not VCFs. Microarray support is on the roadmap.)
+Everything runs locally on your computer. You can install it on a laptop, a desktop, or a lab workstation — no cloud account, no institutional server, no IT department needed.
+
+### What you need
+
+You need a `.vcf` or `.vcf.gz` file from whole genome (WGS) or whole exome (WES) sequencing. If you had your genome sequenced through a company like DNA Complete (Nebula), Dante Labs, or Sequencing.com, log into your account and look for a **"Download Raw Data"** or **"Download VCF"** option. The file you want ends in `.vcf` or `.vcf.gz`. You may also see `.bam` or `.fastq` files — you don't need those, just the VCF. Most providers deliver GRCh38 by default. If unsure, check with your provider.
+
+> **23andMe, AncestryDNA, MyHeritage?** These services use microarray chips that read a few hundred thousand pre-selected positions — a tiny fraction of your genome. just-dna-lite needs a file from whole genome or whole exome sequencing, which covers millions of positions. If your data comes from a chip-based service, it won't work here yet (microarray support is planned). Not sure what you have? Check with your provider.
 
 **Where to get your genome sequenced?**
-If you want to sequence your own genome (Whole Genome Sequencing / WGS), there are several commercial providers. As of early 2026, popular and accessible options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure the provider allows you to download your raw `.vcf` or `.vcf.gz` file. *(Disclaimer: We provide these links only as examples and are in no way affiliated with any of these companies or services).*
+If you want to sequence your own genome, there are several commercial providers. As of early 2026, popular and accessible options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure the provider allows you to download your raw `.vcf` or `.vcf.gz` file. *(Disclaimer: We provide these links only as examples and are in no way affiliated with any of these companies or services).*
 
 If you live in Romania, you should follow the **[ROGEN (Romanian Genomics) project](https://rogen.umfcd.ro/)**. It is a major national initiative sequencing 5,000 individuals to create a genomic map of the population, and you might be able to get recruited to have your genome sequenced for free.
 
 **Don't have your genome sequenced yet?**
 You can use any public genome to try out the tool. For example, some of our authors have open-sourced their genomes — you can download [Anton Kulaga's genome here](https://zenodo.org/records/18370498) and see what you discover! You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
 
-First, install [uv](https://github.com/astral-sh/uv) (a fast Python package manager):
+### Install from source (Python)
+
+If you're comfortable with a terminal, this is the fastest way to get started. Open a terminal (Terminal on macOS, PowerShell on Windows, any terminal on Linux) and run the commands below. You'll need [git](https://git-scm.com/downloads) installed.
+
+First, install [uv](https://github.com/astral-sh/uv) — a tool that manages Python and all dependencies for you automatically:
 
 ```bash
 # Linux / macOS
@@ -96,35 +106,36 @@ uv run start
 
 Open the URL printed in the terminal (usually `http://localhost:3000`). Upload your VCF and start exploring.
 
-### macOS Apple Silicon: using Nix (optional)
+### Run with Podman or Docker (no Python required)
 
-If you're on an Apple Silicon Mac (M1/M2/M3/M4) and run into architecture issues (e.g. Polars CPU warnings, wrong native bindings), the included [Nix flake](https://nix.dev/concepts/flakes) provides Python, Node.js, and uv at the correct architecture automatically.
+Don't want to install Python? [Podman](https://podman.io/) (or [Docker](https://www.docker.com/products/docker-desktop/)) packages the entire app so it runs the same on any computer. This still runs on your machine — the container is just a convenient way to get everything pre-installed.
+
+We recommend **Podman** — it runs without root privileges by default, which is a better fit for a tool that handles personal genomic data. Docker works identically; just swap `podman` for `docker` in any command below.
+
+**Install Podman** (one-time):
 
 ```bash
-# Install Nix (one-time, ~2 minutes)
-sh <(curl -L https://nixos.org/nix/install)
-# Restart your terminal, then enable flakes:
-mkdir -p ~/.config/nix
-echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+# Linux (Debian/Ubuntu)
+sudo apt install podman
 
-# Enter the dev environment and start as usual
-cd just-dna-lite
-nix develop
-uv sync
-uv run start
+# macOS (via Homebrew — install Homebrew first from https://brew.sh if needed)
+brew install podman && podman machine init && podman machine start
+
+# Windows: install Podman Desktop from https://podman-desktop.io
+# Or install Docker Desktop from https://www.docker.com/products/docker-desktop/
 ```
 
-Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
-
-### Run with Docker or Podman (no Python required)
-
-If you have Docker or Podman installed, you can run the whole stack without installing Python, uv, or any dependencies on your machine. A pre-built container image is published to GitHub Container Registry on every push to `main`.
-
-**Using the pre-built image (fastest):**
+**Step 1.** Create a folder and put your VCF files in it:
 
 ```bash
-# Pull and run
-docker run -it --rm \
+mkdir -p my_genomes
+# Copy or move your .vcf / .vcf.gz file into my_genomes/
+```
+
+**Step 2.** Run the app:
+
+```bash
+podman run -it --rm \
   -p 3000:3000 -p 3005:3005 -p 8000:8000 \
   -v ./my_genomes:/app/data/input/users/default \
   -v ./my_results:/app/data/output/users/default \
@@ -132,31 +143,40 @@ docker run -it --rm \
   ghcr.io/dna-seq/just-dna-lite:latest
 ```
 
-Put your `.vcf` or `.vcf.gz` files in the `my_genomes/` folder. After annotation, find your reports and Parquet files in `my_results/`. The Ensembl cache (~14 GB, downloaded on first use) and PRS scores are persisted in a named volume so they survive container restarts.
+> **Docker users:** replace `podman` with `docker` — everything else stays the same.
 
-**Using Docker Compose or Podman Compose:**
+**Step 3.** Open `http://localhost:3000` in your browser. Upload your VCF and start exploring.
+
+**Step 4.** When annotation finishes, find your reports and results in the `my_results/` folder (created automatically next to `my_genomes/`). The Ensembl cache (~14 GB, downloaded on first use) and PRS scores are persisted so they survive restarts.
+
+#### Advanced container usage
+
+<details>
+<summary>Compose, building from source, ports, and environment variables</summary>
+
+**Using Podman Compose or Docker Compose:**
 
 ```bash
 git clone https://github.com/dna-seq/just-dna-lite.git
 cd just-dna-lite
 
+# Podman (recommended)
+podman-compose up --build
+
 # Docker
 docker compose up --build
-
-# Podman
-podman-compose up --build
 ```
 
-The compose file automatically creates `my_genomes/` and `my_results/` folders in your project directory. Drop your VCF files in `my_genomes/`, run annotation through the UI at `http://localhost:3000`, and pick up your reports from `my_results/`.
+The compose file automatically creates `my_genomes/` and `my_results/` folders in your project directory.
 
 **Building from source:**
 
 ```bash
-# Docker
-docker build -t just-dna-lite .
-
 # Podman
 podman build -t just-dna-lite .
+
+# Docker
+docker build -t just-dna-lite .
 ```
 
 **Ports:**
@@ -176,7 +196,32 @@ podman build -t just-dna-lite .
 | `API_URL` | Override backend URL (for remote deployments) |
 | `JUST_DNA_PIPELINES_LOGIN` | `none` (default in container), `false` (email login), or `user:pass` |
 
+</details>
+
 To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey) — see [this short video](https://www.youtube.com/watch?v=SbT6WbISBow) if you haven't done this before). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
+
+<details>
+<summary><strong>macOS Apple Silicon: using Nix (optional)</strong></summary>
+
+If you're on an Apple Silicon Mac (M1/M2/M3/M4) and run into architecture issues (e.g. Polars CPU warnings, wrong native bindings), the included [Nix flake](https://nix.dev/concepts/flakes) provides Python, Node.js, and uv at the correct architecture automatically.
+
+```bash
+# Install Nix (one-time, ~2 minutes)
+sh <(curl -L https://nixos.org/nix/install)
+# Restart your terminal, then enable flakes:
+mkdir -p ~/.config/nix
+echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+# Enter the dev environment and start as usual
+cd just-dna-lite
+nix develop
+uv sync
+uv run start
+```
+
+Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
+
+</details>
 
 ## How it works
 

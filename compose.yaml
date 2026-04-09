@@ -22,9 +22,9 @@ services:
       context: .
       dockerfile: Containerfile
     ports:
-      - "3000:3000"   # Web UI
+      - "3000:3000"   # Web UI (Vite frontend)
       - "3005:3005"   # Dagster pipeline dashboard
-      - "8000:8000"   # Backend API (internal)
+      - "8000:8000"   # Backend API + websocket
     volumes:
       # Your VCF files — drop .vcf/.vcf.gz here, they appear in the upload list
       - ./my_genomes:/app/data/input/users/default:rw

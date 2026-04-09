@@ -102,10 +102,16 @@ ENV JUST_DNA_PIPELINES_CACHE_DIR=/app/data/cache
 # PRS cache inside the data volume (PGS Catalog scores, percentiles)
 ENV PRS_CACHE_DIR=/app/data/cache/just-prs
 
+# ── Layer 4: Pre-initialize Reflex (creates .web dir, installs npm deps) ──────
+# Speeds up first startup by ~20-30s.
+WORKDIR /app/webui
+RUN reflex init
+WORKDIR /app
+
 # Ports:
-#   3000 - Reflex frontend (Vite / static)
+#   3000 - Reflex frontend (Vite dev server)
 #   3005 - Dagster web UI
-#   8000 - Reflex backend API
+#   8000 - Reflex backend API + websocket
 EXPOSE 3000 3005 8000
 
 # The start command runs both Reflex UI and Dagster pipelines.
