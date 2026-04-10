@@ -1043,7 +1043,7 @@ Key principles:
 
 - When writing READMEs or user-facing docs: put images at the top, place caveats after Quick Start, and keep intros concise while avoiding technical jargon (e.g., "VCF", "Polars", "DuckDB"). Move deep implementation details to `docs/`.
 - Write in natural, human prose avoiding AI-typical patterns (em-dashes, filler transitions, marketing voice). Never hallucinate documentation.
-- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: ROGEN results are planned/future work, not finished outcomes.
+- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: ROGEN results are planned/future work, not finished outcomes. Never claim the tool solves alignment or variant calling — it only handles annotation of an existing VCF.
 - Update related documentation (AGENTS.md, DAGSTER_GUIDE.md) immediately whenever code is refactored.
 - For upstream PyPI dependencies (like `prs-ui`), try to fix bugs locally or provide copy-paste prompts for upstream fixes rather than patching locally.
 - Use fsspec-based access patterns instead of symlinks. Cache HuggingFace data in the project's own cache using fsspec/HfFileSystem, never use `snapshot_download`.
@@ -1051,28 +1051,23 @@ Key principles:
 - Output file names must reflect semantic content (e.g., `_ensembl_annotated.parquet`), not implementation details. Reports should be timestamped to avoid overwriting previous runs.
 - When the user gives a minimal working example or pattern, wire it in directly instead of over-exploring alternatives.
 - Use global/inclusive framing in docs and UI: avoid EU-only language; users from any country should feel welcome. Reference EHDS as one example among international open health data initiatives.
-- When importing content from Notion into the repo, the repo copy becomes the source of truth. Use structured subfolders and an index document when the file count grows.
 - When describing the platform in papers/docs, frame it as a bioinformatics tool that *joins* VCF data against module databases to add annotations. Never imply the VCF already contains annotations or that the tool makes gene-disease inferences.
+- For workshop/conference proposals: primary readers are organizers, not participants. Address conference themes implicitly (don't name-drop). Use "instructor" not "facilitator". Avoid manifesto/advocacy tone, words like "neat"/"slippery"/"primer", and never leak AI instructions into document text. Clearly separate "will get" vs "will not get". Use Roman numerals for generation labels (Gen I, Gen II).
 
 ## Learned Workspace Facts
 
 - This is a multi-root uv workspace: `just-dna-lite` (main) and `just-prs` (read-only reference). Never modify files in `just-prs`. `just-prs` was developed specifically for Just-DNA-Lite but released as a standalone library. Related repos: `just-dna-lite`, `just-prs`, `reflex-mui-datagrid`, `just-biomarkers`, `dna-seq`, `prepare-annotations`.
+- The project runs on Linux, macOS, and native Windows (no Docker/WSL required). All critical native deps (polars, polars-bio, DuckDB, Dagster, Reflex) have working Windows wheels. The `windows/` directory has installer scripts (`install.bat`, `start.bat`, `update.bat`), an Inno Setup script (`installer.iss`), and `setup-deps.ps1`.
 - The AI Module Creator uses the Agno agentic framework, which allows configuring OpenAI API-compatible local models (e.g., Ollama or vLLM) for complete privacy.
 - Images for README live in `images/` at the project root. Use `<img>` tags (not markdown syntax) for images inside HTML `<div>` blocks.
-- `PRSComputeStateMixin` provides `prs_results` but no count var; use `PRSState.prs_results.length()` for counts. When overriding `compute_selected_prs`, always delegate to the mixin first.
-- VCF normalization renames `start` to `pos` (or vice versa); PRS computation must account for which column name the normalized parquet actually uses.
-- Only GRCh38 VCF files are fully supported (GRCh37, T2T, and microarray are planned).
-- Ensembl annotation assets must depend on `user_vcf_normalized`, not raw VCFs. The `ensembl_source.repo_id` in `modules.yaml` controls the Ensembl HF dataset.
+- Only GRCh38 VCF files are fully supported (GRCh37, T2T, and microarray are planned). VCF normalization renames `start` to `pos`; PRS computation must account for this.
 - `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g. `arrow up`), not hyphenated Lucide-style.
-- Key docs references: `docs/SCIENCE_LITERACY.md` for interpretation guidance, and `docs/AI_MODULE_WALKTHROUGH.md` for AI module creation examples.
-- `module_spec.yaml` structure: module name lives under `module.name`, not a top-level `name` key.
-- AI-generated module logos (via NanoBanana/Gemini) produce ~60% whitespace; `_autocrop_whitespace()` in `module_creator.py` handles this with tolerance-based near-white detection. Prompts must request edge-to-edge filling.
-- Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
 - Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `rxconfig.py` persists the backend URL in `os.environ["API_URL"]`, and `backend_api_url` reads it so the browser constructs direct URLs to the backend (e.g. `http://localhost:8042/api/report/...`). Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
-- Long synchronous work in Reflex event handlers (e.g. `set_lazyframe` with large parquets) holds the state lock and freezes the UI. Use `run_in_executor` for heavy operations.
-- Reflex `rx.upload` wrapper is a real layout participant; CSS on the inner button alone is insufficient. Use `display: contents` on the upload wrapper to avoid phantom width.
+- Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
 - Public genome example for demos: Anton Kulaga's VCF on Zenodo (record 18370498).
 - Nix flake (`flake.nix`) supports Apple Silicon Macs: `nix develop` provides correct Python, Node.js, and uv. Workflow: `nix develop` then `uv sync` then `uv run start`.
-- Only 5 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`. PharmGKB (drugs) has NOT been migrated from Generation 1.
-- HuggingFace `just-dna-seq` org hosts 6 datasets (`annotators`, `ensembl_variations`, `clinvar`, `pgs-catalog`, `prs-percentiles`, `polygenic_risk_scores`) and 1 model (`GenNet`).
+- Only 5 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`. PharmGKB (drugs) has NOT been migrated from Generation I. HuggingFace `just-dna-seq` org hosts 6 datasets and 1 model (`GenNet`).
 - The first preprint was rejected by bioRxiv ("inference drawn between gene(s) and disease(s)") and medRxiv; published on arXiv instead. To avoid repeat rejection, frame the manuscript as a bioinformatics methods/software paper, not a genomic medicine paper.
+- `ghcr.io/dna-seq/just-dna-lite:latest` container image does not exist on GHCR yet; `compose.yaml` builds locally. The `Containerfile` needs `chmod -R 777 .venv` for Podman rootless compatibility and `UV_FROZEN=1` to prevent re-syncing. Workshop materials live in `docs/workshops/`.
+- Pytest must be in workspace root dev dependencies (`[dependency-groups] dev`) for `uv run pytest` to use the venv Python; otherwise the system pytest (wrong Python version) is picked up. `typer.Context(function)` is wrong — call Typer command functions directly as plain Python functions with keyword arguments.
+- GitHub `dna-seq` org Free plan has a 5-seat limit; exceeding it locks Actions. The billing lock may require contacting GitHub Support to clear even after the overage is fixed. `uv` does NOT have a `uv bundle` command (as of April 2026); Astral maintains `python-build-standalone` as foundation for a future feature.

@@ -9,8 +9,8 @@ dependencies = [
   "just-dna-pipelines",
   "webui",
   "pyyaml>=6.0.3",
-  "dagster-dg-cli>=1.12.19",
-  "google-genai>=1.67.0",
+  "dagster-dg-cli>=1.12.22",
+  "google-genai>=1.71.0",
 ]
 
 [tool.uv.sources]
@@ -20,7 +20,7 @@ webui = { workspace = true }
 [dependency-groups]
 dev = [
     "ipykernel>=7.2.0",
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
 ]
 

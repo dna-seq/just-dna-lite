@@ -7,8 +7,8 @@ requires-python = ">=3.13"
 dependencies = [
   "reflex>=0.8.28",
   "just-dna-pipelines",
-  "granian>=2.7.2",
-  "fastapi>=0.135.1",
+  "granian>=2.7.3",
+  "fastapi>=0.135.3",
   "prs-ui>=0.2.3"
 ]
 
@@ -27,5 +27,5 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-  "ruff>=0.15.6",
+  "ruff>=0.15.9",
 ]

@@ -13,6 +13,7 @@ import pytest
 from huggingface_hub import hf_hub_download
 
 from just_dna_pipelines.annotation.hf_modules import (
+    ModuleInfo,
     ModuleTable,
     ModuleOutputMapping,
     AnnotationManifest,
@@ -115,23 +116,44 @@ class TestDynamicModuleDiscovery:
 
 
 class TestModuleTableUrl:
-    """Test URL generation for HF modules."""
-    
-    def test_url_format(self):
+    """Test URL generation for HF modules (offline — uses synthetic ModuleInfo)."""
+
+    @pytest.fixture()
+    def sample_module_info(self) -> ModuleInfo:
+        base = f"datasets/{HF_REPO_ID}/data/longevitymap"
+        return ModuleInfo(
+            name="longevitymap",
+            repo_id=HF_REPO_ID,
+            path=base,
+            weights_url=f"hf://{base}/weights.parquet",
+            annotations_url=f"hf://{base}/annotations.parquet",
+            studies_url=f"hf://{base}/studies.parquet",
+        )
+
+    def test_url_format(self, sample_module_info):
         """URLs should follow HF datasets format."""
-        url = get_module_table_url("longevitymap", ModuleTable.WEIGHTS)
+        url = get_module_table_url("longevitymap", ModuleTable.WEIGHTS, module_info=sample_module_info)
         assert url == f"hf://datasets/{HF_REPO_ID}/data/longevitymap/weights.parquet"
-    
-    def test_url_format_with_string_table(self):
+
+    def test_url_format_with_string_table(self, sample_module_info):
         """URLs should work with string table names too."""
-        url = get_module_table_url("longevitymap", "weights")
+        url = get_module_table_url("longevitymap", "weights", module_info=sample_module_info)
         assert url == f"hf://datasets/{HF_REPO_ID}/data/longevitymap/weights.parquet"
-    
+
     def test_all_table_types(self):
-        """All table types should generate valid URLs."""
+        """All table types should generate valid URLs for a synthetic module."""
         module_name = "coronary"
+        base = f"datasets/{HF_REPO_ID}/data/{module_name}"
+        info = ModuleInfo(
+            name=module_name,
+            repo_id=HF_REPO_ID,
+            path=base,
+            weights_url=f"hf://{base}/weights.parquet",
+            annotations_url=f"hf://{base}/annotations.parquet",
+            studies_url=f"hf://{base}/studies.parquet",
+        )
         for table in ModuleTable:
-            url = get_module_table_url(module_name, table)
+            url = get_module_table_url(module_name, table, module_info=info)
             assert f"/{module_name}/" in url
             assert f"/{table.value}.parquet" in url
 
