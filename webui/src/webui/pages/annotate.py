@@ -843,6 +843,7 @@ def file_type_icon(file_type: rx.Var[str]) -> rx.Component:
         ("weights", fomantic_icon("scale", size=18, color="#2185d0")),
         ("annotations", fomantic_icon("file-text", size=18, color="#21ba45")),
         ("studies", fomantic_icon("book-open", size=18, color="#00b5ad")),
+        ("vcf_export", fomantic_icon("dna", size=18, color="#6435c9")),
         fomantic_icon("file", size=18, color="#767676"),
     )
 
@@ -854,6 +855,7 @@ def file_type_label(file_type: rx.Var[str]) -> rx.Component:
         ("weights", rx.el.span("weights", class_name="ui mini blue label")),
         ("annotations", rx.el.span("annotations", class_name="ui mini green label")),
         ("studies", rx.el.span("studies", class_name="ui mini teal label")),
+        ("vcf_export", rx.el.span("vcf", class_name="ui mini violet label")),
         rx.el.span(file_type, class_name="ui mini grey label"),
     )
 
@@ -938,7 +940,11 @@ def _materialization_badge(
 
 def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
     """Compact card for a single output file with view and download buttons."""
-    download_url = UploadState.backend_api_url + "/api/download/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str)
+    download_url = rx.cond(
+        file_info["type"].to(str) == "vcf_export",
+        UploadState.backend_api_url + "/api/download-vcf/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str),
+        UploadState.backend_api_url + "/api/download/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str),
+    )
 
     return rx.el.div(
         rx.el.div(
@@ -1135,16 +1141,85 @@ def _outputs_tab_menu() -> rx.Component:
     )
 
 
+def _vcf_export_button() -> rx.Component:
+    """Button to trigger VCF export for the current sample, with Dagster link while running."""
+    return rx.el.div(
+        rx.el.div(
+            rx.cond(
+                UploadState.vcf_exporting,
+                rx.el.span(
+                    fomantic_icon("loader-circle", size=12, color="#6435c9"),
+                    " Exporting VCF...",
+                    style={"color": "#6435c9", "fontSize": "0.8rem", "display": "flex", "alignItems": "center", "gap": "4px"},
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                UploadState.vcf_export_dagster_url != "",
+                rx.el.a(
+                    fomantic_icon("external-link", size=12, color="#6435c9"),
+                    " View in Dagster",
+                    href=UploadState.vcf_export_dagster_url,
+                    target="_blank",
+                    style={
+                        "color": "#6435c9",
+                        "fontSize": "0.78rem",
+                        "textDecoration": "none",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "3px",
+                        "marginLeft": "8px",
+                    },
+                ),
+                rx.fragment(),
+            ),
+            style={"display": "flex", "alignItems": "center"},
+        ),
+        rx.el.button(
+            rx.cond(
+                UploadState.vcf_exporting,
+                fomantic_icon("loader-circle", size=14, color="white"),
+                fomantic_icon("dna", size=14, color="white"),
+            ),
+            rx.cond(
+                UploadState.vcf_exporting,
+                " Exporting...",
+                " Export VCF",
+            ),
+            on_click=UploadState.run_vcf_export,
+            disabled=UploadState.vcf_exporting,
+            class_name=rx.cond(
+                UploadState.vcf_exporting,
+                "ui mini violet loading button",
+                "ui mini violet button",
+            ),
+            style={"display": "flex", "alignItems": "center", "gap": "4px"},
+            title="Export annotated data as VCF files (per-module + combined)",
+        ),
+        style={
+            "display": "flex",
+            "justifyContent": "space-between",
+            "alignItems": "center",
+            "padding": "6px 10px",
+            "borderBottom": "1px solid #eee",
+            "backgroundColor": "#fafafa",
+        },
+    )
+
+
 def _data_files_content() -> rx.Component:
     """Content for the Data Files sub-tab."""
     return rx.cond(
         UploadState.output_file_count > 0,
         rx.el.div(
-            rx.foreach(UploadState.output_files, output_file_card),
-            style={
-                "maxHeight": "260px",
-                "overflowY": "auto",
-            },
+            _vcf_export_button(),
+            rx.el.div(
+                rx.foreach(UploadState.output_files, output_file_card),
+                style={
+                    "maxHeight": "260px",
+                    "overflowY": "auto",
+                },
+            ),
         ),
         rx.el.div(
             fomantic_icon("inbox", size=30, color="#ccc"),

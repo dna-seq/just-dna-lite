@@ -50,6 +50,12 @@ Both modes output a deterministic DSL specification (`module_spec.yaml` + `varia
 
 Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
 
+### VCF export
+
+Annotation results are stored as Parquet for speed and columnar tooling, but you can also get **standard VCF** files. The pipeline materializes a `user_vcf_exports` asset: one VCF per selected HF module (annotations in INFO), an optional Ensembl-annotated VCF when you run Ensembl, and a **combined** VCF that merges module (and Ensembl) fields into INFO. Exports land under your sample’s `vcf_exports/` folder.
+
+In the web app, open **Outputs** → **Data Files** and use **Export VCF** to run the export job again (for example after new modules or a stale run). While the job runs, **View in Dagster** opens the live run in the pipeline UI—exports that join large Ensembl tables can take several minutes.
+
 ## Creating a Module with the AI Team
 
 Got a research paper about a trait that interests you? Upload the PDF, describe what you want, and the AI team does the rest — querying EuropePMC, Open Targets, and BioRxiv, extracting variants with per-genotype weights, validating the spec, and writing all module files in one uninterrupted run. No bioinformatics knowledge needed.
@@ -229,7 +235,7 @@ You upload a VCF through the web interface. The pipeline normalizes it (quality 
 
 For Polygenic Risk Scores, the tool pulls scoring files from the PGS Catalog, computes your score, and ranks it against five 1000 Genomes superpopulations (European, African, East Asian, South Asian, American).
 
-All outputs are Parquet files. Open them in Polars, Pandas, DuckDB, R, or anything that speaks Arrow.
+Primary outputs are **Parquet** files—open them in Polars, Pandas, DuckDB, R, or anything that speaks Arrow. **VCF export** (see above) is available when you need a classic variant file with annotations in INFO.
 
 ## What the numbers actually mean
 
