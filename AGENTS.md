@@ -266,6 +266,26 @@ This pattern is also future-proof: swapping `HfFileSystem` for any other fsspec 
 - Use `concurrent_fetches` instead.
 - In `just_dna_pipelines.io.read_vcf_file()`, keep `thread_num` only as backward-compatible API and map it to `concurrent_fetches`.
 
+**polars-bio `write_vcf` with custom INFO fields requires `set_source_metadata`:**
+
+Without `pb.set_source_metadata()`, extra columns on the DataFrame are silently dropped and the VCF always outputs `INFO=.`. Register INFO field definitions **before** calling `pb.write_vcf()`:
+
+```python
+import polars_bio as pb
+
+pb.set_source_metadata(df, format="vcf", header={
+    "info_fields": {
+        "AF": {"number": "A", "type": "Float", "description": "Allele Frequency"},
+        "gene": {"number": "1", "type": "String", "description": "Gene symbol"},
+    }
+})
+pb.write_vcf(df, str(out_vcf))
+```
+
+Each `info_fields` entry requires `number`, `type`, and `description`. `type` is one of `Integer`, `Float`, `String`, `Flag`, `Character`; `number` is `1`, `A`, `R`, `G`, or `.`. See https://biodatageeks.org/polars-bio/features/#setting-custom-metadata.
+
+`write_vcf` also requires all 8 core VCF columns (`chrom`, `start`, `end`, `id`, `ref`, `alt`, `qual`, `filter`) with `start`/`end` as `UInt32`. When exporting from parquets that lack some of these, fill defaults: `end = start + 1`, `qual = None`, `filter = "."`.
+
 **Timestamps are on `RunRecord`, not `DagsterRun`:**
 
 ```python

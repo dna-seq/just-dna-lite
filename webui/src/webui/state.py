@@ -836,6 +836,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "modules": modules_to_use,
                 }
             }
+            run_config["ops"]["user_vcf_exports"] = {
+                "config": {
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                }
+            }
 
         if has_ensembl:
             run_config["ops"]["user_annotated_vcf_duckdb"] = {
@@ -855,6 +862,122 @@ class UploadState(LazyFrameGridMixin, rx.State):
         else:
             self.asset_statuses[partition_key]["hf_annotated"] = "failed"
             yield rx.toast.error(f"HF annotation failed for {sample_name}")
+
+    vcf_exporting: bool = False
+    vcf_export_run_id: str = ""
+
+    @rx.var
+    def vcf_export_dagster_url(self) -> str:
+        """Dagster UI link for the active VCF export run."""
+        if not self.vcf_export_run_id:
+            return ""
+        return f"{get_dagster_web_url()}/runs/{self.vcf_export_run_id}"
+
+    async def run_vcf_export(self):
+        """Manually trigger VCF export for the currently selected file.
+
+        Uses the same daemon-with-fallback pattern as ``start_annotation_run``
+        so that ``poll_run_status`` picks up completion and clears the spinner.
+        """
+        if not self.selected_file:
+            yield rx.toast.error("Please select a file")
+            return
+        if self.vcf_exporting:
+            yield rx.toast.warning("VCF export already in progress")
+            return
+
+        self.vcf_exporting = True
+        self._add_log("Starting VCF export...")
+        yield
+
+        if not self.safe_user_id:
+            auth_state = await self.get_state(AuthState)
+            self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
+
+        sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{self.safe_user_id}/{sample_name}"
+
+        instance = get_dagster_instance()
+        job_name = "export_vcf_job"
+
+        run_config: dict = {
+            "ops": {
+                "user_vcf_exports": {
+                    "config": {
+                        "user_name": self.safe_user_id,
+                        "sample_name": sample_name,
+                    }
+                }
+            }
+        }
+
+        try:
+            job_def = defs.resolve_job_def(job_name)
+            run = instance.create_run_for_job(
+                job_def=job_def,
+                run_config=run_config,
+                tags={
+                    "dagster/partition": partition_key,
+                    "source": "webui",
+                },
+            )
+            run_id = run.run_id
+            self._add_log(f"Created VCF export run: {run_id}")
+        except Exception as e:
+            self._add_log(f"Failed to create VCF export run: {e}")
+            self.vcf_exporting = False
+            yield rx.toast.error(f"VCF export failed: {e}")
+            return
+
+        run_info = {
+            "run_id": run_id,
+            "filename": self.selected_file,
+            "sample_name": sample_name,
+            "modules": [],
+            "status": "QUEUED",
+            "started_at": datetime.now().isoformat(),
+            "ended_at": None,
+            "output_path": None,
+            "error": None,
+            "dagster_url": f"{get_dagster_web_url()}/runs/{run_id}",
+            "job_type": "vcf_export",
+        }
+        self.runs = [run_info] + self.runs
+        self.active_run_id = run_id
+        self.vcf_export_run_id = run_id
+        self.polling_active = True
+        yield
+
+        daemon_success, daemon_error = self._try_submit_to_daemon(instance, run_id)
+
+        if daemon_success:
+            self._add_log(f"VCF export run {run_id} submitted to daemon.")
+            yield rx.toast.info(f"VCF export started for {sample_name}")
+        else:
+            self._add_log(f"Daemon submission failed: {daemon_error}")
+            self._add_log("Running VCF export in-process...")
+            yield rx.toast.info(f"Exporting VCF for {sample_name} — please wait...")
+
+            instance.delete_run(run_id)
+
+            self._inproc_discover_partition = partition_key
+            self._inproc_discover_since = time.time()
+            self._inproc_original_run_id = run_id
+
+            updated_runs = []
+            for r in self.runs:
+                if r["run_id"] == run_id:
+                    r["status"] = "RUNNING"
+                updated_runs.append(r)
+            self.runs = updated_runs
+
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                None,
+                self._execute_inproc_with_state_update,
+                instance, job_name, run_config, partition_key, run_id, sample_name,
+            )
+            yield
 
     @rx.var
     def file_statuses(self) -> Dict[str, str]:
@@ -1776,6 +1899,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             "user_hf_module_annotations",
             "user_longevity_report",
             "user_annotated_vcf_duckdb",
+            "user_vcf_exports",
         ]
         timestamps: Dict[str, float] = {}
         for asset_name in asset_chain:
@@ -1793,8 +1917,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
             "user_hf_module_annotations": "user_vcf_normalized",
             "user_longevity_report": "user_hf_module_annotations",
             "user_annotated_vcf_duckdb": "user_vcf_normalized",
+            "user_vcf_exports": "user_hf_module_annotations",
         }
-        for asset_name in ["user_hf_module_annotations", "user_longevity_report", "user_annotated_vcf_duckdb"]:
+        for asset_name in ["user_hf_module_annotations", "user_longevity_report", "user_annotated_vcf_duckdb", "user_vcf_exports"]:
             ts = timestamps[asset_name]
             upstream_ts = timestamps.get(upstream_map[asset_name], 0.0)
             mat_at = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
@@ -2051,7 +2176,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             return (False, str(e))
 
     def _swap_run_id(self, old_id: str, new_id: str) -> None:
-        """Replace a placeholder run_id with the real one in the runs list."""
+        """Replace a placeholder run_id with the real one everywhere."""
         updated_runs = []
         for r in self.runs:
             if r["run_id"] == old_id:
@@ -2059,6 +2184,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 r["dagster_url"] = f"{get_dagster_web_url()}/runs/{new_id}"
             updated_runs.append(r)
         self.runs = updated_runs
+        if self.vcf_export_run_id == old_id:
+            self.vcf_export_run_id = new_id
 
     def _execute_inproc_with_state_update(
         self, 
@@ -2109,6 +2236,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.runs = updated_runs
             
             self.running = False
+            self.vcf_exporting = False
+            self.vcf_export_run_id = ""
             self.polling_active = False
             self.last_run_success = result.success
             self._load_output_files_sync()
@@ -2121,6 +2250,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self._inproc_discover_since = 0.0
             self._inproc_original_run_id = ""
             self.running = False
+            self.vcf_exporting = False
+            self.vcf_export_run_id = ""
             self.polling_active = False
             self.last_run_success = False
             
@@ -2235,6 +2366,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 }
             }
             run_config["ops"]["user_longevity_report"] = {
+                "config": {
+                    "user_name": self.safe_user_id,
+                    "sample_name": sample_name,
+                    "modules": modules_to_use,
+                }
+            }
+            run_config["ops"]["user_vcf_exports"] = {
                 "config": {
                     "user_name": self.safe_user_id,
                     "sample_name": sample_name,
@@ -2420,11 +2558,16 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.polling_active = False
             self.running = False
             self.last_run_success = (run.status == DagsterRunStatus.SUCCESS)
+
+            if self.vcf_export_run_id and self.active_run_id == self.vcf_export_run_id:
+                self.vcf_exporting = False
+                self.vcf_export_run_id = ""
+
             self._load_output_files_sync()
             if run.status == DagsterRunStatus.SUCCESS:
-                return rx.toast.success("Annotation completed successfully!")
+                return rx.toast.success("Job completed successfully!")
             elif run.status == DagsterRunStatus.FAILURE:
-                return rx.toast.error("Annotation failed. Check logs for details.")
+                return rx.toast.error("Job failed. Check logs for details.")
 
     async def fetch_run_logs(self, run_id: str):
         """Fetch log events from Dagster for a run."""
