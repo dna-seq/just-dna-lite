@@ -38,21 +38,6 @@ def temp_dir():
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def pytest_configure(config):
-    """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests (may be slow)"
-    )
-    config.addinivalue_line(
-        "markers", "large_download: marks tests that download large files (multi-GB)"
-    )
-    config.addinivalue_line(
-        "markers", "slow: marks tests that take a long time to run"
-    )
-    config.addinivalue_line(
-        "markers", "download: marks tests that perform downloads"
-    )
-
 
 def pytest_collection_modifyitems(config, items):
     """Automatically mark tests based on their characteristics."""

@@ -56,9 +56,10 @@ dev = [
 
 [tool.pytest.ini_options]
 markers = [
-    "large_download: marks tests that download large files (multi-GB) - skip by default",
     "integration: marks integration tests that require network access",
-    "slow: marks tests that take a long time to run"
+    "slow: marks tests that take a long time to run",
+    "download: marks tests that perform downloads",
+    "large_download: marks tests that download large files (multi-GB)",
 ]
 
 # Default pytest behavior: extra verbose and no capture to allow Eliot/stdout output

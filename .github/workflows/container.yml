@@ -47,12 +47,31 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
+      - name: Build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Containerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker run --rm "$IMAGE" python -c "import just_dna_pipelines; import webui; print('imports OK')"
+          docker run --rm "$IMAGE" pipelines --help
+          docker run --rm "$IMAGE" pipelines list-modules
+
+      - name: Push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Containerfile
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
