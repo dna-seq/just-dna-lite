@@ -101,6 +101,49 @@ Each source can be a single module or a collection:
 
 ---
 
+## Immutable (Public Demo) Mode
+
+See **[docs/IMMUTABLE_MODE.md](docs/IMMUTABLE_MODE.md)** for full documentation.
+
+Immutable mode disables file uploads and serves only pre-configured public genomes from Zenodo. Controlled by the `JUST_DNA_IMMUTABLE_MODE=true` env var and `immutable_mode:` section in `modules.yaml`.
+
+### Key files
+
+| File | What it does |
+|------|-------------|
+| `modules.yaml` (`immutable_mode:` section) | Default samples, disclaimer, `allow_zenodo_import` flag |
+| `module_config.py` (`ImmutableModeConfig`, `DefaultSample`) | Pydantic models, `is_immutable_mode()`, `get_immutable_config()` |
+| `annotation/resources.py` | `validate_zenodo_record()`, `resolve_default_samples()` |
+| `webui/state.py` | `is_immutable_mode` var, `handle_zenodo_import()`, guards on upload/delete |
+| `webui/pages/annotate.py` | Conditional left panel (upload form vs disclaimer, Zenodo import, public genome hint) |
+| `webui/components/layout.py` | "Public Demo" topbar badge, FAQ nav tab (always visible) |
+| `webui/pages/faq.py` | FAQ page at `/faq` — loads content from `docs/FAQ.md` |
+| `docs/FAQ.md` | FAQ content (markdown) — user, scientific, legal, technical questions |
+
+### Deployment modes
+
+| Mode | File Upload | Zenodo Import | Use Case |
+|------|------------|---------------|----------|
+| Normal (default) | Yes | Yes | Local/personal |
+| Immutable + `allow_zenodo_import: true` | No | Yes | Workshop/conference |
+| Immutable + `allow_zenodo_import: false` | No | No | Strict public demo |
+
+### Important patterns
+
+- **Never hardcode Zenodo URLs in Python** — use `get_immutable_config().default_samples`
+- **`is_immutable_mode()`** checks env var first, then YAML `enabled` flag
+- **`validate_zenodo_record()`** verifies open access, permissive license, and VCF presence before any download
+- **Zenodo metadata is tracked in Dagster** — `source: "zenodo"`, `zenodo_url`, `zenodo_doi`, `zenodo_license`, `zenodo_creator` on `user_vcf_source` materialization
+- **`progress_status`** state var provides phase-specific messages during downloads and normalization
+- **In immutable mode, `safe_user_id` is always `"public"`** — all users share the same data directory
+
+### Known public genomes
+
+- **Anton Kulaga** (CC-Zero): `https://zenodo.org/records/18370498` — `antonkulaga.vcf` (482 MB)
+- **Livia Zaharia** (CC-BY-4.0): `https://zenodo.org/records/19487816` — `SIMHIFQTILQ.hard-filtered.vcf.gz` (349 MB)
+
+---
+
 ## VCF Quality Filtering
 
 Quality filters are configured in `modules.yaml` under `quality_filters:` and applied during normalization (`user_vcf_normalized` asset). All downstream assets receive filtered data.
@@ -1084,7 +1127,7 @@ Key principles:
 - `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g. `arrow up`), not hyphenated Lucide-style.
 - Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `rxconfig.py` persists the backend URL in `os.environ["API_URL"]`, and `backend_api_url` reads it so the browser constructs direct URLs to the backend (e.g. `http://localhost:8042/api/report/...`). Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
 - Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
-- Public genome example for demos: Anton Kulaga's VCF on Zenodo (record 18370498).
+- Public genomes for demos: Anton Kulaga (Zenodo 18370498, CC-Zero, 482 MB) and Livia Zaharia (Zenodo 19487816, CC-BY-4.0, 349 MB). Both are configured as `default_samples` in `modules.yaml` `immutable_mode:` section. The app can also import arbitrary Zenodo records with open-access + permissive license + VCF via the "Import from Zenodo" UI.
 - Nix flake (`flake.nix`) supports Apple Silicon Macs: `nix develop` provides correct Python, Node.js, and uv. Workflow: `nix develop` then `uv sync` then `uv run start`.
 - Only 5 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`. PharmGKB (drugs) has NOT been migrated from Generation I. HuggingFace `just-dna-seq` org hosts 6 datasets and 1 model (`GenNet`).
 - The first preprint was rejected by bioRxiv ("inference drawn between gene(s) and disease(s)") and medRxiv; published on arXiv instead. To avoid repeat rejection, frame the manuscript as a bioinformatics methods/software paper, not a genomic medicine paper.

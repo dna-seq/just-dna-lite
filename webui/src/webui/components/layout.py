@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import reflex as rx
+from just_dna_pipelines.module_config import is_immutable_mode as _check_immutable
 
 
 def fomantic_icon(name: str, size: int | str | None = None, color: str | None = None, style: dict | None = None) -> rx.Component:
@@ -145,6 +146,20 @@ def _nav_tab(label: str, icon_name: str, href: str, is_active: rx.Var) -> rx.Com
     )
 
 
+def _immutable_topbar_badge() -> list[rx.Component]:
+    """Return a 'Public Demo' badge for immutable mode (called at build time)."""
+    from just_dna_pipelines.module_config import get_immutable_config
+    config = get_immutable_config()
+    return [
+        rx.el.div(
+            "Public Demo",
+            class_name="ui small yellow label",
+            style={"margin": "0 0 0 6px"},
+            title=config.disclaimer,
+        ),
+    ]
+
+
 def topbar() -> rx.Component:
     """Top navigation bar with page tabs."""
     current_path = rx.State.router.page.path
@@ -171,18 +186,20 @@ def topbar() -> rx.Component:
                 href="/",
                 style={"display": "flex", "alignItems": "center", "textDecoration": "none"},
             ),
-            rx.el.div(
-                "Medical Disclaimer / RUO",
-                class_name="ui small red label",
-                style={"margin": "0"},
-                title="This tool is not a medical device. For research and educational purposes only. Do not use for diagnostic or medical decisions.",
-            ),
-            style={"display": "flex", "alignItems": "center", "flex": "0 0 auto"},
+        rx.el.div(
+            "Medical Disclaimer / RUO",
+            class_name="ui small red label",
+            style={"margin": "0"},
+            title="This tool is not a medical device. For research and educational purposes only. Do not use for diagnostic or medical decisions.",
+        ),
+        *(_immutable_topbar_badge() if _check_immutable() else []),
+        style={"display": "flex", "alignItems": "center", "flex": "0 0 auto"},
         ),
         # Center: Navigation tabs
         rx.el.div(
-            _nav_tab("Annotation", "dna", "/", current_path != "/modules"),
+            _nav_tab("Annotation", "dna", "/", (current_path != "/modules") & (current_path != "/faq")),
             _nav_tab("Module Manager", "boxes", "/modules", current_path == "/modules"),
+            _nav_tab("FAQ", "help circle", "/faq", current_path == "/faq"),
             style={"display": "flex", "alignItems": "center", "gap": "8px", "flex": "1 1 auto", "justifyContent": "center"},
         ),
         # Right: Spacer for GitHub corner

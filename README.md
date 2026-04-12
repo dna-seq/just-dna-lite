@@ -85,7 +85,18 @@ If you want to sequence your own genome, there are several commercial providers.
 If you live in Romania, you should follow the **[ROGEN (Romanian Genomics) project](https://rogen.umfcd.ro/)**. It is a major national initiative sequencing 5,000 individuals to create a genomic map of the population, and you might be able to get recruited to have your genome sequenced for free.
 
 **Don't have your genome sequenced yet?**
-You can use any public genome to try out the tool. For example, some of our authors have open-sourced their genomes — you can download [Anton Kulaga's genome here](https://zenodo.org/records/18370498) and see what you discover! You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
+You can use any public genome to try out the tool. Some of our authors have voluntarily open-sourced their genomes:
+
+- **Anton Kulaga** (CC-Zero): [zenodo.org/records/18370498](https://zenodo.org/records/18370498)
+  ```
+  https://zenodo.org/records/18370498
+  ```
+- **Livia Zaharia** (CC-BY-4.0): [zenodo.org/records/19487816](https://zenodo.org/records/19487816)
+  ```
+  https://zenodo.org/records/19487816
+  ```
+
+You can paste these URLs directly into the "Import from Zenodo" field in the app, or download the VCF file and upload it manually. You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
 
 ### Download the installer (Windows / macOS)
 

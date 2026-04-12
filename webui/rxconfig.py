@@ -1,4 +1,5 @@
 import reflex as rx
+from reflex.plugins.sitemap import SitemapPlugin
 import os
 import socket
 
@@ -29,7 +30,7 @@ config = rx.Config(
     backend_port=backend_port,
     api_url=api_url,
     vite_allowed_hosts=_vite_hosts,
-    disable_plugins=["reflex.plugins.sitemap.SitemapPlugin"],
+    disable_plugins=[SitemapPlugin],
     # Fomantic UI styling
     stylesheets=[
         "https://cdn.jsdelivr.net/npm/fomantic-ui@2.9.4/dist/semantic.min.css",

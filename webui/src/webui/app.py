@@ -17,6 +17,7 @@ from webui.pages.index import index_page
 from webui.pages.analysis import analysis_page
 from webui.pages.annotate import annotate_page
 from webui.pages.modules import modules_page
+from webui.pages.faq import faq_page
 
 # Load environment variables from .env file (searching up to root)
 load_env()
@@ -311,3 +312,4 @@ app.add_page(index_page)
 app.add_page(analysis_page)
 app.add_page(annotate_page)
 app.add_page(modules_page)
+app.add_page(faq_page)

@@ -242,8 +242,19 @@ def start_all(
         str,
         typer.Option("--dagster-host", help="Host for the Dagster webserver. Use 0.0.0.0 in containers."),
     ] = "",
+    immutable: Annotated[
+        bool,
+        typer.Option("--immutable", help="Start in immutable (public demo) mode. Disables file uploads and serves only pre-configured public genomes."),
+    ] = False,
 ) -> None:
-    """Start the full stack: Dagster (Pipelines) and Reflex UI."""
+    """Start the full stack: Dagster (Pipelines) and Reflex UI.
+
+    Use --immutable for public demos, workshops, or conferences.
+    Equivalent to setting JUST_DNA_IMMUTABLE_MODE=true in .env.
+    """
+    if immutable:
+        os.environ["JUST_DNA_IMMUTABLE_MODE"] = "true"
+
     root = _find_workspace_root(Path.cwd())
     if root is None:
         root = Path.cwd()
@@ -284,6 +295,8 @@ def start_all(
 
     typer.echo("\n" + "═" * 65)
     typer.secho("🚀 Just DNA Pipelines Stack is starting!", fg=typer.colors.GREEN, bold=True)
+    if os.getenv("JUST_DNA_IMMUTABLE_MODE", "").lower() in ("true", "1", "yes"):
+        typer.secho("🔒 IMMUTABLE MODE — file uploads disabled, public genomes only", fg=typer.colors.YELLOW, bold=True)
     typer.secho("⏳ Note: Reflex UI takes ~20s to initialize.", fg=typer.colors.YELLOW)
     typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
     typer.echo(f"  • Pipelines UI: http://localhost:{dagster_port} (Dagster Dashboard)")
@@ -902,9 +915,25 @@ def cleanup_orphaned_runs(
     typer.secho(f"\n✅ Cleaned up {len(run_records)} orphaned run(s).", fg=typer.colors.GREEN)
 
 
+def _start_all_cli() -> None:
+    """Entry point for ``uv run start``.
+
+    ``[project.scripts]`` calls this directly, so we need a thin
+    standalone typer app to parse CLI flags like ``--immutable``.
+    """
+    _start_app = typer.Typer(add_completion=False, invoke_without_command=True)
+    _start_app.command()(start_all)
+    _start_app()
+
+
+def _start_dagster_cli() -> None:
+    """Entry point for ``uv run dagster-ui``."""
+    _dg_app = typer.Typer(add_completion=False, invoke_without_command=True)
+    _dg_app.command()(start_dagster)
+    _dg_app()
+
+
 if __name__ == "__main__":
     app()
-
-
 
 

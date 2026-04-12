@@ -165,12 +165,45 @@ class EnsemblSource(BaseModel):
     repo_id: str = "just-dna-seq/ensembl_variations"
 
 
+class DefaultSample(BaseModel):
+    """A pre-configured public genome sample for immutable mode."""
+    zenodo_url: str
+    label: str
+    subject_id: str = ""
+    sex: str = "N/A"
+    species: str = "Homo sapiens"
+    reference_genome: str = "GRCh38"
+    license: str = ""
+
+
+_DEFAULT_DISCLAIMER = (
+    "This is a public demo with pre-loaded public genomes. "
+    "To analyze your own genome, install just-dna-lite locally: "
+    "https://github.com/dna-seq/just-dna-lite"
+)
+
+
+class ImmutableModeConfig(BaseModel):
+    """Configuration for immutable (public demo) mode.
+
+    When enabled, file uploads are disabled and only pre-configured
+    public genomes from ``default_samples`` are available.  The
+    ``allow_zenodo_import`` flag controls whether users can also
+    import additional genomes from Zenodo URLs.
+    """
+    enabled: bool = False
+    allow_zenodo_import: bool = False
+    disclaimer: str = _DEFAULT_DISCLAIMER
+    default_samples: list[DefaultSample] = []
+
+
 class ModulesConfig(BaseModel):
     """Top-level configuration from modules.yaml."""
     sources: list[Source] = [Source(url="just-dna-seq/annotators")]
     module_metadata: dict[str, ModuleMetadata] = {}
     quality_filters: QualityFilters = QualityFilters()
     ensembl_source: EnsemblSource = EnsemblSource()
+    immutable_mode: ImmutableModeConfig = ImmutableModeConfig()
 
     @model_validator(mode="before")
     @classmethod
@@ -338,6 +371,23 @@ def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
 
 # Loaded once at import time
 MODULES_CONFIG: ModulesConfig = _load_config()
+
+
+def is_immutable_mode() -> bool:
+    """Check whether immutable (public demo) mode is active.
+
+    The environment variable ``JUST_DNA_IMMUTABLE_MODE`` takes precedence
+    over the YAML ``immutable_mode.enabled`` flag.
+    """
+    env = os.getenv("JUST_DNA_IMMUTABLE_MODE")
+    if env is not None:
+        return env.lower() in ("true", "1", "yes")
+    return MODULES_CONFIG.immutable_mode.enabled
+
+
+def get_immutable_config() -> ImmutableModeConfig:
+    """Return the immutable mode configuration from modules.yaml."""
+    return MODULES_CONFIG.immutable_mode
 
 # Backward-compatible: list of HF repo IDs extracted from sources
 DEFAULT_REPOS: list[str] = [

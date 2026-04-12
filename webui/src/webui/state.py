@@ -23,8 +23,16 @@ from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
 from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
-from just_dna_pipelines.annotation.resources import get_user_output_dir, get_user_input_dir, get_generated_modules_dir
-from just_dna_pipelines.module_config import build_module_metadata_dict, _load_config
+from just_dna_pipelines.annotation.resources import (
+    get_user_output_dir, get_user_input_dir, get_generated_modules_dir,
+    download_vcf_from_zenodo, ensure_vcf_in_user_input_dir,
+    validate_zenodo_record, resolve_default_samples,
+)
+from just_dna_pipelines.module_config import (
+    build_module_metadata_dict, _load_config,
+    is_immutable_mode as _is_immutable_mode,
+    get_immutable_config,
+)
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
     register_custom_module,
@@ -297,6 +305,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Maps run_id -> partition_key for runs executing via execute_in_process
     _active_inproc_runs: Dict[str, str] = {}
 
+    # Zenodo import state
+    zenodo_url_input: str = ""
+    zenodo_importing: bool = False
+
+    # Progress feedback for long operations (download, normalize, load)
+    progress_status: str = ""
+
     # ============================================================
     # NEW SAMPLE FORM STATE - for adding samples with metadata
     # ============================================================
@@ -312,6 +327,45 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Uncontrolled inputs (default_value) don't update when state resets;
     # changing the key forces React to destroy and recreate the DOM element.
     _form_key: int = 0
+
+    @rx.var
+    def is_immutable_mode(self) -> bool:
+        """True when the app is in immutable (public demo) mode."""
+        return _is_immutable_mode()
+
+    @rx.var
+    def allow_zenodo_import(self) -> bool:
+        """True when Zenodo URL import is available.
+
+        Always true in normal mode.  In immutable mode, controlled by
+        ``immutable_mode.allow_zenodo_import`` in modules.yaml.
+        """
+        if not _is_immutable_mode():
+            return True
+        return get_immutable_config().allow_zenodo_import
+
+    @rx.var
+    def immutable_disclaimer(self) -> str:
+        """Disclaimer text for immutable mode (from modules.yaml config)."""
+        return get_immutable_config().disclaimer
+
+    @rx.var
+    def has_progress_status(self) -> bool:
+        """True when a long operation is in progress."""
+        return bool(self.progress_status)
+
+    @rx.var
+    def default_sample_list(self) -> List[Dict[str, str]]:
+        """Return the list of default samples for the public genome hint."""
+        config = get_immutable_config()
+        return [
+            {
+                "label": s.label,
+                "zenodo_url": s.zenodo_url,
+                "license": s.license,
+            }
+            for s in config.default_samples
+        ]
 
     @rx.var
     def dagster_web_url(self) -> str:
@@ -404,6 +458,10 @@ class UploadState(LazyFrameGridMixin, rx.State):
         """Set notes for new sample."""
         self.new_sample_notes = value
 
+    def set_zenodo_url_input(self, value: str) -> None:
+        """Explicit setter for zenodo_url_input (avoids deprecation warning)."""
+        self.zenodo_url_input = value
+
     def _reset_new_sample_form(self):
         """Reset new sample form to defaults."""
         self.new_sample_subject_id = ""
@@ -422,6 +480,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of VCF files and register them in Dagster."""
+        if _is_immutable_mode():
+            yield rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")
+            return
         self.uploading = True
         new_files = []
         try:
@@ -494,13 +555,15 @@ class UploadState(LazyFrameGridMixin, rx.State):
             yield rx.toast.warning("No files were uploaded")
 
     async def handle_upload_with_metadata(self, files: list[rx.UploadFile]):
-        """
-        Handle upload of VCF files with metadata from the new sample form.
-        
+        """Handle upload of VCF files with metadata from the new sample form.
+
         This combines file upload and metadata registration in a single operation.
-        The metadata from the form (subject_id, sex, tissue, species, etc.) is 
+        The metadata from the form (subject_id, sex, tissue, species, etc.) is
         stored in the Dagster asset materialization.
         """
+        if _is_immutable_mode():
+            yield rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")
+            return
         if not files:
             yield rx.toast.warning("No files selected for upload")
             return
@@ -608,13 +671,145 @@ class UploadState(LazyFrameGridMixin, rx.State):
         else:
             yield rx.toast.warning("No files were uploaded")
 
-    def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
+    @rx.event(background=True)
+    async def handle_zenodo_import(self) -> None:
+        """Import a VCF file from a Zenodo record URL.
+
+        Validates the record (open access, permissive license, has VCF),
+        downloads it, places it in the user input directory, and registers
+        it as a Dagster asset with Zenodo metadata.
         """
-        Execute a Dagster job in-process (like prepare-annotations does).
-        
+        async with self:
+            url = self.zenodo_url_input.strip()
+            if not url:
+                return
+            self.zenodo_importing = True
+            self.progress_status = "Validating Zenodo record..."
+            safe_user_id = self.safe_user_id
+
+        if not safe_user_id:
+            async with self:
+                auth_state = await self.get_state(AuthState)
+                safe_user_id = self._get_safe_user_id(auth_state.user_email)
+                self.safe_user_id = safe_user_id
+
+        loop = asyncio.get_event_loop()
+
+        # 1. Validate
+        zenodo_meta: Optional[dict] = None
+        try:
+            zenodo_meta = await loop.run_in_executor(None, validate_zenodo_record, url)
+        except (ValueError, Exception) as exc:
+            async with self:
+                self.zenodo_importing = False
+                self.progress_status = ""
+            yield rx.toast.error(str(exc))
+            return
+
+        size_mb = zenodo_meta["vcf_size_bytes"] / (1024 * 1024)
+
+        # 2. Download
+        async with self:
+            self.progress_status = f"Downloading from Zenodo ({size_mb:.0f} MB)..."
+
+        try:
+            cached_path = await loop.run_in_executor(None, download_vcf_from_zenodo, url)
+        except Exception as exc:
+            async with self:
+                self.zenodo_importing = False
+                self.progress_status = ""
+            yield rx.toast.error(f"Download failed: {exc}")
+            return
+
+        # 3. Place in user input dir
+        async with self:
+            self.progress_status = "Registering sample..."
+
+        placed_path = await loop.run_in_executor(
+            None, ensure_vcf_in_user_input_dir, cached_path, safe_user_id,
+        )
+
+        filename = placed_path.name
+        sample_name = filename.replace(".vcf.gz", "").replace(".vcf", "")
+        partition_key = f"{safe_user_id}/{sample_name}"
+        upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # 4. Register in Dagster
+        instance = get_dagster_instance()
+        existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
+        if partition_key not in existing:
+            instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
+
+        metadata: Dict[str, Any] = {
+            "path": MetadataValue.path(str(placed_path.absolute())),
+            "size_bytes": MetadataValue.int(placed_path.stat().st_size),
+            "uploaded_via": MetadataValue.text("zenodo_import"),
+            "upload_date": MetadataValue.text(upload_date),
+            "source": MetadataValue.text("zenodo"),
+            "zenodo_url": MetadataValue.url(url),
+            "zenodo_doi": MetadataValue.text(zenodo_meta.get("doi", "")),
+            "zenodo_license": MetadataValue.text(zenodo_meta.get("license", "")),
+            "zenodo_creator": MetadataValue.text(zenodo_meta.get("creator", "")),
+            "zenodo_title": MetadataValue.text(zenodo_meta.get("title", "")),
+            "species": MetadataValue.text("Homo sapiens"),
+            "reference_genome": MetadataValue.text("GRCh38"),
+            "sex": MetadataValue.text("N/A"),
+        }
+
+        instance.report_runless_asset_event(
+            AssetMaterialization(
+                asset_key="user_vcf_source",
+                partition=partition_key,
+                metadata=metadata,
+            )
+        )
+
+        # 5. Update UI state
+        async with self:
+            if filename in self.files:
+                self.files.remove(filename)
+            self.files.insert(0, filename)
+
+            self.file_metadata[filename] = {
+                "filename": filename,
+                "sample_name": sample_name,
+                "upload_date": upload_date,
+                "species": "Homo sapiens",
+                "reference_genome": "GRCh38",
+                "sex": "N/A",
+                "tissue": "Sample tissue",
+                "subject_id": sample_name,
+                "study_name": zenodo_meta.get("title", ""),
+                "notes": f"Imported from Zenodo: {url} (License: {zenodo_meta.get('license', 'unknown')})",
+                "size_mb": round(placed_path.stat().st_size / (1024 * 1024), 2),
+                "path": str(placed_path),
+                "custom_fields": {},
+                "source": "zenodo",
+                "zenodo_url": url,
+                "zenodo_license": zenodo_meta.get("license", ""),
+            }
+
+            self.zenodo_importing = False
+            self.zenodo_url_input = ""
+            self.progress_status = ""
+
+        yield rx.toast.success(f"Imported {filename} from Zenodo ({zenodo_meta.get('creator', 'Unknown')})")
+
+        async with self:
+            for ev in self.select_file(filename):
+                yield ev
+
+    def import_default_sample(self, zenodo_url: str):
+        """Set Zenodo URL and trigger import (for one-click buttons)."""
+        self.zenodo_url_input = zenodo_url
+        return UploadState.handle_zenodo_import
+
+    def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
+        """Execute a Dagster job in-process (like prepare-annotations does).
+
         This avoids all the daemon/workspace mismatch issues that submit_run has.
         The job runs synchronously in the current process.
-        
+
         Note: We cannot track the run_id before execution because execute_in_process
         creates the run internally. For orphaned STARTED runs from crashes,
         use the CLI cleanup command: `uv run pipelines cleanup-runs --status STARTED`
@@ -1411,6 +1606,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 safe_key = "".join(c if c.isalnum() or c == "_" else "_" for c in key)
                 metadata[f"custom/{safe_key}"] = MetadataValue.text(str(value))
         
+        if file_info.get("source"):
+            metadata["source"] = MetadataValue.text(file_info["source"])
+        if file_info.get("zenodo_url"):
+            metadata["zenodo_url"] = MetadataValue.url(file_info["zenodo_url"])
+        if file_info.get("zenodo_license"):
+            metadata["zenodo_license"] = MetadataValue.text(file_info["zenodo_license"])
+
         # Mark as saved from UI
         metadata["saved_from"] = MetadataValue.text("webui")
         
@@ -1455,7 +1657,13 @@ class UploadState(LazyFrameGridMixin, rx.State):
             file_info["size_mb"] = get_value(metadata["size_mb"])
         if "upload_date" in metadata:
             file_info["upload_date"] = get_value(metadata["upload_date"])
-        
+        if "source" in metadata:
+            file_info["source"] = get_value(metadata["source"])
+        if "zenodo_url" in metadata:
+            file_info["zenodo_url"] = get_value(metadata["zenodo_url"])
+        if "zenodo_license" in metadata:
+            file_info["zenodo_license"] = get_value(metadata["zenodo_license"])
+
         # Custom fields - prefer the JSON blob if available
         if "custom_metadata" in metadata:
             custom = get_value(metadata["custom_metadata"])
@@ -1652,6 +1860,27 @@ class UploadState(LazyFrameGridMixin, rx.State):
         return self.file_metadata.get(self.selected_file, {}).get("tissue", "Sample tissue")
 
     @rx.var
+    def current_source(self) -> str:
+        """Get source type for the currently selected file (e.g. 'zenodo', 'upload')."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("source", "")
+
+    @rx.var
+    def current_zenodo_url(self) -> str:
+        """Get Zenodo URL for the currently selected file, if imported from Zenodo."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("zenodo_url", "")
+
+    @rx.var
+    def current_zenodo_license(self) -> str:
+        """Get Zenodo license for the currently selected file."""
+        if not self.selected_file:
+            return ""
+        return self.file_metadata.get(self.selected_file, {}).get("zenodo_license", "")
+
+    @rx.var
     def species_options(self) -> List[str]:
         """Get available species options."""
         return SPECIES_OPTIONS
@@ -1715,6 +1944,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             if not selected_file or not safe_user_id:
                 self._clear_vcf_preview()
                 return
+            self.progress_status = "Normalizing VCF (quality filtering)..."
 
         sample_name = selected_file.replace(".vcf.gz", "").replace(".vcf", "")
         partition_key = f"{safe_user_id}/{sample_name}"
@@ -1726,9 +1956,11 @@ class UploadState(LazyFrameGridMixin, rx.State):
         )
 
         async with self:
+            self.progress_status = "Loading VCF preview..."
             self._load_norm_stats_from_dagster()
             self._load_vcf_into_grid()
             self._load_output_files_sync()
+            self.progress_status = ""
 
     def _load_vcf_into_grid(self) -> None:
         """Load the normalized (or raw fallback) parquet into the LazyFrame grid.
@@ -1958,6 +2190,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
     async def delete_file(self, filename: str):
         """Delete an uploaded file from the filesystem and state."""
+        if _is_immutable_mode():
+            yield rx.toast.warning("File deletion is disabled in public demo mode.")
+            return
         if not self.safe_user_id:
             auth_state = await self.get_state(AuthState)
             self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
@@ -2721,14 +2956,24 @@ class UploadState(LazyFrameGridMixin, rx.State):
     async def on_load(self):
         """Discover existing files and their statuses when the dashboard loads."""
         auth_state = await self.get_state(AuthState)
-        self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
-        
+        if _is_immutable_mode():
+            self.safe_user_id = "public"
+        else:
+            self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
+
         # Clean up orphaned runs on startup (NOT_STARTED only)
         cleaned = self._cleanup_orphaned_runs()
         if cleaned > 0:
-            self._add_log(f"🧹 Deleted {cleaned} orphaned NOT_STARTED run(s) from Dagster database")
-        
+            self._add_log(f"Deleted {cleaned} orphaned NOT_STARTED run(s) from Dagster database")
+
         user_dir = get_user_input_dir() / self.safe_user_id
+
+        # In immutable mode, ensure default samples are present
+        default_sample_results: list[dict] = []
+        if _is_immutable_mode():
+            config = get_immutable_config()
+            if config.default_samples:
+                default_sample_results = resolve_default_samples(user_name=self.safe_user_id, log=logger)
 
         if not user_dir.exists():
             return
@@ -2741,7 +2986,23 @@ class UploadState(LazyFrameGridMixin, rx.State):
         # Load basic metadata for all files (from filesystem)
         for filename in self.files:
             self._load_file_metadata(filename)
-        
+
+        # Overlay Zenodo source info for default samples resolved in immutable mode
+        for sample_info in default_sample_results:
+            fname = sample_info.get("filename", "")
+            if fname in self.file_metadata:
+                self.file_metadata[fname]["source"] = "zenodo"
+                self.file_metadata[fname]["zenodo_url"] = sample_info.get("zenodo_url", "")
+                self.file_metadata[fname]["zenodo_license"] = sample_info.get("license", "")
+                if sample_info.get("subject_id"):
+                    self.file_metadata[fname]["subject_id"] = sample_info["subject_id"]
+                if sample_info.get("sex") and sample_info["sex"] != "N/A":
+                    self.file_metadata[fname]["sex"] = sample_info["sex"]
+                if sample_info.get("species"):
+                    self.file_metadata[fname]["species"] = sample_info["species"]
+                if sample_info.get("reference_genome"):
+                    self.file_metadata[fname]["reference_genome"] = sample_info["reference_genome"]
+
         # Load persisted metadata from Dagster (overwrites filesystem metadata)
         self._load_metadata_from_dagster()
         

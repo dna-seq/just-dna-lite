@@ -133,8 +133,42 @@ def add_sample_form() -> rx.Component:
                 class_name="ui primary small button",
                 style={"width": "100%"},
             ),
+
+            # Divider + Zenodo import (inline, inside the same segment)
+            rx.el.div(
+                rx.text("or import from Zenodo"),
+                class_name="ui horizontal divider",
+                style={"margin": "10px 0 8px 0", "fontSize": "0.75rem", "color": "#aaa"},
+            ),
+            rx.el.div(
+                rx.el.input(
+                    value=UploadState.zenodo_url_input,
+                    on_change=UploadState.set_zenodo_url_input,
+                    placeholder="https://zenodo.org/records/...",
+                    style={
+                        "flex": "1",
+                        "padding": "5px 8px",
+                        "borderRadius": "4px",
+                        "border": "1px solid #ddd",
+                        "fontSize": "0.8rem",
+                    },
+                ),
+                rx.el.button(
+                    rx.cond(
+                        UploadState.zenodo_importing,
+                        rx.el.i("", class_name="spinner loading icon"),
+                        rx.el.i("", class_name="cloud upload icon"),
+                    ),
+                    on_click=UploadState.handle_zenodo_import,
+                    disabled=UploadState.zenodo_importing,
+                    class_name="ui mini purple icon button",
+                    style={"marginLeft": "6px"},
+                    title="Import from Zenodo",
+                ),
+                style={"display": "flex", "alignItems": "center"},
+            ),
         ),
-        
+
         class_name="ui blue segment",
         style={"padding": "10px 12px", "marginBottom": "12px"},
     )
@@ -566,6 +600,37 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
             ),
             style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "2px 8px", "marginBottom": "6px"},
         ),
+        # Zenodo source link (shown when file was imported from Zenodo)
+        rx.cond(
+            UploadState.current_zenodo_url != "",
+            rx.el.div(
+                fomantic_icon("external-link", size=10, color="rgba(255,255,255,0.6)", style={"marginRight": "4px", "flexShrink": "0"}),
+                rx.el.a(
+                    UploadState.current_zenodo_url,
+                    href=UploadState.current_zenodo_url,
+                    target="_blank",
+                    style={
+                        "fontSize": "0.7rem",
+                        "color": "rgba(255,255,255,0.9)",
+                        "textDecoration": "underline",
+                        "overflow": "hidden",
+                        "textOverflow": "ellipsis",
+                        "whiteSpace": "nowrap",
+                    },
+                ),
+                rx.cond(
+                    UploadState.current_zenodo_license != "",
+                    rx.el.span(
+                        UploadState.current_zenodo_license,
+                        class_name="ui mini label",
+                        style={"marginLeft": "6px", "padding": "2px 4px", "fontSize": "0.6rem", "flexShrink": "0"},
+                    ),
+                    rx.fragment(),
+                ),
+                style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+            ),
+            rx.fragment(),
+        ),
         # Action buttons
         rx.el.div(
             rx.el.button(
@@ -581,23 +646,176 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
     )
 
 
+def _immutable_disclaimer_box() -> rx.Component:
+    """Yellow info box shown instead of upload form in immutable mode."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("lock", size=16, color="#b58105"),
+            rx.el.strong(" Public Demo Mode", style={"marginLeft": "6px"}),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+        ),
+        rx.el.p(
+            UploadState.immutable_disclaimer,
+            style={"fontSize": "0.85rem", "color": "#666", "marginBottom": "8px", "lineHeight": "1.4"},
+        ),
+        rx.el.a(
+            fomantic_icon("download", size=12),
+            " Install locally",
+            href="https://github.com/dna-seq/just-dna-lite#quick-start",
+            target="_blank",
+            class_name="ui mini yellow button",
+        ),
+        rx.cond(
+            UploadState.allow_zenodo_import,
+            rx.el.div(
+                rx.el.div(
+                    rx.text("or import from Zenodo"),
+                    class_name="ui horizontal divider",
+                    style={"margin": "10px 0 8px 0", "fontSize": "0.75rem", "color": "#aaa"},
+                ),
+                rx.el.div(
+                    rx.el.input(
+                        value=UploadState.zenodo_url_input,
+                        on_change=UploadState.set_zenodo_url_input,
+                        placeholder="https://zenodo.org/records/...",
+                        style={
+                            "flex": "1",
+                            "padding": "5px 8px",
+                            "borderRadius": "4px",
+                            "border": "1px solid #ddd",
+                            "fontSize": "0.8rem",
+                        },
+                    ),
+                    rx.el.button(
+                        rx.cond(
+                            UploadState.zenodo_importing,
+                            rx.el.i("", class_name="spinner loading icon"),
+                            rx.el.i("", class_name="cloud upload icon"),
+                        ),
+                        on_click=UploadState.handle_zenodo_import,
+                        disabled=UploadState.zenodo_importing,
+                        class_name="ui mini purple icon button",
+                        style={"marginLeft": "6px"},
+                        title="Import from Zenodo",
+                    ),
+                    style={"display": "flex", "alignItems": "center"},
+                ),
+            ),
+            rx.fragment(),
+        ),
+        class_name="ui yellow message",
+        style={"padding": "12px", "marginBottom": "12px"},
+    )
+
+
+def _public_genome_hint() -> rx.Component:
+    """Non-blocking info message suggesting public genomes for quick import."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("dna", size=14, color="#2185d0"),
+            rx.el.span(
+                " Try a public genome",
+                style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px"},
+            ),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+        ),
+        rx.el.div(
+            rx.el.div(
+                rx.el.span("Anton Kulaga ", style={"fontWeight": "500", "fontSize": "0.85rem"}),
+                rx.el.span("CC-Zero", class_name="ui mini teal label", style={"marginLeft": "4px"}),
+                rx.el.button(
+                    rx.cond(
+                        UploadState.zenodo_importing,
+                        rx.el.i("", class_name="spinner loading icon"),
+                        rx.el.i("", class_name="download icon"),
+                    ),
+                    " Import",
+                    on_click=UploadState.import_default_sample("https://zenodo.org/records/18370498"),
+                    disabled=UploadState.zenodo_importing,
+                    class_name="ui mini button",
+                    style={"marginLeft": "auto", "padding": "4px 8px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+            ),
+            rx.el.div(
+                rx.el.span("Livia Zaharia ", style={"fontWeight": "500", "fontSize": "0.85rem"}),
+                rx.el.span("CC-BY-4.0", class_name="ui mini teal label", style={"marginLeft": "4px"}),
+                rx.el.button(
+                    rx.cond(
+                        UploadState.zenodo_importing,
+                        rx.el.i("", class_name="spinner loading icon"),
+                        rx.el.i("", class_name="download icon"),
+                    ),
+                    " Import",
+                    on_click=UploadState.import_default_sample("https://zenodo.org/records/19487816"),
+                    disabled=UploadState.zenodo_importing,
+                    class_name="ui mini button",
+                    style={"marginLeft": "auto", "padding": "4px 8px"},
+                ),
+                style={"display": "flex", "alignItems": "center"},
+            ),
+        ),
+        rx.el.div(
+            "Voluntarily shared under open licenses for research use.",
+            style={"fontSize": "0.75rem", "color": "#999", "marginTop": "8px"},
+        ),
+        class_name="ui info message",
+        style={"padding": "10px 12px", "marginBottom": "12px"},
+    )
+
+
+def _progress_indicator() -> rx.Component:
+    """Non-blocking progress indicator for long operations."""
+    return rx.cond(
+        UploadState.has_progress_status,
+        rx.el.div(
+            rx.el.i("", class_name="spinner loading icon"),
+            rx.el.span(
+                UploadState.progress_status,
+                style={"marginLeft": "8px", "fontSize": "0.85rem"},
+            ),
+            class_name="ui icon message",
+            style={"padding": "10px 12px", "marginBottom": "12px"},
+        ),
+        rx.fragment(),
+    )
+
+
 def file_column_content() -> rx.Component:
     """Column 1 content: Unified add sample form and library."""
     return rx.el.div(
         # ============================================================
-        # ADD SAMPLE FORM - Compact file + metadata form
+        # ADD SAMPLE FORM or IMMUTABLE DISCLAIMER
         # ============================================================
-        add_sample_form(),
-        
+        rx.cond(
+            UploadState.is_immutable_mode,
+            _immutable_disclaimer_box(),
+            add_sample_form(),
+        ),
+
+        # ============================================================
+        # PUBLIC GENOME SUGGESTION
+        # Always visible in immutable mode; in normal mode only when no files yet
+        # ============================================================
+        rx.cond(
+            UploadState.is_immutable_mode | (UploadState.files.length() == 0),
+            _public_genome_hint(),
+            rx.fragment(),
+        ),
+
+        # ============================================================
+        # PROGRESS INDICATOR for long operations
+        # ============================================================
+        _progress_indicator(),
+
         # ============================================================
         # METADATA EDIT SECTION - Only shown when edit mode is enabled
         # ============================================================
         rx.cond(
             UploadState.has_selected_file & UploadState.metadata_edit_mode,
             rx.el.div(
-                # Header with close button
                 rx.el.div(
-                    fomantic_icon("edit", size=16, color="#21ba45"),  # green for edit/save
+                    fomantic_icon("edit", size=16, color="#21ba45"),
                     rx.el.span(" Edit Metadata", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "6px", "flex": "1"}),
                     rx.el.button(
                         fomantic_icon("x", size=12),
@@ -614,12 +832,11 @@ def file_column_content() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        
+
         # ============================================================
         # LIBRARY SECTION - List of uploaded samples
         # ============================================================
         rx.el.div(
-            # Library header with count and refresh
             rx.el.div(
                 rx.el.div(
                     fomantic_icon("database", size=16, color="#767676"),
@@ -640,28 +857,30 @@ def file_column_content() -> rx.Component:
                 ),
                 style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "10px"},
             ),
-            
-            # File list (scrollable accordion area)
+
             rx.cond(
                 UploadState.files.length() > 0,
                 rx.el.div(
                     rx.foreach(UploadState.files, file_item),
                     id="file-list",
                     style={
-                        "maxHeight": "400px", 
+                        "maxHeight": "400px",
                         "overflowY": "auto",
-                        "paddingRight": "4px",  # Space for scrollbar
+                        "paddingRight": "4px",
                     },
                 ),
                 rx.el.div(
                     fomantic_icon("inbox", size=40, color="#ccc"),
                     rx.el.div("No samples yet", style={"color": "#888", "marginTop": "8px"}),
-                    rx.el.div("Upload a VCF file to get started", style={"color": "#aaa", "fontSize": "0.85rem", "marginTop": "4px"}),
+                    rx.el.div(
+                        "Upload a VCF file or import from Zenodo to get started",
+                        style={"color": "#aaa", "fontSize": "0.85rem", "marginTop": "4px"},
+                    ),
                     style={"textAlign": "center", "padding": "30px 10px"},
                     id="empty-file-list",
                 ),
             ),
-            
+
             class_name="ui segment",
         ),
         id="file-column-content",

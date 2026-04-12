@@ -5,14 +5,23 @@ These are not Dagster resources, but shared utility functions for
 determining cache, input, and output directories.
 """
 
+import logging
 import os
 import shutil
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 from platformdirs import user_cache_dir
+
+logger = logging.getLogger(__name__)
+
+PERMISSIVE_LICENSES = {
+    "cc-zero", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0",
+    "cc-by-3.0", "cc-by-sa-3.0", "cc-by-nc-4.0", "cc-by-nc-sa-4.0",
+    "mit", "apache-2.0", "bsd-3-clause",
+}
 
 
 @lru_cache(maxsize=1)
@@ -172,126 +181,220 @@ def get_generated_modules_dir() -> Path:
 def download_vcf_from_zenodo(
     zenodo_url: str,
     filename: Optional[str] = None,
-    logger=None,
+    logger: Optional[Any] = None,
 ) -> Path:
-    """
-    Download a VCF file from Zenodo.
-    
+    """Download a VCF file from Zenodo.
+
     Supports:
-    - Record URLs: https://zenodo.org/records/18370498 (finds first VCF)
-    - Direct file URLs: https://zenodo.org/api/records/18370498/files/antonkulaga.vcf/content
-    
-    Downloaded files are cached in ~/.cache/just-dna-pipelines/zenodo/
-    
-    Args:
-        zenodo_url: Zenodo record URL or direct file URL
-        filename: Optional filename override (auto-detected if not provided)
-        logger: Optional logger for messages
-        
-    Returns:
-        Path to the downloaded VCF file
+    - Record URLs: ``https://zenodo.org/records/18370498`` (finds first VCF)
+    - Direct file URLs: ``https://zenodo.org/api/records/.../files/.../content``
+
+    Downloaded files are cached in ``~/.cache/just-dna-pipelines/zenodo/``
+    and are not re-downloaded on subsequent calls.
     """
+    from just_dna_pipelines.annotation.resources import logger as _module_logger
+    _log = logger or _module_logger
+
     cache_dir = get_cache_dir() / "zenodo"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Handle record URLs: https://zenodo.org/records/{record_id}
+
     if "/records/" in zenodo_url and "/files/" not in zenodo_url:
         record_id = zenodo_url.split("/records/")[-1].split("?")[0].split("/")[0]
         api_url = f"https://zenodo.org/api/records/{record_id}"
-        
-        if logger:
-            logger.info(f"Fetching Zenodo record metadata: {api_url}")
-        
-        response = requests.get(api_url)
+
+        _log.info(f"Fetching Zenodo record metadata: {api_url}")
+
+        response = requests.get(api_url, timeout=15)
         response.raise_for_status()
         data = response.json()
-        
-        # Find the first VCF file
+
         vcf_file = next(
-            (f for f in data["files"] if f["key"].endswith(".vcf") or f["key"].endswith(".vcf.gz")),
-            None
+            (f for f in data["files"]
+             if f["key"].endswith(".vcf") or f["key"].endswith(".vcf.gz")),
+            None,
         )
         if not vcf_file:
             raise ValueError(f"No VCF file found in Zenodo record {record_id}")
-        
+
         download_url = vcf_file["links"]["self"]
         resolved_filename = filename or vcf_file["key"]
     else:
-        # Direct file URL
         download_url = zenodo_url
         if filename:
             resolved_filename = filename
         else:
-            # Extract filename from URL
             resolved_filename = zenodo_url.split("/")[-1].split("?")[0]
             if not (resolved_filename.endswith(".vcf") or resolved_filename.endswith(".vcf.gz")):
                 resolved_filename = "genome.vcf"
-    
+
     vcf_path = cache_dir / resolved_filename
-    
-    # Check if already cached
+
     if vcf_path.exists():
-        if logger:
-            logger.info(f"Using cached VCF from Zenodo: {vcf_path}")
+        _log.info(f"Using cached VCF from Zenodo: {vcf_path}")
         return vcf_path
-    
-    # Download
-    if logger:
-        logger.info(f"Downloading VCF from Zenodo: {download_url}")
-    
-    response = requests.get(download_url, stream=True)
+
+    _log.info(f"Downloading VCF from Zenodo: {download_url}")
+
+    response = requests.get(download_url, stream=True, timeout=30)
     response.raise_for_status()
-    
+
     with open(vcf_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
-    
-    if logger:
-        size_mb = vcf_path.stat().st_size / (1024 * 1024)
-        logger.info(f"Downloaded VCF: {vcf_path} ({size_mb:.1f} MB)")
-    
+
+    size_mb = vcf_path.stat().st_size / (1024 * 1024)
+    _log.info(f"Downloaded VCF: {vcf_path} ({size_mb:.1f} MB)")
+
     return vcf_path
 
 
 def ensure_vcf_in_user_input_dir(
     vcf_path: Path,
     user_name: str,
-    logger,
+    log: Optional[Any] = None,
 ) -> Path:
-    """
-    Ensure the VCF file is in the expected user input directory.
-    
-    If the VCF is already in data/input/users/{user_name}/, return as-is.
-    If the VCF is elsewhere, copy it to the expected location.
-    
+    """Ensure the VCF file is in the expected user input directory.
+
+    If the VCF is already in ``data/input/users/{user_name}/``, return as-is.
+    If elsewhere, copy it to the expected location.
+
     Returns the path to the VCF in the user input directory.
     """
+    _log = log or logger
     user_input_dir = get_user_input_dir() / user_name
     expected_vcf_path = user_input_dir / vcf_path.name
-    
-    # Check if already in the expected location
+
     if vcf_path.resolve() == expected_vcf_path.resolve():
-        logger.info(f"VCF already in expected location: {vcf_path}")
+        _log.info(f"VCF already in expected location: {vcf_path}")
         return vcf_path
-    
-    # Check if already exists in expected location (by name)
+
     if expected_vcf_path.exists():
-        # Compare file sizes to detect if it's the same file
         if vcf_path.stat().st_size == expected_vcf_path.stat().st_size:
-            logger.info(f"VCF already exists in user input directory: {expected_vcf_path}")
+            _log.info(f"VCF already exists in user input directory: {expected_vcf_path}")
             return expected_vcf_path
         else:
-            logger.warning(
+            _log.warning(
                 f"VCF with same name but different size exists. "
                 f"Source: {vcf_path.stat().st_size} bytes, "
                 f"Existing: {expected_vcf_path.stat().st_size} bytes. "
                 f"Overwriting with source file."
             )
-    
-    # Copy to expected location
+
     user_input_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Copying VCF to user input directory: {vcf_path} -> {expected_vcf_path}")
+    _log.info(f"Copying VCF to user input directory: {vcf_path} -> {expected_vcf_path}")
     shutil.copy2(vcf_path, expected_vcf_path)
-    
+
     return expected_vcf_path
+
+
+def validate_zenodo_record(zenodo_url: str) -> dict[str, Any]:
+    """Validate a Zenodo record for open-access VCF import.
+
+    Checks that the record:
+    - Has ``access_right == "open"``
+    - Has a permissive license
+    - Contains at least one ``.vcf`` or ``.vcf.gz`` file
+
+    Returns a metadata dict on success::
+
+        {
+            "record_id": str,
+            "title": str,
+            "creator": str,
+            "license": str,
+            "doi": str,
+            "vcf_filename": str,
+            "vcf_size_bytes": int,
+        }
+
+    Raises ``ValueError`` with a user-friendly message on failure.
+    """
+    if "/records/" not in zenodo_url:
+        raise ValueError(
+            "Not a valid Zenodo record URL. "
+            "Expected format: https://zenodo.org/records/<record_id>"
+        )
+
+    record_id = zenodo_url.split("/records/")[-1].split("?")[0].split("/")[0]
+    api_url = f"https://zenodo.org/api/records/{record_id}"
+
+    resp = requests.get(api_url, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+
+    metadata = data.get("metadata", {})
+    access_right = metadata.get("access_right", "")
+    if access_right != "open":
+        raise ValueError(
+            f"Zenodo record {record_id} is not open-access (access_right={access_right!r}). "
+            "Only open-access records with permissive licenses can be imported."
+        )
+
+    license_id = (metadata.get("license", {}).get("id") or "").lower()
+    if license_id not in PERMISSIVE_LICENSES:
+        raise ValueError(
+            f"Zenodo record {record_id} has license {license_id!r} which is not "
+            f"in the allowed list. Allowed licenses: {', '.join(sorted(PERMISSIVE_LICENSES))}"
+        )
+
+    vcf_file = next(
+        (f for f in data.get("files", [])
+         if f["key"].endswith(".vcf") or f["key"].endswith(".vcf.gz")),
+        None,
+    )
+    if vcf_file is None:
+        raise ValueError(
+            f"Zenodo record {record_id} does not contain a .vcf or .vcf.gz file."
+        )
+
+    creators = metadata.get("creators", [])
+    creator_name = creators[0].get("name", "Unknown") if creators else "Unknown"
+
+    return {
+        "record_id": record_id,
+        "title": metadata.get("title", ""),
+        "creator": creator_name,
+        "license": license_id,
+        "doi": metadata.get("doi", ""),
+        "vcf_filename": vcf_file["key"],
+        "vcf_size_bytes": vcf_file.get("size", 0),
+    }
+
+
+def resolve_default_samples(
+    user_name: str = "public",
+    log: Optional[Any] = None,
+) -> list[dict[str, Any]]:
+    """Download and place all default samples from the immutable mode config.
+
+    For each ``DefaultSample`` in ``modules.yaml`` ``immutable_mode.default_samples``:
+    1. Download from Zenodo (cached in ``~/.cache/just-dna-pipelines/zenodo/``)
+    2. Copy into ``data/input/users/{user_name}/``
+
+    Returns a list of dicts with ``path`` (Path) and all sample metadata fields.
+    Already-cached files are not re-downloaded.
+    """
+    from just_dna_pipelines.module_config import get_immutable_config
+
+    _log = log or logger
+    config = get_immutable_config()
+    results: list[dict[str, Any]] = []
+
+    for sample in config.default_samples:
+        vcf_path = download_vcf_from_zenodo(sample.zenodo_url, logger=_log)
+        placed = ensure_vcf_in_user_input_dir(vcf_path, user_name, _log)
+        results.append({
+            "path": placed,
+            "filename": placed.name,
+            "label": sample.label,
+            "subject_id": sample.subject_id,
+            "sex": sample.sex,
+            "species": sample.species,
+            "reference_genome": sample.reference_genome,
+            "license": sample.license,
+            "zenodo_url": sample.zenodo_url,
+            "source": "zenodo",
+        })
+
+    return results
 

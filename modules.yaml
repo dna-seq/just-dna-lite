@@ -4,6 +4,26 @@ quality_filters:
   - .
   min_depth: 10
   min_qual: 20
+
+immutable_mode:
+  enabled: false
+  allow_zenodo_import: false
+  disclaimer: "This is a public demo with pre-loaded public genomes. To analyze your own genome, install just-dna-lite locally: https://github.com/dna-seq/just-dna-lite"
+  default_samples:
+  - zenodo_url: "https://zenodo.org/records/18370498"
+    label: "Anton Kulaga"
+    subject_id: "antonkulaga"
+    sex: "Male"
+    species: "Homo sapiens"
+    reference_genome: "GRCh38"
+    license: "CC-Zero"
+  - zenodo_url: "https://zenodo.org/records/19487816"
+    label: "Livia Zaharia"
+    subject_id: "SIMHIFQTILQ"
+    sex: "Female"
+    species: "Homo sapiens"
+    reference_genome: "GRCh38"
+    license: "CC-BY-4.0"
 ensembl_source:
   repo_id: just-dna-seq/ensembl_variations
 sources:
