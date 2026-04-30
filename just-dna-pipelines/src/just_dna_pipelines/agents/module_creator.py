@@ -283,6 +283,11 @@ def _write_spec_files(
 def _validate_spec(spec_dir: str) -> str:
     """Validate a DSL spec directory (dry-run, no side effects)."""
     result = validate_module_spec(Path(spec_dir))
+    warnings_text = (
+        "none"
+        if not result.warnings
+        else "REVIEW BEFORE REGISTRATION: " + "; ".join(result.warnings)
+    )
     if result.valid:
         stats = result.stats or {}
         return (
@@ -290,9 +295,9 @@ def _validate_spec(spec_dir: str) -> str:
             f"{stats.get('variant_rows', '?')} variant rows, "
             f"{stats.get('unique_rsids', '?')} unique rsids, "
             f"categories: {stats.get('categories', '?')}. "
-            f"Warnings: {result.warnings or 'none'}"
+            f"Warnings: {warnings_text}"
         )
-    return f"INVALID. Errors: {result.errors}. Warnings: {result.warnings or 'none'}"
+    return f"INVALID. Errors: {result.errors}. Warnings: {warnings_text}"
 
 
 
@@ -506,7 +511,8 @@ def _build_pi_tools(output_dir: Path, api_key: str, current_version: int = 0) ->
             icon: Icon name for UI display.
             color: Hex color string for UI display.
             variants_csv_content: Full CSV content for variants.csv including header row.
-            studies_csv_content: Full CSV content for studies.csv including header row (empty string if none).
+            studies_csv_content: Full CSV content for mandatory studies.csv including header row.
+                Do not leave empty; validate_spec will reject ungrounded modules.
         """
         return _write_spec_files(
             spec_dir=output_dir / module_name,

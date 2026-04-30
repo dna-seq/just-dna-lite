@@ -332,6 +332,10 @@ class TestValidation:
             "rsid,genotype,weight,state,conclusion\n"
             "rs123,A/G,0.5,risk,Conclusion\n"
         )
+        (tmp_path / "studies.csv").write_text(
+            "rsid,pmid,population,p_value,conclusion,study_design\n"
+            "rs123,123456,Test,0.05,Grounding evidence,Unit test\n"
+        )
         result = validate_spec(tmp_path)
         assert result.valid
         assert any("risk" in w and "weight=0.5" in w for w in result.warnings)
@@ -441,11 +445,17 @@ class TestResolver:
 # ── Compilation tests (with real resolution) ──────────────────────────────────
 
 
+DEFAULT_TEST_STUDIES_CSV = (
+    "rsid,pmid,population,p_value,conclusion,study_design\n"
+    "rs4244285,123456,Test,0.05,Grounding evidence,Unit test\n"
+)
+
+
 def _make_spec_dir(
     tmp_path: Path,
     module_name: str,
     variants_csv: str,
-    studies_csv: Optional[str] = None,
+    studies_csv: Optional[str] = DEFAULT_TEST_STUDIES_CSV,
 ) -> Path:
     """Helper to write a spec directory."""
     spec_dir = tmp_path / module_name
@@ -591,19 +601,22 @@ class TestCompilation:
         assert not result.success
         assert len(result.errors) > 0
 
-    def test_no_studies_ok(self, tmp_path: Path, output_dir: Path, ensembl_db_path: Path) -> None:
+    def test_missing_studies_rejected(
+        self,
+        tmp_path: Path,
+        output_dir: Path,
+        ensembl_db_path: Path,
+    ) -> None:
         spec_dir = _make_spec_dir(
             tmp_path,
             "no_studies",
             "rsid,chrom,start,ref,alts,genotype,weight,state,conclusion\n"
             "rs4244285,10,94781859,G,A,A/G,0.5,protective,Good variant\n",
+            studies_csv=None,
         )
         result = compile_module(spec_dir, output_dir)
-        assert result.success
-        assert (output_dir / "weights.parquet").exists()
-        assert (output_dir / "annotations.parquet").exists()
-        assert not (output_dir / "studies.parquet").exists()
-        assert result.stats["studies_rows"] == 0
+        assert not result.success
+        assert any("studies.csv is missing" in error for error in result.errors)
 
 
 # ── Compilation with resolution tests ─────────────────────────────────────────

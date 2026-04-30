@@ -171,7 +171,7 @@ def validate_spec(spec_dir: Path) -> ValidationResult:
     Checks:
     - module_spec.yaml structure and values
     - variants.csv rows against Pydantic model
-    - studies.csv rows (if present)
+    - studies.csv rows (mandatory grounding evidence)
     - Cross-row consistency (positions, uniqueness, weight direction)
 
     Returns a ValidationResult with errors, warnings, and summary stats.
@@ -197,7 +197,7 @@ def validate_spec(spec_dir: Path) -> ValidationResult:
     all_errors.extend(var_errors)
     all_warnings.extend(var_warnings)
 
-    # 3. Load studies (optional)
+    # 3. Load studies (mandatory grounding evidence)
     studies_path = spec_dir / "studies.csv"
     studies: List[StudyRow] = []
     if studies_path.exists():
@@ -206,6 +206,16 @@ def validate_spec(spec_dir: Path) -> ValidationResult:
         )
         all_errors.extend(study_errors)
         all_warnings.extend(study_warnings)
+        if not studies and not study_errors:
+            all_errors.append(
+                "studies.csv is present but has no study rows. Grounding evidence is "
+                "mandatory; add at least one PMID or evidence reference."
+            )
+    else:
+        all_errors.append(
+            "studies.csv is missing. Grounding evidence is mandatory; add study rows "
+            "with PMIDs or evidence references before validation and registration."
+        )
 
     # 4. Cross-validation
     if variants:
@@ -260,11 +270,11 @@ def compile_module(
     2. Optionally resolve rsid<->position via Ensembl DuckDB
     3. Build weights.parquet from variants.csv
     4. Build annotations.parquet (deduplicated by variant key) from variants.csv
-    5. Build studies.parquet from studies.csv (if present)
+    5. Build studies.parquet from mandatory studies.csv
 
-    The output directory will contain: weights.parquet, annotations.parquet,
-    and optionally studies.parquet. This is directly compatible with the
-    module discovery system.
+    The output directory will contain weights.parquet, annotations.parquet,
+    and studies.parquet. This is directly compatible with the module discovery
+    system.
 
     Args:
         spec_dir: Path to the module spec directory.

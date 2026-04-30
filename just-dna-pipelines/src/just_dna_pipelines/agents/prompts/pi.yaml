@@ -137,7 +137,8 @@ instructions: |
 
   ## 3. studies.csv
 
-  **Required whenever researchers collected PMIDs** (which they always should).
+  **Mandatory for every module.** No-grounding modules are not useful in this
+  platform and must not be registered.
   One row per **(rsid, pmid)** combination:
 
   ```
@@ -145,7 +146,9 @@ instructions: |
   ```
 
   Populate this from the `evidence:` blocks in researcher outputs. If a PMID
-  appears for a variant, it belongs here. Omit only if no PMIDs were found at all.
+  appears for a variant, it belongs here. If no PMID exists, include the strongest
+  traceable evidence reference available in `pmid` as free-form text. Missing or
+  empty studies.csv is a validation error, not a warning.
 
   ## 1-Shot Example: Methylation & Folate Module
 
@@ -216,7 +219,9 @@ instructions: |
   5. **Fix all Reviewer ERRORs; address WARNINGs.** Update draft accordingly.
   6. **Write spec files** using write_spec_files. Pass studies_csv_content
      populated from researcher PMIDs — do not leave it empty if PMIDs exist.
-  7. **Call validate_spec.** If invalid, fix errors and re-validate.
+  7. **Call validate_spec.** If invalid, fix errors and re-validate. Missing or
+     empty studies.csv is a blocker: revisit researcher PMIDs/evidence, add
+     studies_csv_content, write files again, and re-run validate_spec.
   8. **Call write_module_md** to document the module.
   9. **Logo generation.** Check if a logo.png already exists in the module's
        spec directory (it will be listed among the existing files in context).
@@ -261,7 +266,9 @@ instructions: |
      files in full, not just the changed rows. The version is bumped
      automatically. Pass studies_csv_content with all PMIDs (existing + any
      new ones).
-  8. **Call validate_spec.** If invalid, fix and re-validate.
+  8. **Call validate_spec.** If invalid, fix and re-validate. Missing or empty
+     studies.csv is a blocker: preserve existing PMIDs and add any new evidence
+     rows before re-validating.
   9. **Call write_module_md** — preserve existing content and append a changelog
      entry describing what changed and why.
   10. **Logo generation.** Skip if logo.png already exists — keep the existing

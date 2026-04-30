@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 import polars as pl
-from eliot import start_action
+from eliot import log_message, start_action
 
 from just_dna_pipelines.annotation.hf_modules import (
     ModuleInfo,
@@ -18,6 +18,53 @@ from just_dna_pipelines.annotation.hf_modules import (
     scan_module_table,
     discover_hf_modules,
 )
+
+
+ANNOTATION_REPORT_COLUMNS: tuple[str, ...] = ("gene", "category", "phenotype")
+
+
+def _log_missing_module_table(module_name: str, table: ModuleTable, reason: str) -> None:
+    """Log a non-fatal missing module table during report generation."""
+    log_message(
+        message_type="warning",
+        action="missing_module_table_for_report",
+        module=module_name,
+        table=table.value,
+        reason=reason,
+    )
+
+
+def _scan_optional_module_table(
+    module_name: str,
+    table: ModuleTable,
+    module_info: Optional[ModuleInfo] = None,
+) -> Optional[pl.LazyFrame]:
+    """Scan a module table, returning None when optional report metadata is absent."""
+    if module_info is not None:
+        if table == ModuleTable.ANNOTATIONS and module_info.annotations_url is None:
+            _log_missing_module_table(module_name, table, "module metadata has no annotations table")
+            return None
+        if table == ModuleTable.STUDIES and module_info.studies_url is None:
+            _log_missing_module_table(module_name, table, "module metadata has no studies table")
+            return None
+
+    try:
+        return scan_module_table(module_name, table, module_info=module_info)
+    except ValueError as exc:
+        _log_missing_module_table(module_name, table, str(exc))
+        return None
+
+
+def _ensure_annotation_report_columns(df: pl.DataFrame) -> pl.DataFrame:
+    """Ensure fallback report rows have nullable annotation metadata columns."""
+    missing_columns = [
+        pl.lit(None).cast(pl.String).alias(column)
+        for column in ANNOTATION_REPORT_COLUMNS
+        if column not in df.columns
+    ]
+    if not missing_columns:
+        return df
+    return df.with_columns(missing_columns)
 
 
 # Longevity pathway categories and their display metadata
@@ -198,8 +245,15 @@ def load_annotated_weights(
             # dropping the original empty rsid column first.
             weights_lf = weights_lf.drop("rsid").rename({module_rsid_col: "rsid"})
 
-        # Load annotations table from HF (has gene, category, phenotype)
-        annotations_lf = scan_module_table(module_name, ModuleTable.ANNOTATIONS, module_info=module_info)
+        # Load annotations table from the module. If a custom module was removed
+        # or published without optional report metadata, keep the report usable.
+        annotations_lf = _scan_optional_module_table(
+            module_name,
+            ModuleTable.ANNOTATIONS,
+            module_info=module_info,
+        )
+        if annotations_lf is None:
+            return _ensure_annotation_report_columns(weights_lf.collect())
 
         # Join to get gene and category info
         enriched = weights_lf.join(
@@ -209,7 +263,7 @@ def load_annotated_weights(
             suffix="_ann",
         )
 
-        return enriched.collect()
+        return _ensure_annotation_report_columns(enriched.collect())
 
 
 def load_studies_for_variants(
@@ -223,7 +277,16 @@ def load_studies_for_variants(
     Returns a mapping of rsid -> list of study dicts.
     """
     with start_action(action_type="load_studies_for_variants", module=module_name):
-        studies_lf = scan_module_table(module_name, ModuleTable.STUDIES, module_info=module_info)
+        if not rsids:
+            return {}
+
+        studies_lf = _scan_optional_module_table(
+            module_name,
+            ModuleTable.STUDIES,
+            module_info=module_info,
+        )
+        if studies_lf is None:
+            return {}
 
         # Filter to relevant rsids
         studies_df = studies_lf.filter(
