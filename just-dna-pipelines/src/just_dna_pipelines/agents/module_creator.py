@@ -213,7 +213,7 @@ def _available_researcher_models(
     Anthropic researchers when their API keys are present.
     """
     researcher_model_id = spec.get("researcher_model", {}).get(
-        "default_id", "gemini-3-pro-preview"
+        "default_id", "gemini-3.1-pro-preview"
     )
 
     models: List[Tuple[str, Any]] = [
@@ -225,11 +225,11 @@ def _available_researcher_models(
 
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
-        models.append(("OpenAI (gpt-4.1)", OpenAIResponses(id="gpt-5.2")))
+        models.append(("OpenAI (gpt-4.1)", OpenAIResponses(id="gpt-5.4")))
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if anthropic_key:
-        models.append(("Claude (claude-sonnet-4-5-20250929)", Claude(id="claude-sonnet-4-5-20250929")))
+        models.append(("Claude (claude-sonnet-4-6)", Claude(id="claude-sonnet-4-6")))
 
     return models
 

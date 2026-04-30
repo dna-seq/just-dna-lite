@@ -5,7 +5,7 @@ Reads modules.yaml to determine which sources to scan for annotation modules
 and provides optional display metadata overrides for discovered modules.
 
 The file is searched in three locations (first found wins):
-  1. Working copy ``data/interim/modules.yaml`` (mutable, gitignored)
+  1. Working copy ``modules.yaml`` in the runtime interim directory
   2. Project root ``modules.yaml`` (git-tracked, read-only defaults)
   3. Package directory ``just_dna_pipelines/`` (bundled fallback)
 
@@ -241,18 +241,40 @@ def _find_project_root() -> Optional[Path]:
     return None
 
 
+def _runtime_data_root_from_output(output_dir: Path) -> Path:
+    """Infer the runtime data root from JUST_DNA_PIPELINES_OUTPUT_DIR."""
+    resolved = output_dir.resolve()
+    if resolved.name == "users" and resolved.parent.name == "output":
+        return resolved.parent.parent
+    if resolved.name == "output":
+        return resolved.parent
+    return resolved.parent
+
+
 def _working_config_path() -> Optional[Path]:
     """Return the path for the mutable working copy of modules.yaml.
 
     Resolution order:
       1. ``JUST_DNA_MODULES_YAML`` env var (absolute path)
-      2. ``data/interim/modules.yaml`` under the project root (gitignored)
+      2. ``JUST_DNA_PIPELINES_INTERIM_DIR`` env var
+      3. ``JUST_DNA_PIPELINES_OUTPUT_DIR``-derived runtime data root
+      4. ``data/interim/modules.yaml`` under the project root (gitignored)
 
     Returns None when neither is available.
     """
     env = os.getenv("JUST_DNA_MODULES_YAML")
     if env:
-        return Path(env)
+        return Path(env).expanduser().resolve()
+
+    env_interim = os.getenv("JUST_DNA_PIPELINES_INTERIM_DIR")
+    if env_interim:
+        return Path(env_interim).expanduser().resolve() / "modules.yaml"
+
+    env_output = os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR")
+    if env_output:
+        data_root = _runtime_data_root_from_output(Path(env_output).expanduser())
+        return data_root / "interim" / "modules.yaml"
+
     project_root = _find_project_root()
     if project_root is None:
         return None
@@ -273,6 +295,30 @@ def _default_config_path() -> Optional[Path]:
     if pkg.exists():
         return pkg
     return None
+
+
+def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove repo-local generated/interim sources in env-backed runtimes."""
+    if not os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR"):
+        return raw
+
+    project_root = _find_project_root()
+    if project_root is None:
+        return raw
+
+    project_data = (project_root / "data").resolve()
+    filtered_sources = []
+    for source in raw.get("sources", []):
+        url = source.get("url") if isinstance(source, dict) else source
+        if isinstance(url, str) and url.startswith("/"):
+            source_path = Path(url).expanduser().resolve()
+            if source_path == project_data or project_data in source_path.parents:
+                continue
+        filtered_sources.append(source)
+
+    raw = dict(raw)
+    raw["sources"] = filtered_sources
+    return raw
 
 
 def _load_config() -> ModulesConfig:
@@ -301,7 +347,7 @@ def _load_config() -> ModulesConfig:
             with open(config_path) as f:
                 raw = yaml.safe_load(f)
             if raw is not None:
-                return ModulesConfig.model_validate(raw)
+                return ModulesConfig.model_validate(_drop_project_runtime_sources(raw))
 
     return ModulesConfig()
 

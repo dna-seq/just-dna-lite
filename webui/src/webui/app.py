@@ -12,15 +12,16 @@ from fastapi.responses import FileResponse, StreamingResponse
 from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.annotation.resources import get_user_output_dir
 
+# Load environment variables before importing pages/state modules that resolve
+# data paths at import time.
+load_env()
+
 from webui.pages.dashboard import dashboard_page
 from webui.pages.index import index_page
 from webui.pages.analysis import analysis_page
 from webui.pages.annotate import annotate_page
 from webui.pages.modules import modules_page
 from webui.pages.faq import faq_page
-
-# Load environment variables from .env file (searching up to root)
-load_env()
 
 # Note: Shutdown cleanup of STARTED runs is handled by the parent `uv run start` command,
 # which catches Ctrl+C and cleans up before killing subprocesses.

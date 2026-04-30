@@ -317,11 +317,17 @@ def refresh_modules() -> dict[str, ModuleInfo]:
         The refreshed MODULE_INFOS dict.
     """
     import just_dna_pipelines.module_config as mc
+    global MODULES_CONFIG, HF_REPO_ID
+
     mc.MODULES_CONFIG = mc._load_config()
     mc.DEFAULT_REPOS[:] = [
         s.hf_repo_id for s in mc.MODULES_CONFIG.sources
         if s.is_hf and s.hf_repo_id is not None
     ]
+    MODULES_CONFIG = mc.MODULES_CONFIG
+    DEFAULT_REPOS[:] = mc.DEFAULT_REPOS
+    HF_DEFAULT_REPOS[:] = mc.DEFAULT_REPOS
+    HF_REPO_ID = HF_DEFAULT_REPOS[0] if HF_DEFAULT_REPOS else ""
 
     fresh = discover_all_modules()
     MODULE_INFOS.clear()

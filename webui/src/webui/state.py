@@ -47,6 +47,14 @@ logger = logging.getLogger(__name__)
 GENERATED_MODULES_DIR: Path = get_generated_modules_dir()
 
 
+def _backend_api_url() -> str:
+    """Return the browser-reachable Reflex backend URL for custom API routes."""
+    return os.environ.get(
+        "API_URL",
+        f"http://localhost:{os.environ.get('BACKEND_PORT', '8000')}",
+    ).rstrip("/")
+
+
 # Module metadata with titles, descriptions, and icons
 # This maps module names to human-readable information
 # Species options for VCF metadata (Latin/scientific names)
@@ -934,12 +942,17 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.selected_modules = kept + [m for m in newly_added if m not in kept]
 
     def refresh_module_registry_state(self):
-        """Public event: re-sync UI state from the module globals.
+        """Public event: refresh discovery from disk and re-sync UI state.
 
-        Yielded by AgentState after registration so the sources list updates
-        without relying on cross-state proxy mutation.
+        Used by the module manager page on load so hard refreshes reflect the
+        mutable modules.yaml instead of import-time defaults.
         """
+        refresh_module_registry()
         self._refresh_module_ui_state()
+
+    def load_modules_page(self):
+        """Initialize the module manager page."""
+        self.refresh_module_registry_state()
 
     def toggle_ensembl(self):
         """Toggle Ensembl variation annotation on/off."""
@@ -1025,13 +1038,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 }
             }
             run_config["ops"]["user_longevity_report"] = {
-                "config": {
-                    "user_name": self.safe_user_id,
-                    "sample_name": sample_name,
-                    "modules": modules_to_use,
-                }
-            }
-            run_config["ops"]["user_vcf_exports"] = {
                 "config": {
                     "user_name": self.safe_user_id,
                     "sample_name": sample_name,
@@ -1808,7 +1814,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         the browser constructs direct URLs to the backend
         (e.g. ``http://localhost:8042/api/report/...``).
         """
-        return os.environ.get("API_URL", "").rstrip("/")
+        return _backend_api_url()
 
     @rx.var
     def current_subject_id(self) -> str:
@@ -2601,13 +2607,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 }
             }
             run_config["ops"]["user_longevity_report"] = {
-                "config": {
-                    "user_name": self.safe_user_id,
-                    "sample_name": sample_name,
-                    "modules": modules_to_use,
-                }
-            }
-            run_config["ops"]["user_vcf_exports"] = {
                 "config": {
                     "user_name": self.safe_user_id,
                     "sample_name": sample_name,
@@ -3670,7 +3669,7 @@ class AgentState(rx.State):
         """URL to download the slot spec as a zip (version appended to filename)."""
         if not self._slot_spec_dir or not self.slot_module_name:
             return ""
-        return f"/api/agent-spec-zip/{self.slot_module_name}?v={self.slot_version}"
+        return f"{_backend_api_url()}/api/agent-spec-zip/{self.slot_module_name}?v={self.slot_version}"
 
     @rx.var
     def slot_display_name(self) -> str:
@@ -3701,7 +3700,7 @@ class AgentState(rx.State):
                 if f.is_file() and f.suffix == ".log":
                     logs.append({
                         "name": f.name,
-                        "url": f"/api/agent-log/{name}/{vdir.name}/{f.name}",
+                        "url": f"{_backend_api_url()}/api/agent-log/{name}/{vdir.name}/{f.name}",
                     })
         return logs
 
@@ -3881,7 +3880,14 @@ class AgentState(rx.State):
             spec_dir = self._slot_spec_dir
             self.slot_adding = True
 
-        result = register_custom_module(Path(spec_dir))
+        loop = asyncio.get_event_loop()
+        try:
+            result = await loop.run_in_executor(None, register_custom_module, Path(spec_dir))
+        except Exception as exc:
+            async with self:
+                self.slot_adding = False
+                self._add_chat_message("agent", f"Registration failed: {exc}")
+            return
 
         async with self:
             self.slot_adding = False

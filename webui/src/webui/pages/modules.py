@@ -1203,7 +1203,7 @@ def agent_chat_panel() -> rx.Component:
 # MAIN PAGE
 # ============================================================================
 
-@rx.page(route="/modules", title="Module Creator | Just DNA Lite", on_load=UploadState.on_load)
+@rx.page(route="/modules", title="Module Creator | Just DNA Lite", on_load=UploadState.load_modules_page)
 def modules_page() -> rx.Component:
     """Module Manager page — sources, editing slot, and AI agent chat."""
     return template(

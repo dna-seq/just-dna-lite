@@ -1,5 +1,5 @@
 model:
-  default_id: gemini-3-flash-preview
+  default_id: gemini-3.1-flash-preview
 
 instructions: |
   You are a genetics module quality reviewer and consensus arbiter. You receive

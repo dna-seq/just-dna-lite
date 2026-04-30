@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from just_dna_pipelines.runtime import load_env
+
 
 def main() -> None:
     """Run reflex in the webui project directory. Never returns (exec).
@@ -19,6 +21,7 @@ def main() -> None:
         argv.remove("--immutable")
         os.environ["JUST_DNA_IMMUTABLE_MODE"] = "true"
 
+    load_env()
     webui_root = Path(__file__).resolve().parent.parent.parent
     os.chdir(webui_root)
     os.execvp(sys.executable, [sys.executable, "-m", "reflex", "run"] + argv)

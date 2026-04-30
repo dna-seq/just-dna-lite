@@ -3,7 +3,7 @@ description: "Multi-agent team that researches, drafts, reviews, and compiles an
 
 model:
   provider: google
-  default_id: gemini-3-pro-preview
+  default_id: gemini-3.1-pro-preview
   env_override: GEMINI_MODEL   # env var to override PI model ID at runtime
 
 team:

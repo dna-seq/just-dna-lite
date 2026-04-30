@@ -3,7 +3,7 @@ description: "AI agent that turns research papers and variant lists into annotat
 
 model:
   provider: google
-  default_id: gemini-3-pro-preview
+  default_id: gemini-3.1-pro-preview
   env_override: GEMINI_MODEL   # env var to override model ID at runtime
 
 agent:
