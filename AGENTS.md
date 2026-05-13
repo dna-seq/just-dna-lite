@@ -21,6 +21,16 @@ The recommended way to start the application is from the repo root:
 
 - `uv run start` - Starts the Reflex Web UI development server.
 
+### uv Script Entry Point Collisions
+
+If `uv run start` or another project script unexpectedly resolves to a dependency's script
+(for example `prs-ui`'s `start` instead of Just-DNA-Lite's `start`), do **not** rename the
+user-facing command or duplicate script entries in workspace members. This can happen after
+dependency upgrades when uv keeps stale generated wrappers in `.venv/bin`. Bump the main
+`just-dna-lite` package version after upgrading dependencies, then run `uv sync` so uv rebuilds
+and reinstalls the root package entry points. The root package's script should own public commands
+like `start`.
+
 ---
 
 ## Coding Standards

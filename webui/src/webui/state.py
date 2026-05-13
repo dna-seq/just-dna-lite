@@ -3275,6 +3275,7 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 # ============================================================================
 
 from prs_ui import PRSComputeStateMixin
+import prs_ui.state as _prs_ui_state
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
 from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
@@ -3285,6 +3286,38 @@ from just_prs.quality import (
 )
 
 _prs_catalog_instance: Optional[_PRSCatalog] = None
+_PRS_REQUIRED_SCORE_COLUMNS = {
+    "ftp_link_ebi",
+    "scoring_parquet_filename",
+    "scoring_parquet_path",
+}
+_prs_cache_checked = False
+
+
+def _prs_scores_cache_is_stale(cache_dir: Path) -> bool:
+    """Return whether cached PRS score metadata predates parquet-backed scoring."""
+    scores_path = cache_dir / "metadata" / "scores.parquet"
+    if not scores_path.exists():
+        return False
+    schema = pl.scan_parquet(scores_path).collect_schema()
+    return not _PRS_REQUIRED_SCORE_COLUMNS.issubset(set(schema.names()))
+
+
+def _ensure_prs_catalog_cache_current(cache_dir: str) -> None:
+    """Refresh stale PRS metadata left behind by older just-prs releases."""
+    global _prs_cache_checked, _prs_catalog_instance
+    if _prs_cache_checked:
+        return
+
+    cache_path = Path(cache_dir)
+    if _prs_ui_state._catalog.cache_dir != cache_path:
+        _prs_ui_state._catalog = _PRSCatalog(cache_dir=cache_path)
+
+    if _prs_scores_cache_is_stale(cache_path):
+        _prs_ui_state._catalog.reload()
+        _prs_catalog_instance = None
+
+    _prs_cache_checked = True
 
 
 def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
@@ -3428,6 +3461,16 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     status_message: str = ""
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
+
+    def initialize_prs(self) -> Any:
+        """Initialize PRS score metadata after validating the local cache."""
+        _ensure_prs_catalog_cache_current(self.cache_dir)
+        yield from PRSComputeStateMixin.initialize_prs(self)
+
+    def load_compute_scores(self) -> Any:
+        """Load PRS scores after refreshing stale metadata caches."""
+        _ensure_prs_catalog_cache_current(self.cache_dir)
+        yield from PRSComputeStateMixin.load_compute_scores(self)
 
     def toggle_prs_expanded(self) -> None:
         self.prs_expanded = not self.prs_expanded

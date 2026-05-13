@@ -30,6 +30,7 @@ config = rx.Config(
     backend_port=backend_port,
     api_url=api_url,
     vite_allowed_hosts=_vite_hosts,
+    plugins=[rx.plugins.RadixThemesPlugin()],
     disable_plugins=[SitemapPlugin],
     # Fomantic UI styling
     stylesheets=[
