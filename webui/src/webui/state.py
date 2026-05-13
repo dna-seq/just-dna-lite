@@ -3461,6 +3461,17 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     status_message: str = ""
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
+    prs_selection_mode: str = "traits"
+
+    def set_prs_selection_mode(self, mode: str) -> None:
+        self.prs_selection_mode = mode
+        if mode == "individual" and self.selected_pgs_ids:
+            self._sync_loaded_grid_selection(self.selected_pgs_ids)
+
+    def sync_trait_pgs_ids(self, ids: list[str]) -> None:
+        """Receive resolved PGS IDs from PRSTraitState."""
+        if self.prs_selection_mode == "traits":
+            self.selected_pgs_ids = ids
 
     def initialize_prs(self) -> Any:
         """Initialize PRS score metadata after validating the local cache."""
@@ -3529,6 +3540,13 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             p = Path(parquet_path)
             partition_key = f"{p.parent.parent.name}/{p.parent.name}"
             self._load_prs_results_from_dagster(partition_key)
+
+        yield PRSTraitState.initialize_traits(self.genome_build)
+
+    def set_prs_genome_build(self, value: str) -> Any:
+        """Set genome build and reload both individual scores and trait grid."""
+        yield from PRSComputeStateMixin.set_prs_genome_build(self, value)
+        yield PRSTraitState.load_traits(self.genome_build)
 
     @rx.event(background=True)
     async def compute_selected_prs(self) -> None:
@@ -3608,6 +3626,8 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             self.prs_progress = 100
             self.status_message = f"Computed {total} PRS score(s)"
             self._checkpoint_prs_to_dagster()
+            if self.prs_selection_mode == "traits" and self.prs_results:
+                self.build_trait_summary()
 
     def _checkpoint_prs_to_dagster(self) -> None:
         """Persist current PRS results to Dagster for cross-session restore."""
@@ -3667,6 +3687,162 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 self.status_message = f"Restored {n} PRS result(s) from previous session"
         except Exception:
             pass
+
+
+# ============================================================================
+# PRS TRAIT STATE — Grouped-by-trait PRS selection
+# ============================================================================
+
+def _build_trait_column_overrides() -> dict:
+    return {
+        "trait": {"minWidth": 200, "flex": 2},
+        "trait_efo_id": {
+            "width": 160,
+            "cellRendererType": "url",
+            "cellRendererConfig": {
+                "baseUrl": "http://www.ebi.ac.uk/efo/",
+                "color": "#1565c0",
+            },
+        },
+        "n_models": {"width": 100},
+        "avg_variants": {"width": 130},
+        "min_variants": {"width": 120},
+        "max_variants": {"width": 120},
+        "pgs_ids": {"minWidth": 200, "flex": 1},
+    }
+
+
+class PRSTraitState(LazyFrameGridMixin, rx.State):
+    """Trait-grouped PRS selection grid.
+
+    Groups PGS Catalog scores by EFO trait so the user can select traits
+    instead of individual PGS IDs.  Selected traits are resolved to their
+    constituent PGS IDs and synced to PRSState for computation.
+    """
+
+    selected_traits: list[str] = []
+    trait_selected_pgs_ids: list[str] = []
+    traits_loaded: bool = False
+
+    _trait_to_pgs: dict[str, list[str]] = {}
+    _traits_genome_build: str = ""
+
+    def _build_trait_df(self, genome_build: str) -> pl.DataFrame:
+        """Group PGS Catalog scores by trait and return a summary DataFrame."""
+        _ensure_prs_catalog_cache_current(str(_prs_resolve_cache_dir()))
+        lf = _prs_ui_state._catalog.scores(genome_build=genome_build)
+        df = lf.select(
+            "pgs_id", "trait_reported", "trait_efo", "trait_efo_id", "n_variants",
+        ).collect()
+
+        df = df.with_columns(
+            pl.when(pl.col("trait_efo").is_not_null() & (pl.col("trait_efo") != ""))
+            .then(pl.col("trait_efo"))
+            .otherwise(pl.col("trait_reported"))
+            .alias("trait"),
+        )
+
+        grouped = df.group_by("trait").agg(
+            pl.col("pgs_id").count().alias("n_models"),
+            pl.col("pgs_id").alias("_pgs_list"),
+            pl.col("trait_efo_id").first().alias("trait_efo_id"),
+            pl.col("n_variants").mean().cast(pl.Int64).alias("avg_variants"),
+            pl.col("n_variants").min().alias("min_variants"),
+            pl.col("n_variants").max().alias("max_variants"),
+        ).sort("n_models", descending=True)
+
+        mapping: dict[str, list[str]] = {}
+        for row in grouped.iter_rows(named=True):
+            mapping[row["trait"]] = row["_pgs_list"]
+        self._trait_to_pgs = mapping
+
+        result = grouped.with_columns(
+            pl.col("_pgs_list").list.join(", ").alias("pgs_ids"),
+        ).drop("_pgs_list")
+        return result
+
+    def load_traits(self, genome_build: str) -> Any:
+        """Load trait-grouped data into the grid."""
+        self._traits_genome_build = genome_build
+        self.traits_loaded = False
+        self.selected_traits = []
+        self.trait_selected_pgs_ids = []
+        yield
+        trait_df = self._build_trait_df(genome_build)
+        self.traits_loaded = True
+        yield from self.set_lazyframe(
+            trait_df.lazy(),
+            chunk_size=500,
+            column_overrides=_build_trait_column_overrides(),
+        )
+
+    def initialize_traits(self, genome_build: str) -> Any:
+        """Load traits on first access or when genome build changes."""
+        if self._traits_genome_build == genome_build and self.traits_loaded:
+            return
+        yield from self.load_traits(genome_build)
+
+    def handle_lf_grid_row_selection(self, model: dict) -> None:
+        """Track selected traits and resolve to PGS IDs."""
+        self.lf_grid_row_selection_model = model
+
+        selection_type: str = model.get("type", "include")
+        raw_ids: list = model.get("ids", [])
+        selected_row_ids: set[int] = {int(i) for i in raw_ids}
+
+        if selection_type == "exclude" and not selected_row_ids:
+            self.selected_traits = list(self._trait_to_pgs.keys())
+            pgs_ids: list[str] = []
+            for ids in self._trait_to_pgs.values():
+                pgs_ids.extend(ids)
+            self.trait_selected_pgs_ids = pgs_ids
+            return PRSState.sync_trait_pgs_ids(pgs_ids)  # type: ignore[return-value]
+
+        if selection_type == "include" and not selected_row_ids:
+            self.selected_traits = []
+            self.trait_selected_pgs_ids = []
+            return PRSState.sync_trait_pgs_ids([])  # type: ignore[return-value]
+
+        traits: list[str] = []
+        for row in self.lf_grid_rows:
+            row_id = row.get("__row_id__")
+            in_set = (int(row_id) in selected_row_ids) if row_id is not None else False
+            if (selection_type == "include" and in_set) or (
+                selection_type == "exclude" and not in_set
+            ):
+                trait = row.get("trait")
+                if trait:
+                    traits.append(str(trait))
+
+        self.selected_traits = traits
+        resolved = self._resolve_pgs_ids_from_traits()
+        return PRSState.sync_trait_pgs_ids(resolved)  # type: ignore[return-value]
+
+    def select_filtered_traits(self) -> Any:
+        """Select traits matching the current grid filter."""
+        traits: list[str] = []
+        for row in self.lf_grid_rows:
+            trait = row.get("trait")
+            if trait:
+                traits.append(str(trait))
+        self.selected_traits = traits
+        resolved = self._resolve_pgs_ids_from_traits()
+        return PRSState.sync_trait_pgs_ids(resolved)  # type: ignore[return-value]
+
+    def deselect_all_traits(self) -> Any:
+        """Clear all selected traits."""
+        self.selected_traits = []
+        self.trait_selected_pgs_ids = []
+        self.lf_grid_row_selection_model = {"type": "include", "ids": []}
+        return PRSState.sync_trait_pgs_ids([])  # type: ignore[return-value]
+
+    def _resolve_pgs_ids_from_traits(self) -> list[str]:
+        """Resolve selected traits to PGS IDs."""
+        pgs_ids: list[str] = []
+        for trait in self.selected_traits:
+            pgs_ids.extend(self._trait_to_pgs.get(trait, []))
+        self.trait_selected_pgs_ids = pgs_ids
+        return pgs_ids
 
 
 # ============================================================================

@@ -13,15 +13,18 @@ from __future__ import annotations
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
-from webui.state import UploadState, OutputPreviewState, PRSState
-from reflex_mui_datagrid import data_grid, lazyframe_grid
+from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
+from reflex_mui_datagrid import data_grid, lazyframe_grid, lazyframe_grid_stats_bar
 from prs_ui import (
     prs_ancestry_selector,
     prs_build_selector,
     prs_compute_button,
     prs_progress_section,
+    prs_results_table,
     prs_scores_selector,
+    trait_summary_table,
 )
+from prs_ui.grid_style import data_grid_scroll_container
 
 
 RIGHT_PANEL_TAB_STYLE = {
@@ -2613,11 +2616,123 @@ def _input_tab_content() -> rx.Component:
     )
 
 
+def _prs_mode_toggle() -> rx.Component:
+    """Segmented toggle for switching between trait-grouped and individual PRS selection."""
+    return rx.el.div(
+        rx.el.button(
+            fomantic_icon("layers", size=16),
+            " By Trait",
+            on_click=PRSState.set_prs_selection_mode("traits"),
+            class_name=rx.cond(
+                PRSState.prs_selection_mode == "traits",
+                "ui blue button",
+                "ui basic button",
+            ),
+            style={"marginRight": "0"},
+        ),
+        rx.el.button(
+            fomantic_icon("list", size=16),
+            " Individual",
+            on_click=PRSState.set_prs_selection_mode("individual"),
+            class_name=rx.cond(
+                PRSState.prs_selection_mode == "individual",
+                "ui blue button",
+                "ui basic button",
+            ),
+            style={"marginLeft": "0"},
+        ),
+        class_name="ui buttons",
+    )
+
+
+def _prs_trait_selector() -> rx.Component:
+    """Trait selection grid for grouped-by-trait PRS input."""
+    return rx.vstack(
+        rx.hstack(
+            rx.icon("layers", size=16),
+            rx.text("Select Traits", size="3", weight="bold"),
+            rx.text(
+                "Choose traits to compute PRS for all associated scoring models.",
+                size="2",
+                color="gray",
+            ),
+            spacing="2",
+            align="center",
+        ),
+        rx.hstack(
+            rx.button(
+                rx.icon("list-checks", size=14),
+                "Select Filtered",
+                on_click=PRSTraitState.select_filtered_traits,
+                variant="outline",
+                size="2",
+                disabled=~PRSTraitState.traits_loaded,  # type: ignore[operator]
+            ),
+            rx.button(
+                "Clear Selection",
+                on_click=PRSTraitState.deselect_all_traits,
+                variant="outline",
+                color_scheme="gray",
+                size="2",
+                disabled=PRSTraitState.selected_traits.length() == 0,  # type: ignore[operator]
+            ),
+            rx.spacer(),
+            rx.cond(
+                PRSTraitState.selected_traits.length() > 0,  # type: ignore[operator]
+                rx.hstack(
+                    rx.badge(
+                        rx.text(PRSTraitState.selected_traits.length(), " traits"),  # type: ignore[operator]
+                        color_scheme="blue",
+                        size="2",
+                    ),
+                    rx.badge(
+                        rx.text(PRSTraitState.trait_selected_pgs_ids.length(), " PGS IDs"),  # type: ignore[operator]
+                        color_scheme="green",
+                        size="2",
+                    ),
+                    spacing="2",
+                ),
+            ),
+            wrap="wrap",
+            spacing="2",
+            align="center",
+            width="100%",
+        ),
+        rx.cond(
+            PRSTraitState.traits_loaded,
+            rx.vstack(
+                lazyframe_grid_stats_bar(PRSTraitState),
+                data_grid_scroll_container(
+                    lazyframe_grid(
+                        PRSTraitState,
+                        height="400px",
+                        density="compact",
+                        column_header_height=56,
+                        checkbox_selection=True,
+                    ),
+                ),
+                width="100%",
+                spacing="2",
+            ),
+            rx.hstack(
+                rx.spinner(size="3"),
+                rx.text("Loading traits from PGS Catalog...", size="2", color="gray"),
+                spacing="2",
+                align="center",
+                padding="16px",
+            ),
+        ),
+        spacing="3",
+        width="100%",
+    )
+
+
 def _prs_tab_content() -> rx.Component:
     """Content for the PRS tab.
 
     Compose the reusable PRS controls locally so the result grid can use a
     row-count-based height instead of the fixed 500px height in `prs_section`.
+    Supports both trait-grouped (default) and individual PRS selection modes.
     """
     return rx.el.div(
         _tab_info_message(
@@ -2633,14 +2748,22 @@ def _prs_tab_content() -> rx.Component:
                     prs_build_selector(PRSState),
                     rx.separator(orientation="vertical", size="2"),
                     prs_ancestry_selector(PRSState),
+                    rx.spacer(),
+                    _prs_mode_toggle(),
                     spacing="4",
                     align="center",
                     wrap="wrap",
+                    width="100%",
                 ),
-                prs_scores_selector(PRSState),
+                rx.cond(
+                    PRSState.prs_selection_mode == "traits",
+                    _prs_trait_selector(),
+                    prs_scores_selector(PRSState),
+                ),
                 prs_compute_button(PRSState),
                 prs_progress_section(PRSState),
                 _prs_results_content(),
+                trait_summary_table(PRSState),
                 width="100%",
                 spacing="4",
             ),
