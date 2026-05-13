@@ -14,11 +14,40 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.state import UploadState, OutputPreviewState, PRSState
-from reflex_mui_datagrid import lazyframe_grid
+from reflex_mui_datagrid import data_grid, lazyframe_grid
 from prs_ui import (
-    prs_results_table,
-    prs_section,
+    prs_ancestry_selector,
+    prs_build_selector,
+    prs_compute_button,
+    prs_progress_section,
+    prs_scores_selector,
 )
+
+
+RIGHT_PANEL_TAB_STYLE = {
+    "cursor": "pointer",
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "8px",
+    "fontSize": "1rem",
+    "fontWeight": "600",
+    "padding": "14px 18px",
+    "minHeight": "52px",
+}
+
+RIGHT_PANEL_TAB_BADGE_STYLE = {
+    "marginLeft": "4px",
+    "fontSize": "0.8rem",
+    "padding": "4px 7px",
+}
+
+OUTPUT_CARD_META_ROW_STYLE = {
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "12px",
+    "marginTop": "8px",
+    "flexWrap": "wrap",
+}
 
 
 # ============================================================================
@@ -178,11 +207,11 @@ def file_status_label(status: rx.Var[str]) -> rx.Component:
     """Return a colored label based on file status (DNA palette: green/yellow/red/grey)."""
     return rx.match(
         status,
-        ("completed", rx.el.span("completed", class_name="ui mini green label")),
-        ("running", rx.el.span("running", class_name="ui mini yellow label")),
-        ("uploaded", rx.el.span("uploaded", class_name="ui mini label")),
-        ("error", rx.el.span("error", class_name="ui mini red label")),
-        rx.el.span(status, class_name="ui mini grey label"),
+        ("completed", rx.el.span("completed", class_name="ui green label")),
+        ("running", rx.el.span("running", class_name="ui yellow label")),
+        ("uploaded", rx.el.span("uploaded", class_name="ui label")),
+        ("error", rx.el.span("error", class_name="ui red label")),
+        rx.el.span(status, class_name="ui grey label"),
     )
 
 
@@ -493,8 +522,8 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
             # Expand/collapse chevron
             rx.cond(
                 is_selected,
-                fomantic_icon("chevron-down", size=12, color="#fff", style={"marginRight": "4px", "flexShrink": "0"}),
-                fomantic_icon("chevron-right", size=12, color="#888", style={"marginRight": "4px", "flexShrink": "0"}),
+                fomantic_icon("chevron-down", size=14, color="#fff", style={"marginRight": "6px", "flexShrink": "0"}),
+                fomantic_icon("chevron-right", size=14, color="#888", style={"marginRight": "6px", "flexShrink": "0"}),
             ),
             # Name + upload date stacked
             rx.el.div(
@@ -502,11 +531,11 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                 rx.el.div(
                     display_name,
                     style={
-                        "fontSize": "0.85rem", 
+                        "fontSize": "1rem",
                         "overflow": "hidden", 
                         "textOverflow": "ellipsis", 
                         "whiteSpace": "nowrap",
-                        "fontWeight": "500",
+                        "fontWeight": "600",
                     },
                 ),
                 # Upload date
@@ -515,7 +544,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                     rx.el.div(
                         upload_date,
                         style={
-                            "fontSize": "0.65rem",
+                            "fontSize": "0.78rem",
                             "color": rx.cond(is_selected, "rgba(255,255,255,0.7)", "#999"),
                             "lineHeight": "1.2",
                         },
@@ -528,11 +557,11 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
             file_status_label(UploadState.file_statuses[filename]),
             # Delete button
             rx.el.button(
-                fomantic_icon("trash-2", size=10),
+                fomantic_icon("trash-2", size=12),
                 on_click=lambda: UploadState.delete_file(filename),
-                class_name=rx.cond(is_selected, "ui mini icon inverted button", "ui mini icon button"),
+                class_name=rx.cond(is_selected, "ui small icon inverted button", "ui small icon button"),
                 title="Delete sample",
-                style={"padding": "3px 5px", "marginLeft": "4px", "flexShrink": "0"},
+                style={"padding": "6px 8px", "marginLeft": "6px", "flexShrink": "0"},
             ),
             on_click=lambda: UploadState.select_file(filename),
             role="button",
@@ -541,7 +570,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                 "display": "flex",
                 "alignItems": "center",
                 "cursor": "pointer",
-                "padding": "6px 8px",
+                "padding": "10px 10px",
             },
         ),
         
@@ -992,12 +1021,12 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
             # Content
             rx.el.div(
                 rx.el.div(
-                    rx.el.strong(module["title"], style={"fontSize": "0.95rem"}),
-                    style={"marginBottom": "4px"},
+                    rx.el.strong(module["title"], style={"fontSize": "1.05rem"}),
+                    style={"marginBottom": "5px"},
                 ),
                 rx.el.div(
                     module["description"],
-                    style={"fontSize": "0.85rem", "color": "#666", "lineHeight": "1.3", "marginBottom": "6px"},
+                    style={"fontSize": "0.94rem", "color": "#666", "lineHeight": "1.35", "marginBottom": "8px"},
                 ),
                 # Source repo badge (compact, muted)
                 rx.cond(
@@ -1005,7 +1034,7 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                     rx.el.span(
                         module["repo_id"].to(str),
                         class_name="ui mini label",
-                        style={"fontSize": "0.7rem", "fontWeight": "400", "color": "#888"},
+                        style={"fontSize": "0.78rem", "fontWeight": "400", "color": "#888"},
                     ),
                     rx.fragment(),
                 ),
@@ -1024,7 +1053,7 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
         style={
             "cursor": rx.cond(has_file, "pointer", "not-allowed"),
             "margin": "0 0 10px 0",
-            "padding": "14px",
+            "padding": "16px",
             "border": "1px solid #e0e0e0",
             "borderRadius": "6px",
             "backgroundColor": rx.cond(
@@ -1059,11 +1088,11 @@ def file_type_icon(file_type: rx.Var[str]) -> rx.Component:
     """Return an icon for file type (DNA palette)."""
     return rx.match(
         file_type,
-        ("weights", fomantic_icon("scale", size=18, color="#2185d0")),
-        ("annotations", fomantic_icon("file-text", size=18, color="#21ba45")),
-        ("studies", fomantic_icon("book-open", size=18, color="#00b5ad")),
-        ("vcf_export", fomantic_icon("dna", size=18, color="#6435c9")),
-        fomantic_icon("file", size=18, color="#767676"),
+        ("weights", fomantic_icon("scale", size=22, color="#2185d0")),
+        ("annotations", fomantic_icon("file-text", size=22, color="#21ba45")),
+        ("studies", fomantic_icon("book-open", size=22, color="#00b5ad")),
+        ("vcf_export", fomantic_icon("dna", size=22, color="#6435c9")),
+        fomantic_icon("file", size=22, color="#767676"),
     )
 
 
@@ -1071,11 +1100,11 @@ def file_type_label(file_type: rx.Var[str]) -> rx.Component:
     """Return a colored label for file type (DNA palette: blue/green/teal)."""
     return rx.match(
         file_type,
-        ("weights", rx.el.span("weights", class_name="ui mini blue label")),
-        ("annotations", rx.el.span("annotations", class_name="ui mini green label")),
-        ("studies", rx.el.span("studies", class_name="ui mini teal label")),
-        ("vcf_export", rx.el.span("vcf", class_name="ui mini violet label")),
-        rx.el.span(file_type, class_name="ui mini grey label"),
+        ("weights", rx.el.span("weights", class_name="ui blue label")),
+        ("annotations", rx.el.span("annotations", class_name="ui green label")),
+        ("studies", rx.el.span("studies", class_name="ui teal label")),
+        ("vcf_export", rx.el.span("vcf", class_name="ui violet label")),
+        rx.el.span(file_type, class_name="ui grey label"),
     )
 
 
@@ -1129,36 +1158,93 @@ def _materialization_badge(
             rx.el.div(
                 rx.cond(
                     needs_materialization,
-                    fomantic_icon("circle-alert", size=10, color="#f2711c", style={"marginRight": "3px"}),
-                    fomantic_icon("circle-check", size=10, color="#21ba45", style={"marginRight": "3px"}),
+                    fomantic_icon("circle-alert", size=12, color="#f2711c", style={"marginRight": "4px"}),
+                    fomantic_icon("circle-check", size=12, color="#21ba45", style={"marginRight": "4px"}),
                 ),
                 rx.el.span(
                     materialized_at,
-                    style={"fontSize": "0.7rem", "color": "#888"},
+                    style={"fontSize": "0.86rem", "color": "#666"},
                 ),
                 rx.cond(
                     needs_materialization,
                     rx.el.span(
                         " stale",
                         class_name="ui mini orange label",
-                        style={"marginLeft": "4px", "fontSize": "0.6rem", "padding": "2px 4px"},
+                        style={"marginLeft": "4px", "fontSize": "0.72rem", "padding": "3px 5px"},
                     ),
                     rx.fragment(),
                 ),
                 style={"display": "flex", "alignItems": "center"},
             ),
             rx.el.div(
-                fomantic_icon("circle-x", size=10, color="#999", style={"marginRight": "3px"}),
-                rx.el.span("not materialized", style={"fontSize": "0.7rem", "color": "#999"}),
+                fomantic_icon("circle-x", size=12, color="#999", style={"marginRight": "4px"}),
+                rx.el.span("not materialized", style={"fontSize": "0.86rem", "color": "#999"}),
                 style={"display": "flex", "alignItems": "center"},
             ),
         ),
-        style={"marginTop": "2px"},
+        style={"display": "inline-flex", "alignItems": "center"},
+    )
+
+
+def _run_id_badge(file_info: rx.Var[dict]) -> rx.Component:
+    """Compact 'run abc12345' label under an output card, linked to the Dagster run page.
+
+    Hidden when the file's materialization has no associated run_id (e.g.,
+    runless events from PRS checkpoints or pre-tracking historical files).
+    """
+    run_id = file_info["run_id"].to(str)
+    run_short = file_info["run_short"].to(str)
+    dagster_url = UploadState.dagster_web_url + "/runs/" + run_id
+    return rx.cond(
+        run_short != "",
+        rx.el.a(
+            fomantic_icon("history", size=13, color="#2185d0"),
+            " run ",
+            rx.el.code(
+                run_short,
+                style={
+                    "fontSize": "0.86rem",
+                    "background": "transparent",
+                    "padding": "0",
+                    "color": "#2185d0",
+                    "fontWeight": "700",
+                },
+            ),
+            href=dagster_url,
+            target="_blank",
+            title="Open the run that produced this file in Dagster",
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "5px",
+                "fontSize": "0.86rem",
+                "fontWeight": "600",
+                "color": "#2185d0",
+                "textDecoration": "none",
+                "padding": "4px 8px",
+                "border": "1px solid #d4e6f6",
+                "borderRadius": "999px",
+                "backgroundColor": "#f3f8fc",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
+def _output_card_meta_row(file_info: rx.Var[dict]) -> rx.Component:
+    """Single metadata row for output cards: materialized date plus run link."""
+    return rx.el.div(
+        _materialization_badge(
+            file_info["materialized_at"].to(str),
+            file_info["needs_materialization"].to(bool),
+        ),
+        _run_id_badge(file_info),
+        style=OUTPUT_CARD_META_ROW_STYLE,
     )
 
 
 def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
-    """Compact card for a single output file with view and download buttons."""
+    """Card for a single output file with view and download buttons."""
     download_url = rx.cond(
         file_info["type"].to(str) == "vcf_export",
         UploadState.backend_api_url + "/api/download-vcf/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str),
@@ -1175,54 +1261,69 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
                     file_info["name"].to(str),
                     on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
                     style={
-                        "fontSize": "0.85rem",
-                        "fontWeight": "bold",
+                        "fontSize": "1.12rem",
+                        "fontWeight": "700",
                         "color": "#2185d0",
                         "cursor": "pointer",
+                        "lineHeight": "1.25",
+                        "wordBreak": "break-word",
                     },
                 ),
                 rx.el.div(
                     file_type_label(file_info["type"]),
                     rx.el.span(
-                        file_info["module"].to(str),
-                        class_name="ui mini label",
-                        style={"marginLeft": "4px"},
+                        "Produced by ",
+                        rx.el.strong(file_info["module"].to(str)),
+                        " module",
+                        style={
+                            "color": "#444",
+                            "fontSize": "0.96rem",
+                            "marginLeft": "6px",
+                        },
                     ),
                     rx.el.span(
                         file_info["size_mb"].to(str),
                         " MB",
-                        style={"color": "#888", "fontSize": "0.75rem", "marginLeft": "8px"},
+                        class_name="ui label",
+                        style={
+                            "color": "#666",
+                            "fontSize": "0.86rem",
+                            "marginLeft": "8px",
+                        },
                     ),
-                    style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
+                    style={
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "6px",
+                        "marginTop": "6px",
+                        "flexWrap": "wrap",
+                    },
                 ),
-                _materialization_badge(
-                    file_info["materialized_at"].to(str),
-                    file_info["needs_materialization"].to(bool),
-                ),
-                style={"flex": "1", "marginLeft": "10px"},
+                _output_card_meta_row(file_info),
+                style={"flex": "1", "marginLeft": "14px", "minWidth": "0"},
             ),
             # Action buttons
             rx.el.div(
                 # View in grid button
                 rx.el.button(
-                    fomantic_icon("eye", size=14),
+                    fomantic_icon("eye", size=15),
                     on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
-                    class_name="ui mini icon button",
+                    class_name="ui icon button",
                     title="Preview in data grid",
                 ),
                 # Download button
                 rx.el.a(
-                    fomantic_icon("download", size=14),
+                    fomantic_icon("download", size=15),
                     href=download_url,
                     download=file_info["name"].to(str),
-                    class_name="ui mini icon primary button",
+                    class_name="ui icon primary button",
                 ),
-                style={"display": "flex", "gap": "4px", "marginLeft": "auto"},
+                style={"display": "flex", "gap": "8px", "marginLeft": "auto", "flexShrink": "0"},
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
         style={
-            "padding": "8px 10px",
+            "padding": "16px 12px",
             "borderBottom": "1px solid #eee",
         },
     )
@@ -1240,7 +1341,7 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
     return rx.el.div(
         rx.el.div(
             # Report icon
-            fomantic_icon("file-text", size=20, color="#e03997"),
+            fomantic_icon("file-text", size=22, color="#e03997"),
             # File info
             rx.el.div(
                 rx.el.a(
@@ -1248,115 +1349,50 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
                     href=view_url,
                     target="_blank",
                     style={
-                        "fontSize": "0.85rem",
-                        "fontWeight": "bold",
+                        "fontSize": "1.12rem",
+                        "fontWeight": "700",
                         "color": "#e03997",
                         "textDecoration": "none",
                         "cursor": "pointer",
+                        "lineHeight": "1.25",
+                        "wordBreak": "break-word",
                     },
                 ),
                 rx.el.div(
-                    rx.el.span("report", class_name="ui mini pink label"),
+                    rx.el.span("report", class_name="ui pink label"),
                     rx.el.span(
                         file_info["size_kb"].to(str),
                         " KB",
-                        style={"color": "#888", "fontSize": "0.75rem", "marginLeft": "8px"},
+                        style={"color": "#666", "fontSize": "0.86rem", "marginLeft": "8px"},
                     ),
-                    style={"display": "flex", "alignItems": "center", "gap": "4px", "marginTop": "2px"},
+                    style={"display": "flex", "alignItems": "center", "gap": "6px", "marginTop": "6px"},
                 ),
-                _materialization_badge(
-                    file_info["materialized_at"].to(str),
-                    file_info["needs_materialization"].to(bool),
-                ),
-                style={"flex": "1", "marginLeft": "10px"},
+                _output_card_meta_row(file_info),
+                style={"flex": "1", "marginLeft": "14px", "minWidth": "0"},
             ),
             # View button (opens in new tab)
             rx.el.a(
-                fomantic_icon("external-link", size=14),
+                fomantic_icon("external-link", size=15),
                 " View",
                 href=view_url,
                 target="_blank",
-                class_name="ui mini pink button",
-                style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "4px"},
+                class_name="ui pink button",
+                style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "6px", "flexShrink": "0"},
             ),
             # Download button
             rx.el.a(
-                fomantic_icon("download", size=14),
+                fomantic_icon("download", size=15),
                 href=view_url,
                 download=file_info["name"].to(str),
-                class_name="ui mini icon button",
-                style={"marginLeft": "6px"},
+                class_name="ui icon button",
+                style={"marginLeft": "8px", "flexShrink": "0"},
             ),
             style={"display": "flex", "alignItems": "center", "width": "100%"},
         ),
         style={
-            "padding": "10px 12px",
+            "padding": "16px 12px",
             "borderBottom": "1px solid #eee",
         },
-    )
-
-
-def _outputs_tab_menu() -> rx.Component:
-    """Sub-tab menu for switching between Data Files and Reports."""
-    return rx.el.div(
-        rx.el.a(
-            fomantic_icon("database", size=14, color=rx.cond(UploadState.outputs_active_tab == "data", "#00b5ad", "#888")),
-            " Data Files",
-            rx.el.span(
-                UploadState.output_file_count,
-                class_name="ui mini circular label",
-                style={"marginLeft": "6px"},
-            ),
-            class_name=rx.cond(
-                UploadState.outputs_active_tab == "data",
-                "active item",
-                "item",
-            ),
-            on_click=lambda: UploadState.switch_outputs_tab("data"),
-            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
-        ),
-        rx.el.a(
-            fomantic_icon("file-text", size=14, color=rx.cond(UploadState.outputs_active_tab == "reports", "#e03997", "#888")),
-            " Reports",
-            rx.cond(
-                UploadState.has_report_files,
-                rx.el.span(
-                    UploadState.report_file_count,
-                    class_name="ui mini circular pink label",
-                    style={"marginLeft": "6px"},
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.outputs_active_tab == "reports",
-                "active item",
-                "item",
-            ),
-            on_click=lambda: UploadState.switch_outputs_tab("reports"),
-            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
-        ),
-        rx.el.a(
-            fomantic_icon("chart-bar", size=14, color=rx.cond(UploadState.outputs_active_tab == "prs", "#f2711c", "#888")),
-            " PRS",
-            rx.cond(
-                PRSState.prs_results.length() > 0,
-                rx.el.span(
-                    PRSState.prs_results.length(),
-                    class_name="ui mini circular orange label",
-                    style={"marginLeft": "6px"},
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.outputs_active_tab == "prs",
-                "active item",
-                "item",
-            ),
-            on_click=lambda: UploadState.switch_outputs_tab("prs"),
-            style={"cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "4px"},
-        ),
-        class_name="ui top attached tabular menu",
-        style={"marginBottom": "0"},
     )
 
 
@@ -1434,10 +1470,6 @@ def _data_files_content() -> rx.Component:
             _vcf_export_button(),
             rx.el.div(
                 rx.foreach(UploadState.output_files, output_file_card),
-                style={
-                    "maxHeight": "260px",
-                    "overflowY": "auto",
-                },
             ),
         ),
         rx.el.div(
@@ -1461,10 +1493,6 @@ def _reports_content() -> rx.Component:
         UploadState.has_report_files,
         rx.el.div(
             rx.foreach(UploadState.report_files, report_file_card),
-            style={
-                "maxHeight": "260px",
-                "overflowY": "auto",
-            },
         ),
         rx.el.div(
             fomantic_icon("file-text", size=30, color="#ccc"),
@@ -1482,20 +1510,113 @@ def _reports_content() -> rx.Component:
 
 
 def _prs_results_content() -> rx.Component:
-    """Content for the PRS sub-tab — full PRS results table with filter/sort/interpretation."""
+    """Full PRS results table with filter/sort/interpretation."""
     return rx.cond(
         PRSState.prs_results.length() > 0,
-        rx.el.div(
-            rx.theme(
-                prs_results_table(PRSState),
-                has_background=False,
+        rx.theme(
+            rx.vstack(
+                rx.callout(
+                    "PRS results are statistical estimates for research purposes. "
+                    "They should not be used as clinical diagnoses. "
+                    "Consult a healthcare professional for medical interpretation.",
+                    icon="shield_alert",
+                    color_scheme="amber",
+                    size="1",
+                    width="100%",
+                ),
+                rx.callout(
+                    "Raw PRS scores are NOT comparable across different PGS models. "
+                    "Each model uses a different scale, number of variants, and weighting. "
+                    "A higher score in one model does not mean higher risk than a lower "
+                    "score in another model. Compare scores only within the same PGS ID.",
+                    icon="info",
+                    color_scheme="blue",
+                    size="1",
+                    width="100%",
+                ),
+                rx.callout(
+                    "Percentiles are estimated using 1000 Genomes reference distributions "
+                    "(matched to your selected ancestry group) when available. "
+                    "For scores without reference data, a theoretical distribution from "
+                    "allele frequencies or an AUROC-based approximation is used. "
+                    "The method is shown in the Pct. Method column. "
+                    "Reference Data column indicates whether precomputed "
+                    "population distributions exist.",
+                    icon="info",
+                    color_scheme="iris",
+                    size="1",
+                    width="100%",
+                ),
+                rx.cond(
+                    PRSState.low_match_warning,
+                    rx.callout(
+                        "One or more scores have a match rate below 10%. "
+                        "This may indicate a genome build mismatch between "
+                        "the VCF and scoring files. Check your genome build selection.",
+                        icon="triangle_alert",
+                        color_scheme="red",
+                        size="1",
+                        width="100%",
+                    ),
+                ),
+                rx.hstack(
+                    fomantic_icon("chart-bar", size=16),
+                    rx.text("PRS Results", size="3", weight="bold"),
+                    rx.spacer(),
+                    rx.button(
+                        fomantic_icon("download", size=14),
+                        "Download CSV",
+                        on_click=PRSState.download_prs_results_csv,
+                        color_scheme="green",
+                        size="2",
+                    ),
+                    align="center",
+                    spacing="2",
+                    width="100%",
+                ),
+                _prs_interpretation_guide(),
+                data_grid(
+                    rows=PRSState.prs_results_rows,
+                    columns=PRSState.prs_results_columns,
+                    column_grouping_model=PRSState.prs_results_column_groups,
+                    row_id_field="id",
+                    pagination=False,
+                    hide_footer=True,
+                    density="compact",
+                    height=PRSState.prs_results_grid_height,
+                    disable_row_selection_on_click=True,
+                    detail_columns=[
+                        "risk_level", "risk_hint", "summary",
+                        "reference_source_detail", "effect_size_detail",
+                    ],
+                    detail_labels={
+                        "risk_level": "Risk Level",
+                        "risk_hint": "Interpretation",
+                        "summary": "Quality Summary",
+                        "reference_source_detail": "Reference Data Source",
+                        "effect_size_detail": "Effect Size & Classification",
+                    },
+                    detail_badge_fields=["risk_level"],
+                    detail_badge_colors={
+                        "High predisposition": ["#c62828", "#ffcdd2"],
+                        "Above average predisposition": ["#e65100", "#fff3e0"],
+                        "Average predisposition": ["#455a64", "#eceff1"],
+                        "Below average predisposition": ["#2e7d32", "#c8e6c9"],
+                    },
+                ),
+                rx.text(
+                    "AUROC, effect size, and population are from the best available "
+                    "PGS Catalog evaluation study (largest sample, European-ancestry preferred). "
+                    "Quality combines AUROC (model accuracy) and match rate (genotype coverage). "
+                    "Results are most accurate when your ancestry matches the evaluation population. "
+                    "Click the chevron on any row to see detailed interpretation.",
+                    size="1",
+                    color="gray",
+                ),
+                spacing="3",
+                width="100%",
             ),
-            style={
-                "maxHeight": "520px",
-                "overflowY": "auto",
-                "overflowX": "hidden",
-                "padding": "8px",
-            },
+            has_background=False,
         ),
         rx.el.div(
             fomantic_icon("chart-bar", size=30, color="#ccc"),
@@ -1512,6 +1633,81 @@ def _prs_results_content() -> rx.Component:
     )
 
 
+def _prs_interpretation_guide() -> rx.Component:
+    """Collapsible guide explaining how to read PRS results.
+
+    Uses an inline span in the native summary so the browser disclosure
+    triangle and title stay on the same baseline.
+    """
+    return rx.el.details(
+        rx.el.summary(
+            rx.el.span(
+                "How to interpret PRS results",
+                style={
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "cursor": "pointer",
+                    "verticalAlign": "middle",
+                },
+            ),
+            style={
+                "cursor": "pointer",
+                "lineHeight": "1.4",
+            },
+        ),
+        rx.vstack(
+            rx.text(
+                "The raw PRS score (e.g. 0.098) is model-specific and unitless - "
+                "it cannot be read as 'protective' or 'risky' on its own, and scores "
+                "from different PGS models cannot be compared to each other.",
+                size="2",
+            ),
+            rx.text(
+                "The percentile is the key number. It shows where your score falls "
+                "relative to a reference population of the same ancestry. "
+                "For virtually all standard PRS models, higher percentile = more "
+                "genetic variants associated with increased risk for that trait.",
+                size="2",
+            ),
+            rx.hstack(
+                rx.badge("< 25th", color_scheme="blue", size="1", variant="soft"),
+                rx.text("Below average predisposition", size="2"),
+                spacing="2",
+                align="center",
+            ),
+            rx.hstack(
+                rx.badge("25th - 75th", color_scheme="gray", size="1", variant="soft"),
+                rx.text("Average predisposition", size="2"),
+                spacing="2",
+                align="center",
+            ),
+            rx.hstack(
+                rx.badge("75th - 90th", color_scheme="orange", size="1", variant="soft"),
+                rx.text("Above average predisposition", size="2"),
+                spacing="2",
+                align="center",
+            ),
+            rx.hstack(
+                rx.badge("> 90th", color_scheme="red", size="1", variant="soft"),
+                rx.text("High predisposition", size="2"),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                "PRS captures only inherited genetic variants - not lifestyle, "
+                "environment, or treatment. Most people with a high PRS never develop "
+                "the condition, and many with a low PRS do. This is a research tool, "
+                "not a diagnostic test.",
+                size="2",
+                color="var(--gray-11)",
+            ),
+            spacing="2",
+            padding_top="8px",
+            padding_x="4px",
+        ),
+    )
+
+
 def _output_preview_grid() -> rx.Component:
     """Inline output preview grid inside the Outputs section.
 
@@ -1522,7 +1718,7 @@ def _output_preview_grid() -> rx.Component:
     return rx.cond(
         OutputPreviewState.output_preview_expanded,
         rx.el.div(
-            # Header bar with file name, row count, and close button
+            # Header bar with file name and row count
             rx.el.div(
                 rx.el.div(
                     fomantic_icon("eye", size=16, color="#00b5ad"),
@@ -1549,20 +1745,18 @@ def _output_preview_grid() -> rx.Component:
                         ),
                         rx.fragment(),
                     ),
-                    style={"display": "flex", "alignItems": "center"},
-                ),
-                rx.el.button(
-                    fomantic_icon("x", size=14, color="#888"),
-                    on_click=OutputPreviewState.clear_output_preview,
-                    class_name="ui mini icon basic button",
-                    title="Close preview",
+                    style={
+                        "display": "flex",
+                        "alignItems": "center",
+                        "flexWrap": "wrap",
+                        "gap": "4px",
+                    },
                 ),
                 style={
                     "display": "flex",
-                    "justifyContent": "space-between",
                     "alignItems": "center",
                     "padding": "8px 0",
-                    "marginBottom": "8px",
+                    "marginBottom": "10px",
                     "borderBottom": "1px solid #e0e0e0",
                 },
             ),
@@ -1601,7 +1795,7 @@ def _output_preview_grid() -> rx.Component:
                     show_description_in_header=True,
                     density="compact",
                     column_header_height=70,
-                    height="420px",
+                    height="72vh",
                     width="100%",
                     debug_log=False,
                 ),
@@ -1610,80 +1804,10 @@ def _output_preview_grid() -> rx.Component:
                 },
             ),
             style={
-                "marginTop": "12px",
-                "padding": "12px",
-                "background": "#f8fffe",
-                "borderRadius": "4px",
-                "border": "1px solid #d4edda",
+                "marginTop": "18px",
             },
         ),
         rx.fragment(),
-    )
-
-
-def outputs_section() -> rx.Component:
-    """
-    Collapsible section showing output files for the selected sample.
-    Contains two sub-tabs: Data Files (parquets) and Reports (HTML).
-    When the user clicks the eye icon on a data file, an inline preview
-    grid appears below the file list within this same section.
-    """
-    return rx.el.div(
-        # Foldable header (teal accent to match ui teal segment)
-        _collapsible_header(
-            expanded=UploadState.outputs_expanded,
-            icon_name="folder-output",
-            title="Outputs",
-            right_badge=rx.el.span(
-                UploadState.total_output_count,
-                " files",
-                class_name="ui mini teal label",
-            ),
-            on_toggle=UploadState.toggle_outputs,
-            accent_color="#00b5ad",
-        ),
-        
-        # Expanded content
-        rx.cond(
-            UploadState.outputs_expanded,
-            rx.cond(
-                UploadState.has_output_files | (PRSState.prs_results.length() > 0),
-                # Tabbed content + inline preview
-                rx.el.div(
-                    _outputs_tab_menu(),
-                    rx.el.div(
-                        rx.match(
-                            UploadState.outputs_active_tab,
-                            ("data", _data_files_content()),
-                            ("reports", _reports_content()),
-                            ("prs", _prs_results_content()),
-                            _data_files_content(),  # default
-                        ),
-                        class_name="ui bottom attached segment",
-                        style={"padding": "0", "border": "1px solid #e0e0e0", "borderTop": "none"},
-                    ),
-                    # Output preview grid (appears when user clicks eye icon)
-                    _output_preview_grid(),
-                ),
-                # Empty state - prompt to analyze
-                rx.el.div(
-                    fomantic_icon("inbox", size=36, color="#ccc"),
-                    rx.el.div(
-                        "No outputs yet",
-                        style={"color": "#888", "marginTop": "10px", "fontSize": "1rem", "fontWeight": "500"},
-                    ),
-                    rx.el.div(
-                        "Run an analysis to generate output files",
-                        style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.85rem"},
-                    ),
-                    style={"textAlign": "center", "padding": "24px 16px"},
-                ),
-            ),
-            rx.box(),
-        ),
-        
-        style={"padding": "0", "overflow": "hidden"},
-        id="outputs-section",
     )
 
 
@@ -1752,105 +1876,104 @@ def quality_filter_stats_banner() -> rx.Component:
 
 
 def input_vcf_preview_section() -> rx.Component:
-    """Collapsible section showing the selected input VCF file.
+    """Show the selected input VCF file without an inner accordion.
 
     The grid is rendered once and kept mounted to avoid DOM destruction on
     state changes (which causes blinking).  Only the initial loading spinner
     and error overlay are conditionally shown on top.
     """
     return rx.el.div(
-        _collapsible_header(
-            expanded=UploadState.vcf_preview_expanded,
-            icon_name="database",
-            title="Normalized VCF Preview",
-            right_badge=rx.el.div(
-                # File name label
-                rx.cond(
-                    UploadState.preview_source_label != "",
-                    rx.el.span(
-                        UploadState.preview_source_label,
-                        class_name="ui mini violet label",
-                        style={"marginRight": "6px"},
-                    ),
-                    rx.fragment(),
-                ),
-                # Row count badge
+        rx.el.div(
+            fomantic_icon("database", size=16, color="#6435c9"),
+            rx.el.strong(
+                "Normalized VCF Preview",
+                style={"marginLeft": "6px"},
+            ),
+            rx.cond(
+                UploadState.preview_source_label != "",
                 rx.el.span(
-                    UploadState.vcf_preview_row_count,
-                    " rows",
+                    UploadState.preview_source_label,
                     class_name="ui mini violet label",
+                    style={"marginLeft": "8px"},
                 ),
-                style={"display": "flex", "alignItems": "center"},
+                rx.fragment(),
             ),
-            on_toggle=UploadState.toggle_vcf_preview,
-            accent_color="#6435c9",
+            rx.el.span(
+                UploadState.vcf_preview_row_count,
+                " rows",
+                class_name="ui mini violet label",
+                style={"marginLeft": "4px"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "flexWrap": "wrap",
+                "gap": "4px",
+                "padding": "4px 0 10px 0",
+                "marginBottom": "10px",
+                "borderBottom": "1px solid #e0d8f0",
+            },
         ),
+        # Quality filter statistics banner
+        quality_filter_stats_banner(),
+        # Initial-load spinner (only during first VCF scan, NOT scroll loads)
         rx.cond(
-            UploadState.vcf_preview_expanded,
+            UploadState.vcf_preview_loading,
             rx.el.div(
-                # Quality filter statistics banner
-                quality_filter_stats_banner(),
-                # Initial-load spinner (only during first VCF scan, NOT scroll loads)
-                rx.cond(
-                    UploadState.vcf_preview_loading,
-                    rx.el.div(
-                        rx.el.i("", class_name="spinner loading icon"),
-                        rx.el.span(" Loading VCF preview...", style={"marginLeft": "8px"}),
-                        style={"padding": "16px", "color": "#666"},
-                    ),
-                    rx.fragment(),
-                ),
-                # Error overlay
-                rx.cond(
-                    UploadState.has_vcf_preview_error,
-                    rx.el.div(
-                        rx.el.div(
-                            rx.el.strong("Failed to load VCF preview"),
-                            rx.el.div(
-                                UploadState.vcf_preview_error,
-                                style={"fontSize": "0.85rem", "marginTop": "6px"},
-                            ),
-                            class_name="content",
-                        ),
-                        class_name="ui negative message",
-                        style={"margin": "0"},
-                    ),
-                    rx.fragment(),
-                ),
-                # Grid – always mounted once UploadState inherits from the mixin.
-                # Hidden via CSS when no data loaded yet (avoids DOM destroy/recreate).
-                rx.el.div(
-                    lazyframe_grid(
-                        UploadState,
-                        show_toolbar=True,
-                        show_description_in_header=True,
-                        density="compact",
-                        column_header_height=70,
-                        height="420px",
-                        width="100%",
-                        debug_log=False,
-                    ),
-                    style={
-                        "display": rx.cond(UploadState.has_vcf_preview, "block", "none"),
-                    },
-                ),
-                # Empty state placeholder (only when nothing loaded and no error)
-                rx.cond(
-                    ~UploadState.has_vcf_preview & ~UploadState.has_vcf_preview_error & ~UploadState.vcf_preview_loading,
-                    rx.el.div(
-                        fomantic_icon("inbox", size=30, color="#ccc"),
-                        rx.el.div(
-                            "No rows to preview",
-                            style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
-                        ),
-                        style={"textAlign": "center", "padding": "20px 16px"},
-                    ),
-                    rx.fragment(),
-                ),
+                rx.el.i("", class_name="spinner loading icon"),
+                rx.el.span(" Loading VCF preview...", style={"marginLeft": "8px"}),
+                style={"padding": "16px", "color": "#666"},
             ),
-            rx.box(),
+            rx.fragment(),
         ),
-        style={"padding": "0", "overflow": "hidden"},
+        # Error overlay
+        rx.cond(
+            UploadState.has_vcf_preview_error,
+            rx.el.div(
+                rx.el.div(
+                    rx.el.strong("Failed to load VCF preview"),
+                    rx.el.div(
+                        UploadState.vcf_preview_error,
+                        style={"fontSize": "0.85rem", "marginTop": "6px"},
+                    ),
+                    class_name="content",
+                ),
+                class_name="ui negative message",
+                style={"margin": "0"},
+            ),
+            rx.fragment(),
+        ),
+        # Grid – always mounted once UploadState inherits from the mixin.
+        # Hidden via CSS when no data loaded yet (avoids DOM destroy/recreate).
+        rx.el.div(
+            lazyframe_grid(
+                UploadState,
+                show_toolbar=True,
+                show_description_in_header=True,
+                density="compact",
+                column_header_height=70,
+                height="calc(100vh - 270px)",
+                width="100%",
+                debug_log=False,
+            ),
+            style={
+                "display": rx.cond(UploadState.has_vcf_preview, "block", "none"),
+            },
+        ),
+        # Empty state placeholder (only when nothing loaded and no error)
+        rx.cond(
+            ~UploadState.has_vcf_preview & ~UploadState.has_vcf_preview_error & ~UploadState.vcf_preview_loading,
+            rx.el.div(
+                fomantic_icon("inbox", size=30, color="#ccc"),
+                rx.el.div(
+                    "No rows to preview",
+                    style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
+                ),
+                style={"textAlign": "center", "padding": "20px 16px"},
+            ),
+            rx.fragment(),
+        ),
+        style={"padding": "0"},
         id="input-vcf-preview-section",
     )
 
@@ -1875,19 +1998,19 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
             # Latest badge for first run
             rx.cond(
                 is_latest,
-                rx.el.span("latest", class_name="ui mini teal label", style={"marginLeft": "6px"}),
+                rx.el.span("latest", class_name="ui teal label", style={"marginLeft": "6px"}),
                 rx.box(),
             ),
             # Timestamp
             rx.el.span(
                 run["started_at"].to(str),
-                style={"marginLeft": "12px", "color": "#666", "fontSize": "0.85rem", "flex": "1"},
+                style={"marginLeft": "12px", "color": "#666", "fontSize": "0.95rem", "flex": "1"},
             ),
             # Module count
             rx.el.span(
                 run["modules"].to(list).length(),
                 " modules",
-                class_name="ui mini label",
+                class_name="ui label",
                 style={"marginRight": "8px"},
             ),
             # Expand/collapse button
@@ -1897,8 +2020,8 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                     fomantic_icon("chevron-up", size=16),
                     fomantic_icon("chevron-down", size=16),
                 ),
-                class_name="ui mini icon button",
-                style={"padding": "6px", "pointerEvents": "none"},  # Let parent handle click
+                class_name="ui icon button",
+                style={"padding": "8px", "pointerEvents": "none"},  # Let parent handle click
             ),
             style={"display": "flex", "alignItems": "center", "cursor": "pointer"},
             on_click=lambda: UploadState.toggle_run_expansion(run_id),
@@ -1910,10 +2033,10 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
             rx.el.div(
                 # Modules list
                 rx.el.div(
-                    rx.el.span("Modules: ", style={"color": "#666", "fontSize": "0.85rem"}),
+                    rx.el.span("Modules: ", style={"color": "#666", "fontSize": "0.95rem"}),
                     rx.foreach(
                         run["modules"].to(list),
-                        lambda m: rx.el.span(m.to(str), class_name="ui mini label", style={"marginRight": "3px"}),
+                        lambda m: rx.el.span(m.to(str), class_name="ui label", style={"marginRight": "4px"}),
                     ),
                     style={"marginBottom": "10px"},
                 ),
@@ -1926,14 +2049,14 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                             " Re-run",
                             on_click=UploadState.rerun_with_same_modules,
                             disabled=UploadState.selected_file_is_running,
-                            class_name="ui mini primary button",
+                            class_name="ui primary button",
                             style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
                         ),
                         rx.el.button(
                             fomantic_icon("sliders-horizontal", size=14),
                             " Modify",
                             on_click=UploadState.modify_and_run,
-                            class_name="ui mini button",
+                            class_name="ui button",
                             style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
                         ),
                         style={"marginBottom": "10px"},
@@ -1942,8 +2065,8 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                 ),
                 # Run ID
                 rx.el.div(
-                    rx.el.span("Run ID: ", style={"color": "#666", "fontSize": "0.85rem"}),
-                    rx.el.code(run_id, style={"fontSize": "0.75rem"}),
+                    rx.el.span("Run ID: ", style={"color": "#666", "fontSize": "0.95rem"}),
+                    rx.el.code(run_id, style={"fontSize": "0.86rem"}),
                     style={"marginBottom": "10px"},
                 ),
                 # Dagster link
@@ -1952,7 +2075,7 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
                     " Open in Dagster",
                     href=dagster_url,
                     target="_blank",
-                    class_name="ui mini button",
+                    class_name="ui button",
                     style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
                 ),
                 style={"marginTop": "12px", "paddingTop": "12px", "borderTop": "1px solid #eee"},
@@ -1961,7 +2084,7 @@ def run_timeline_card(run: rx.Var[dict]) -> rx.Component:
         ),
         
         class_name=rx.cond(is_latest, "ui teal segment", "ui segment"),
-        style={"margin": "0 0 8px 0", "padding": "10px 12px"},
+        style={"margin": "0 0 10px 0", "padding": "14px 16px"},
         id=rx.Var.create("timeline-run-") + run_id,
     )
 
@@ -2022,145 +2145,112 @@ def run_timeline() -> rx.Component:
 
 def new_analysis_section() -> rx.Component:
     """
-    Collapsible section for starting a new analysis.
-    
+    Section for starting a new analysis (always shown — no accordion header
+    because the parent New Analysis tab is the entry point).
+
     Contains:
-    - HF repository sources (where modules come from)
-    - Module selection grid with logos
+    - Manage-module-sources link
+    - Module selection grid with logos (no internal scroll, grows naturally)
+    - Ensembl annotation toggle
     - Start button
-    
-    Uses shared _collapsible_header for uniform design.
     """
     return rx.el.div(
-        # Foldable header (blue accent to match ui blue segment)
-        _collapsible_header(
-            expanded=UploadState.new_analysis_expanded,
-            icon_name="plus-circle",
-            title="New Analysis",
-            right_badge=rx.el.span(
-                UploadState.selected_modules.length(),
-                " modules selected",
-                class_name="ui mini blue label",
+        rx.el.div(
+            fomantic_icon("boxes", size=14, color="#a333c8"),
+            rx.el.a(
+                " Manage module sources",
+                href="/modules",
+                style={"fontSize": "0.85rem", "color": "#a333c8", "marginLeft": "4px"},
             ),
-            on_toggle=UploadState.toggle_new_analysis,
-            accent_color="#2185d0",
+            style={"display": "flex", "alignItems": "center", "marginBottom": "14px"},
         ),
-        
-        # Expanded content
-        rx.cond(
-            UploadState.new_analysis_expanded,
+        rx.el.div(
+            rx.el.button(
+                "Select All",
+                on_click=UploadState.select_all_modules,
+                class_name="ui mini button",
+            ),
+            rx.el.button(
+                "Select None",
+                on_click=UploadState.deselect_all_modules,
+                class_name="ui mini button",
+                style={"marginLeft": "6px"},
+            ),
+            style={"marginBottom": "16px"},
+        ),
+        rx.el.div(
+            rx.foreach(UploadState.module_metadata_list, module_card),
+            style={
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(320px, 1fr))",
+                "gap": "12px",
+                "marginBottom": "16px",
+            },
+            id="module-cards-grid",
+        ),
+        rx.el.div(
             rx.el.div(
-                # Link to Module Manager for source management
                 rx.el.div(
-                    fomantic_icon("boxes", size=14, color="#a333c8"),
-                    rx.el.a(
-                        " Manage module sources",
-                        href="/modules",
-                        style={"fontSize": "0.85rem", "color": "#a333c8", "marginLeft": "4px"},
+                    rx.el.input(
+                        type="checkbox",
+                        checked=UploadState.include_ensembl,
+                        read_only=True,
                     ),
-                    style={"display": "flex", "alignItems": "center", "marginBottom": "14px"},
+                    rx.el.label(
+                        rx.el.strong("Include Ensembl Variation Annotations"),
+                    ),
+                    on_click=UploadState.toggle_ensembl,
+                    class_name=rx.cond(
+                        UploadState.include_ensembl,
+                        "ui checked checkbox",
+                        "ui checkbox",
+                    ),
                 ),
-                
-                # Selection controls
-                rx.el.div(
-                    rx.el.button(
-                        "Select All",
-                        on_click=UploadState.select_all_modules,
-                        class_name="ui mini button",
-                    ),
-                    rx.el.button(
-                        "Select None",
-                        on_click=UploadState.deselect_all_modules,
-                        class_name="ui mini button",
-                        style={"marginLeft": "6px"},
-                    ),
-                    style={"marginBottom": "16px"},
+                style={"display": "flex", "alignItems": "center", "gap": "10px"},
+            ),
+            rx.el.div(
+                "Position-based annotation with the Ensembl variation database via DuckDB. "
+                "Adds rsid mapping and known variant classifications.",
+                style={
+                    "fontSize": "0.85rem",
+                    "color": "#666",
+                    "marginTop": "6px",
+                    "lineHeight": "1.3",
+                },
+            ),
+            class_name="ui segment",
+            style={
+                "padding": "14px",
+                "marginBottom": "16px",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "6px",
+                "backgroundColor": rx.cond(
+                    UploadState.include_ensembl,
+                    "#f0f7ff",
+                    "#fff",
                 ),
-                
-                # Module cards grid – scroll after ~2 rows
-                rx.el.div(
-                    rx.foreach(UploadState.module_metadata_list, module_card),
-                    style={
-                        "display": "grid",
-                        "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
-                        "gap": "10px",
-                        "marginBottom": "16px",
-                        "maxHeight": "320px",
-                        "overflowY": "auto",
-                    },
-                    id="module-cards-grid",
-                ),
-
-                # Ensembl annotation toggle
-                rx.el.div(
-                    rx.el.div(
-                        rx.el.div(
-                            rx.el.input(
-                                type="checkbox",
-                                checked=UploadState.include_ensembl,
-                                read_only=True,
-                            ),
-                            rx.el.label(
-                                rx.el.strong("Include Ensembl Variation Annotations"),
-                            ),
-                            on_click=UploadState.toggle_ensembl,
-                            class_name=rx.cond(
-                                UploadState.include_ensembl,
-                                "ui checked checkbox",
-                                "ui checkbox",
-                            ),
-                        ),
-                        style={"display": "flex", "alignItems": "center", "gap": "10px"},
+            },
+        ),
+        rx.el.button(
+            UploadState.analysis_button_text,
+            rx.el.i(
+                "",
+                class_name=rx.cond(
+                    UploadState.selected_file_is_running,
+                    "spinner loading icon",
+                    rx.cond(
+                        UploadState.last_run_success,
+                        "check circle icon",
+                        "play icon",
                     ),
-                    rx.el.div(
-                        "Position-based annotation with the Ensembl variation database via DuckDB. "
-                        "Adds rsid mapping and known variant classifications.",
-                        style={
-                            "fontSize": "0.85rem",
-                            "color": "#666",
-                            "marginTop": "6px",
-                            "lineHeight": "1.3",
-                        },
-                    ),
-                    class_name="ui segment",
-                    style={
-                        "padding": "14px",
-                        "marginBottom": "16px",
-                        "border": "1px solid #e0e0e0",
-                        "borderRadius": "6px",
-                        "backgroundColor": rx.cond(
-                            UploadState.include_ensembl,
-                            "#f0f7ff",
-                            "#fff",
-                        ),
-                    },
-                ),
-                
-                # Start button
-                rx.el.button(
-                    UploadState.analysis_button_text,
-                    rx.el.i(
-                        "",
-                        class_name=rx.cond(
-                            UploadState.selected_file_is_running,
-                            "spinner loading icon",
-                            rx.cond(
-                                UploadState.last_run_success,
-                                "check circle icon",
-                                "play icon",
-                            ),
-                        ),
-                    ),
-                    on_click=UploadState.start_annotation_run,
-                    disabled=~UploadState.can_run_annotation,
-                    class_name=UploadState.analysis_button_color,
-                    style={"maxWidth": "400px"},
                 ),
             ),
-            rx.box(),
+            on_click=UploadState.start_annotation_run,
+            disabled=~UploadState.can_run_annotation,
+            class_name=UploadState.analysis_button_color,
+            style={"maxWidth": "400px"},
         ),
-        
-        style={"padding": "0", "overflow": "hidden"},
+        style={"padding": "0"},
         id="new-analysis-section",
     )
 
@@ -2345,12 +2435,339 @@ def no_file_selected_message() -> rx.Component:
 
 
 
+def _right_panel_tab_menu() -> rx.Component:
+    """Top-level horizontal tab menu for the right panel.
+
+    Tabs are flat: Input | PRS | Annotated Files | Reports | New Analysis.
+    """
+    return rx.el.div(
+        rx.el.a(
+            fomantic_icon(
+                "database",
+                size=16,
+                color=rx.cond(UploadState.right_panel_active_tab == "input", "#6435c9", "#888"),
+            ),
+            " Input",
+            rx.cond(
+                UploadState.vcf_preview_row_count > 0,
+                rx.el.span(
+                    UploadState.vcf_preview_row_count,
+                    " rows",
+                    class_name="ui mini circular violet label",
+                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.right_panel_active_tab == "input",
+                "active item",
+                "item",
+            ),
+            on_click=UploadState.switch_to_input_tab,
+            style=RIGHT_PANEL_TAB_STYLE,
+        ),
+        rx.el.a(
+            fomantic_icon(
+                "chart-bar",
+                size=16,
+                color=rx.cond(UploadState.right_panel_active_tab == "prs", "#f2711c", "#888"),
+            ),
+            " PRS",
+            rx.cond(
+                PRSState.prs_results.length() > 0,
+                rx.el.span(
+                    PRSState.prs_results.length(),
+                    class_name="ui mini circular orange label",
+                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.right_panel_active_tab == "prs",
+                "active item",
+                "item",
+            ),
+            on_click=UploadState.switch_to_prs_tab,
+            style=RIGHT_PANEL_TAB_STYLE,
+        ),
+        rx.el.a(
+            fomantic_icon(
+                "folder-output",
+                size=16,
+                color=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "#00b5ad", "#888"),
+            ),
+            " Annotated Files",
+            rx.el.span(
+                UploadState.output_file_count,
+                class_name="ui mini circular teal label",
+                style=RIGHT_PANEL_TAB_BADGE_STYLE,
+            ),
+            class_name=rx.cond(
+                UploadState.right_panel_active_tab == "annotated_files",
+                "active item",
+                "item",
+            ),
+            on_click=UploadState.switch_to_annotated_files_tab,
+            style=RIGHT_PANEL_TAB_STYLE,
+        ),
+        rx.el.a(
+            fomantic_icon(
+                "file-text",
+                size=16,
+                color=rx.cond(UploadState.right_panel_active_tab == "reports", "#e03997", "#888"),
+            ),
+            " Reports",
+            rx.cond(
+                UploadState.has_report_files,
+                rx.el.span(
+                    UploadState.report_file_count,
+                    class_name="ui mini circular pink label",
+                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.right_panel_active_tab == "reports",
+                "active item",
+                "item",
+            ),
+            on_click=UploadState.switch_to_reports_tab,
+            style=RIGHT_PANEL_TAB_STYLE,
+        ),
+        rx.el.a(
+            fomantic_icon(
+                "plus-circle",
+                size=16,
+                color=rx.cond(UploadState.right_panel_active_tab == "analysis", "#2185d0", "#888"),
+            ),
+            " New Analysis",
+            rx.cond(
+                UploadState.selected_modules.length() > 0,
+                rx.el.span(
+                    UploadState.selected_modules.length(),
+                    " selected",
+                    class_name="ui mini circular blue label",
+                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                ),
+                rx.fragment(),
+            ),
+            class_name=rx.cond(
+                UploadState.right_panel_active_tab == "analysis",
+                "active item",
+                "item",
+            ),
+            on_click=UploadState.switch_to_analysis_tab,
+            style=RIGHT_PANEL_TAB_STYLE,
+        ),
+        class_name="ui top attached tabular menu",
+        style={"marginBottom": "0"},
+        id="right-panel-tab-menu",
+    )
+
+
+def _tab_info_message(
+    visible: rx.Var[bool],
+    close_event: rx.event.EventHandler,
+    icon_name: str,
+    title: str,
+    body: str,
+) -> rx.Component:
+    """Closable Fomantic info message for right-panel tabs."""
+    return rx.cond(
+        visible,
+        rx.el.div(
+            rx.el.i(
+                "",
+                class_name="close icon",
+                on_click=close_event,
+                role="button",
+                aria_label=f"Close {title} message",
+                tab_index=0,
+                style={"cursor": "pointer"},
+            ),
+            fomantic_icon(icon_name, size=20, color="#2185d0"),
+            rx.el.div(
+                rx.el.div(title, class_name="header"),
+                rx.el.p(body),
+                class_name="content",
+            ),
+            class_name="ui icon info message",
+            style={"margin": "0 0 16px 0"},
+        ),
+        rx.fragment(),
+    )
+
+
+def _input_tab_content() -> rx.Component:
+    """Content for the Input tab: the normalized VCF preview."""
+    return rx.el.div(
+        _tab_info_message(
+            UploadState.show_input_tab_info,
+            UploadState.close_input_tab_info,
+            "database",
+            "Your uploaded DNA file, prepared for analysis",
+            "This preview shows the variants after cleanup: low-quality rows are filtered, chromosome names are standardized, and the table is ready to match against annotation modules.",
+        ),
+        input_vcf_preview_section(),
+        id="segment-vcf-preview",
+    )
+
+
+def _prs_tab_content() -> rx.Component:
+    """Content for the PRS tab.
+
+    Compose the reusable PRS controls locally so the result grid can use a
+    row-count-based height instead of the fixed 500px height in `prs_section`.
+    """
+    return rx.el.div(
+        _tab_info_message(
+            UploadState.show_prs_tab_info,
+            UploadState.close_prs_tab_info,
+            "chart-bar",
+            "Polygenic Risk Scores from the PGS Catalog",
+            "A PRS combines many DNA variants into one score using weights from a published model. We import the full PGS Catalog here, so you can search available scores, pick relevant models, and compute them for the selected genome.",
+        ),
+        rx.theme(
+            rx.vstack(
+                rx.hstack(
+                    prs_build_selector(PRSState),
+                    rx.separator(orientation="vertical", size="2"),
+                    prs_ancestry_selector(PRSState),
+                    spacing="4",
+                    align="center",
+                    wrap="wrap",
+                ),
+                prs_scores_selector(PRSState),
+                prs_compute_button(PRSState),
+                prs_progress_section(PRSState),
+                _prs_results_content(),
+                width="100%",
+                spacing="4",
+            ),
+            has_background=False,
+        ),
+        id="segment-prs",
+    )
+
+
+def _annotated_files_tab_content() -> rx.Component:
+    """Content for the Annotated Files tab: output data cards and inline preview."""
+    return rx.el.div(
+        _tab_info_message(
+            UploadState.show_annotated_files_tab_info,
+            UploadState.close_annotated_files_tab_info,
+            "folder-output",
+            "Annotated files created by your analysis",
+            "Each file shows which module produced it. You can open any result in the data grid to explore the annotated variants with search, sorting, and filtering options.",
+        ),
+        _data_files_content(),
+        _output_preview_grid(),
+        id="segment-annotated-files",
+    )
+
+
+def _reports_tab_content() -> rx.Component:
+    """Content for the Reports tab: generated HTML reports."""
+    return rx.el.div(
+        _tab_info_message(
+            UploadState.show_reports_tab_info,
+            UploadState.close_reports_tab_info,
+            "file-text",
+            "Readable summaries",
+            "Reports turn the output tables into a browser-friendly view so you can explore the main matches without opening parquet files.",
+        ),
+        _reports_content(),
+        id="segment-reports",
+    )
+
+
+def _latest_run_status_card() -> rx.Component:
+    """Compact card under the New Analysis form showing the most recently started run.
+
+    Gives the user immediate feedback after clicking Run. Highlights with a yellow border + spinner
+    while the run is still RUNNING/QUEUED/STARTING.
+    """
+    last = UploadState.last_run_for_file
+    last_id = UploadState.latest_run_id
+    is_running = UploadState.selected_file_is_running
+    dagster_url = UploadState.dagster_web_url + "/runs/" + last_id
+
+    return rx.cond(
+        UploadState.has_last_run,
+        rx.el.div(
+            rx.el.div(
+                rx.cond(
+                    is_running,
+                    fomantic_icon("loader-circle", size=16, color="#fbbd08"),
+                    fomantic_icon("history", size=16, color="#2185d0"),
+                ),
+                rx.el.span(
+                    rx.cond(is_running, "Run in progress", "Latest run"),
+                    style={"fontWeight": "700", "marginLeft": "8px", "fontSize": "1.05rem"},
+                ),
+                run_status_badge(last["status"].to(str)),
+                rx.el.span(
+                    last["started_at"].to(str),
+                    style={"marginLeft": "10px", "color": "#666", "fontSize": "0.95rem", "flex": "1"},
+                ),
+                rx.el.span(
+                    last["modules"].to(list).length(),
+                    " modules",
+                    class_name="ui blue label",
+                    style={"marginLeft": "8px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px", "flexWrap": "wrap"},
+            ),
+            rx.el.div(
+                rx.el.button(
+                    fomantic_icon("history", size=12),
+                    " View Annotated Files",
+                    on_click=lambda: UploadState.view_run_in_results(last_id),
+                    class_name="ui green button",
+                    style={"display": "inline-flex", "alignItems": "center", "gap": "6px"},
+                ),
+                rx.el.a(
+                    fomantic_icon("external-link", size=12),
+                    " Dagster",
+                    href=dagster_url,
+                    target="_blank",
+                    class_name="ui basic button",
+                    style={"display": "inline-flex", "alignItems": "center", "gap": "6px", "marginLeft": "8px"},
+                ),
+                style={"marginTop": "10px"},
+            ),
+            class_name=rx.cond(
+                is_running,
+                "ui yellow segment",
+                "ui segment",
+            ),
+            style={"marginTop": "16px", "padding": "14px 16px"},
+            id="segment-latest-run-status",
+        ),
+        rx.fragment(),
+    )
+
+
+def _analysis_tab_content() -> rx.Component:
+    """Content for the Analysis tab: module selection, start button, and latest-run status."""
+    return rx.el.div(
+        _tab_info_message(
+            UploadState.show_analysis_tab_info,
+            UploadState.close_analysis_tab_info,
+            "plus-circle",
+            "Choose what to compare",
+            "Pick one or more annotation modules, then run the pipeline. The tool joins your cleaned variant table with those module databases and saves the results.",
+        ),
+        new_analysis_section(),
+        _latest_run_status_card(),
+        id="segment-new-analysis",
+    )
+
+
 def right_panel_run_view() -> rx.Component:
     """
-    Run-centric right panel with three sections:
-    1. Outputs (top) - results the user wants to see first
-    2. Run History (middle) - unified timeline of all runs
-    3. New Analysis (bottom) - start new work
+    Run-centric right panel organized as flat horizontal tabs:
+    Input | PRS | Annotated Files | Reports | New Analysis.
     """
     return rx.el.div(
         # Header – DNA gradient banner (green -> teal -> blue from logo)
@@ -2379,106 +2796,24 @@ def right_panel_run_view() -> rx.Component:
             },
             id="right-column-header",
         ),
-        # Content: show sections based on whether sample has been analyzed
+        # Tabbed content (only when a file is selected)
         rx.cond(
             UploadState.has_selected_file,
             rx.fragment(
-                # Section 0: Normalized VCF Preview (top)
+                _right_panel_tab_menu(),
                 rx.el.div(
-                    input_vcf_preview_section(),
-                    class_name="ui violet segment",
-                    style={"padding": "16px", "marginBottom": "16px"},
-                    id="segment-vcf-preview",
-                ),
-                # Section 0.5: Polygenic Risk Scores (PRS)
-                rx.el.div(
-                    _collapsible_header(
-                        expanded=PRSState.prs_expanded,
-                        icon_name="chart-bar",
-                        title="Polygenic Risk Scores",
-                        right_badge=rx.cond(
-                            PRSState.prs_results.length() > 0,
-                            rx.el.span(
-                                PRSState.prs_results.length(),
-                                " results",
-                                class_name="ui mini orange label",
-                            ),
-                            rx.el.span("PGS Catalog", class_name="ui mini orange label"),
-                        ),
-                        on_toggle=PRSState.toggle_prs_expanded,
-                        accent_color="#f2711c",
+                    rx.match(
+                        UploadState.right_panel_active_tab,
+                        ("input", _input_tab_content()),
+                        ("prs", _prs_tab_content()),
+                        ("annotated_files", _annotated_files_tab_content()),
+                        ("reports", _reports_tab_content()),
+                        ("analysis", _analysis_tab_content()),
+                        _input_tab_content(),  # default
                     ),
-                    rx.cond(
-                        PRSState.prs_expanded,
-                        rx.el.div(
-                            rx.cond(
-                                PRSState.prs_results.length() > 0,
-                                rx.el.div(
-                                    rx.el.button(
-                                        fomantic_icon("folder-output", size=12),
-                                        " View results in Outputs tab",
-                                        on_click=UploadState.view_prs_in_outputs,
-                                        class_name="ui mini teal button",
-                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px"},
-                                    ),
-                                    rx.el.a(
-                                        fomantic_icon("external-link", size=12),
-                                        " Dagster",
-                                        href=PRSState.prs_dagster_url,
-                                        target="_blank",
-                                        class_name="ui mini orange basic button",
-                                        style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "marginLeft": "6px"},
-                                    ),
-                                    style={"marginBottom": "10px"},
-                                ),
-                            ),
-                            prs_section(PRSState),
-                            rx.cond(
-                                PRSState.prs_results.length() > 0,
-                                rx.el.button(
-                                    fomantic_icon("eye", size=14),
-                                    " View Results in Outputs tab",
-                                    on_click=UploadState.view_prs_in_outputs,
-                                    class_name="ui small teal basic button",
-                                    style={"display": "inline-flex", "alignItems": "center", "gap": "6px", "marginTop": "12px", "width": "100%", "justifyContent": "center"},
-                                ),
-                            ),
-                            style={"marginTop": "12px"},
-                        ),
-                        rx.box(),
-                    ),
-                    class_name="ui orange segment",
-                    style={"padding": "16px", "marginBottom": "16px"},
-                    id="segment-prs",
-                ),
-                # Section 1: Outputs (top) - shown when files or PRS results exist
-                rx.cond(
-                    UploadState.has_output_files | (PRSState.prs_results.length() > 0),
-                    rx.el.div(
-                        outputs_section(),
-                        class_name="ui teal segment",
-                        style={"padding": "16px", "marginBottom": "16px"},
-                        id="segment-outputs",
-                    ),
-                    rx.fragment(),
-                ),
-                # Section 2: Run History (middle) - only shown when there are runs
-                rx.cond(
-                    UploadState.has_filtered_runs,
-                    rx.el.div(
-                        run_timeline(),
-                        class_name="ui green segment",
-                        style={"padding": "16px", "marginBottom": "16px"},
-                        id="segment-run-history",
-                    ),
-                    rx.fragment(),
-                ),
-                # Section 3: New Analysis (always shown)
-                rx.el.div(
-                    new_analysis_section(),
-                    class_name="ui blue segment",
+                    class_name="ui bottom attached segment",
                     style={"padding": "16px"},
-                    id="segment-new-analysis",
+                    id="right-panel-tab-content",
                 ),
             ),
             no_file_selected_message(),

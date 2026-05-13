@@ -126,16 +126,18 @@ def _nav_tab(label: str, icon_name: str, href: str, is_active: rx.Var) -> rx.Com
     base_style = {
         "display": "flex",
         "alignItems": "center",
-        "padding": "6px 16px",
-        "borderRadius": "4px",
-        "fontSize": "0.95rem",
+        "padding": "10px 20px",
+        "borderRadius": "6px",
+        "fontSize": "1.08rem",
+        "fontWeight": "600",
         "textDecoration": "none",
         "transition": "all 0.15s ease",
         "cursor": "pointer",
+        "minHeight": "44px",
     }
     return rx.el.a(
-        fomantic_icon(icon_name, size=16),
-        rx.el.span(label, style={"marginLeft": "6px"}),
+        fomantic_icon(icon_name, size=20),
+        rx.el.span(label, style={"marginLeft": "8px"}),
         href=href,
         style=base_style,
         class_name=rx.cond(
@@ -165,9 +167,9 @@ def topbar() -> rx.Component:
     current_path = rx.State.router.page.path
     nav_tab_css = rx.el.style(
         """
-        .nav-tab { color: #555; font-weight: 500; }
+        .nav-tab { color: #555; }
         .nav-tab:hover { background-color: #f0f0f0; color: #333; }
-        .nav-tab-active { background-color: #e8f5e9 !important; color: #00897b !important; font-weight: 600 !important; }
+        .nav-tab-active { background-color: #e8f5e9 !important; color: #00897b !important; font-weight: 700 !important; }
         """
     )
     return rx.el.div(
@@ -177,11 +179,11 @@ def topbar() -> rx.Component:
             rx.el.a(
                 rx.el.img(
                     src="/just_dna_seq.jpg",
-                    style={"height": "36px", "width": "auto", "marginRight": "12px"},
+                    style={"height": "40px", "width": "auto", "marginRight": "12px"},
                 ),
                 rx.el.span(
                     "just-dna-lite",
-                    style={"fontSize": "1.3rem", "fontWeight": "600", "color": "#333", "marginRight": "12px"},
+                    style={"fontSize": "1.4rem", "fontWeight": "700", "color": "#333", "marginRight": "12px"},
                 ),
                 href="/",
                 style={"display": "flex", "alignItems": "center", "textDecoration": "none"},
@@ -211,7 +213,7 @@ def topbar() -> rx.Component:
             "top": "0",
             "left": "0",
             "right": "0",
-            "height": "56px",
+            "height": "64px",
             "backgroundColor": "#ffffff",
             "borderBottom": "1px solid #e0e0e0",
             "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
@@ -317,7 +319,7 @@ _WS_WATCHDOG_JS = """
     if (banner) return;
     banner = document.createElement('div');
     banner.style.cssText =
-      'position:fixed;top:56px;left:0;right:0;z-index:99999;background:#c62828;' +
+      'position:fixed;top:64px;left:0;right:0;z-index:99999;background:#c62828;' +
       'color:#fff;text-align:center;padding:10px 16px;font-size:14px;' +
       'font-family:sans-serif;cursor:pointer;letter-spacing:.3px';
     banner.onclick = function () { window.location.reload(); };
@@ -362,9 +364,9 @@ def template(*children: rx.Component) -> rx.Component:
                 class_name="ui fluid container",
             ),
             style={
-                "marginTop": "56px",
+                "marginTop": "64px",
                 "padding": "20px",
-                "minHeight": "calc(100vh - 56px)",
+                "minHeight": "calc(100vh - 64px)",
                 "backgroundColor": "#f5f7fa",
             },
         ),
@@ -382,8 +384,8 @@ def two_column_layout(
     Left column is narrow (files), right column is wide (tabbed content).
     Uses flexbox for reliable horizontal layout.
     """
-    # 56px header + 20px padding top + 20px padding bottom
-    column_height = "calc(100vh - 96px)"
+    # 64px header + 20px padding top + 20px padding bottom
+    column_height = "calc(100vh - 104px)"
     
     # Common column styles
     column_base = {
@@ -442,8 +444,8 @@ def three_column_layout(
     
     DEPRECATED: Use two_column_layout with tabs instead.
     """
-    # 56px header + 20px padding top + 20px padding bottom
-    column_height = "calc(100vh - 96px)"
+    # 64px header + 20px padding top + 20px padding bottom
+    column_height = "calc(100vh - 104px)"
     
     # Common column styles
     column_base = {

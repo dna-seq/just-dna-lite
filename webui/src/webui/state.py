@@ -1216,7 +1216,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Output files for the selected sample
     output_files: List[Dict[str, Any]] = []
     report_files: List[Dict[str, Any]] = []  # HTML report files
-    outputs_active_tab: str = "data"  # "data" or "reports" sub-tab in outputs section
 
     # Data preview state (server-side grid state is managed by LazyFrameGridMixin)
     vcf_preview_loading: bool = False
@@ -1235,6 +1234,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
     outputs_expanded: bool = True  # Whether the outputs section is expanded
     run_history_expanded: bool = True  # Whether the run history section is expanded
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
+    right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis"
+    show_input_tab_info: bool = True
+    show_prs_tab_info: bool = True
+    show_annotated_files_tab_info: bool = True
+    show_reports_tab_info: bool = True
+    show_analysis_tab_info: bool = True
     expanded_run_id: str = ""  # Which run in the timeline is expanded to show logs
     show_outputs_modal: bool = False  # Whether to show the outputs modal (legacy, kept for compatibility)
     
@@ -1931,6 +1936,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.outputs_expanded = True
         self.run_history_expanded = True
         self.new_analysis_expanded = True
+        self.right_panel_active_tab = "input"
 
         self.vcf_preview_loading = True
         self.vcf_preview_error = ""
@@ -2054,6 +2060,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 
                 module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
                 
+                run_id = annotations_mat.get("run_id", "")
                 files.append({
                     "name": f.name,
                     "path": str(f),
@@ -2063,6 +2070,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "sample_name": sample_name,
                     "materialized_at": annotations_mat.get("materialized_at", ""),
                     "needs_materialization": annotations_mat.get("needs_materialization", True),
+                    "run_id": run_id,
+                    "run_short": run_id[:8] if run_id else "",
                 })
         
         # Also scan sample root for Ensembl annotation parquets (*_ensembl_annotated.parquet)
@@ -2070,6 +2079,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         sample_dir = get_user_output_dir() / self.safe_user_id / sample_name
         if sample_dir.exists():
             for f in sample_dir.glob("*_ensembl_annotated.parquet"):
+                run_id = ensembl_mat.get("run_id", "")
                 files.append({
                     "name": f.name,
                     "path": str(f),
@@ -2079,6 +2089,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "sample_name": sample_name,
                     "materialized_at": ensembl_mat.get("materialized_at", ""),
                     "needs_materialization": ensembl_mat.get("needs_materialization", True),
+                    "run_id": run_id,
+                    "run_short": run_id[:8] if run_id else "",
                 })
 
         # Scan vcf_exports/ directory for exported VCF files
@@ -2091,6 +2103,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 if not (f.name.endswith(".vcf") or f.name.endswith(".vcf.gz") or f.name.endswith(".vcf.bgz")):
                     continue
                 module = f.stem.replace("_annotated", "").replace(".vcf", "")
+                run_id = vcf_export_mat.get("run_id", "")
                 files.append({
                     "name": f.name,
                     "path": str(f),
@@ -2100,6 +2113,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "sample_name": sample_name,
                     "materialized_at": vcf_export_mat.get("materialized_at", ""),
                     "needs_materialization": vcf_export_mat.get("needs_materialization", True),
+                    "run_id": run_id,
+                    "run_short": run_id[:8] if run_id else "",
                 })
 
         files.sort(key=lambda x: (x["module"], x["type"]))
@@ -2107,7 +2122,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
         
         # Load HTML report files from reports/ directory
         reports_dir = get_user_output_dir() / self.safe_user_id / sample_name / "reports"
-        
+        report_run_id = report_mat.get("run_id", "")
+
         reports: list[dict] = []
         if reports_dir.exists():
             for f in reports_dir.glob("*.html"):
@@ -2120,6 +2136,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "sample_name": sample_name,
                     "materialized_at": mtime_str,
                     "needs_materialization": False,
+                    "run_id": report_run_id,
+                    "run_short": report_run_id[:8] if report_run_id else "",
                 })
         
         reports.sort(key=lambda x: x["name"], reverse=True)
@@ -2140,6 +2158,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             "user_vcf_exports",
         ]
         timestamps: Dict[str, float] = {}
+        run_ids: Dict[str, str] = {}
         for asset_name in asset_chain:
             result = instance.fetch_materializations(
                 records_filter=AssetRecordsFilter(
@@ -2148,7 +2167,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 ),
                 limit=1,
             )
-            timestamps[asset_name] = result.records[0].timestamp if result.records else 0.0
+            if result.records:
+                timestamps[asset_name] = result.records[0].timestamp
+                run_ids[asset_name] = result.records[0].run_id or ""
+            else:
+                timestamps[asset_name] = 0.0
+                run_ids[asset_name] = ""
 
         info: Dict[str, Dict[str, Any]] = {}
         upstream_map = {
@@ -2166,6 +2190,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 "materialized_at": mat_at,
                 "needs_materialization": needs,
                 "timestamp": ts,
+                "run_id": run_ids[asset_name],
             }
         return info
 
@@ -2188,11 +2213,6 @@ class UploadState(LazyFrameGridMixin, rx.State):
     def has_report_files(self) -> bool:
         """Check if there are any report files."""
         return len(self.report_files) > 0
-
-    @rx.var
-    def total_output_count(self) -> int:
-        """Total count of all output files (data + reports)."""
-        return len(self.output_files) + len(self.report_files)
 
     async def delete_file(self, filename: str):
         """Delete an uploaded file from the filesystem and state."""
@@ -2860,14 +2880,76 @@ class UploadState(LazyFrameGridMixin, rx.State):
         """Toggle the VCF preview section expanded/collapsed."""
         self.vcf_preview_expanded = not self.vcf_preview_expanded
 
-    def switch_outputs_tab(self, tab_name: str):
-        """Switch between sub-tabs in outputs section."""
-        self.outputs_active_tab = tab_name
+    def switch_right_panel_tab(self, tab_name: str):
+        """Switch between top-level tabs in the right panel."""
+        self.right_panel_active_tab = tab_name
+
+    def switch_to_input_tab(self):
+        """Switch the right panel to the input preview tab."""
+        self.right_panel_active_tab = "input"
+
+    def switch_to_prs_tab(self):
+        """Switch the right panel to the PRS tab."""
+        self.right_panel_active_tab = "prs"
+
+    def switch_to_annotated_files_tab(self):
+        """Switch the right panel to the annotated files tab."""
+        self.right_panel_active_tab = "annotated_files"
+
+    def switch_to_reports_tab(self):
+        """Switch the right panel to the reports tab."""
+        self.right_panel_active_tab = "reports"
+
+    def switch_to_analysis_tab(self):
+        """Switch the right panel to the new analysis tab."""
+        self.right_panel_active_tab = "analysis"
+
+    def close_right_panel_tab_info(self, tab_name: str):
+        """Hide the explanatory message for one right-panel tab."""
+        if tab_name == "input":
+            self.show_input_tab_info = False
+        elif tab_name == "prs":
+            self.show_prs_tab_info = False
+        elif tab_name == "annotated_files":
+            self.show_annotated_files_tab_info = False
+        elif tab_name == "reports":
+            self.show_reports_tab_info = False
+        elif tab_name == "analysis":
+            self.show_analysis_tab_info = False
+
+    def close_input_tab_info(self):
+        """Hide the input tab explanatory message."""
+        self.show_input_tab_info = False
+
+    def close_prs_tab_info(self):
+        """Hide the PRS tab explanatory message."""
+        self.show_prs_tab_info = False
+
+    def close_annotated_files_tab_info(self):
+        """Hide the annotated files tab explanatory message."""
+        self.show_annotated_files_tab_info = False
+
+    def close_reports_tab_info(self):
+        """Hide the reports tab explanatory message."""
+        self.show_reports_tab_info = False
+
+    def close_analysis_tab_info(self):
+        """Hide the analysis tab explanatory message."""
+        self.show_analysis_tab_info = False
+
+    def view_run_in_results(self, run_id: str = ""):
+        """Switch to annotated files produced by the run.
+
+        ``run_id`` is accepted for forward compatibility (e.g. future
+        scroll-into-view of the matching output card) but is currently unused.
+        """
+        del run_id  # currently unused; retained for future highlight logic
+        self.right_panel_active_tab = "annotated_files"
+        self.outputs_expanded = True
 
     def view_prs_in_outputs(self):
-        """Expand the Outputs section and switch to the PRS tab."""
-        self.outputs_expanded = True
-        self.outputs_active_tab = "prs"
+        """Switch the right panel to the PRS tab."""
+        self.right_panel_active_tab = "prs"
 
     def toggle_run_history(self):
         """Toggle the run history section expanded/collapsed."""
@@ -2919,10 +3001,11 @@ class UploadState(LazyFrameGridMixin, rx.State):
             yield event
 
     def modify_and_run(self):
-        """Pre-select modules from last run and expand the analysis section."""
+        """Pre-select modules from last run and switch the right panel to the Analysis tab."""
         last_run = self.last_run_for_file
         if last_run and last_run.get("modules"):
             self.selected_modules = last_run["modules"].copy()
+        self.right_panel_active_tab = "analysis"
         self.new_analysis_expanded = True
 
     def _cleanup_orphaned_runs(self) -> int:
@@ -3350,6 +3433,19 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         self.prs_expanded = not self.prs_expanded
 
     @rx.var
+    def prs_results_grid_height(self) -> str:
+        """Height for the PRS results grid based on row count.
+
+        The PRS results grid is the last element in the PRS tab, so it should
+        grow with its rows and let the page scroll naturally instead of showing
+        a mostly-empty fixed-height internal viewport.
+        """
+        row_count = len(self.prs_results_rows) or len(self.prs_results)
+        if row_count <= 0:
+            return "160px"
+        return f"{max(160, 64 + (row_count * 42))}px"
+
+    @rx.var
     def prs_dagster_url(self) -> str:
         parquet_path = self.prs_initialized_for_file
         if not parquet_path:
@@ -3425,6 +3521,9 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             self.prs_computing = True
             self.prs_progress = 0
             self.prs_results = []
+            self.prs_results_rows = []
+            self.prs_results_columns = []
+            self.prs_results_column_groups = []
             self.low_match_warning = False
             self.status_message = f"Computing PRS for {total} score(s)..."
 
@@ -3460,6 +3559,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
         async with self:
             self.prs_results = results
+            self._build_prs_results_grid()
             self.low_match_warning = any_low_match
             self.prs_computing = False
             self.prs_progress = 100
