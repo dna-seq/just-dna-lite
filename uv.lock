@@ -1788,7 +1788,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.2.4"
+version = "0.2.6"
 source = { editable = "." }
 dependencies = [
     { name = "dagster-dg-cli" },
@@ -1912,7 +1912,7 @@ dev = [
 
 [[package]]
 name = "just-prs"
-version = "0.4.2"
+version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eliot" },
@@ -1927,9 +1927,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/2f/5120c83733ceb2808298bcbd68337c69f4e41ddf8c4431f19b35305d9379/just_prs-0.4.2.tar.gz", hash = "sha256:b81d7577929f8e9ae0ee86ee14e8af581890742b717c54ed64aa4e2393e7328f", size = 104841, upload-time = "2026-05-14T12:07:31.653Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/a7/158fed8adef1ffe7b3092b8a85b74ba5ec1369ff1c72baef7f58fcbc91af/just_prs-0.4.3.tar.gz", hash = "sha256:f1e8578c81e873333c17c282dd784fbcd728205c28ff70e3c16564e3e0739a1e", size = 104894, upload-time = "2026-05-14T13:42:36.738Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/38/7c59e86064f278aac7eea766789fe7ccd6cdb79aa3af0adabc0686adb2ab/just_prs-0.4.2-py3-none-any.whl", hash = "sha256:3d88849445f62bfae664a499582d06c10bfa3c3be33adc7d9aeb8f6c16675f20", size = 116133, upload-time = "2026-05-14T12:07:27.382Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/6c/0d8911ca8f4e219674a2c1271bb816f7f7f30039e461ec95759be316f930/just_prs-0.4.3-py3-none-any.whl", hash = "sha256:b8366d1843ebbd9eb060a5ab25db900cda826ef273899ffca1a8bd0d90908494", size = 116169, upload-time = "2026-05-14T13:42:32.362Z" },
 ]
 
 [[package]]
@@ -2621,7 +2621,7 @@ wheels = [
 
 [[package]]
 name = "prs-ui"
-version = "0.2.8"
+version = "0.2.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "just-prs" },
@@ -2631,9 +2631,9 @@ dependencies = [
     { name = "reflex-components-radix" },
     { name = "reflex-mui-datagrid" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/ae/0bc473b47fee9915a6cf1f1975b4cb30f6401d2b4e4c307b2af01e54eae8/prs_ui-0.2.8.tar.gz", hash = "sha256:98a05533ca3057fda38833e11132606c7b3f59208eaf30a661cc38544deead49", size = 40424, upload-time = "2026-05-14T12:07:28.875Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/86/4a17b33dd8769c25a1c1d6d8d9949b4880eb911587616969e6db77f22f1a/prs_ui-0.2.9.tar.gz", hash = "sha256:1571c21ca66e5c1e62488ab285c4bf41c8812e1fb62c2bf0acb1c5086a348bc2", size = 40423, upload-time = "2026-05-14T13:42:35.277Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/2b/9a0937f35e66a5f37eb58d1f20211c6b877741ee804130a488f9de396ecb/prs_ui-0.2.8-py3-none-any.whl", hash = "sha256:f569e9450cc096f78dacc3dff6f352ca886d5680601829df82c63506f206ec0d", size = 46866, upload-time = "2026-05-14T12:07:30.01Z" },
+    { url = "https://files.pythonhosted.org/packages/72/14/a03926493e771e0e795612e2ed6ce02d4ab84e9b387167c52d53475056aa/prs_ui-0.2.9-py3-none-any.whl", hash = "sha256:fcb174db87a09643a1ecade03f862cadb506cd485208c62dd2c6f5aa1076e134", size = 46866, upload-time = "2026-05-14T13:42:33.923Z" },
 ]
 
 [[package]]

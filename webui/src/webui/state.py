@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import queue
@@ -3542,7 +3543,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 self.prs_computing = False
                 self.prs_progress = 100
                 self.status_message = f"All {len(selected_ids)} selected score(s) already computed"
-                if self.prs_selection_mode == "traits" and self.prs_results:
+                if self.prs_view_mode == "grouped" and self.prs_results:
                     self.build_trait_summary()
                 return
 
@@ -3582,11 +3583,13 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 except Exception as score_exc:
                     logger.warning("PRS compute failed for %s: %s", pgs_id, score_exc)
                     failed_ids.append(pgs_id)
+                    gc.collect()
                     continue
 
                 if row.pop("_low_match", False):
                     any_low_match = True
                 new_results.append(row)
+                gc.collect()
 
             async with self:
                 for r in new_results:
@@ -3605,7 +3608,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                     parts.append(f"{len(failed_ids)} failed: {', '.join(failed_ids[:5])}")
                 self.status_message = "Computed " + "; ".join(parts)
                 self._checkpoint_prs_to_dagster()
-                if self.prs_selection_mode == "traits" and self.prs_results:
+                if self.prs_view_mode == "grouped" and self.prs_results:
                     self.build_trait_summary()
         except Exception as exc:
             logger.error("PRS computation failed: %s", exc, exc_info=True)
