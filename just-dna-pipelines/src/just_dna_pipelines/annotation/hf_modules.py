@@ -330,8 +330,14 @@ def refresh_modules() -> dict[str, ModuleInfo]:
     HF_REPO_ID = HF_DEFAULT_REPOS[0] if HF_DEFAULT_REPOS else ""
 
     fresh = discover_all_modules()
-    MODULE_INFOS.clear()
+    # Update existing entries and add new ones first (readers always see
+    # valid data), then remove stale keys.  The previous clear()+update()
+    # pattern left an empty window that caused crashes when other threads
+    # read MODULE_INFOS concurrently (e.g. PRS background task).
     MODULE_INFOS.update(fresh)
+    for stale_key in list(MODULE_INFOS.keys()):
+        if stale_key not in fresh:
+            MODULE_INFOS.pop(stale_key, None)
     DISCOVERED_MODULES[:] = sorted(MODULE_INFOS.keys())
 
     log_message(

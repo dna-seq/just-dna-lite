@@ -930,10 +930,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
 
     def _refresh_module_ui_state(self):
         """Re-read MODULE_INFOS globals and update UI state vars."""
-        MODULE_METADATA.clear()
-        MODULE_METADATA.update(build_module_metadata_dict(list(MODULE_INFOS.keys())))
+        # Snapshot keys once to avoid reading a dict being mutated by another thread
+        current_keys = list(MODULE_INFOS.keys())
+        MODULE_METADATA.update(build_module_metadata_dict(current_keys))
+        for stale in list(MODULE_METADATA.keys()):
+            if stale not in current_keys:
+                MODULE_METADATA.pop(stale, None)
         old_available = set(self.available_modules)
-        self.available_modules = sorted(list(MODULE_INFOS.keys()))
+        self.available_modules = sorted(current_keys)
         new_available = set(self.available_modules)
         # Keep existing selections (removing modules no longer available)
         kept = [m for m in self.selected_modules if m in new_available]
@@ -2449,20 +2453,25 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self.vcf_export_run_id = new_id
 
     def _execute_inproc_with_state_update(
-        self, 
-        instance: DagsterInstance, 
-        job_name: str, 
-        run_config: dict, 
+        self,
+        instance: DagsterInstance,
+        job_name: str,
+        run_config: dict,
         partition_key: str,
         original_run_id: str,
         sample_name: str
     ) -> None:
         """
         Execute job in-process and update UI state with result.
-        
+
         This method runs synchronously but is called from a background thread/executor
         to avoid blocking the UI. DO NOT use asyncio.to_thread() here - causes
         Python/Rust interop panics with Dagster objects.
+
+        WARNING: Modifies Reflex state directly from a thread without the async
+        state lock.  The poll_run_status handler is the primary state-update
+        mechanism; the writes here are best-effort fallbacks.  Concurrent
+        events on the same session may see stale/torn state.
         """
         actual_run_id = None
         try:
@@ -3541,53 +3550,68 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 f" ({len(existing_by_id)} already computed)" if existing_by_id else ""
             )
 
-        catalog = _get_prs_catalog(cache_dir_str)
-        cache_path = Path(cache_dir_str) / "scores"
-        best_perf_df = catalog.best_performance().collect()
-        new_results: List[Dict[str, Any]] = []
-        any_low_match = False
+        try:
+            catalog = _get_prs_catalog(cache_dir_str)
+            cache_path = Path(cache_dir_str) / "scores"
+            best_perf_df = catalog.best_performance().collect()
+            new_results: List[Dict[str, Any]] = []
+            any_low_match = False
+            failed_ids: List[str] = []
 
-        for i, pgs_id in enumerate(ids_to_compute, start=1):
+            for i, pgs_id in enumerate(ids_to_compute, start=1):
+                async with self:
+                    self.prs_progress = round(i / total * 100)
+                    self.status_message = f"Computing {i}/{total}: {pgs_id}..."
+
+                loop = asyncio.get_event_loop()
+                try:
+                    row = await loop.run_in_executor(
+                        None,
+                        lambda pid=pgs_id: _compute_single_prs(
+                            pgs_id=pid,
+                            vcf_path=vcf_path,
+                            genome_build=genome_build,
+                            cache_dir=cache_path,
+                            genotypes_lf=genotypes_lf,
+                            catalog=catalog,
+                            best_perf_df=best_perf_df,
+                            ancestry=ancestry,
+                            compute_all_populations=all_pops,
+                        ),
+                    )
+                except Exception as score_exc:
+                    logger.warning("PRS compute failed for %s: %s", pgs_id, score_exc)
+                    failed_ids.append(pgs_id)
+                    continue
+
+                if row.pop("_low_match", False):
+                    any_low_match = True
+                new_results.append(row)
+
             async with self:
-                self.prs_progress = round(i / total * 100)
-                self.status_message = f"Computing {i}/{total}: {pgs_id}..."
-
-            loop = asyncio.get_event_loop()
-            row = await loop.run_in_executor(
-                None,
-                lambda pid=pgs_id: _compute_single_prs(
-                    pgs_id=pid,
-                    vcf_path=vcf_path,
-                    genome_build=genome_build,
-                    cache_dir=cache_path,
-                    genotypes_lf=genotypes_lf,
-                    catalog=catalog,
-                    best_perf_df=best_perf_df,
-                    ancestry=ancestry,
-                    compute_all_populations=all_pops,
-                ),
-            )
-
-            if row.pop("_low_match", False):
-                any_low_match = True
-            new_results.append(row)
-
-        async with self:
-            for r in new_results:
-                pid = r.get("pgs_id", "")
-                if pid:
-                    existing_by_id[pid] = r
-            merged = list(existing_by_id.values())
-            self.prs_results = merged
-            self._build_prs_results_grid()
-            self.low_match_warning = any_low_match
-            self.prs_computing = False
-            self.prs_progress = 100
-            n_reused = len(merged) - len(new_results)
-            self.status_message = f"Computed {len(new_results)} new + {n_reused} cached = {len(merged)} total PRS score(s)"
-            self._checkpoint_prs_to_dagster()
-            if self.prs_selection_mode == "traits" and self.prs_results:
-                self.build_trait_summary()
+                for r in new_results:
+                    pid = r.get("pgs_id", "")
+                    if pid:
+                        existing_by_id[pid] = r
+                merged = list(existing_by_id.values())
+                self.prs_results = merged
+                self._build_prs_results_grid()
+                self.low_match_warning = any_low_match
+                self.prs_computing = False
+                self.prs_progress = 100
+                n_reused = len(merged) - len(new_results)
+                parts = [f"{len(new_results)} new + {n_reused} cached = {len(merged)} total PRS score(s)"]
+                if failed_ids:
+                    parts.append(f"{len(failed_ids)} failed: {', '.join(failed_ids[:5])}")
+                self.status_message = "Computed " + "; ".join(parts)
+                self._checkpoint_prs_to_dagster()
+                if self.prs_selection_mode == "traits" and self.prs_results:
+                    self.build_trait_summary()
+        except Exception as exc:
+            logger.error("PRS computation failed: %s", exc, exc_info=True)
+            async with self:
+                self.prs_computing = False
+                self.status_message = f"PRS computation failed: {exc}"
 
     def _checkpoint_prs_to_dagster(self) -> None:
         """Persist current PRS results to Dagster for cross-session restore."""
@@ -4171,29 +4195,36 @@ class AgentState(rx.State):
         try:
             result = await loop.run_in_executor(None, register_custom_module, Path(spec_dir))
         except Exception as exc:
+            logger.error("Module registration executor failed: %s", exc, exc_info=True)
             async with self:
                 self.slot_adding = False
                 self._add_chat_message("agent", f"Registration failed: {exc}")
             return
 
-        async with self:
-            self.slot_adding = False
-            if result.success:
-                stats = result.stats or {}
-                name = stats.get("module_name", self.slot_module_name)
-                variant_count = stats.get("weights_rows", 0)
-                self._add_chat_message(
-                    "agent",
-                    f"Module **{name}** registered successfully! "
-                    f"({variant_count} variants) — now available for annotation.",
-                )
-                upload_state = await self.get_state(UploadState)
-                upload_state._refresh_module_ui_state()
-            else:
-                self._add_chat_message(
-                    "agent",
-                    f"Registration failed: {'; '.join(result.errors[:3])}",
-                )
+        try:
+            async with self:
+                self.slot_adding = False
+                if result.success:
+                    stats = result.stats or {}
+                    name = stats.get("module_name", self.slot_module_name)
+                    variant_count = stats.get("weights_rows", 0)
+                    self._add_chat_message(
+                        "agent",
+                        f"Module **{name}** registered successfully! "
+                        f"({variant_count} variants) — now available for annotation.",
+                    )
+                    upload_state = await self.get_state(UploadState)
+                    upload_state._refresh_module_ui_state()
+                else:
+                    self._add_chat_message(
+                        "agent",
+                        f"Registration failed: {'; '.join(result.errors[:3])}",
+                    )
+        except Exception as exc:
+            logger.error("Module UI refresh after registration failed: %s", exc, exc_info=True)
+            async with self:
+                self.slot_adding = False
+                self._add_chat_message("agent", f"Module registered but UI refresh failed: {exc}")
 
     def clear_slot(self) -> None:
         """Empty the editing slot."""
@@ -4365,24 +4396,29 @@ class AgentState(rx.State):
             run_log.log(f"ERROR: {error_msg}")
 
         found_spec_dir = ""
-        if spec_output.exists():
-            for d in spec_output.iterdir():
-                if d.is_dir() and (d / "module_spec.yaml").exists():
-                    found_spec_dir = str(d)
-                    break
+        try:
+            if spec_output.exists():
+                for d in spec_output.iterdir():
+                    if d.is_dir() and (d / "module_spec.yaml").exists():
+                        found_spec_dir = str(d)
+                        break
 
-        # Persist to data/output/generated_modules/{name}/v{X}/
-        if found_spec_dir:
-            from just_dna_pipelines.agents.module_creator import read_spec_meta
-            meta = read_spec_meta(Path(found_spec_dir))
-            module_name = meta.get("name") or Path(found_spec_dir).name
-            version = int(meta.get("version", 1))
-            persist_dir = GENERATED_MODULES_DIR / module_name / f"v{version}"
-            persist_dir.mkdir(parents=True, exist_ok=True)
-            for f in Path(found_spec_dir).iterdir():
-                if f.is_file():
-                    shutil.copy2(f, persist_dir / f.name)
-            found_spec_dir = str(persist_dir)
+            # Persist to data/output/generated_modules/{name}/v{X}/
+            if found_spec_dir:
+                from just_dna_pipelines.agents.module_creator import read_spec_meta
+                meta = read_spec_meta(Path(found_spec_dir))
+                module_name = meta.get("name") or Path(found_spec_dir).name
+                version = int(meta.get("version", 1))
+                persist_dir = GENERATED_MODULES_DIR / module_name / f"v{version}"
+                persist_dir.mkdir(parents=True, exist_ok=True)
+                for f in Path(found_spec_dir).iterdir():
+                    if f.is_file():
+                        shutil.copy2(f, persist_dir / f.name)
+                found_spec_dir = str(persist_dir)
+        except Exception as exc:
+            logger.error("Failed to persist agent module spec: %s", exc, exc_info=True)
+            if not error_msg:
+                error_msg = f"Module spec generated but failed to persist: {exc}"
 
         async with self:
             agent_reply = (
