@@ -3275,15 +3275,13 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 # ============================================================================
 
 from prs_ui import PRSComputeStateMixin
+import prs_ui
 import prs_ui.state as _prs_ui_state
+from prs_ui.state import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
 from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
-from just_prs.quality import (
-    format_effect_size as _format_effect_size,
-    format_classification as _format_classification,
-    interpret_prs_result as _interpret_prs_result,
-)
+from just_prs.enrich import enrich_prs_result as _enrich_prs_result
 
 _prs_catalog_instance: Optional[_PRSCatalog] = None
 _PRS_REQUIRED_SCORE_COLUMNS = {
@@ -3328,6 +3326,11 @@ def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
     return _prs_catalog_instance
 
 
+def _prs_results_version() -> str:
+    """Version tag for stored PRS results.  Changes when enrichment format changes."""
+    return f"prs-ui={prs_ui.__version__}"
+
+
 def _compute_single_prs(
     pgs_id: str,
     vcf_path: str,
@@ -3337,10 +3340,12 @@ def _compute_single_prs(
     catalog: _PRSCatalog,
     best_perf_df: pl.DataFrame,
     ancestry: str,
+    compute_all_populations: bool = False,
 ) -> Dict[str, Any]:
-    """Compute PRS for a single score — pure function, no Reflex state access.
+    """Compute and enrich a single PRS — pure function, no Reflex state access.
 
-    Runs outside the Reflex state lock so the UI stays responsive.
+    Uses enrich_prs_result + _enriched_to_row_dict so the result dict matches
+    the format that _build_prs_results_grid expects.
     """
     info = catalog.score_info_row(pgs_id)
     trait = info["trait_reported"] if info else None
@@ -3355,97 +3360,18 @@ def _compute_single_prs(
         genotypes_lf=genotypes_lf,
     )
 
-    match_pct = round(result.match_rate * 100, 1)
-    if match_pct < 10:
-        match_color = "red"
-    elif match_pct < 50:
-        match_color = "orange"
-    else:
-        match_color = "green"
-
-    auroc_val: Optional[float] = None
-    ancestry_str = ""
-    n_individuals: Optional[int] = None
-    effect_size_str = ""
-    classification_str = ""
-    perf_rows = best_perf_df.filter(pl.col("pgs_id") == pgs_id)
-    if perf_rows.height > 0:
-        p = perf_rows.row(0, named=True)
-        effect_size_str = _format_effect_size(p)
-        classification_str = _format_classification(p)
-        auroc_val = p.get("auroc_estimate")
-        ancestry_str = p.get("ancestry_broad") or ""
-        n_individuals = p.get("n_individuals")
-
-    pct_value = result.percentile
-    pct_method = result.percentile_method or (
-        "theoretical" if result.has_allele_frequencies else ""
+    enriched = _enrich_prs_result(
+        result,
+        catalog,
+        best_perf_df,
+        genome_build=genome_build,
+        selected_ancestry=ancestry,
+        compute_all_populations=compute_all_populations,
     )
-    if pct_value is None:
-        pct_value, pct_method = catalog.percentile(
-            result.score, pgs_id, ancestry=ancestry
-        )
 
-    interp = _interpret_prs_result(pct_value, result.match_rate, auroc_val)
-
-    if pct_value is not None:
-        if pct_value >= 90:
-            risk_level, risk_level_color = "High predisposition", "red"
-        elif pct_value >= 75:
-            risk_level, risk_level_color = "Above average predisposition", "orange"
-        elif pct_value >= 25:
-            risk_level, risk_level_color = "Average predisposition", "gray"
-        else:
-            risk_level, risk_level_color = "Below average predisposition", "blue"
-    else:
-        risk_level, risk_level_color = "", "gray"
-
-    trait_name = result.trait_reported or pgs_id
-    pop_label = ancestry_str or ancestry or "the reference population"
-    if pct_value is not None:
-        pct_int = int(pct_value)
-        sfx = "th"
-        if pct_int % 100 not in (11, 12, 13):
-            sfx = {1: "st", 2: "nd", 3: "rd"}.get(pct_int % 10, "th")
-        risk_hint = (
-            f"Your PRS for {trait_name} is at the {pct_int}{sfx} percentile — "
-            f"{risk_level.lower()} compared to the {pop_label} reference population. "
-            "For standard PRS models, higher percentile = more genetic variants "
-            "associated with increased risk."
-        )
-    else:
-        risk_hint = (
-            f"No reference percentile is available for {trait_name}. "
-            "The raw score is model-specific and cannot be read as protective or risky "
-            "without a population reference. Try selecting a different ancestry or "
-            "checking whether a reference panel exists for this score."
-        )
-
-    return {
-        "pgs_id": result.pgs_id,
-        "trait": result.trait_reported or "",
-        "score": round(result.score, 6),
-        "percentile": f"{pct_value:.1f}" if pct_value is not None else "",
-        "percentile_method": pct_method or "",
-        "has_allele_frequencies": result.has_allele_frequencies,
-        "match_rate": match_pct,
-        "match_color": match_color,
-        "variants_matched": result.variants_matched,
-        "variants_total": result.variants_total,
-        "effect_size": effect_size_str,
-        "classification": classification_str,
-        "auroc": f"{auroc_val:.3f}" if auroc_val is not None else "",
-        "quality_label": interp["quality_label"],
-        "quality_color": interp["quality_color"],
-        "summary": interp["summary"],
-        "ancestry": ancestry_str,
-        "selected_ancestry": ancestry,
-        "n_individuals": n_individuals if n_individuals is not None else 0,
-        "risk_level": risk_level,
-        "risk_level_color": risk_level_color,
-        "risk_hint": risk_hint,
-        "_low_match": result.match_rate < 0.1,
-    }
+    row = _prs_enriched_to_row_dict(enriched)
+    row["_low_match"] = result.match_rate < 0.1
+    return row
 
 
 class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
@@ -3462,6 +3388,10 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
     prs_selection_mode: str = "traits"
+    prs_force_recompute: bool = False
+
+    def set_prs_force_recompute(self, value: bool) -> None:
+        self.prs_force_recompute = bool(value)
 
     def set_prs_selection_mode(self, mode: str) -> None:
         self.prs_selection_mode = mode
@@ -3577,24 +3507,47 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             vcf_path = self.prs_genotypes_path
             genotypes_lf = self._get_genotypes_lf()
             ancestry = self.selected_ancestry
+            all_pops = self.compute_all_populations
 
-            total = len(selected_ids)
+            existing_by_id: dict[str, dict] = {}
+            if not self.prs_force_recompute:
+                for r in self.prs_results:
+                    pid = r.get("pgs_id", "")
+                    if pid:
+                        existing_by_id[pid] = r
+
+            ids_to_compute = [pid for pid in selected_ids if pid not in existing_by_id]
+            total = len(ids_to_compute)
+
             self.prs_computing = True
             self.prs_progress = 0
-            self.prs_results = []
-            self.prs_results_rows = []
-            self.prs_results_columns = []
-            self.prs_results_column_groups = []
             self.low_match_warning = False
-            self.status_message = f"Computing PRS for {total} score(s)..."
+            if self.prs_force_recompute:
+                self.prs_results = []
+                self.prs_results_rows = []
+                self.prs_results_columns = []
+                self.prs_results_column_groups = []
+
+            if not ids_to_compute:
+                self._build_prs_results_grid()
+                self.prs_computing = False
+                self.prs_progress = 100
+                self.status_message = f"All {len(selected_ids)} selected score(s) already computed"
+                if self.prs_selection_mode == "traits" and self.prs_results:
+                    self.build_trait_summary()
+                return
+
+            self.status_message = f"Computing PRS for {total} score(s)..." + (
+                f" ({len(existing_by_id)} already computed)" if existing_by_id else ""
+            )
 
         catalog = _get_prs_catalog(cache_dir_str)
         cache_path = Path(cache_dir_str) / "scores"
         best_perf_df = catalog.best_performance().collect()
-        results: List[Dict[str, Any]] = []
+        new_results: List[Dict[str, Any]] = []
         any_low_match = False
 
-        for i, pgs_id in enumerate(selected_ids, start=1):
+        for i, pgs_id in enumerate(ids_to_compute, start=1):
             async with self:
                 self.prs_progress = round(i / total * 100)
                 self.status_message = f"Computing {i}/{total}: {pgs_id}..."
@@ -3611,20 +3564,27 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                     catalog=catalog,
                     best_perf_df=best_perf_df,
                     ancestry=ancestry,
+                    compute_all_populations=all_pops,
                 ),
             )
 
             if row.pop("_low_match", False):
                 any_low_match = True
-            results.append(row)
+            new_results.append(row)
 
         async with self:
-            self.prs_results = results
+            for r in new_results:
+                pid = r.get("pgs_id", "")
+                if pid:
+                    existing_by_id[pid] = r
+            merged = list(existing_by_id.values())
+            self.prs_results = merged
             self._build_prs_results_grid()
             self.low_match_warning = any_low_match
             self.prs_computing = False
             self.prs_progress = 100
-            self.status_message = f"Computed {total} PRS score(s)"
+            n_reused = len(merged) - len(new_results)
+            self.status_message = f"Computed {len(new_results)} new + {n_reused} cached = {len(merged)} total PRS score(s)"
             self._checkpoint_prs_to_dagster()
             if self.prs_selection_mode == "traits" and self.prs_results:
                 self.build_trait_summary()
@@ -3650,6 +3610,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                         "genome_build": MetadataValue.text(self.genome_build),
                         "ancestry": MetadataValue.text(self.selected_ancestry or ""),
                         "row_count": MetadataValue.int(len(self.prs_results)),
+                        "format_version": MetadataValue.text(_prs_results_version()),
                     },
                 )
             )
@@ -3658,7 +3619,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
     def _load_prs_results_from_dagster(self, partition_key: str) -> None:
         """Restore PRS results from the latest Dagster materialization."""
-        if not partition_key:
+        if not partition_key or self.prs_force_recompute:
             return
         try:
             instance = get_dagster_instance()
@@ -3674,6 +3635,11 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             mat = result.records[0].asset_materialization
             if not mat or not mat.metadata:
                 return
+            version_meta = mat.metadata.get("format_version")
+            stored_version = str(version_meta.value) if version_meta and hasattr(version_meta, "value") else ""
+            if stored_version != _prs_results_version():
+                self.status_message = "Stored PRS results are from an older version — please recompute."
+                return
             results_meta = mat.metadata.get("results")
             if not results_meta or not hasattr(results_meta, "data"):
                 return
@@ -3682,11 +3648,13 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             if rows:
                 self.prs_results = rows
                 self._build_prs_results_grid()
+                if self.prs_view_mode == "grouped":
+                    self.build_trait_summary()
                 count_meta = mat.metadata.get("row_count")
                 n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
                 self.status_message = f"Restored {n} PRS result(s) from previous session"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to restore PRS results from Dagster: %s", exc)
 
 
 # ============================================================================

@@ -2062,6 +2062,7 @@ dependencies = [
     { name = "dagster-dg-cli" },
     { name = "google-genai" },
     { name = "just-dna-pipelines" },
+    { name = "just-prs" },
     { name = "pyyaml" },
     { name = "typer" },
     { name = "webui" },
@@ -2079,6 +2080,7 @@ requires-dist = [
     { name = "dagster-dg-cli", specifier = ">=1.12.22" },
     { name = "google-genai", specifier = ">=1.71.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
+    { name = "just-prs", specifier = ">=0.4.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.24.1" },
     { name = "webui", editable = "webui" },
@@ -2178,7 +2180,7 @@ dev = [
 
 [[package]]
 name = "just-prs"
-version = "0.4.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eliot" },
@@ -2193,9 +2195,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/ef/9fad4eb5cdb5d0d10fe34e23b1600aee9f030f4edd939cec2b7d7b019afb/just_prs-0.4.0.tar.gz", hash = "sha256:64612bd2e6b42eb878e0302a774cb1147a1260911be006de3995dae80dd1f958", size = 103533, upload-time = "2026-05-13T20:25:36.818Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/80/7544f9693e13d1e1d34bb6460adb81b15d905cde02919455ea9fa29ed9dd/just_prs-0.4.1.tar.gz", hash = "sha256:b31b78b16e547765f0450f7074ad9fc1e907b7492a1c7d663d4059ea5cad1a26", size = 103534, upload-time = "2026-05-14T00:36:21.639Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/40/5faccf44e879754a754317c92e5ab3dc9518b5b0505ff865f291f1ad7b6f/just_prs-0.4.0-py3-none-any.whl", hash = "sha256:b2b3afe79937577977c51771d9e856cf795eb4306cb248dc14ad7b2116018790", size = 114761, upload-time = "2026-05-13T20:25:38.062Z" },
+    { url = "https://files.pythonhosted.org/packages/24/19/78a7cb2663878cef9a3c5226f9a30616923b08a879f5b6dee932820a3e23/just_prs-0.4.1-py3-none-any.whl", hash = "sha256:3d0c819d236e7c6e702e3dd745c80b73d6f95bedc2278dd79344d7e065577854", size = 114761, upload-time = "2026-05-14T00:36:20.049Z" },
 ]
 
 [[package]]
@@ -3078,7 +3080,7 @@ wheels = [
 
 [[package]]
 name = "prs-ui"
-version = "0.2.5"
+version = "0.2.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "just-prs" },
@@ -3088,9 +3090,9 @@ dependencies = [
     { name = "reflex-components-radix" },
     { name = "reflex-mui-datagrid" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/5e/ef8611df6a25a2084cbca75a056bc9a2ccc7553b1a04d4363e71e3a226cd/prs_ui-0.2.5.tar.gz", hash = "sha256:35a08bc5465709aa0b19893eb7d4d73ea5c07d93ba04ed41a6214f0bdd030c81", size = 37539, upload-time = "2026-05-13T15:30:31.212Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/24/da194e4d12e4907c1a55a4fac50e0806e2103d316be6043fbbb6f2f020e8/prs_ui-0.2.6.tar.gz", hash = "sha256:d0af722998f72989137660a65f51298bfb0caaa06f2ba03da3601633e0cd3247", size = 38561, upload-time = "2026-05-14T01:04:21.134Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/3c/76a81b857445b573ab178258ef64c6057c702da6c9bffa9a6c2523da44e3/prs_ui-0.2.5-py3-none-any.whl", hash = "sha256:f732bd3cdeeea3a6b7399ff8ae6859332d33815b705d7b05120701b57a790c02", size = 43140, upload-time = "2026-05-13T15:30:32.614Z" },
+    { url = "https://files.pythonhosted.org/packages/60/31/9f174f1eedb0b081a14e7d519800a2ae668646e3d269fe774839d51289e2/prs_ui-0.2.6-py3-none-any.whl", hash = "sha256:a55a4de8396e51b78c8f6a06df11e29cfb7ff5f4f6488f220e48d3c561c7e68b", size = 44118, upload-time = "2026-05-14T01:04:23.698Z" },
 ]
 
 [[package]]
@@ -3982,16 +3984,16 @@ wheels = [
 
 [[package]]
 name = "reflex-mui-datagrid"
-version = "0.3.3"
+version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
     { name = "reflex" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/9d/c91f374d39e97c3e0419def40b7ebf3f2dca6ae4ce8d43b59aa78cf0beb0/reflex_mui_datagrid-0.3.3.tar.gz", hash = "sha256:8026be67e4b99c8f569e807d7512066eee10e02dd4a332751bdaa8404c3b540d", size = 63055, upload-time = "2026-05-13T15:22:02.384Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/1d/25815617b1919cfc96b89e44bd93eb5316cf16f4a91759bc6b581a3ea302/reflex_mui_datagrid-0.3.4.tar.gz", hash = "sha256:8d0602c6e3a477b40aefc0d22d701d443ebeb859b8e626763a59d2e95db3edbf", size = 63233, upload-time = "2026-05-13T22:44:15.003Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/34/46d4a029303f9468ee31ab38ccc2f5709b9816fb1db84226aed288af6e3e/reflex_mui_datagrid-0.3.3-py3-none-any.whl", hash = "sha256:c38a674baf585ca8d38e47e9426d2b82195b279d5e5a46808ea99910a78f5edd", size = 68080, upload-time = "2026-05-13T15:22:03.619Z" },
+    { url = "https://files.pythonhosted.org/packages/67/4b/e245139554bfc0fcdc2a2497ccebfee8ed8fe71f2fab6c0fadfe85c34aeb/reflex_mui_datagrid-0.3.4-py3-none-any.whl", hash = "sha256:5e073fc7134c7778b9e96ebe938fc40c80fff7ceca810f382a08794d9436b23f", size = 68295, upload-time = "2026-05-13T22:44:13.754Z" },
 ]
 
 [[package]]
@@ -4872,7 +4874,7 @@ wheels = [
 
 [[package]]
 name = "webui"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "webui" }
 dependencies = [
     { name = "fastapi" },
@@ -4892,7 +4894,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.135.3" },
     { name = "granian", specifier = ">=2.7.3" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "prs-ui", specifier = ">=0.2.3" },
+    { name = "prs-ui", specifier = ">=0.2.6" },
     { name = "reflex", specifier = ">=0.8.28" },
 ]
 

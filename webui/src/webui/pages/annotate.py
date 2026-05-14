@@ -24,6 +24,7 @@ from prs_ui import (
     prs_scores_selector,
     trait_summary_table,
 )
+from prs_ui.components.prs_section import _prs_results_header
 from prs_ui.grid_style import data_grid_scroll_container
 
 
@@ -1513,113 +1514,27 @@ def _reports_content() -> rx.Component:
 
 
 def _prs_results_content() -> rx.Component:
-    """Full PRS results table with filter/sort/interpretation."""
+    """PRS results section with Grouped/Individual toggle from prs-ui."""
     return rx.cond(
         PRSState.prs_results.length() > 0,
-        rx.theme(
-            rx.vstack(
+        rx.vstack(
+            rx.cond(
+                PRSState.low_match_warning,
                 rx.callout(
-                    "PRS results are statistical estimates for research purposes. "
-                    "They should not be used as clinical diagnoses. "
-                    "Consult a healthcare professional for medical interpretation.",
-                    icon="shield_alert",
-                    color_scheme="amber",
+                    "One or more scores have a match rate below 10%. "
+                    "This may indicate a genome build mismatch between "
+                    "the VCF and scoring files. Check your genome build selection.",
+                    icon="triangle_alert",
+                    color_scheme="red",
                     size="1",
                     width="100%",
                 ),
-                rx.callout(
-                    "Raw PRS scores are NOT comparable across different PGS models. "
-                    "Each model uses a different scale, number of variants, and weighting. "
-                    "A higher score in one model does not mean higher risk than a lower "
-                    "score in another model. Compare scores only within the same PGS ID.",
-                    icon="info",
-                    color_scheme="blue",
-                    size="1",
-                    width="100%",
-                ),
-                rx.callout(
-                    "Percentiles are estimated using 1000 Genomes reference distributions "
-                    "(matched to your selected ancestry group) when available. "
-                    "For scores without reference data, a theoretical distribution from "
-                    "allele frequencies or an AUROC-based approximation is used. "
-                    "The method is shown in the Pct. Method column. "
-                    "Reference Data column indicates whether precomputed "
-                    "population distributions exist.",
-                    icon="info",
-                    color_scheme="iris",
-                    size="1",
-                    width="100%",
-                ),
-                rx.cond(
-                    PRSState.low_match_warning,
-                    rx.callout(
-                        "One or more scores have a match rate below 10%. "
-                        "This may indicate a genome build mismatch between "
-                        "the VCF and scoring files. Check your genome build selection.",
-                        icon="triangle_alert",
-                        color_scheme="red",
-                        size="1",
-                        width="100%",
-                    ),
-                ),
-                rx.hstack(
-                    fomantic_icon("chart-bar", size=16),
-                    rx.text("PRS Results", size="3", weight="bold"),
-                    rx.spacer(),
-                    rx.button(
-                        fomantic_icon("download", size=14),
-                        "Download CSV",
-                        on_click=PRSState.download_prs_results_csv,
-                        color_scheme="green",
-                        size="2",
-                    ),
-                    align="center",
-                    spacing="2",
-                    width="100%",
-                ),
-                _prs_interpretation_guide(),
-                data_grid(
-                    rows=PRSState.prs_results_rows,
-                    columns=PRSState.prs_results_columns,
-                    column_grouping_model=PRSState.prs_results_column_groups,
-                    row_id_field="id",
-                    pagination=False,
-                    hide_footer=True,
-                    density="compact",
-                    height=PRSState.prs_results_grid_height,
-                    disable_row_selection_on_click=True,
-                    detail_columns=[
-                        "risk_level", "risk_hint", "summary",
-                        "reference_source_detail", "effect_size_detail",
-                    ],
-                    detail_labels={
-                        "risk_level": "Risk Level",
-                        "risk_hint": "Interpretation",
-                        "summary": "Quality Summary",
-                        "reference_source_detail": "Reference Data Source",
-                        "effect_size_detail": "Effect Size & Classification",
-                    },
-                    detail_badge_fields=["risk_level"],
-                    detail_badge_colors={
-                        "High predisposition": ["#c62828", "#ffcdd2"],
-                        "Above average predisposition": ["#e65100", "#fff3e0"],
-                        "Average predisposition": ["#455a64", "#eceff1"],
-                        "Below average predisposition": ["#2e7d32", "#c8e6c9"],
-                    },
-                ),
-                rx.text(
-                    "AUROC, effect size, and population are from the best available "
-                    "PGS Catalog evaluation study (largest sample, European-ancestry preferred). "
-                    "Quality combines AUROC (model accuracy) and match rate (genotype coverage). "
-                    "Results are most accurate when your ancestry matches the evaluation population. "
-                    "Click the chevron on any row to see detailed interpretation.",
-                    size="1",
-                    color="gray",
-                ),
-                spacing="3",
-                width="100%",
             ),
-            has_background=False,
+            _prs_results_header(PRSState),
+            trait_summary_table(PRSState, detail_height=800),
+            prs_results_table(PRSState, detail_height=800),
+            spacing="3",
+            width="100%",
         ),
         rx.el.div(
             fomantic_icon("chart-bar", size=30, color="#ccc"),
@@ -2761,9 +2676,15 @@ def _prs_tab_content() -> rx.Component:
                     prs_scores_selector(PRSState),
                 ),
                 prs_compute_button(PRSState),
+                rx.checkbox(
+                    "Force recompute (ignore saved results)",
+                    checked=PRSState.prs_force_recompute,
+                    on_change=PRSState.set_prs_force_recompute,
+                    size="1",
+                    color_scheme="gray",
+                ),
                 prs_progress_section(PRSState),
                 _prs_results_content(),
-                trait_summary_table(PRSState),
                 width="100%",
                 spacing="4",
             ),
