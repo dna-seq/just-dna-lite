@@ -35,6 +35,9 @@ services:
       - just-dna-state:/app/data/interim
     environment:
       - API_URL=${API_URL:-http://localhost:8000}
+      - PUBLIC_BACKEND_URL=${PUBLIC_BACKEND_URL:-}
+      - DAGSTER_WEB_URL=${DAGSTER_WEB_URL:-http://localhost:3005}
+      - PUBLIC_DAGSTER_WEB_URL=${PUBLIC_DAGSTER_WEB_URL:-}
       - JUST_DNA_PIPELINES_LOGIN=${JUST_DNA_PIPELINES_LOGIN:-none}
       - HF_TOKEN=${HF_TOKEN:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}

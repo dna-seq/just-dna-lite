@@ -1,7 +1,10 @@
-import reflex as rx
-from reflex.plugins.sitemap import SitemapPlugin
 import os
 import socket
+
+import reflex as rx
+from reflex.plugins.sitemap import SitemapPlugin
+
+from webui.deployment_urls import resolve_public_backend_base_url
 
 _IN_CONTAINER = os.path.exists("/.dockerenv") or os.environ.get("container") == "podman"
 
@@ -15,9 +18,9 @@ def _find_free_port(start: int = 8000, end: int = 9000) -> int:
 
 
 backend_port = int(os.getenv("BACKEND_PORT", "0")) or _find_free_port(8000)
-api_url = os.getenv("API_URL", f"http://localhost:{backend_port}")
+api_url = resolve_public_backend_base_url(backend_port)
 
-# Persist so state.py's backend_api_url computed var reads the correct port
+# Persist so state/backend links use the same browser-reachable URL as Reflex
 os.environ["API_URL"] = api_url
 
 # In containers: allow all Vite hosts so the mapped port is reachable from the host.

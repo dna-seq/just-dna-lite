@@ -23,7 +23,9 @@
 # With environment overrides:
 #   podman run -it --rm \
 #     -p 3000:3000 -p 3005:3005 -p 8000:8000 \
-#     -e API_URL=http://your-server:8000 \
+#     -e PUBLIC_BACKEND_URL=https://your-server:8000 \
+#     (or -e API_URL=https://your-server:8000)
+#     -e PUBLIC_DAGSTER_WEB_URL=https://your-server:3005 \
 #     -e HF_TOKEN=hf_xxx \
 #     -e GEMINI_API_KEY=xxx \
 #     --env-file .env \
@@ -79,7 +81,8 @@ ENV HOME=/root
 ENV PATH="/app/.venv/bin:$PATH"
 # Fix backend port to 8000 inside the container (no auto-discovery needed)
 ENV BACKEND_PORT=8000
-# Default API URL — override at runtime for external access
+# Default API URL for same-machine Docker (browser on host → mapped port).
+# Public hosts: set PUBLIC_BACKEND_URL or API_URL to https://your-domain:8000 at runtime.
 ENV API_URL=http://localhost:8000
 # Use Granian for the backend server
 ENV REFLEX_USE_GRANIAN=true

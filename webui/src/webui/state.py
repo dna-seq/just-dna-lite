@@ -42,6 +42,7 @@ from just_dna_pipelines.module_registry import (
     refresh_module_registry,
 )
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
+from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +51,11 @@ GENERATED_MODULES_DIR: Path = get_generated_modules_dir()
 
 def _backend_api_url() -> str:
     """Return the browser-reachable Reflex backend URL for custom API routes."""
-    return os.environ.get(
-        "API_URL",
-        f"http://localhost:{os.environ.get('BACKEND_PORT', '8000')}",
-    ).rstrip("/")
+    if os.environ.get("API_URL", "").strip():
+        return os.environ["API_URL"].strip().rstrip("/")
+    port_raw = os.environ.get("BACKEND_PORT", "8000").strip()
+    fb = int(port_raw) if port_raw.isdigit() else 8000
+    return resolve_public_backend_base_url(fb)
 
 
 # Module metadata with titles, descriptions, and icons
@@ -154,7 +156,7 @@ def get_dagster_instance() -> DagsterInstance:
 
 def get_dagster_web_url() -> str:
     """Get the URL for the Dagster web UI from environment or default."""
-    return os.getenv("DAGSTER_WEB_URL", "http://localhost:3005").rstrip("/")
+    return resolve_dagster_web_public_url()
 
 
 class AuthState(rx.State):
