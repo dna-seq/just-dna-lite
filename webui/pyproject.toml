@@ -9,15 +9,13 @@ dependencies = [
   "just-dna-pipelines",
   "granian>=2.7.3",
   "fastapi>=0.135.3",
-  "prs-ui>=0.3.1",
+  "prs-ui>=0.3.4",
   "gunicorn>=26.0.0",
 ]
 
 [tool.uv.sources]
 # Use the workspace-local just-dna-pipelines package as a dependency.
 just-dna-pipelines = { workspace = true }
-#prs-ui = { path = "/data/sources/just-prs/prs-ui", editable = true }
-#just-prs = { path = "/data/sources/just-prs/just-prs", editable = true }
 
 [project.scripts]
 run = "webui.run:main"

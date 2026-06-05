@@ -3489,8 +3489,11 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
     def set_prs_selection_mode(self, mode: str) -> None:
         self.prs_selection_mode = mode
+        self.prs_view_mode = "grouped" if mode == "traits" else "individual"
         if mode == "individual" and self.selected_pgs_ids:
             self._sync_loaded_grid_selection(self.selected_pgs_ids)
+        if mode == "traits" and self.prs_results and not self.trait_summary_rows:
+            self.build_trait_summary()
 
     def sync_trait_pgs_ids(self, ids: list[str]) -> None:
         """Receive resolved PGS IDs from PRSTraitState."""
@@ -3538,25 +3541,26 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         Sets genotypes LazyFrame and loads PGS Catalog scores.  On file
         switch, clears stale results and tries to restore from Dagster.
         """
-        import polars as pl
-
         self.genome_build = "GRCh37" if genome_build in ("GRCh37", "hg19") else "GRCh38"
 
         same_file = (parquet_path == self.prs_initialized_for_file)
         self.prs_initialized_for_file = parquet_path
-        self.prs_genotypes_path = parquet_path
-        self._prs_genotypes_lf = None
-
-        if parquet_path and Path(parquet_path).exists():
-            self.set_prs_genotypes_lf(pl.scan_parquet(parquet_path))
-
         if not same_file:
-            self.prs_results = []
+            self.load_genotypes(parquet_path)
             self.prs_results_rows = []
             self.prs_results_columns = []
             self.prs_results_column_groups = []
+            self.trait_summary_rows = []
+            self.trait_summary_columns = []
+            self.trait_summary_visible = False
             self.selected_pgs_ids = []
             self.low_match_warning = False
+        elif parquet_path and Path(parquet_path).exists():
+            self.prs_genotypes_path = parquet_path
+            self.set_prs_genotypes_lf(pl.scan_parquet(parquet_path))
+        else:
+            self.prs_genotypes_path = parquet_path
+            self._prs_genotypes_lf = None
 
         yield from self.initialize_prs()
 
@@ -3565,12 +3569,17 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             partition_key = f"{p.parent.parent.name}/{p.parent.name}"
             self._load_prs_results_from_dagster(partition_key)
 
-        yield PRSTraitState.initialize_traits(self.genome_build)
+        yield PRSTraitState.initialize_traits(self.genome_build, parquet_path, self.include_harmonized)
 
     def set_prs_genome_build(self, value: str) -> Any:
         """Set genome build and reload both individual scores and trait grid."""
         yield from PRSComputeStateMixin.set_prs_genome_build(self, value)
-        yield PRSTraitState.load_traits(self.genome_build)
+        yield PRSTraitState.load_traits(self.genome_build, self.prs_genotypes_path, self.include_harmonized)
+
+    def set_include_harmonized(self, value: bool) -> Any:
+        """Reload both score and trait selectors when harmonized scores change."""
+        yield from PRSComputeStateMixin.set_include_harmonized(self, value)
+        yield PRSTraitState.load_traits(self.genome_build, self.prs_genotypes_path, self.include_harmonized)
 
     @rx.event(background=True)
     async def compute_selected_prs(self) -> None:
@@ -3627,7 +3636,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 self.prs_computing = False
                 self.prs_progress = 100
                 self.status_message = f"All {len(selected_ids)} selected score(s) already computed"
-                if self.prs_view_mode == "grouped" and self.prs_results:
+                if self.prs_results:
                     self.build_trait_summary()
                 return
 
@@ -3692,7 +3701,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                     parts.append(f"{len(failed_ids)} failed: {', '.join(failed_ids[:5])}")
                 self.status_message = "Computed " + "; ".join(parts)
                 self._checkpoint_prs_to_dagster()
-                if self.prs_view_mode == "grouped" and self.prs_results:
+                if self.prs_results:
                     self.build_trait_summary()
         except Exception as exc:
             logger.error("PRS computation failed: %s", exc, exc_info=True)
@@ -3759,7 +3768,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             if rows:
                 self.prs_results = rows
                 self._build_prs_results_grid()
-                if self.prs_view_mode == "grouped":
+                if self.prs_results:
                     self.build_trait_summary()
                 count_meta = mat.metadata.get("row_count")
                 n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
@@ -3800,16 +3809,22 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
     """
 
     selected_traits: list[str] = []
+    selected_pgs_ids: list[str] = []
     trait_selected_pgs_ids: list[str] = []
+    prs_genotypes_path: str = ""
     traits_loaded: bool = False
 
     _trait_to_pgs: dict[str, list[str]] = {}
     _traits_genome_build: str = ""
+    _traits_include_harmonized: bool = True
 
-    def _build_trait_df(self, genome_build: str) -> pl.DataFrame:
+    def _build_trait_df(self, genome_build: str, include_harmonized: bool = True) -> pl.DataFrame:
         """Group PGS Catalog scores by trait and return a summary DataFrame."""
         _ensure_prs_catalog_cache_current(str(_prs_resolve_cache_dir()))
-        lf = _prs_ui_mixin._catalog.scores(genome_build=genome_build)
+        lf = _prs_ui_mixin._catalog.scores(
+            genome_build=genome_build,
+            include_harmonized=include_harmonized,
+        )
         df = lf.select(
             "pgs_id", "trait_reported", "trait_efo", "trait_efo_id", "n_variants",
         ).collect()
@@ -3840,14 +3855,22 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
         ).drop("_pgs_list")
         return result
 
-    def load_traits(self, genome_build: str) -> Any:
+    def load_traits(
+        self,
+        genome_build: str,
+        genotypes_path: str = "",
+        include_harmonized: bool = True,
+    ) -> Any:
         """Load trait-grouped data into the grid."""
         self._traits_genome_build = genome_build
+        self._traits_include_harmonized = include_harmonized
+        self.prs_genotypes_path = genotypes_path
         self.traits_loaded = False
         self.selected_traits = []
+        self.selected_pgs_ids = []
         self.trait_selected_pgs_ids = []
         yield
-        trait_df = self._build_trait_df(genome_build)
+        trait_df = self._build_trait_df(genome_build, include_harmonized)
         self.traits_loaded = True
         yield from self.set_lazyframe(
             trait_df.lazy(),
@@ -3855,11 +3878,21 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
             column_overrides=_build_trait_column_overrides(),
         )
 
-    def initialize_traits(self, genome_build: str) -> Any:
+    def initialize_traits(
+        self,
+        genome_build: str,
+        genotypes_path: str = "",
+        include_harmonized: bool = True,
+    ) -> Any:
         """Load traits on first access or when genome build changes."""
-        if self._traits_genome_build == genome_build and self.traits_loaded:
+        same_config = (
+            self._traits_genome_build == genome_build
+            and self._traits_include_harmonized == include_harmonized
+        )
+        self.prs_genotypes_path = genotypes_path
+        if same_config and self.traits_loaded:
             return
-        yield from self.load_traits(genome_build)
+        yield from self.load_traits(genome_build, genotypes_path, include_harmonized)
 
     def handle_lf_grid_row_selection(self, model: dict) -> None:
         """Track selected traits and resolve to PGS IDs."""
@@ -3874,11 +3907,13 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
             pgs_ids: list[str] = []
             for ids in self._trait_to_pgs.values():
                 pgs_ids.extend(ids)
+            self.selected_pgs_ids = pgs_ids
             self.trait_selected_pgs_ids = pgs_ids
             return PRSState.sync_trait_pgs_ids(pgs_ids)  # type: ignore[return-value]
 
         if selection_type == "include" and not selected_row_ids:
             self.selected_traits = []
+            self.selected_pgs_ids = []
             self.trait_selected_pgs_ids = []
             return PRSState.sync_trait_pgs_ids([])  # type: ignore[return-value]
 
@@ -3911,6 +3946,7 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
     def deselect_all_traits(self) -> Any:
         """Clear all selected traits."""
         self.selected_traits = []
+        self.selected_pgs_ids = []
         self.trait_selected_pgs_ids = []
         self.lf_grid_row_selection_model = {"type": "include", "ids": []}
         return PRSState.sync_trait_pgs_ids([])  # type: ignore[return-value]
@@ -3920,6 +3956,7 @@ class PRSTraitState(LazyFrameGridMixin, rx.State):
         pgs_ids: list[str] = []
         for trait in self.selected_traits:
             pgs_ids.extend(self._trait_to_pgs.get(trait, []))
+        self.selected_pgs_ids = pgs_ids
         self.trait_selected_pgs_ids = pgs_ids
         return pgs_ids
 

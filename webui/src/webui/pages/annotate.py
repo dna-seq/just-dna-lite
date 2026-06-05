@@ -20,13 +20,14 @@ from prs_ui import (
     prs_ancestry_selector,
     prs_build_selector,
     prs_compute_button,
+    prs_engine_selector,
     prs_progress_section,
     prs_results_table,
     prs_scores_selector,
     trait_summary_table,
 )
-from prs_ui.components.prs_section import _prs_results_header
 from prs_ui.grid_style import data_grid_scroll_container
+from prs_ui.pages.traits import trait_selector
 
 
 RIGHT_PANEL_TAB_STYLE = {
@@ -44,6 +45,26 @@ RIGHT_PANEL_TAB_BADGE_STYLE = {
     "marginLeft": "4px",
     "fontSize": "0.8rem",
     "padding": "4px 7px",
+}
+
+PRS_MODE_TAB_STYLE = {
+    "cursor": "pointer",
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "8px",
+    "fontSize": "1rem",
+    "fontWeight": "700",
+    "padding": "14px 24px",
+    "minHeight": "54px",
+}
+
+PRS_RESULTS_TITLE_STYLE = {
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "10px",
+    "color": "#1f2933",
+    "fontSize": "1.15rem",
+    "fontWeight": "800",
 }
 
 OUTPUT_CARD_META_ROW_STYLE = {
@@ -1514,8 +1535,82 @@ def _reports_content() -> rx.Component:
     )
 
 
+def _prs_results_header() -> rx.Component:
+    """Readable PRS results title and export action."""
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("chart-bar", size=18, color="#2185d0"),
+            rx.el.span("PRS Results", style={"color": "#1f2933"}),
+            style=PRS_RESULTS_TITLE_STYLE,
+        ),
+        rx.button(
+            fomantic_icon("download", size=14),
+            "CSV",
+            on_click=PRSState.download_prs_results_csv,
+            color_scheme="green",
+            variant="soft",
+            size="2",
+        ),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "spaceBetween",
+            "width": "100%",
+        },
+    )
+
+
+def _prs_results_tab_menu() -> rx.Component:
+    """Attached tab menu for switching between grouped and individual PRS results."""
+    return rx.el.div(
+        rx.el.a(
+            fomantic_icon("layers", size=16),
+            " Grouped",
+            on_click=PRSState.set_prs_view_mode("grouped"),
+            class_name=rx.cond(
+                PRSState.prs_view_mode == "grouped",
+                "active item",
+                "item",
+            ),
+            style=PRS_MODE_TAB_STYLE,
+        ),
+        rx.el.a(
+            fomantic_icon("list", size=16),
+            " Individual",
+            on_click=PRSState.set_prs_view_mode("individual"),
+            class_name=rx.cond(
+                PRSState.prs_view_mode == "individual",
+                "active item",
+                "item",
+            ),
+            style=PRS_MODE_TAB_STYLE,
+        ),
+        class_name="ui top attached tabular menu",
+        style={"margin": "0"},
+    )
+
+
+def _prs_results_panel() -> rx.Component:
+    """Bordered PRS results panel with attached view tabs."""
+    return rx.el.div(
+        _prs_results_tab_menu(),
+        rx.el.div(
+            trait_summary_table(PRSState, detail_height="auto"),
+            prs_results_table(PRSState, detail_height="auto"),
+            class_name="ui bottom attached segment",
+            style={
+                "padding": "18px",
+                "overflow": "hidden",
+                "borderColor": "#d4d4d5",
+                "boxShadow": "0 1px 3px rgba(34, 36, 38, 0.08)",
+            },
+        ),
+        style={"width": "100%", "minWidth": "0"},
+    )
+
+
 def _prs_results_content() -> rx.Component:
-    """PRS results section with Grouped/Individual toggle from prs-ui."""
+    """PRS results section with attached tabs and a readable local header."""
     return rx.cond(
         PRSState.prs_results.length() > 0,
         rx.vstack(
@@ -1531,9 +1626,8 @@ def _prs_results_content() -> rx.Component:
                     width="100%",
                 ),
             ),
-            _prs_results_header(PRSState),
-            trait_summary_table(PRSState, detail_height=800),
-            prs_results_table(PRSState, detail_height=800),
+            _prs_results_header(),
+            _prs_results_panel(),
             spacing="3",
             width="100%",
         ),
@@ -2532,114 +2626,69 @@ def _input_tab_content() -> rx.Component:
     )
 
 
-def _prs_mode_toggle() -> rx.Component:
-    """Segmented toggle for switching between trait-grouped and individual PRS selection."""
+def _prs_mode_tab_menu() -> rx.Component:
+    """Attached tab menu for switching between trait-grouped and individual PRS selection."""
     return rx.el.div(
-        rx.el.button(
+        rx.el.a(
             fomantic_icon("layers", size=16),
             " By Trait",
             on_click=PRSState.set_prs_selection_mode("traits"),
             class_name=rx.cond(
                 PRSState.prs_selection_mode == "traits",
-                "ui blue button",
-                "ui basic button",
+                "active item",
+                "item",
             ),
-            style={"marginRight": "0"},
+            style=PRS_MODE_TAB_STYLE,
         ),
-        rx.el.button(
+        rx.el.a(
             fomantic_icon("list", size=16),
-            " Individual",
+            " By PRS",
             on_click=PRSState.set_prs_selection_mode("individual"),
             class_name=rx.cond(
                 PRSState.prs_selection_mode == "individual",
-                "ui blue button",
-                "ui basic button",
+                "active item",
+                "item",
             ),
-            style={"marginLeft": "0"},
+            style=PRS_MODE_TAB_STYLE,
         ),
-        class_name="ui buttons",
+        class_name="ui top attached tabular menu",
+        style={"margin": "0"},
     )
 
 
 def _prs_trait_selector() -> rx.Component:
     """Trait selection grid for grouped-by-trait PRS input."""
-    return rx.vstack(
-        rx.hstack(
-            rx.icon("layers", size=16),
-            rx.text("Select Traits", size="3", weight="bold"),
-            rx.text(
-                "Choose traits to compute PRS for all associated scoring models.",
-                size="2",
-                color="gray",
-            ),
-            spacing="2",
-            align="center",
-        ),
-        rx.hstack(
-            rx.button(
-                rx.icon("list-checks", size=14),
-                "Select Filtered",
-                on_click=PRSTraitState.select_filtered_traits,
-                variant="outline",
-                size="2",
-                disabled=~PRSTraitState.traits_loaded,  # type: ignore[operator]
-            ),
-            rx.button(
-                "Clear Selection",
-                on_click=PRSTraitState.deselect_all_traits,
-                variant="outline",
-                color_scheme="gray",
-                size="2",
-                disabled=PRSTraitState.selected_traits.length() == 0,  # type: ignore[operator]
-            ),
-            rx.spacer(),
+    return trait_selector(
+        PRSTraitState,
+        normalizing=UploadState.vcf_preview_loading,
+    )
+
+
+def _prs_selection_panel() -> rx.Component:
+    """Bordered PRS mode panel with attached tab navigation."""
+    return rx.el.div(
+        _prs_mode_tab_menu(),
+        rx.el.div(
             rx.cond(
-                PRSTraitState.selected_traits.length() > 0,  # type: ignore[operator]
-                rx.hstack(
-                    rx.badge(
-                        rx.text(PRSTraitState.selected_traits.length(), " traits"),  # type: ignore[operator]
-                        color_scheme="blue",
-                        size="2",
-                    ),
-                    rx.badge(
-                        rx.text(PRSTraitState.trait_selected_pgs_ids.length(), " PGS IDs"),  # type: ignore[operator]
-                        color_scheme="green",
-                        size="2",
-                    ),
-                    spacing="2",
-                ),
+                PRSState.prs_selection_mode == "traits",
+                _prs_trait_selector(),
+                prs_scores_selector(PRSState, normalizing=UploadState.vcf_preview_loading),
             ),
-            wrap="wrap",
-            spacing="2",
-            align="center",
-            width="100%",
+            class_name="ui bottom attached segment",
+            style={
+                "padding": "20px",
+                "minHeight": "520px",
+                "overflow": "hidden",
+                "borderColor": "#d4d4d5",
+                "boxShadow": "0 1px 3px rgba(34, 36, 38, 0.08)",
+            },
         ),
-        rx.cond(
-            PRSTraitState.traits_loaded,
-            rx.vstack(
-                lazyframe_grid_stats_bar(PRSTraitState),
-                data_grid_scroll_container(
-                    lazyframe_grid(
-                        PRSTraitState,
-                        height="400px",
-                        density="compact",
-                        column_header_height=56,
-                        checkbox_selection=True,
-                    ),
-                ),
-                width="100%",
-                spacing="2",
-            ),
-            rx.hstack(
-                rx.spinner(size="3"),
-                rx.text("Loading traits from PGS Catalog...", size="2", color="gray"),
-                spacing="2",
-                align="center",
-                padding="16px",
-            ),
-        ),
-        spacing="3",
-        width="100%",
+        style={
+            "width": "100%",
+            "minWidth": "0",
+            "marginTop": "4px",
+            "marginBottom": "4px",
+        },
     )
 
 
@@ -2663,20 +2712,16 @@ def _prs_tab_content() -> rx.Component:
                 rx.hstack(
                     prs_build_selector(PRSState),
                     rx.separator(orientation="vertical", size="2"),
+                    prs_engine_selector(PRSState),
+                    rx.separator(orientation="vertical", size="2"),
                     prs_ancestry_selector(PRSState),
-                    rx.spacer(),
-                    _prs_mode_toggle(),
                     spacing="4",
                     align="center",
                     wrap="wrap",
                     width="100%",
                 ),
-                rx.cond(
-                    PRSState.prs_selection_mode == "traits",
-                    _prs_trait_selector(),
-                    prs_scores_selector(PRSState),
-                ),
-                prs_compute_button(PRSState),
+                _prs_selection_panel(),
+                prs_compute_button(PRSState, normalizing=UploadState.vcf_preview_loading),
                 rx.checkbox(
                     "Force recompute (ignore saved results)",
                     checked=PRSState.prs_force_recompute,

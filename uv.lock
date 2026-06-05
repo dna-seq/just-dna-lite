@@ -1199,9 +1199,7 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/27/69/7f7e5372d998b81001899b1c0823c957aa413ba0f2662e65821611cc31e4/greenlet-3.5.1-cp313-cp313-macosx_11_0_universal2.whl", hash = "sha256:51518ff74664078fc51bffcc6fc529b0df5ae58da192691cee765d45ce944a2b", size = 285060, upload-time = "2026-05-20T13:08:51.899Z" },
     { url = "https://files.pythonhosted.org/packages/b1/bf/387f9b6b865fd2ae0d0be09e0004827295a01b71be76ed350dd1e28a91a4/greenlet-3.5.1-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1ffdb3c0bb002c99cd8f298957e046c3dbf6006b5b7cdf11a4e19194624a0a0a", size = 604370, upload-time = "2026-05-20T14:00:07.492Z" },
     { url = "https://files.pythonhosted.org/packages/32/f5/169ce3d4e4c67291bd18f8cbe0299c9f3e45102c7f1fb3c14780c93e4532/greenlet-3.5.1-cp313-cp313-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:7715a5a2c3378ba602c3a440558261e13a820bb53a82693aacd7b7f6d964e283", size = 616987, upload-time = "2026-05-20T14:05:44.237Z" },
-    { url = "https://files.pythonhosted.org/packages/19/ba/c24110c55dffa55aa6e1d98b45310da33801aeba7686ff0190fe5d46fd32/greenlet-3.5.1-cp313-cp313-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:d40a890035c0058cadbdc4af7569800fd28a0e527a0fdbb7b5f9418f176846ce", size = 622911, upload-time = "2026-05-20T14:09:10.598Z" },
     { url = "https://files.pythonhosted.org/packages/ee/e5/7f2e41d5273be07e77560d61ea4e56485b4d6c316d2a84518c62d1364061/greenlet-3.5.1-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:dc71ff466927a201b08305acac451ebe1aedfcea002f62f1f2f2ac2ac1e6a135", size = 613911, upload-time = "2026-05-20T13:14:27.539Z" },
-    { url = "https://files.pythonhosted.org/packages/ec/7b/d20db2e8a5ad6c038702f3179b136f93f0a3d1a21a0c0777f3e470cdf4b2/greenlet-3.5.1-cp313-cp313-manylinux_2_39_riscv64.whl", hash = "sha256:67821bb03e4e98664490edb787ff6af501194c29bbee0f5c1dfdcf1dc3d9d436", size = 425228, upload-time = "2026-05-20T14:01:40.837Z" },
     { url = "https://files.pythonhosted.org/packages/c5/a4/fbdc67579b73615a1f91615e814303cc71e06128f7baaba87be79b8fb90c/greenlet-3.5.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:cd443683db272ebaaca03af98c0b063ab30db70ea8a31a1559f35e3f7b744ccd", size = 1570689, upload-time = "2026-05-20T14:02:27.225Z" },
     { url = "https://files.pythonhosted.org/packages/e6/b4/77abbe35078be39718a46cd49caf16bceb35662f97a34101dca28aa98e47/greenlet-3.5.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:089fff7a6ce8d9316d1f65ebc00273a56be258c1725b32b94de90a3a979557e1", size = 1635602, upload-time = "2026-05-20T13:14:36.344Z" },
     { url = "https://files.pythonhosted.org/packages/37/f7/129f27ca700845b8ee8ca88ce7f43435a1239c2eddb7677fc938822762cf/greenlet-3.5.1-cp313-cp313-win_amd64.whl", hash = "sha256:110a1ca7b49b014b097f6078272c3f4ed31af45b254de5228b79adba879f6af9", size = 238683, upload-time = "2026-05-20T13:11:50.57Z" },
@@ -1807,7 +1805,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.3.3"
+version = "0.3.4"
 source = { editable = "." }
 dependencies = [
     { name = "dagster-dg-cli" },
@@ -1831,7 +1829,7 @@ requires-dist = [
     { name = "dagster-dg-cli", specifier = ">=1.12.22" },
     { name = "google-genai", specifier = ">=1.71.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "just-prs", specifier = ">=0.4.5" },
+    { name = "just-prs", specifier = ">=0.4.7" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.24.1" },
     { name = "webui", editable = "webui" },
@@ -1931,7 +1929,7 @@ dev = [
 
 [[package]]
 name = "just-prs"
-version = "0.4.5"
+version = "0.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "duckdb" },
@@ -1947,9 +1945,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/98/73/f30f282664dd32611f388836d138e141e46837a949759faeadeb215cf32d/just_prs-0.4.5.tar.gz", hash = "sha256:da46635725f67d69668fa80071f520b49dabeff680be91d66de0739c2db12ff6", size = 106546, upload-time = "2026-05-28T00:01:55.922Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/37/8bd80f8c8055336771a0bbbfa934ddf6994f52a52a7dba81b6ffd11a4b12/just_prs-0.4.7.tar.gz", hash = "sha256:5f8923bb1ed022ca332b52be5b97e9daa58dbb6be9adaf2ea8c2ed62c925c8f4", size = 116120, upload-time = "2026-06-05T01:42:44.91Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/48/7f7d8524601fbe88fe49e27518d5d066c38ee99eb1cdda6cae027fd3f152/just_prs-0.4.5-py3-none-any.whl", hash = "sha256:f4dc5c9038bf4ad7a8dbae150d182f1319c387170e80bfd0e8cb618bf5cf712c", size = 117863, upload-time = "2026-05-28T00:01:57.15Z" },
+    { url = "https://files.pythonhosted.org/packages/be/21/fc9eda8992f071a8448fec7693f6f90210a3cdd114f1ae1badcb09ef824f/just_prs-0.4.7-py3-none-any.whl", hash = "sha256:739da7446f3dea30234b0394372a02cf524b19f41019f6df79b321fe4ed086c5", size = 128760, upload-time = "2026-06-05T01:42:43.004Z" },
 ]
 
 [[package]]
@@ -2642,7 +2640,7 @@ wheels = [
 
 [[package]]
 name = "prs-ui"
-version = "0.3.1"
+version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "just-prs" },
@@ -2652,9 +2650,9 @@ dependencies = [
     { name = "reflex-components-radix" },
     { name = "reflex-mui-datagrid" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/03/b9a26ea07dcdcc3f8000fb27f57cc52a9fceeafdfbba11cbfde8061ebca6/prs_ui-0.3.1.tar.gz", hash = "sha256:a3be35846ceaaea92fb3aa856c7057dc825195846573463f14851655bbb43321", size = 104721, upload-time = "2026-05-28T01:03:13.025Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/a4/cfd012c33476da08a99e28db7664a3dddfa4d76b6eb439787684c744d398/prs_ui-0.3.4.tar.gz", hash = "sha256:27daf935d3e4dc6cb929f167aeb1cef299412a1ea2557fd5a6eeeb66e5d1478a", size = 117539, upload-time = "2026-06-05T11:09:37.998Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/65/2f93de49f351ad23cecfc8e514abad6aeb0bcb846e81307f1cb5e9b067ee/prs_ui-0.3.1-py3-none-any.whl", hash = "sha256:5dea0e465b6a54c005d36e934d38a46df236c7d331a91e18840cff195321a385", size = 48805, upload-time = "2026-05-28T01:03:14.246Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/e2/3933b5a0ec214ef5232d5075ad0a610d49e8a88529e6fc69d2719d32a674/prs_ui-0.3.4-py3-none-any.whl", hash = "sha256:35ca5e05f3866c8dc3ce21dad0a1aebed28506a284421808a3d41682dd689e4a", size = 59421, upload-time = "2026-06-05T11:09:36.716Z" },
 ]
 
 [[package]]
@@ -3451,16 +3449,17 @@ wheels = [
 
 [[package]]
 name = "reflex-mui-datagrid"
-version = "0.3.5"
+version = "0.3.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
     { name = "reflex" },
+    { name = "reflex-components-core" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/09/10a4534ef4fb3d8cb31d281f30d77b524d28c0504d9dfb23c08146759140/reflex_mui_datagrid-0.3.5.tar.gz", hash = "sha256:49ab6d9a0a406fb9477567e5e1e6479bf564c02ae106f613bdf6a71e6f944171", size = 63581, upload-time = "2026-05-14T07:21:32.604Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/ef/df13fd2d7557cbb5071198ddbb04f90fdf7f0e39421ac5326663ac8e3bef/reflex_mui_datagrid-0.3.7.tar.gz", hash = "sha256:090ecedcaac4e9558e989f77aee2c610148e75f31e97e1a2c6c8b677aa98f59f", size = 64651, upload-time = "2026-06-04T23:55:21.66Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/40/128ccd006a736c7ae0c2b188d33f41237270fa5eed644b8acd24a8677900/reflex_mui_datagrid-0.3.5-py3-none-any.whl", hash = "sha256:b3ddeb088ff85c78c5cb73f8c820ede847abc7e5ed234ac30288a41f2ec41f2f", size = 68621, upload-time = "2026-05-14T07:21:30.797Z" },
+    { url = "https://files.pythonhosted.org/packages/24/b4/360d10f243f03f915c8c44402a7f04091f3acaec7ca7b91ddf2ecd5a9029/reflex_mui_datagrid-0.3.7-py3-none-any.whl", hash = "sha256:a4b68997101ad57e9bb69211254d29aab2c8e8ec3743f699bd39c9abeabadbf7", size = 69676, upload-time = "2026-06-04T23:55:22.867Z" },
 ]
 
 [[package]]
@@ -4224,7 +4223,7 @@ requires-dist = [
     { name = "granian", specifier = ">=2.7.3" },
     { name = "gunicorn", specifier = ">=26.0.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "prs-ui", specifier = ">=0.3.1" },
+    { name = "prs-ui", specifier = ">=0.3.4" },
     { name = "reflex", specifier = "==0.9.4" },
 ]
 

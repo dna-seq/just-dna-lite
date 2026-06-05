@@ -359,7 +359,57 @@ body,
 #just-dna-app-shell .ui.container,
 #layout-left-column,
 #layout-right-column {
-    color: #222;
+    color: #1f2933;
+    --gray-9: #6b7280;
+    --gray-10: #4b5563;
+    --gray-11: #374151;
+    --gray-12: #1f2933;
+}
+
+#just-dna-app-shell .ui.form .field > label,
+#just-dna-app-shell .ui.checkbox label,
+#just-dna-app-shell .ui.tabular.menu .item,
+#just-dna-app-shell .ui.menu .item,
+#just-dna-app-shell .rt-Text,
+#just-dna-app-shell [role="tab"],
+#just-dna-app-shell label {
+    color: #1f2933 !important;
+}
+
+#just-dna-app-shell .rt-SelectTrigger,
+#just-dna-app-shell .rt-CheckboxRoot,
+#just-dna-app-shell .rt-SegmentedControlRoot {
+    color: #1f2933 !important;
+}
+
+#just-dna-app-shell .ui.tabular.menu .active.item,
+#just-dna-app-shell .ui.menu .active.item {
+    color: #111827 !important;
+    font-weight: 700 !important;
+}
+
+#just-dna-app-shell .ui.disabled,
+#just-dna-app-shell .ui.disabled *,
+#just-dna-app-shell button:disabled,
+#just-dna-app-shell input:disabled,
+#just-dna-app-shell select:disabled,
+#just-dna-app-shell [aria-disabled="true"] {
+    color: #4b5563 !important;
+    opacity: 0.72 !important;
+}
+
+#just-dna-app-shell .ui.message,
+#just-dna-app-shell .ui.segment,
+#right-panel-tab-content,
+#segment-prs {
+    color: #1f2933;
+}
+
+#just-dna-app-shell .ui.message .header,
+#just-dna-app-shell .ui.segment .header,
+#segment-prs .header,
+#segment-prs strong {
+    color: #111827 !important;
 }
 """
 

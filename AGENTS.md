@@ -1044,8 +1044,8 @@ The web UI integrates the `prs-ui` PyPI package for polygenic risk score computa
 
 ### Dependencies
 
-- **`just-prs>=0.3.1`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
-- **`prs-ui>=0.1.1`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_section()`, score grid, results table
+- **`just-prs>=0.4.7`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
+- **`prs-ui>=0.3.3`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench()`, score grid, results table
 
 Both are added to `webui/pyproject.toml`.
 
