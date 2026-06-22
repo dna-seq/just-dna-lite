@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-lite"
-version = "0.3.4"
+version = "0.3.6"
 description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
@@ -10,13 +10,14 @@ dependencies = [
   "webui",
   "pyyaml>=6.0.3",
   "dagster-dg-cli>=1.12.22",
-  "google-genai>=1.71.0",
-  "just-prs>=0.4.7",
+  "google-genai>=1.71.0,<2.0",
+  "just-prs>=0.4.9",
 ]
 
 [tool.uv.sources]
 just-dna-pipelines = { workspace = true }
 webui = { workspace = true }
+agno = { git = "https://github.com/agno-agi/agno.git", rev = "f9de37bc43d3da911db239dc0b81045865c2a346", subdirectory = "libs/agno" }
 
 [dependency-groups]
 dev = [

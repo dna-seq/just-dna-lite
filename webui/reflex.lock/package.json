@@ -17,6 +17,7 @@
     "moment": "2.30.1",
     "plotly.js-dist-min": "^3.0.0",
     "react": "19.2.6",
+    "react-debounce-input": "3.3.0",
     "react-dom": "19.2.6",
     "react-dropzone": "15.0.0",
     "react-error-boundary": "6.1.1",
