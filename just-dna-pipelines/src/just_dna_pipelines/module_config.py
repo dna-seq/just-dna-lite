@@ -73,6 +73,20 @@ def _find_column(schema_names: list[str], candidates: tuple[str, ...]) -> Option
     return None
 
 
+def _expand_pass_filters(pass_filters: list[str]) -> list[str]:
+    """Expand the FILTER allow-list to cover the VCF "missing" sentinel.
+
+    The VCF spec uses ``.`` for an unfiltered/missing FILTER, but ``polars-bio``
+    decodes ``.`` as an empty string ``""``. So a config of ``["PASS", "."]``
+    would never match GATK HaplotypeCaller-style records (FILTER=".") and would
+    drop every row. Treat ``.`` and ``""`` as the same "no filter applied" value.
+    """
+    allowed = set(pass_filters)
+    if "." in allowed or "" in allowed:
+        allowed.update({".", ""})
+    return list(allowed)
+
+
 def build_quality_filter_expr(
     filters: QualityFilters,
     schema_names: list[str],
@@ -86,7 +100,7 @@ def build_quality_filter_expr(
     if filters.pass_filters:
         col = _find_column(schema_names, ("filter", "Filter", "FILTER"))
         if col is not None:
-            conditions.append(pl.col(col).is_in(filters.pass_filters))
+            conditions.append(pl.col(col).is_in(_expand_pass_filters(filters.pass_filters)))
 
     if filters.min_depth is not None and filters.min_depth > 0:
         col = _find_column(schema_names, ("DP", "Dp", "dp"))
