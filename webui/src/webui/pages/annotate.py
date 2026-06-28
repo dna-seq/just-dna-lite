@@ -2696,6 +2696,36 @@ def _prs_selection_panel() -> rx.Component:
     )
 
 
+def _prs_sample_type_control() -> rx.Component:
+    """Sequencing-type selector (WGS vs array) with the auto-detected default.
+
+    WGS enables reference-allele restoration (absent variants scored as hom-ref,
+    lifting genome-wide coverage); array/targeted keeps the recorded-set scoring.
+    Detected from variant density on load; the user can override here.
+    """
+    return rx.hstack(
+        rx.text("Sequencing:", size="2", weight="medium"),
+        rx.select.root(
+            rx.select.trigger(variant="soft"),
+            rx.select.content(
+                rx.select.item("Whole genome (WGS)", value="wgs"),
+                rx.select.item("Array / targeted", value="array"),
+            ),
+            value=PRSState.sample_type,
+            on_change=PRSState.set_sample_type,
+            size="1",
+        ),
+        rx.cond(
+            PRSState.sample_type_label != "",
+            rx.text(PRSState.sample_type_label, size="1", color="var(--gray-10)"),
+            rx.fragment(),
+        ),
+        spacing="2",
+        align="center",
+        wrap="wrap",
+    )
+
+
 def _prs_ancestry_detection_badge() -> rx.Component:
     """Auto-detected ancestry status shown beneath the PRS control row.
 
@@ -2762,6 +2792,8 @@ def _prs_tab_content() -> rx.Component:
             rx.vstack(
                 rx.hstack(
                     prs_build_selector(PRSState),
+                    rx.separator(orientation="vertical", size="2"),
+                    _prs_sample_type_control(),
                     rx.separator(orientation="vertical", size="2"),
                     prs_engine_selector(PRSState),
                     rx.separator(orientation="vertical", size="2"),

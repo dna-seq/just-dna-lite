@@ -3391,11 +3391,18 @@ def _compute_single_prs(
     best_perf_df: pl.DataFrame,
     ancestry: str,
     compute_all_populations: bool = False,
+    reference_restoration: bool = False,
+    reference_universe_path: Optional[str] = None,
+    sample_build: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute and enrich a single PRS — pure function, no Reflex state access.
 
     Uses enrich_prs_result + _enriched_to_row_dict so the result dict matches
     the format that _build_prs_results_grid expects.
+
+    For WGS samples ``reference_restoration=True`` (with a resolved universe
+    parquet) fills absent variants as hom-ref, lifting genome-wide coverage
+    from ~27% to ~99.9%.  ``sample_build`` arms just-prs' build-mismatch guard.
     """
     info = catalog.score_info_row(pgs_id)
     trait = info["trait_reported"] if info else None
@@ -3408,6 +3415,9 @@ def _compute_single_prs(
         pgs_id=pgs_id,
         trait_reported=trait,
         genotypes_lf=genotypes_lf,
+        reference_restoration=reference_restoration,
+        reference_universe_path=reference_universe_path,
+        sample_build=sample_build,
     )
 
     enriched = _enrich_prs_result(
@@ -3434,20 +3444,27 @@ def _compute_single_prs_with_cache_repair(
     best_perf_df: pl.DataFrame,
     ancestry: str,
     compute_all_populations: bool = False,
+    reference_restoration: bool = False,
+    reference_universe_path: Optional[str] = None,
+    sample_build: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute one PRS, repairing a corrupt local scoring parquet and retrying once."""
+    kwargs = dict(
+        pgs_id=pgs_id,
+        vcf_path=vcf_path,
+        genome_build=genome_build,
+        cache_dir=cache_dir,
+        genotypes_lf=genotypes_lf,
+        catalog=catalog,
+        best_perf_df=best_perf_df,
+        ancestry=ancestry,
+        compute_all_populations=compute_all_populations,
+        reference_restoration=reference_restoration,
+        reference_universe_path=reference_universe_path,
+        sample_build=sample_build,
+    )
     try:
-        return _compute_single_prs(
-            pgs_id=pgs_id,
-            vcf_path=vcf_path,
-            genome_build=genome_build,
-            cache_dir=cache_dir,
-            genotypes_lf=genotypes_lf,
-            catalog=catalog,
-            best_perf_df=best_perf_df,
-            ancestry=ancestry,
-            compute_all_populations=compute_all_populations,
-        )
+        return _compute_single_prs(**kwargs)
     except Exception as exc:
         if not _is_prs_corrupt_parquet_error(exc):
             raise
@@ -3455,17 +3472,26 @@ def _compute_single_prs_with_cache_repair(
         if not removed:
             raise
         logger.warning("Retrying PRS compute for %s after removing corrupt cache", pgs_id)
-        return _compute_single_prs(
-            pgs_id=pgs_id,
-            vcf_path=vcf_path,
-            genome_build=genome_build,
-            cache_dir=cache_dir,
-            genotypes_lf=genotypes_lf,
-            catalog=catalog,
-            best_perf_df=best_perf_df,
-            ancestry=ancestry,
-            compute_all_populations=compute_all_populations,
-        )
+        return _compute_single_prs(**kwargs)
+
+
+def _classify_sample_type(variant_count: int) -> tuple[str, float]:
+    """Heuristically classify a normalized sample as WGS or array by variant density.
+
+    Whole-genome callsets carry millions of variant records; consumer genotyping
+    arrays carry ~0.3–1M typed markers; targeted panels far fewer.  Returns
+    ``(sample_type, confidence)``; the user can override in the UI.  We only call
+    WGS at high counts because mis-labelling an array as WGS would wrongly assume
+    every untyped site is hom-ref.
+    """
+    n = variant_count
+    if n >= 2_000_000:
+        return "wgs", 0.97
+    if n >= 1_000_000:
+        return "wgs", 0.80
+    if n >= 300_000:
+        return "array", 0.75
+    return "array", 0.85
 
 
 class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
@@ -3492,8 +3518,34 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     detected_fine_population: str = ""     # within-continent call, when available
     ancestry_detection_status: str = ""    # "" | detecting | done | unknown | failed
 
+    # --- Sequencing type (WGS vs array) — drives reference-allele restoration ---
+    # WGS: absent variants are hom-ref, so restoring REF alleles lifts coverage
+    # ~27% -> ~99.9%.  Array/targeted: absent means untyped, so no hom-ref fill.
+    # Auto-detected from variant density on load (preselected), user-overridable.
+    sample_type: str = "wgs"               # effective choice: "wgs" | "array"
+    detected_sample_type: str = ""         # heuristic suggestion
+    sample_type_confidence: float = 0.0
+    sample_type_source: str = ""           # "" | detected | metadata | user
+    sample_variant_count: int = 0
+
     def set_prs_force_recompute(self, value: bool) -> None:
         self.prs_force_recompute = bool(value)
+
+    def set_sample_type(self, value: str) -> None:
+        """User override of the sequencing type used for restoration."""
+        self.sample_type = "wgs" if value == "wgs" else "array"
+        self.sample_type_source = "user"
+
+    @rx.var
+    def sample_type_label(self) -> str:
+        """Confidence note for the detected sequencing type."""
+        if self.detected_sample_type and self.sample_type_source == "detected":
+            pct = round(self.sample_type_confidence * 100)
+            kind = "whole-genome" if self.detected_sample_type == "wgs" else "array/targeted"
+            return f"Detected {kind} ({pct}% confidence, {self.sample_variant_count:,} variants)"
+        if self.sample_type_source == "metadata":
+            return "Set from sample metadata"
+        return ""
 
     @rx.var
     def ancestry_detection_label(self) -> str:
@@ -3643,11 +3695,32 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
         yield PRSTraitState.initialize_traits(self.genome_build, parquet_path, self.include_harmonized)
 
-        # Auto-detect ancestry for a newly loaded sample (background; no button).
+        # Auto-detect sequencing type + ancestry for a newly loaded sample
+        # (no buttons — detect and preselect, user can override).
         if not same_file and parquet_path:
+            self._detect_sample_type(parquet_path)
             self.ancestry_detection_status = ""
             self.detected_ancestry = ""
             yield PRSState.detect_sample_ancestry
+
+    def _detect_sample_type(self, parquet_path: str) -> None:
+        """Classify WGS vs array from variant density and preselect it.
+
+        Runs per newly loaded sample, overriding any prior in-session choice
+        because the override belonged to the previous sample.  Parquet row count
+        is read from file metadata, so this is fast even for large WGS callsets.
+        """
+        try:
+            n = int(pl.scan_parquet(parquet_path).select(pl.len()).collect().item())
+        except Exception as exc:
+            logger.debug("Sample-type detection skipped: %s", exc)
+            return
+        kind, confidence = _classify_sample_type(n)
+        self.sample_variant_count = n
+        self.detected_sample_type = kind
+        self.sample_type_confidence = confidence
+        self.sample_type = kind
+        self.sample_type_source = "detected"
 
     def set_prs_genome_build(self, value: str) -> Any:
         """Set genome build and reload both individual scores and trait grid."""
@@ -3689,6 +3762,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             genotypes_lf = self._get_genotypes_lf()
             ancestry = self.selected_ancestry
             all_pops = self.compute_all_populations
+            sample_type = self.sample_type
 
             existing_by_id: dict[str, dict] = {}
             if not self.prs_force_recompute:
@@ -3726,6 +3800,26 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             catalog = _get_prs_catalog(cache_dir_str)
             cache_path = Path(cache_dir_str) / "scores"
             best_perf_df = catalog.best_performance().collect()
+
+            # WGS samples: restore reference alleles for absent variants (assumed
+            # hom-ref) so genome-wide coverage isn't capped at the recorded set.
+            # The universe parquet is pulled from HF on first use; if unavailable
+            # we degrade to no restoration rather than mis-fill.
+            restoration = sample_type == "wgs"
+            universe_path: Optional[str] = None
+            if restoration:
+                try:
+                    resolved = catalog._reference_universe_path(genome_build)
+                    universe_path = str(resolved) if resolved else None
+                except Exception as exc:
+                    logger.warning(
+                        "Reference-allele universe unavailable; scoring without restoration: %s",
+                        exc,
+                    )
+                if not universe_path:
+                    restoration = False
+                    logger.info("WGS restoration requested but universe unavailable for %s", genome_build)
+
             new_results: List[Dict[str, Any]] = []
             any_low_match = False
             failed_ids: List[str] = []
@@ -3749,6 +3843,9 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                             best_perf_df=best_perf_df,
                             ancestry=ancestry,
                             compute_all_populations=all_pops,
+                            reference_restoration=restoration,
+                            reference_universe_path=universe_path,
+                            sample_build=genome_build,
                         ),
                     )
                 except Exception as score_exc:
@@ -3807,6 +3904,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                         "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
                         "genome_build": MetadataValue.text(self.genome_build),
                         "ancestry": MetadataValue.text(self.selected_ancestry or ""),
+                        "sample_type": MetadataValue.text(self.sample_type),
                         "row_count": MetadataValue.int(len(self.prs_results)),
                         "format_version": MetadataValue.text(_prs_results_version()),
                     },
@@ -3846,6 +3944,11 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             if rows:
                 self.prs_results = rows
                 self._build_prs_results_grid()
+                stype_meta = mat.metadata.get("sample_type")
+                stored_stype = str(stype_meta.value) if stype_meta and hasattr(stype_meta, "value") else ""
+                if stored_stype in ("wgs", "array"):
+                    self.sample_type = stored_stype
+                    self.sample_type_source = "metadata"
                 if self.prs_results:
                     self.build_trait_summary()
                 count_meta = mat.metadata.get("row_count")
