@@ -2696,6 +2696,53 @@ def _prs_selection_panel() -> rx.Component:
     )
 
 
+def _prs_ancestry_detection_badge() -> rx.Component:
+    """Auto-detected ancestry status shown beneath the PRS control row.
+
+    Detection runs on file load (no button); this surfaces the result and its
+    confidence, and explains that the matched reference panel was preselected.
+    """
+    return rx.cond(
+        PRSState.ancestry_detection_status == "detecting",
+        rx.hstack(
+            rx.spinner(size="1"),
+            rx.text("Detecting sample ancestry…", size="1", color="var(--gray-11)"),
+            spacing="2",
+            align="center",
+        ),
+        rx.cond(
+            PRSState.ancestry_detection_status == "done",
+            rx.hstack(
+                rx.badge(
+                    fomantic_icon("globe", size=12),
+                    PRSState.ancestry_detection_label,
+                    color_scheme="green",
+                    variant="soft",
+                    size="2",
+                ),
+                rx.text(
+                    "auto-selected as the reference population — change above to override",
+                    size="1",
+                    color="var(--gray-10)",
+                ),
+                spacing="2",
+                align="center",
+                wrap="wrap",
+            ),
+            rx.cond(
+                PRSState.ancestry_detection_status == "unknown",
+                rx.badge(
+                    PRSState.ancestry_detection_label,
+                    color_scheme="gray",
+                    variant="soft",
+                    size="2",
+                ),
+                rx.fragment(),
+            ),
+        ),
+    )
+
+
 def _prs_tab_content() -> rx.Component:
     """Content for the PRS tab.
 
@@ -2724,6 +2771,7 @@ def _prs_tab_content() -> rx.Component:
                     wrap="wrap",
                     width="100%",
                 ),
+                _prs_ancestry_detection_badge(),
                 _prs_selection_panel(),
                 prs_compute_button(PRSState, normalizing=UploadState.vcf_preview_loading),
                 rx.checkbox(

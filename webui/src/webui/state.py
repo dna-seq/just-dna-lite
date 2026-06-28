@@ -3484,8 +3484,80 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     prs_selection_mode: str = "traits"
     prs_force_recompute: bool = False
 
+    # --- Auto-detected sample ancestry (just-prs 0.5.1 ancestry epic) ---
+    # Inferred on file load; preselects the reference population so percentiles
+    # default to the matched-ancestry panel.  No button — detect + preselect.
+    detected_ancestry: str = ""           # super-pop code (AFR/AMR/EAS/EUR/SAS) or ""
+    detected_ancestry_confidence: float = 0.0
+    detected_fine_population: str = ""     # within-continent call, when available
+    ancestry_detection_status: str = ""    # "" | detecting | done | unknown | failed
+
     def set_prs_force_recompute(self, value: bool) -> None:
         self.prs_force_recompute = bool(value)
+
+    @rx.var
+    def ancestry_detection_label(self) -> str:
+        """Human-readable ancestry-detection status for the control-row badge."""
+        if self.ancestry_detection_status == "detecting":
+            return "Detecting ancestry…"
+        if self.ancestry_detection_status == "done" and self.detected_ancestry:
+            pct = round(self.detected_ancestry_confidence * 100)
+            fine = f" · {self.detected_fine_population}" if self.detected_fine_population else ""
+            return f"Ancestry: {self.detected_ancestry} ({pct}% confidence){fine}"
+        if self.ancestry_detection_status == "unknown":
+            return "Ancestry: insufficient coverage to infer"
+        return ""
+
+    @rx.event(background=True)
+    async def detect_sample_ancestry(self) -> None:
+        """Infer the sample's genetic ancestry and preselect the reference panel.
+
+        Runs in the background (first call lazy-pulls ~250 MB of reference
+        models from HuggingFace) so the UI stays responsive.  On success the
+        detected super-population becomes the primary percentile reference and
+        its comparison curve is enabled — the user can still override.
+        """
+        async with self:
+            if self._get_genotypes_lf() is None:
+                path = self.prs_genotypes_path
+                if path and Path(path).exists():
+                    self.set_prs_genotypes_lf(pl.scan_parquet(path))
+            genotypes_lf = self._get_genotypes_lf()
+            if genotypes_lf is None:
+                return
+            build = self.genome_build
+            cache_dir_str = self.cache_dir
+            self.ancestry_detection_status = "detecting"
+            self.detected_ancestry = ""
+            self.detected_ancestry_confidence = 0.0
+            self.detected_fine_population = ""
+
+        try:
+            catalog = _get_prs_catalog(cache_dir_str)
+            loop = asyncio.get_event_loop()
+            sample_ancestry = await loop.run_in_executor(
+                None,
+                lambda: catalog.infer_sample_ancestry(
+                    genotypes_lf=genotypes_lf, sample_build=build
+                ),
+            )
+            async with self:
+                superpop = getattr(sample_ancestry, "superpopulation", None)
+                if not sample_ancestry or not superpop or superpop == "UNKNOWN":
+                    self.ancestry_detection_status = "unknown"
+                    return
+                self.detected_ancestry = superpop
+                self.detected_ancestry_confidence = float(sample_ancestry.confidence or 0.0)
+                self.detected_fine_population = sample_ancestry.fine_population or ""
+                self.ancestry_detection_status = "done"
+                # Preselect: detected super-pop becomes the primary reference and
+                # gets a visible comparison curve.  Override remains the user's.
+                self.set_selected_ancestry(superpop)
+                self.set_reference_population(superpop, True)
+        except Exception as exc:
+            logger.warning("Sample ancestry inference failed: %s", exc)
+            async with self:
+                self.ancestry_detection_status = "failed"
 
     def set_prs_selection_mode(self, mode: str) -> None:
         self.prs_selection_mode = mode
@@ -3570,6 +3642,12 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             self._load_prs_results_from_dagster(partition_key)
 
         yield PRSTraitState.initialize_traits(self.genome_build, parquet_path, self.include_harmonized)
+
+        # Auto-detect ancestry for a newly loaded sample (background; no button).
+        if not same_file and parquet_path:
+            self.ancestry_detection_status = ""
+            self.detected_ancestry = ""
+            yield PRSState.detect_sample_ancestry
 
     def set_prs_genome_build(self, value: str) -> Any:
         """Set genome build and reload both individual scores and trait grid."""
