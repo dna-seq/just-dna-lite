@@ -231,6 +231,21 @@ def _inject_rsid_link_renderer(state_instance: Any) -> None:
         state_instance.lf_grid_columns = new_cols
 
 
+def _parquet_is_empty(path: Path) -> bool:
+    """Return True when the parquet is missing or has zero rows.
+
+    Uses parquet metadata only (no full read), so it is cheap to call on the
+    hot path. Any error reading the file is treated as "empty/invalid" so the
+    caller regenerates it.
+    """
+    if not path.exists():
+        return True
+    try:
+        return pl.scan_parquet(path).select(pl.len()).collect().item() == 0
+    except Exception:
+        return True
+
+
 def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_key: str) -> None:
     """Ensure normalized parquet exists and is fresh — pure function, no Reflex state.
 
@@ -261,6 +276,13 @@ def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_
             stored_hash = str(h.value) if h and hasattr(h, "value") else ""
             if stored_hash == current_hash and normalized_path.exists():
                 needs_normalize = False
+
+    # Guard against a stale/empty cached parquet. A normalized genome is never
+    # legitimately 0 rows; an empty file is the signature of a prior buggy run
+    # whose config hash did not change (so the hash check above won't catch it).
+    # Treat it as stale so the fix self-heals without manual cache wiping.
+    if not needs_normalize and _parquet_is_empty(normalized_path):
+        needs_normalize = True
 
     if not needs_normalize:
         return
@@ -3293,8 +3315,10 @@ import prs_ui.mixin as _prs_ui_mixin
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
+from just_prs.prs import ReferenceUniverse as _ReferenceUniverse
 from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
 from just_prs.enrich import enrich_prs_result as _enrich_prs_result
+from just_prs.reference import SUPERPOPULATIONS
 
 _prs_catalog_instance: Optional[_PRSCatalog] = None
 _PRS_REQUIRED_SCORE_COLUMNS = {
@@ -3393,6 +3417,7 @@ def _compute_single_prs(
     compute_all_populations: bool = False,
     reference_restoration: bool = False,
     reference_universe_path: Optional[str] = None,
+    reference_universe: Optional[_ReferenceUniverse] = None,
     sample_build: Optional[str] = None,
     genotype_input_mode: str = "auto",
 ) -> Dict[str, Any]:
@@ -3401,12 +3426,16 @@ def _compute_single_prs(
     Uses enrich_prs_result + _enriched_to_row_dict so the result dict matches
     the format that _build_prs_results_grid expects.
 
-    For WGS samples ``reference_restoration=True`` (with a resolved universe
-    parquet) fills absent variants as hom-ref, lifting genome-wide coverage
-    from ~27% to ~99.9%.  Restoration only engages in just-prs' ``variant_only``
-    genotype mode, so WGS callers must pass ``genotype_input_mode="variant_only"``
-    — under ``auto`` a DeepVariant VCF's RefCall records resolve to ``all_sites``
-    and restoration silently no-ops.  ``sample_build`` arms the build guard.
+    For WGS samples ``reference_restoration=True`` (with a resolved universe)
+    fills absent variants as hom-ref, lifting genome-wide coverage from ~27% to
+    ~99.9%.  The catalog-wide reference-allele universe is parsed **once** by the
+    caller (``prepare_reference_universe``) and injected via ``reference_universe``
+    so it is not re-parsed/re-joined per score; ``reference_universe`` takes
+    precedence over ``reference_universe_path``.  Restoration only engages in
+    just-prs' ``variant_only`` genotype mode, so WGS callers must pass
+    ``genotype_input_mode="variant_only"`` — under ``auto`` a DeepVariant VCF's
+    RefCall records resolve to ``all_sites`` and restoration silently no-ops.
+    ``sample_build`` arms the build guard.
     """
     info = catalog.score_info_row(pgs_id)
     trait = info["trait_reported"] if info else None
@@ -3422,6 +3451,7 @@ def _compute_single_prs(
         genotype_input_mode=genotype_input_mode,
         reference_restoration=reference_restoration,
         reference_universe_path=reference_universe_path,
+        reference_universe=reference_universe,
         sample_build=sample_build,
     )
 
@@ -3451,6 +3481,7 @@ def _compute_single_prs_with_cache_repair(
     compute_all_populations: bool = False,
     reference_restoration: bool = False,
     reference_universe_path: Optional[str] = None,
+    reference_universe: Optional[_ReferenceUniverse] = None,
     sample_build: Optional[str] = None,
     genotype_input_mode: str = "auto",
 ) -> Dict[str, Any]:
@@ -3467,6 +3498,7 @@ def _compute_single_prs_with_cache_repair(
         compute_all_populations=compute_all_populations,
         reference_restoration=reference_restoration,
         reference_universe_path=reference_universe_path,
+        reference_universe=reference_universe,
         sample_build=sample_build,
         genotype_input_mode=genotype_input_mode,
     )
@@ -3543,13 +3575,49 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         self.sample_type = "wgs" if value == "wgs" else "array"
         self.sample_type_source = "user"
 
+    def _native_reference_code(self) -> str:
+        """Return the best available sample-native 1000G population code."""
+        code = (self.detected_ancestry or self.selected_ancestry or "EUR").upper()
+        return code if code in SUPERPOPULATIONS else "EUR"
+
+    def select_native_reference_population(self) -> None:
+        """Use the detected sample ancestry as the visible reference population."""
+        code = self._native_reference_code()
+        self.selected_ancestry = code
+        self.selected_reference_populations = [code]
+        self.compute_all_populations = True
+        self._sync_reference_population_flags()
+        if self.prs_results:
+            self._build_prs_results_grid()
+
+    def set_reference_population(self, code: str, value: bool) -> None:
+        """Toggle visible reference populations and keep percentile lookup aligned."""
+        normalized = code.upper()
+        if normalized not in SUPERPOPULATIONS:
+            return
+
+        selected = [sp for sp in self.selected_reference_populations if sp in SUPERPOPULATIONS]
+        if value:
+            if normalized not in selected:
+                selected.append(normalized)
+            self.selected_ancestry = normalized
+        else:
+            selected = [sp for sp in selected if sp != normalized]
+            if self.selected_ancestry == normalized:
+                self.selected_ancestry = selected[0] if selected else self._native_reference_code()
+
+        self.selected_reference_populations = selected
+        self.compute_all_populations = bool(selected)
+        self._sync_reference_population_flags()
+        if self.prs_results:
+            self._build_prs_results_grid()
+
     @rx.var
     def sample_type_label(self) -> str:
         """Confidence note for the detected sequencing type."""
         if self.detected_sample_type and self.sample_type_source == "detected":
             pct = round(self.sample_type_confidence * 100)
-            kind = "whole-genome" if self.detected_sample_type == "wgs" else "array/targeted"
-            return f"Detected {kind} ({pct}% confidence, {self.sample_variant_count:,} variants)"
+            return f"(autodetected {pct}% confidence)"
         if self.sample_type_source == "metadata":
             return "Set from sample metadata"
         return ""
@@ -3609,10 +3677,9 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                 self.detected_ancestry_confidence = float(sample_ancestry.confidence or 0.0)
                 self.detected_fine_population = sample_ancestry.fine_population or ""
                 self.ancestry_detection_status = "done"
-                # Preselect: detected super-pop becomes the primary reference and
-                # gets a visible comparison curve.  Override remains the user's.
-                self.set_selected_ancestry(superpop)
-                self.set_reference_population(superpop, True)
+                # Preselect the detected super-pop so the checkbox and compute
+                # reference match what the user sees.
+                self.select_native_reference_population()
         except Exception as exc:
             logger.warning("Sample ancestry inference failed: %s", exc)
             async with self:
@@ -3672,7 +3739,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         Sets genotypes LazyFrame and loads PGS Catalog scores.  On file
         switch, clears stale results and tries to restore from Dagster.
         """
-        self.genome_build = "GRCh37" if genome_build in ("GRCh37", "hg19") else "GRCh38"
+        self.genome_build = "GRCh38"
 
         same_file = (parquet_path == self.prs_initialized_for_file)
         self.prs_initialized_for_file = parquet_path
@@ -3816,19 +3883,28 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             # untyped, never hom-ref, so they must not impute.
             restoration = sample_type == "wgs"
             genotype_mode = "variant_only" if sample_type == "wgs" else "auto"
-            universe_path: Optional[str] = None
+            # Parse the catalog-wide (~34M-row) reference-allele universe ONCE and
+            # reuse the in-memory handle across every selected score, instead of
+            # re-parsing + re-joining it per score (the dominant cost — ~8.4 s/score
+            # vs ~1.2 s/score with the prepared handle).
+            reference_universe: Optional[_ReferenceUniverse] = None
             if restoration:
                 try:
-                    resolved = catalog._reference_universe_path(genome_build)
-                    universe_path = str(resolved) if resolved else None
+                    reference_universe = catalog.prepare_reference_universe(genome_build)
                 except Exception as exc:
                     logger.warning(
                         "Reference-allele universe unavailable; scoring without restoration: %s",
                         exc,
                     )
-                if not universe_path:
+                if reference_universe is None:
                     restoration = False
                     logger.info("WGS restoration requested but universe unavailable for %s", genome_build)
+                else:
+                    logger.info(
+                        "Prepared reference-allele universe once for %s: %d positions",
+                        genome_build,
+                        reference_universe.n_positions,
+                    )
 
             new_results: List[Dict[str, Any]] = []
             any_low_match = False
@@ -3854,7 +3930,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
                             ancestry=ancestry,
                             compute_all_populations=all_pops,
                             reference_restoration=restoration,
-                            reference_universe_path=universe_path,
+                            reference_universe=reference_universe,
                             sample_build=genome_build,
                             genotype_input_mode=genotype_mode,
                         ),
