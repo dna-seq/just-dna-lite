@@ -312,11 +312,14 @@ def user_vcf_normalized(
         output_dir = get_user_output_dir() / partition_key
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / "user_vcf_normalized.parquet"
+        temp_output_path = output_path.with_name(f"{output_path.stem}.tmp{output_path.suffix}")
 
-        lf.sink_parquet(str(output_path), compression=config.compression)
+        temp_output_path.unlink(missing_ok=True)
+        lf.sink_parquet(str(temp_output_path), compression=config.compression)
+        row_count = pl.scan_parquet(str(temp_output_path)).select(pl.len()).collect().item()
+        temp_output_path.replace(output_path)
 
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
-    row_count = pl.scan_parquet(str(output_path)).select(pl.len()).collect().item()
 
     if rows_before_filter is not None:
         rows_removed = rows_before_filter - row_count

@@ -232,7 +232,7 @@ def _inject_rsid_link_renderer(state_instance: Any) -> None:
 
 
 def _parquet_is_empty(path: Path) -> bool:
-    """Return True when the parquet is missing or has zero rows.
+    """Return True when the parquet is missing, invalid, or has zero rows.
 
     Uses parquet metadata only (no full read), so it is cheap to call on the
     hot path. Any error reading the file is treated as "empty/invalid" so the
@@ -244,6 +244,11 @@ def _parquet_is_empty(path: Path) -> bool:
         return pl.scan_parquet(path).select(pl.len()).collect().item() == 0
     except Exception:
         return True
+
+
+def _parquet_is_ready(path: Path) -> bool:
+    """Return whether a parquet exists, is readable, and contains rows."""
+    return not _parquet_is_empty(path)
 
 
 def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_key: str) -> None:
@@ -512,6 +517,20 @@ class UploadState(LazyFrameGridMixin, rx.State):
         user_id = auth_email or "anonymous"
         return "".join([c if c.isalnum() else "_" for c in user_id])
 
+    @staticmethod
+    def _detect_build(file_path) -> Optional[str]:
+        """Detect the genome build from a saved VCF, or None if undetermined.
+
+        Reads the VCF header via just-prs (``##reference=``/``##assembly=``,
+        DRAGEN command lines, then contig-length voting). Never raises — a
+        detection failure falls back to the user's manual selection.
+        """
+        try:
+            from just_prs.vcf import detect_genome_build
+            return detect_genome_build(file_path)
+        except Exception:
+            return None
+
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of VCF files and register them in Dagster."""
         if _is_immutable_mode():
@@ -551,17 +570,25 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 if partition_key not in existing:
                     instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
 
-                # 2. Materialize user_vcf_source (the source asset)
+                # 2. Materialize user_vcf_source (the source asset). This quick
+                # path carries no metadata form, so the header is the only build
+                # signal — record it when detectable.
+                source_metadata: Dict[str, Any] = {
+                    "path": str(file_path.absolute()),
+                    "size_bytes": len(content),
+                    "uploaded_via": "webui",
+                    "upload_date": upload_date,
+                }
+                detected_build = self._detect_build(file_path)
+                if detected_build:
+                    source_metadata["reference_genome"] = detected_build
+                    source_metadata["reference_genome_source"] = "header"
+
                 instance.report_runless_asset_event(
                     AssetMaterialization(
                         asset_key="user_vcf_source",
                         partition=partition_key,
-                        metadata={
-                            "path": str(file_path.absolute()),
-                            "size_bytes": len(content),
-                            "uploaded_via": "webui",
-                            "upload_date": upload_date,
-                        }
+                        metadata=source_metadata,
                     )
                 )
 
@@ -604,6 +631,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             
         self.uploading = True
         new_files = []
+        build_warnings: list[str] = []
         try:
             auth_state = await self.get_state(AuthState)
             self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
@@ -634,6 +662,20 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 if partition_key not in existing:
                     instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
 
+                # Detect the genome build from the VCF header. The header is
+                # authoritative evidence, so it overrides the dropdown selection;
+                # we warn when the two disagree so the user notices a wrong pick.
+                detected_build = self._detect_build(file_path)
+                effective_genome = self.new_sample_reference_genome
+                if detected_build:
+                    if detected_build != self.new_sample_reference_genome:
+                        build_warnings.append(
+                            f"{file.filename}: detected {detected_build} from the VCF "
+                            f"header — overriding your selection of "
+                            f"{self.new_sample_reference_genome}."
+                        )
+                    effective_genome = detected_build
+
                 # Build complete metadata dict with form values
                 metadata: Dict[str, Any] = {
                     "path": MetadataValue.path(str(file_path.absolute())),
@@ -641,7 +683,10 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "uploaded_via": MetadataValue.text("webui"),
                     "upload_date": MetadataValue.text(upload_date),
                     "species": MetadataValue.text(self.new_sample_species),
-                    "reference_genome": MetadataValue.text(self.new_sample_reference_genome),
+                    "reference_genome": MetadataValue.text(effective_genome),
+                    "reference_genome_source": MetadataValue.text(
+                        "header" if detected_build else "manual"
+                    ),
                     "sex": MetadataValue.text(self.new_sample_sex),
                     "tissue": MetadataValue.text(self.new_sample_tissue),
                 }
@@ -675,7 +720,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
                     "sample_name": sample_name,
                     "upload_date": upload_date,
                     "species": self.new_sample_species,
-                    "reference_genome": self.new_sample_reference_genome,
+                    "reference_genome": effective_genome,
                     "sex": self.new_sample_sex,
                     "tissue": self.new_sample_tissue,
                     "subject_id": self.new_sample_subject_id.strip() if self.new_sample_subject_id else "",
@@ -696,6 +741,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
             yield rx.toast.error(f"Upload failed: {exc}")
         finally:
             self.uploading = False
+
+        for warning in build_warnings:
+            yield rx.toast.warning(warning)
 
         if new_files:
             self._reset_new_sample_form()
@@ -1467,16 +1515,18 @@ class UploadState(LazyFrameGridMixin, rx.State):
         return get_user_output_dir() / self.safe_user_id / sample_name / "user_vcf_normalized.parquet"
 
     def _get_normalized_parquet_path(self) -> Optional[Path]:
-        """Return the normalized parquet path only if it already exists on disk."""
+        """Return the normalized parquet path only if it is readable and non-empty."""
         path = self._get_expected_normalized_parquet_path()
-        if path is not None and path.exists():
+        if path is not None and _parquet_is_ready(path):
             return path
         return None
 
     def _yield_prs_init_events(self) -> List[EventSpec]:
         """Build the cross-state events that initialize PRSState for the selected file."""
-        expected_parquet = self._get_expected_normalized_parquet_path()
-        parquet_str = str(expected_parquet) if expected_parquet else ""
+        normalized_parquet = self._get_normalized_parquet_path()
+        if normalized_parquet is None:
+            return []
+        parquet_str = str(normalized_parquet)
         ref_genome = self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
         return [PRSState.initialize_prs_for_file(parquet_str, ref_genome)]
 
@@ -1978,7 +2028,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         ]
 
     @rx.event(background=True)
-    async def load_file_data_background(self) -> None:
+    async def load_file_data_background(self) -> Optional[List[EventSpec]]:
         """Load VCF preview + output files in background (state lock released)."""
         async with self:
             selected_file = self.selected_file
@@ -1986,6 +2036,10 @@ class UploadState(LazyFrameGridMixin, rx.State):
             if not selected_file or not safe_user_id:
                 self._clear_vcf_preview()
                 return
+            expected_parquet = self._get_expected_normalized_parquet_path()
+            prs_init_after_normalize = (
+                expected_parquet is not None and not _parquet_is_ready(expected_parquet)
+            )
             self.progress_status = "Normalizing VCF (quality filtering)..."
 
         sample_name = selected_file.replace(".vcf.gz", "").replace(".vcf", "")
@@ -2003,6 +2057,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self._load_vcf_into_grid()
             self._load_output_files_sync()
             self.progress_status = ""
+            normalized_parquet = self._get_normalized_parquet_path()
+            ref_genome = self.file_metadata.get(selected_file, {}).get("reference_genome", "GRCh38")
+
+        if prs_init_after_normalize and normalized_parquet is not None:
+            return [PRSState.initialize_prs_for_file(str(normalized_parquet), ref_genome)]
+        return None
 
     def _load_vcf_into_grid(self) -> None:
         """Load the normalized (or raw fallback) parquet into the LazyFrame grid.
@@ -3744,11 +3804,16 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
         switch, clears stale results and tries to restore from Dagster.
         """
         self.genome_build = "GRCh38"
+        ready_parquet_path = (
+            parquet_path
+            if parquet_path and _parquet_is_ready(Path(parquet_path))
+            else ""
+        )
 
-        same_file = (parquet_path == self.prs_initialized_for_file)
-        self.prs_initialized_for_file = parquet_path
+        same_file = (ready_parquet_path == self.prs_initialized_for_file)
+        self.prs_initialized_for_file = ready_parquet_path
         if not same_file:
-            self.load_genotypes(parquet_path)
+            self.load_genotypes(ready_parquet_path)
             self.prs_results_rows = []
             self.prs_results_columns = []
             self.prs_results_column_groups = []
@@ -3757,26 +3822,26 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
             self.trait_summary_visible = False
             self.selected_pgs_ids = []
             self.low_match_warning = False
-        elif parquet_path and Path(parquet_path).exists():
-            self.prs_genotypes_path = parquet_path
-            self.set_prs_genotypes_lf(pl.scan_parquet(parquet_path))
+        elif ready_parquet_path:
+            self.prs_genotypes_path = ready_parquet_path
+            self.set_prs_genotypes_lf(pl.scan_parquet(ready_parquet_path))
         else:
-            self.prs_genotypes_path = parquet_path
+            self.prs_genotypes_path = ready_parquet_path
             self._prs_genotypes_lf = None
 
         yield from self.initialize_prs()
 
-        if not self.prs_results and parquet_path:
-            p = Path(parquet_path)
+        if not self.prs_results and ready_parquet_path:
+            p = Path(ready_parquet_path)
             partition_key = f"{p.parent.parent.name}/{p.parent.name}"
             self._load_prs_results_from_dagster(partition_key)
 
-        yield PRSTraitState.initialize_traits(self.genome_build, parquet_path, self.include_harmonized)
+        yield PRSTraitState.initialize_traits(self.genome_build, ready_parquet_path, self.include_harmonized)
 
         # Auto-detect sequencing type + ancestry for a newly loaded sample
         # (no buttons — detect and preselect, user can override).
-        if not same_file and parquet_path:
-            self._detect_sample_type(parquet_path)
+        if not same_file and ready_parquet_path:
+            self._detect_sample_type(ready_parquet_path)
             self.ancestry_detection_status = ""
             self.detected_ancestry = ""
             yield PRSState.detect_sample_ancestry
