@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -11,7 +12,12 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 import reflex as rx  # noqa: E402
 from reflex.plugins.sitemap import SitemapPlugin  # noqa: E402
 
-os.environ.setdefault("REFLEX_SSR", "true")
+_IS_WINDOWS = sys.platform == "win32"
+
+# SSR is disabled on Windows because @mui/x-data-grid ships a bare CSS import
+# that Node.js cannot resolve during the Vite SSR build (bun handles it on
+# Linux/macOS).  Upstream fix needed in reflex-mui-datagrid / reflex.
+os.environ.setdefault("REFLEX_SSR", "false" if _IS_WINDOWS else "true")
 os.environ.setdefault("REFLEX_SOCKET_MAX_HTTP_BUFFER_SIZE", "50000000")
 
 _IN_CONTAINER = os.path.exists("/.dockerenv") or os.environ.get("container") == "podman"

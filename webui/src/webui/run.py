@@ -10,6 +10,8 @@ import sys
 import atexit
 from pathlib import Path
 
+_IS_WINDOWS = sys.platform == "win32"
+
 from just_dna_pipelines.runtime import load_env
 
 DEFAULT_DAGSTER_FILE = "just-dna-pipelines/src/just_dna_pipelines/annotation/definitions.py"
@@ -101,12 +103,18 @@ def _start_dagster_for_serve() -> subprocess.Popen[bytes] | None:
         )
         return None
 
-    dg_path = Path(sys.executable).parent / "dg"
+    dg_name = "dg.exe" if _IS_WINDOWS else "dg"
+    dg_path = Path(sys.executable).parent / dg_name
+    popen_kwargs: dict[str, object] = {}
+    if _IS_WINDOWS:
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(
         ["dg", "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
         cwd=workspace_root,
         executable=str(dg_path) if dg_path.exists() else None,
-        start_new_session=True,
+        **popen_kwargs,
     )
     print(f"Started Dagster UI at http://{dagster_host}:{dagster_port}", flush=True)
     print(f"Dagster home: {dagster_home}", flush=True)
@@ -119,13 +127,19 @@ def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
         return
 
     try:
-        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-    except ProcessLookupError:
+        if _IS_WINDOWS:
+            process.terminate()
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+    except (ProcessLookupError, OSError):
         return
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        if _IS_WINDOWS:
+            process.kill()
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
 
 
 def main() -> None:
@@ -189,6 +203,63 @@ def serve() -> None:
     )
 
 
+def _find_pids_on_port_unix(port: int) -> list[tuple[int, str]]:
+    """Return (pid, command) pairs listening on *port* using lsof/ps."""
+    try:
+        out = subprocess.check_output(
+            ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    results = []
+    for raw_pid in out.split():
+        pid = int(raw_pid)
+        try:
+            cmd = subprocess.check_output(
+                ["ps", "-p", str(pid), "-o", "comm="], text=True, stderr=subprocess.DEVNULL,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            cmd = "?"
+        results.append((pid, cmd))
+    return results
+
+
+def _find_pids_on_port_windows(port: int) -> list[tuple[int, str]]:
+    """Return (pid, command) pairs listening on *port* using netstat."""
+    try:
+        out = subprocess.check_output(
+            ["netstat", "-ano", "-p", "TCP"], text=True, stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    seen: set[int] = set()
+    results = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) < 5 or "LISTENING" not in parts:
+            continue
+        local_addr = parts[1]
+        if not local_addr.endswith(f":{port}"):
+            continue
+        try:
+            pid = int(parts[-1])
+        except ValueError:
+            continue
+        if pid == 0 or pid in seen:
+            continue
+        seen.add(pid)
+        try:
+            info = subprocess.check_output(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                text=True, stderr=subprocess.DEVNULL,
+            ).strip()
+            cmd = info.split(",")[0].strip('"') if info else "?"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            cmd = "?"
+        results.append((pid, cmd))
+    return results
+
+
 def kill_ports() -> None:
     """Show and kill processes on ports 3000 and 8000-8010.
 
@@ -199,29 +270,21 @@ def kill_ports() -> None:
         uv run kill-ports 3000 8000  # explicit list
     """
     ports = [int(p) for p in sys.argv[1:]] if len(sys.argv) > 1 else [3000, *range(8000, 8011)]
+    find_pids = _find_pids_on_port_windows if _IS_WINDOWS else _find_pids_on_port_unix
     killed_any = False
     for port in ports:
-        try:
-            out = subprocess.check_output(
-                ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL,
-            ).strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            out = ""
-        if not out:
-            continue
-        pids = [int(p) for p in out.split()]
-        for pid in pids:
-            try:
-                cmd = subprocess.check_output(
-                    ["ps", "-p", str(pid), "-o", "comm="], text=True, stderr=subprocess.DEVNULL,
-                ).strip()
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                cmd = "?"
+        for pid, cmd in find_pids(port):
             print(f"Port {port}: killing PID {pid} ({cmd})")
             try:
-                os.kill(pid, signal.SIGKILL)
+                if _IS_WINDOWS:
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(pid)],
+                        check=True, capture_output=True,
+                    )
+                else:
+                    os.kill(pid, signal.SIGKILL)
                 killed_any = True
-            except OSError as exc:
+            except (OSError, subprocess.CalledProcessError) as exc:
                 print(f"  failed: {exc}")
     if not killed_any:
         print("Nothing to kill — ports are free.")
