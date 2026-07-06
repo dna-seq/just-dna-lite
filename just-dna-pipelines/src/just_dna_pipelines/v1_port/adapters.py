@@ -371,6 +371,8 @@ def adapt_superhuman(
 ) -> AdapterResult:
     warnings: list[str] = []
     variants: list[VariantRow] = []
+    studies: list[StudyRow] = []
+    study_seen: set[tuple[str, str]] = set()
     skipped = 0
 
     for row in _rows(db, "superhuman"):
@@ -399,15 +401,25 @@ def adapt_superhuman(
             conclusion=conclusion or superability or "Beneficial variant",
             gene=_clean_str(row.get("gene")),
         ))
+        # Most `references` are dbSNP URLs (no PMID); a subset are real PubMed links. Ground only
+        # those (rsid-specific, verified citations). The full literature backfill + March-2026
+        # refresh is v2 — see docs/SUPERHUMAN_REFRESH_PLAN.md.
+        ref = row.get("references")
+        if ref and "pubmed" in str(ref).lower():
+            for pmid in normalize_pmids(ref):
+                if (rsid, pmid) in study_seen:
+                    continue
+                study_seen.add((rsid, pmid))
+                studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=superability or None))
 
     if skipped:
         warnings.append(f"skipped {skipped} row(s) with invalid rsid/genotype")
-    # references are NCBI SNP URLs, not PMIDs → no groundable studies (see GAPS.md).
     warnings.append(
-        "superhuman references are NCBI SNP URLs, not PubMed IDs: no studies.csv rows produced "
-        "(studies are mandatory, so compilation is expected to fail — documented in GAPS.md)"
+        f"grounded {len(studies)} variant(s) from in-source PubMed references (subset-studies v1); "
+        f"the remaining variants are ungrounded pending literature curation "
+        f"(docs/SUPERHUMAN_REFRESH_PLAN.md → v2)"
     )
-    return _build_spec(module), _dedup_variants(variants, warnings), [], warnings
+    return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
 
 
 ADAPTERS = {

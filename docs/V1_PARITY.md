@@ -17,7 +17,7 @@ variant-backed modules from that canonical source; this plan covers the rest.
 | `just_lipidmetabolism` | lipidmetabolism | `lipid_metabolism.sqlite` | ✅ compiled | ✅ | **full** — 15/15 match HF |
 | `just_longevitymap` | longevitymap | `longevitymap.sqlite` | ✅ compiled | ✅ | **near-full** — 518/528 rsids (10 het-only rsids unresolved, below) |
 | `just_thrombophilia` | thrombophilia | `thrombophilia.sqlite` | ✅ compiled | ✅ (published 2026-07) | **full** — newly published to the collection |
-| `just_superhuman` | superhuman | `superhuman.sqlite` | ⚠️ variants only | ✅ | **blocked** — no PMIDs in source (below) |
+| `just_superhuman` | superhuman | `superhuman.sqlite` | ✅ compiled (subset) | ✅ (marketplace v1.0.0) | **partial** — v1 grounded on the 2 in-source verified PMIDs; full curation + refresh = v2 |
 | `just_lnewco` | lnewco (APOE) | `metabolic_genotype.sqlite` | ❌ | ❌ | **gap** — diplotype schema needed |
 | `just_cardio` | cardio | `genes.txt` | ❌ | ❌ | **gap** — ClinVar gene-panel type |
 | `just_cancer` | cancer | `genes.txt` | ❌ | ❌ | **gap** — ClinVar gene-panel type |
@@ -42,11 +42,12 @@ whose ref/alt pair wasn't found in the Ensembl cache (novel/merged/multiallelic 
 - carry the original module's runtime ref lookup forward.
 Low value relative to effort — 518/528 already reproduced. Track, don't block.
 
-### 3. Ground `superhuman` with real PMIDs (blocked on evidence)
-1071 curated variants port, but the source's `references` are dbSNP URLs, not PubMed IDs, so it
-can't satisfy the mandatory-studies rule. Needs a PMID back-fill (literature review or a
-dbSNP-citation → PubMed lookup). Do **not** fabricate. Until then, `superhuman/variants.csv` stands
-as the best-effort artifact.
+### 3. Ground `superhuman` with real PMIDs — v1 subset published; v2 pending
+Most of the source's `references` are dbSNP URLs, but a subset are real PubMed links. **v1.0.0** is
+published to the marketplace grounded on those 2 in-source, rsid-specific, PubMed-verified citations
+(APOA2 `rs5082`→17446329, APOE `rs7412`→16603077); the other 755 variants are ungrounded. The full
+literature backfill (per-gene founding PMIDs) + **March 2026 refresh** is **v2** — see
+`docs/SUPERHUMAN_REFRESH_PLAN.md` (supervised, verification-gated, never fabricates PMIDs).
 
 ### 4. New module type: ClinVar gene-panel (`cardio`, `cancer`, `pathogenic`)
 These three don't carry per-variant weights — they select ClinVar pathogenic variants (by gene list
