@@ -92,3 +92,35 @@ def v1_port(
     console.print(f"\nOutput: {out_root}\n")
     if failures:
         console.print(f"[yellow]{failures} module(s) did not fully compile (see notes / GAPS.md).[/yellow]")
+
+
+@app.command("publish")
+def v1_publish(
+    module: str = typer.Argument(..., help="Compiled module name under the output root to publish."),
+    out_root: Path = typer.Option(
+        Path("data/interim/v1_port"), "--out", help="Output root holding the compiled module dir."
+    ),
+    repo_id: Optional[str] = typer.Option(
+        None, "--repo", help="Target HF dataset. Default: first collection source in modules.yaml."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be uploaded without contacting HuggingFace."
+    ),
+) -> None:
+    """Upload a compiled module's artifacts to the HuggingFace annotator collection."""
+    from just_dna_pipelines.v1_port.publish import plan_publish, publish_module
+
+    module_dir = out_root / module
+    if dry_run:
+        plan = plan_publish(module_dir, module, repo_id)
+        console.print(f"[bold]Would upload[/bold] to [cyan]{plan.repo_id}[/cyan] at "
+                      f"[cyan]{plan.path_in_repo}/[/cyan]:")
+        for f in plan.files:
+            console.print(f"  • {f}")
+        return
+
+    plan = publish_module(module_dir, module, repo_id)
+    console.print(
+        f"[bold green]✓ Published {module}[/bold green] → "
+        f"{plan.repo_id}/{plan.path_in_repo} ({len(plan.files)} files)"
+    )

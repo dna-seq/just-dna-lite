@@ -66,6 +66,12 @@ module_metadata:
     report_title: Coronary Artery Disease
     icon: heart
     color: '#db2828'
+  thrombophilia:
+    title: Thrombophilia
+    description: Inherited blood-clotting risk variants (Factor V Leiden, prothrombin, and related loci)
+    report_title: Thrombophilia Risk
+    icon: droplets
+    color: '#9f3a38'
   drugs:
     title: Pharmacogenomics
     description: Drug response and metabolism (PharmGKB)
