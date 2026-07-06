@@ -12,6 +12,7 @@ dependencies = [
   "dagster-dg-cli>=1.12.22",
   "google-genai>=1.71.0,<2.0",
   "just-prs>=0.7.4",
+  "just-dna-marketplace>=0.2.0",
 ]
 
 [tool.uv.sources]

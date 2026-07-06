@@ -14,6 +14,7 @@ from rich.table import Table
 from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
+from just_dna_marketplace.client_cli import app as marketplace_client_app
 
 app = typer.Typer(
     name="pipelines",
@@ -23,6 +24,7 @@ app = typer.Typer(
 app.add_typer(module_app, name="module")
 app.add_typer(agent_app, name="agent")
 app.add_typer(v1_port_app, name="v1-port")
+app.add_typer(marketplace_client_app, name="marketplace")
 
 console = Console()
 
