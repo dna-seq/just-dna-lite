@@ -15,9 +15,12 @@ from pathlib import Path
 import pytest
 
 from just_dna_pipelines.v1_port.adapters import (
+    _SUPERHUMAN_CURATION,
+    _load_superhuman_curation,
     _longevitymap_genotype,
     adapt_coronary,
     adapt_longevitymap,
+    adapt_superhuman,
     adapt_three_table,
 )
 from just_dna_pipelines.v1_port.genotype import state_from_weight, to_slash_genotype
@@ -184,3 +187,109 @@ def test_thrombophilia_studies_cover_source_pubmed_ids(sources_cache):
     # Every source (rsid, pubmed_id) with a valid rsid should appear among the ported studies.
     missing = source_links - ported_links
     assert not missing, f"ported studies missing source links: {sorted(missing)[:5]}"
+
+
+# ------------------------------------------------------------------ superhuman v2 curation tests
+
+def test_superhuman_curation_csv_is_well_formed():
+    """The frozen PMID curation (deterministic, no network) must satisfy the grounding guardrails."""
+    import csv as _csv
+
+    rows = list(_csv.DictReader(_SUPERHUMAN_CURATION.open(newline="")))
+    assert rows, "curation CSV should not be empty"
+    seen: set[tuple[str, str, str]] = set()
+    for r in rows:
+        gene, rsid, scope, pmid = r["gene"], r["rsid"], r["scope"], r["pmid"]
+        assert gene, "every row needs a gene"
+        assert _DIGITS.match(pmid), f"non-digit pmid {pmid!r} for {gene}/{rsid}"  # ROADMAP 0.2
+        assert r["verified_title"].strip(), f"missing verified_title for {gene}/{rsid} pmid {pmid}"
+        assert scope in {"rsid", "gene-indel"}, f"bad scope {scope!r}"
+        if scope == "gene-indel":
+            assert not rsid, "gene-indel rows carry no rsid"
+        else:
+            assert rsid.startswith("rs"), f"bad rsid {rsid!r}"
+        key = (gene, rsid, pmid)
+        assert key not in seen, f"duplicate curation row {key}"
+        seen.add(key)
+
+
+def test_superhuman_added_genes_have_explicit_verified_genotypes():
+    """The March-2026 additions are not in the source, so they must carry a hand-verified genotype."""
+    cur = _load_superhuman_curation()
+    # Allele orientation confirmed against dbSNP/MyVariant (see docs/SUPERHUMAN_REFRESH_PLAN.md).
+    expected = {
+        "rs4570625": ("TPH2", "T/T"),      # -703 minor-allele homozygous
+        "rs4680": ("COMT", "G/G"),         # Val158 (G)
+        "rs6265": ("BDNF", "C/C"),         # Val66 (C)
+        "rs5882": ("CETP", "G/G"),         # Val405 (G)
+        "rs121918393": ("APOE", "A/C"),    # Christchurch R136S carrier
+    }
+    assert set(cur.added) == set(expected), f"added rsids drifted: {sorted(cur.added)}"
+    for rsid, (gene, gt) in expected.items():
+        entry = cur.added[rsid]
+        assert entry["gene"] == gene and entry["genotype"] == gt
+        assert all(_DIGITS.match(p) for p in entry["pmids"]) and entry["pmids"]
+
+
+def test_superhuman_port_narrows_and_grounds(sources_cache):
+    """Every kept variant is a curated protective allele and every one is grounded; the unnamed
+    whole-gene dbSNP dumps are dropped."""
+    if not DEFAULT_ENSEMBL_CACHE.exists():
+        pytest.skip(f"Ensembl cache not present at {DEFAULT_ENSEMBL_CACHE}")
+    db = _fetch("superhuman", sources_cache)
+    _, variants, studies, _ = adapt_superhuman(REGISTRY["superhuman"], db, DEFAULT_ENSEMBL_CACHE)
+
+    assert studies, "superhuman should produce grounded studies"
+    for s in studies:
+        assert _DIGITS.match(s.pmid), f"non-digit superhuman pmid: {s.pmid!r}"
+
+    variant_rsids = {v.rsid for v in variants}
+    study_rsids = {s.rsid for s in studies}
+    # Referential integrity: every study points at a kept variant.
+    assert study_rsids <= variant_rsids, f"studies reference absent rsids: {study_rsids - variant_rsids}"
+    # Narrowing grounds the whole set: every kept variant has at least one study.
+    assert variant_rsids == study_rsids, (
+        f"ungrounded kept variants: {sorted(variant_rsids - study_rsids)}"
+    )
+
+    # Narrowing dropped the unnamed NTRK1 SNP dump but kept its deletion-class (indel) variants.
+    con = sqlite3.connect(db)
+    try:
+        ntrk1_snv = con.execute(
+            "SELECT rsid FROM superhuman WHERE gene='NTRK1' AND length(ref_allele)=1 "
+            "AND length(alt_allele)=1 LIMIT 1"
+        ).fetchone()
+    finally:
+        con.close()
+    if ntrk1_snv:
+        assert ntrk1_snv[0] not in variant_rsids, "an unnamed NTRK1 SNP should have been dropped"
+
+    # The March-2026 additions are present with their verified genotypes.
+    by_rsid = {v.rsid: v for v in variants}
+    for rsid, gt in [("rs4570625", "T/T"), ("rs6265", "C/C"), ("rs5882", "G/G"),
+                     ("rs4680", "G/G"), ("rs121918393", "A/C")]:
+        assert rsid in by_rsid, f"missing refresh addition {rsid}"
+        assert by_rsid[rsid].genotype == gt, f"{rsid}: {by_rsid[rsid].genotype} != {gt}"
+
+
+# ---------------------------------------------------- gene-panel symbol reconciliation (pure)
+
+def test_symbol_resolver_maps_aliases_and_flags_typos():
+    """Legacy aliases resolve to current symbols; true typos are reported, never guessed."""
+    from just_dna_pipelines.v1_port.symbols import SymbolResolver, resolve_panel_genes
+
+    resolver = SymbolResolver(
+        official={"MYCL", "PRKN", "TAFAZZIN", "AKT1"},
+        synonym_to_official={"MYCL1": "MYCL", "PARK2": "PRKN", "TAZ": "TAFAZZIN"},
+    )
+    wanted, alias_map, unresolved = resolve_panel_genes(
+        {"MYCL1", "PARK2", "TAZ", "AKT1", "ATK1"}, resolver
+    )
+    assert alias_map == {"MYCL1": "MYCL", "PARK2": "PRKN", "TAZ": "TAFAZZIN"}
+    assert unresolved == ["ATK1"]  # not a current symbol nor a known synonym → flagged, not guessed
+    assert {"MYCL", "PRKN", "TAFAZZIN", "AKT1"}.issubset(wanted)
+    assert "ATK1" in wanted  # kept (so it's visible), even though it will match nothing
+
+    # No resolver (no gene_info cache) → pass-through, nothing flagged.
+    passthrough, aliases, missing = resolve_panel_genes({"MYCL1"}, None)
+    assert passthrough == {"MYCL1"} and not aliases and not missing

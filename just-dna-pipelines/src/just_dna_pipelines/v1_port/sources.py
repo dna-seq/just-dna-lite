@@ -74,6 +74,13 @@ REGISTRY: dict[str, V1Module] = {
         name="cancer", repo="just_cancer", data_path="data/genes.txt",
         adapter="gene_panel", needs_ensembl=False,
     ),
+    # pathogenic has no gene list (just_pathogenic ships no data) — it's a genome-wide ClinVar
+    # pathogenicity flag. Empty data_path → runner skips the fetch and the adapter keeps every
+    # pathogenic variant. This resolves the "no gene list" blocker by deriving it from ClinVar.
+    "pathogenic": V1Module(
+        name="pathogenic", repo="just_pathogenic", data_path="",
+        adapter="gene_panel", needs_ensembl=False,
+    ),
 }
 
 

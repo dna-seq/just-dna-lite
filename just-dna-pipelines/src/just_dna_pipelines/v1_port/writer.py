@@ -8,6 +8,7 @@ cell, which the compiler's ``csv.DictReader`` reader maps back to ``None``.
 
 import hashlib
 from pathlib import Path
+from typing import Optional
 
 import polars as pl
 import yaml
@@ -47,7 +48,7 @@ def write_spec_dir(
     out_dir: Path,
     *,
     source_repo: str,
-    source_file: Path,
+    source_file: Optional[Path],
     warnings: list[str],
 ) -> Path:
     """Write module_spec.yaml, variants.csv, studies.csv, and v1_port.log into ``out_dir``."""
@@ -64,8 +65,8 @@ def write_spec_dir(
     log_lines = [
         f"module: {spec.module.name}",
         f"source_repo: dna-seq/{source_repo}",
-        f"source_file: {source_file.name}",
-        f"source_sha256: sha256:{_sha256(source_file)}",
+        f"source_file: {source_file.name if source_file else '(derived from ClinVar)'}",
+        f"source_sha256: sha256:{_sha256(source_file) if source_file else '(n/a)'}",
         f"variant_rows: {len(variants)}",
         f"study_rows: {len(studies)}",
         "warnings:",

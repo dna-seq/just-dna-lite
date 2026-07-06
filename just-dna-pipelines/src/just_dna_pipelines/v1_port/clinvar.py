@@ -87,18 +87,21 @@ def _norm_chrom(raw: str) -> Optional[str]:
 
 
 def load_gene_panel_variants(
-    genes: set[str], vcf_path: Path = DEFAULT_CLINVAR_VCF
+    genes: Optional[set[str]], vcf_path: Path = DEFAULT_CLINVAR_VCF
 ) -> tuple[list[ClinVarVariant], dict[str, int]]:
     """Scan the ClinVar VCF for pathogenic/likely-pathogenic variants in ``genes``.
 
-    Returns the matched variants plus a small ``stats`` dict (matched, skipped_non_acgt, total_path).
+    ``genes=None`` keeps every pathogenic variant that carries a gene annotation (the ``pathogenic``
+    module — a genome-wide ClinVar pathogenicity flag). Returns the matched variants plus a small
+    ``stats`` dict (matched, skipped_non_acgt, skipped_too_long, pathogenic_in_panel, genes_matched).
     Raises ``FileNotFoundError`` if the VCF is absent so the caller can skip with a clear warning.
     """
     if not vcf_path.exists():
         raise FileNotFoundError(f"ClinVar VCF not found at {vcf_path}")
 
-    wanted = {g.strip().upper() for g in genes if g.strip()}
+    wanted = {g.strip().upper() for g in genes if g.strip()} if genes is not None else None
     matched: list[ClinVarVariant] = []
+    genes_matched: set[str] = set()
     skipped_non_acgt = 0
     skipped_too_long = 0
     total_path = 0
@@ -108,7 +111,8 @@ def load_gene_panel_variants(
         info_d = _parse_info(info)
         if not _is_pathogenic(info_d.get("CLNSIG")):
             continue
-        hit_genes = [g for g in _genes(info_d.get("GENEINFO")) if g.upper() in wanted]
+        record_genes = _genes(info_d.get("GENEINFO"))
+        hit_genes = record_genes if wanted is None else [g for g in record_genes if g.upper() in wanted]
         if not hit_genes:
             continue
         total_path += 1
@@ -132,12 +136,14 @@ def load_gene_panel_variants(
                 chrom=chrom, pos=int(pos_s), ref=ref_u, alt=alt_u, rsid=rsid,
                 gene=hit_genes[0], significance=info_d.get("CLNSIG", ""), condition=condition,
             ))
+            genes_matched.add(hit_genes[0].upper())
 
     return matched, {
         "matched": len(matched),
         "skipped_non_acgt": skipped_non_acgt,
         "skipped_too_long": skipped_too_long,
         "pathogenic_in_panel": total_path,
+        "genes_matched": len(genes_matched),
     }
 
 

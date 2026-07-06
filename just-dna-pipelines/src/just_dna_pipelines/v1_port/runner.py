@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from just_dna_pipelines.module_compiler.compiler import compile_module, validate_spec
 from just_dna_pipelines.v1_port.adapters import run_adapter
+from just_dna_pipelines.v1_port.clinvar import DEFAULT_CLINVAR_VCF
 from just_dna_pipelines.v1_port.sources import REGISTRY, V1Module, fetch_data_file
 from just_dna_pipelines.v1_port.writer import write_spec_dir
 
@@ -45,13 +46,18 @@ def port_module(
 ) -> PortResult:
     """Port a single module end-to-end. Compilation is skipped gracefully if it can't run."""
     out_dir = out_root / module.name
-    db_path = fetch_data_file(module, download_cache)
+    # Modules with no data file (pathogenic: a genome-wide ClinVar flag) skip the fetch entirely.
+    db_path = fetch_data_file(module, download_cache) if module.data_path else None
     cache = ensembl_cache if (ensembl_cache and ensembl_cache.exists()) else None
     spec, variants, studies, warnings = run_adapter(module, db_path, cache)
 
+    # For the data-less pathogenic module, pin the ClinVar release as the provenance source.
+    provenance_file = db_path
+    if provenance_file is None and DEFAULT_CLINVAR_VCF.exists():
+        provenance_file = DEFAULT_CLINVAR_VCF
     write_spec_dir(
         spec, variants, studies, out_dir,
-        source_repo=module.repo, source_file=db_path, warnings=warnings,
+        source_repo=module.repo, source_file=provenance_file, warnings=warnings,
     )
 
     result = PortResult(

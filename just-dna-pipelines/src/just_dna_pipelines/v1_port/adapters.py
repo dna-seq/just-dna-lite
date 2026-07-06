@@ -7,6 +7,7 @@ otherwise from the weight's sign (``genotype.state_from_weight``). Rows that can
 genotype/rsid are skipped and reported as warnings rather than emitted invalid.
 """
 
+import csv
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -33,6 +34,7 @@ from just_dna_pipelines.v1_port.genotype import (
 )
 from just_dna_pipelines.v1_port.pmid import normalize_pmids
 from just_dna_pipelines.v1_port.sources import V1Module, display_meta
+from just_dna_pipelines.v1_port.symbols import load_symbol_resolver, resolve_panel_genes
 
 _CURATOR = "just-dna-seq"
 _METHOD = "expert-curated"
@@ -398,6 +400,114 @@ def adapt_longevitymap(
 
 # ------------------------------------------------------------------- adapter D: superhuman
 
+# Frozen, human-reviewed PMID curation (docs/SUPERHUMAN_REFRESH_PLAN.md, Phase 4). Every PMID was
+# fetched + title-verified against the gene + protective phenotype via NCBI E-utilities; nothing is
+# fabricated. This file is the authoritative, narrowed variant list: superhuman is scoped to the
+# specific protective alleles the source/AREP names (not every dbSNP variant in a gene region).
+_SUPERHUMAN_CURATION = Path(__file__).with_name("data") / "superhuman_pmid_curation.csv"
+
+
+class _SuperhumanCuration:
+    """Parsed curation: which source rsids to keep, gene-level LOF grounding, and new-gene rows."""
+
+    def __init__(self) -> None:
+        self.rsid_pmids: dict[str, list[str]] = {}          # source rsid -> verified PMID(s)
+        self.gene_indel_pmids: dict[str, list[str]] = {}    # LOF gene -> gene-level PMID(s)
+        self.conclusion_override: dict[str, str] = {}       # rsid -> corrected conclusion
+        self.added: dict[str, dict[str, object]] = {}       # new rsid -> {gene, genotype, conclusion, pmids}
+
+    @property
+    def keep_rsids(self) -> set[str]:
+        return set(self.rsid_pmids)
+
+
+def _load_superhuman_curation(path: Path = _SUPERHUMAN_CURATION) -> _SuperhumanCuration:
+    cur = _SuperhumanCuration()
+    with path.open(newline="") as f:
+        for row in csv.DictReader(f):
+            gene = (row.get("gene") or "").strip()
+            rsid = (row.get("rsid") or "").strip()
+            scope = (row.get("scope") or "rsid").strip()
+            genotype = (row.get("genotype") or "").strip()
+            pmid = (row.get("pmid") or "").strip()
+            conclusion = (row.get("conclusion") or "").strip()
+            if not pmid.isdigit():  # ROADMAP 0.2 rule: digit-only PMIDs, enforced at load
+                raise ValueError(f"superhuman curation: non-digit pmid {pmid!r} for {gene}/{rsid}")
+            if scope == "gene-indel":
+                gene_list = cur.gene_indel_pmids.setdefault(gene, [])
+                if pmid not in gene_list:
+                    gene_list.append(pmid)
+                continue
+            if genotype:  # a new-gene addition not present in the source SQLite
+                entry = cur.added.setdefault(rsid, {"gene": gene, "genotype": genotype,
+                                                     "conclusion": conclusion, "pmids": []})
+                if pmid not in entry["pmids"]:
+                    entry["pmids"].append(pmid)  # type: ignore[union-attr]
+                continue
+            plist = cur.rsid_pmids.setdefault(rsid, [])  # existing source rsid, keep + ground
+            if pmid not in plist:
+                plist.append(pmid)
+            if conclusion:
+                cur.conclusion_override[rsid] = conclusion
+    return cur
+
+
+def _is_indel(row: dict[str, object]) -> bool:
+    """A deleterious/structural (non-SNV) source variant: differing allele lengths, or unspecified
+    (empty/'-') alleles. The 'keep deletions, drop plain SNPs' rule for the LOF dump genes."""
+    ref = str(row.get("ref_allele") or "").strip().replace("-", "")
+    alt = str(row.get("alt_allele") or "").strip().replace("-", "")
+    if not ref or not alt:
+        return True
+    return len(ref) != len(alt)
+
+
+def _norm_allele(raw: object) -> Optional[str]:
+    """Uppercase A/C/G/T allele (single- or multi-base for indels); None if not a clean sequence."""
+    a = str(raw or "").strip().upper().replace("-", "")
+    return a if a and set(a) <= set("ACGT") else None
+
+
+def _superhuman_genotypes(
+    row: dict[str, object], resolved: Optional[tuple[Optional[str], Optional[str]]]
+) -> list[str]:
+    """Protective genotype(s) for a kept superhuman variant.
+
+    The source rarely stores alleles for its named protective variants (it relied on runtime dbSNP
+    lookup), so we reconstruct ref/alt from the Ensembl cache (``resolved``) exactly like
+    longevitymap. The HF annotator joins on chrom+start+**genotype** (ref/alt are not compared), so
+    the genotype allele-list must equal what a carrier's VCF would produce: het = sorted(ref, alt),
+    hom = alt/alt. Zygosity ``both`` emits both so heterozygous and homozygous carriers each match.
+    The effect allele is the derived (alt); for a multiallelic Ensembl alt list we take the first
+    single-base token (the position join ignores which alt, so this only shapes the pairing)."""
+    gt = to_slash_genotype(row.get("genotype"))
+    if gt:  # explicit two-base genotype in the source (e.g. APOA2 'CC', APOE 'TT')
+        return [gt]
+
+    ref = _norm_allele(row.get("ref_allele"))
+    alt = _norm_allele(row.get("alt_allele"))
+    if ref is None or alt is None:
+        rref, ralt = resolved or (None, None)
+        ref = ref or _norm_allele(rref)
+        if alt is None and ralt:
+            tokens = str(ralt).upper().split("|")
+            singles = [t for t in tokens if _norm_allele(t) and len(t) == 1]
+            alt = _norm_allele(singles[0]) if singles else _norm_allele(tokens[0])
+    if alt is None:
+        return []
+
+    zyg = str(row.get("zygosity") or "").strip().lower()
+    hom = "/".join(sorted([alt, alt]))
+    het = "/".join(sorted([ref, alt])) if ref else None
+    if zyg.startswith("hom"):
+        out = [hom]
+    elif zyg.startswith("het"):
+        out = [het or hom]
+    else:  # 'both' or unspecified: match carriers in either zygosity
+        out = [g for g in (het, hom) if g]
+    return list(dict.fromkeys(out))
+
+
 def adapt_superhuman(
     module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
 ) -> AdapterResult:
@@ -406,50 +516,90 @@ def adapt_superhuman(
     studies: list[StudyRow] = []
     study_seen: set[tuple[str, str]] = set()
     skipped = 0
+    dropped_unnamed = 0
 
+    curation = _load_superhuman_curation()
+
+    # Pass 1: select the kept source rows (narrowing) and collect rsids that need allele resolution.
+    kept: list[tuple[dict[str, object], str, str, list[str]]] = []  # (row, rsid, gene, pmids)
+    need_alleles: set[str] = set()
     for row in _rows(db, "superhuman"):
         rsid = _valid_rsid(row.get("rsid"))
         if rsid is None:
             skipped += 1
             continue
-        genotype = to_slash_genotype(row.get("genotype"))
-        if genotype is None:
-            # No explicit genotype: build from the beneficial (alt) allele + zygosity.
-            genotype = genotype_from_allele_zygosity(
-                row.get("alt_allele"), row.get("zygosity"),
-                row.get("ref_allele"), row.get("alt_allele"),
-            )
-        if genotype is None:
+        gene = _clean_str(row.get("gene"))
+        gene_norm = (gene.strip() if gene else gene) or ""
+
+        # Keep a source variant only if it is a curated named allele, or an indel-class (deleterious)
+        # variant of a gene grounded at the gene level. Plain unnamed SNPs are dropped (narrowing).
+        if rsid in curation.keep_rsids:
+            study_pmids = curation.rsid_pmids[rsid]
+        elif gene_norm in curation.gene_indel_pmids and _is_indel(row):
+            study_pmids = curation.gene_indel_pmids[gene_norm]
+        else:
+            dropped_unnamed += 1
+            continue
+        kept.append((row, rsid, gene_norm, study_pmids))
+        if to_slash_genotype(row.get("genotype")) is None and (
+            _norm_allele(row.get("ref_allele")) is None or _norm_allele(row.get("alt_allele")) is None
+        ):
+            need_alleles.add(rsid)
+
+    ref_alt = lookup_alleles(need_alleles, ensembl_cache)
+    if need_alleles and not ref_alt:
+        warnings.append(
+            "Ensembl allele cache unavailable: named protective genotypes could not be "
+            "reconstructed for variants lacking source alleles; those rows were skipped"
+        )
+
+    # Pass 2: build variants + study rows.
+    for row, rsid, gene_norm, study_pmids in kept:
+        genotypes = _superhuman_genotypes(row, ref_alt.get(rsid))
+        if not genotypes:
             skipped += 1
             continue
         superability = _clean_str(row.get("superability")) or ""
         adverse = _clean_str(row.get("adverse_effects"))
-        conclusion = superability + (f" Adverse effects: {adverse}" if adverse else "")
+        base = superability + (f" Adverse effects: {adverse}" if adverse else "")
+        conclusion = curation.conclusion_override.get(rsid) or base or superability or "Beneficial variant"
+        for genotype in genotypes:
+            variants.append(VariantRow(
+                rsid=rsid,
+                genotype=genotype,
+                weight=None,  # superhuman carries no curated effect size — never invented
+                state="significant",
+                conclusion=conclusion,
+                gene=gene_norm or None,
+            ))
+        for pmid in study_pmids:
+            if (rsid, pmid) in study_seen:
+                continue
+            study_seen.add((rsid, pmid))
+            studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=superability or None))
+
+    # New-gene additions from the March-2026 refresh (not present in the source SQLite).
+    for rsid, entry in curation.added.items():
         variants.append(VariantRow(
             rsid=rsid,
-            genotype=genotype,
-            weight=None,  # superhuman carries no curated effect size — never invented
+            genotype=str(entry["genotype"]),
+            weight=None,
             state="significant",
-            conclusion=conclusion or superability or "Beneficial variant",
-            gene=_clean_str(row.get("gene")),
+            conclusion=str(entry["conclusion"]) or "Beneficial variant",
+            gene=str(entry["gene"]),
         ))
-        # Most `references` are dbSNP URLs (no PMID); a subset are real PubMed links. Ground only
-        # those (rsid-specific, verified citations). The full literature backfill + March-2026
-        # refresh is v2 — see docs/SUPERHUMAN_REFRESH_PLAN.md.
-        ref = row.get("references")
-        if ref and "pubmed" in str(ref).lower():
-            for pmid in normalize_pmids(ref):
-                if (rsid, pmid) in study_seen:
-                    continue
-                study_seen.add((rsid, pmid))
-                studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=superability or None))
+        for pmid in entry["pmids"]:  # type: ignore[union-attr]
+            if (rsid, pmid) in study_seen:
+                continue
+            study_seen.add((rsid, pmid))
+            studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=str(entry["conclusion"]) or None))
 
     if skipped:
-        warnings.append(f"skipped {skipped} row(s) with invalid rsid/genotype")
+        warnings.append(f"skipped {skipped} row(s) with invalid rsid/unresolvable genotype")
     warnings.append(
-        f"grounded {len(studies)} variant(s) from in-source PubMed references (subset-studies v1); "
-        f"the remaining variants are ungrounded pending literature curation "
-        f"(docs/SUPERHUMAN_REFRESH_PLAN.md → v2)"
+        f"narrowed to {len(variants)} curated protective-allele genotype row(s) across the named "
+        f"genes (dropped {dropped_unnamed} unnamed dbSNP variant(s)); grounded {len(studies)} study "
+        f"row(s) on human-verified PMIDs (superhuman_pmid_curation.csv; docs/SUPERHUMAN_REFRESH_PLAN.md)"
     )
     return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
 
@@ -464,19 +614,40 @@ def _panel_conclusion(cv: ClinVarVariant) -> str:
 
 
 def adapt_gene_panel(
-    module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
+    module: V1Module, db: Optional[Path], ensembl_cache: Optional[Path] = None
 ) -> AdapterResult:
-    """cardio / cancer: a gene list flagging ClinVar pathogenic variants in those genes.
+    """cardio / cancer / pathogenic: flag ClinVar pathogenic variants (optionally by gene panel).
 
     Reference implementation for the gene-panel module type (just-dna-format ROADMAP item 7). The
-    authored source is just a gene list; ClinVar supplies the actual pathogenic variants, which we
-    enumerate as risk-state rows (both heterozygous and homozygous-alt carrier genotypes) so any
-    carrier is flagged. Every variant is grounded to the ClinVar resource paper.
+    authored source is just a gene list (``cardio``/``cancer``); ClinVar supplies the actual
+    pathogenic variants, which we enumerate as risk-state rows (both heterozygous and homozygous-alt
+    carrier genotypes) so any carrier is flagged. ``pathogenic`` has no gene list — ``db`` is ``None``
+    and every pathogenic ClinVar variant is kept (a genome-wide pathogenicity flag). Every variant is
+    grounded to the ClinVar resource paper.
     """
     warnings: list[str] = []
-    genes = {line.strip() for line in Path(db).read_text().splitlines() if line.strip()}
-    if not genes:
-        return _build_spec(module), [], [], [f"empty gene list in {db.name}"]
+    if db is None:
+        genes: Optional[set[str]] = None  # pathogenic: no gene filter, keep all pathogenic variants
+    else:
+        raw_genes = {line.strip() for line in Path(db).read_text().splitlines() if line.strip()}
+        if not raw_genes:
+            return _build_spec(module), [], [], [f"empty gene list in {db.name}"]
+        # Reconcile legacy/alias symbols to the current NCBI symbols ClinVar's GENEINFO uses.
+        resolver = load_symbol_resolver()
+        genes, alias_map, unresolved = resolve_panel_genes(raw_genes, resolver)
+        if resolver is None:
+            warnings.append(
+                "gene-symbol resolver unavailable (no NCBI gene_info cache) — panel matched by "
+                "literal symbol only; legacy aliases may miss variants"
+            )
+        if alias_map:
+            pairs = ", ".join(f"{old}→{new}" for old, new in sorted(alias_map.items()))
+            warnings.append(f"resolved {len(alias_map)} legacy gene alias(es): {pairs}")
+        if unresolved:
+            warnings.append(
+                f"{len(unresolved)} panel symbol(s) not current NCBI symbols or known aliases "
+                f"(likely source typos; kept but match nothing): {', '.join(unresolved)}"
+            )
 
     try:
         cv_variants, stats = load_gene_panel_variants(genes)
@@ -522,9 +693,13 @@ def adapt_gene_panel(
             f"keyed by chrom:pos:ref instead"
         )
 
+    scope = (
+        f"{len(genes)} panel gene(s), {stats['genes_matched']} matched"
+        if genes is not None else f"all pathogenic genes ({stats['genes_matched']} matched)"
+    )
     warnings.append(
         f"gene-panel over ClinVar: {stats['matched']} pathogenic variant record(s) across "
-        f"{len(genes)} panel gene(s); {stats['skipped_non_acgt']} non-ACGT/symbolic and "
+        f"{scope}; {stats['skipped_non_acgt']} non-ACGT/symbolic and "
         f"{stats['skipped_too_long']} structural (>{MAX_ALLELE_LEN}bp) allele(s) skipped (not "
         f"matchable as a two-allele genotype); grounded to ClinVar resource PMID {CLINVAR_RESOURCE_PMID}"
     )
