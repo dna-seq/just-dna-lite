@@ -68,10 +68,11 @@ def port_module(
 
     if do_compile:
         cache = ensembl_cache if (ensembl_cache and ensembl_cache.exists()) else None
+        resolve = cache is not None and module.needs_ensembl
         compiled = compile_module(
             out_dir, out_dir,
-            resolve_with_ensembl=cache is not None,
-            ensembl_cache=cache,
+            resolve_with_ensembl=resolve,
+            ensembl_cache=cache if resolve else None,
         )
         result.compiled = compiled.success
         result.errors.extend(compiled.errors)

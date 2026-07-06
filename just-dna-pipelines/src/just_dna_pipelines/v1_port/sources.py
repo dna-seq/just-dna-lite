@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from just_dna_pipelines.module_config import get_module_meta
 
-AdapterKind = Literal["coronary", "three_table", "longevitymap", "superhuman"]
+AdapterKind = Literal["coronary", "three_table", "longevitymap", "superhuman", "gene_panel"]
 
 _GITHUB_ORG = "dna-seq"
 
@@ -30,6 +30,11 @@ class V1Module(BaseModel):
     adapter: AdapterKind = Field(description="Which adapter reads this module's SQLite shape")
     has_studies_table: bool = Field(
         default=False, description="three_table modules: whether a dedicated studies table exists"
+    )
+    needs_ensembl: bool = Field(
+        default=True,
+        description="Whether variants need Ensembl position resolution. Gene panels carry ClinVar "
+        "positions already, so they skip the (expensive) resolver.",
     )
 
 
@@ -58,6 +63,16 @@ REGISTRY: dict[str, V1Module] = {
     "superhuman": V1Module(
         name="superhuman", repo="just_superhuman",
         data_path="data/superhuman.sqlite", adapter="superhuman",
+    ),
+    # Gene panels: authored source is just a gene list; ClinVar supplies the pathogenic variants.
+    # Require the local ClinVar VCF (see clinvar.py DEFAULT_CLINVAR_VCF); skip cleanly if absent.
+    "cardio": V1Module(
+        name="cardio", repo="just_cardio", data_path="data/genes.txt",
+        adapter="gene_panel", needs_ensembl=False,
+    ),
+    "cancer": V1Module(
+        name="cancer", repo="just_cancer", data_path="data/genes.txt",
+        adapter="gene_panel", needs_ensembl=False,
     ),
 }
 

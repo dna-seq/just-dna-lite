@@ -14,9 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from just_dna_pipelines.v1_port.adapters import adapt_coronary, adapt_three_table
+from just_dna_pipelines.v1_port.adapters import (
+    _longevitymap_genotype,
+    adapt_coronary,
+    adapt_longevitymap,
+    adapt_three_table,
+)
 from just_dna_pipelines.v1_port.genotype import state_from_weight, to_slash_genotype
 from just_dna_pipelines.v1_port.pmid import normalize_pmids
+from just_dna_pipelines.v1_port.runner import DEFAULT_ENSEMBL_CACHE
 from just_dna_pipelines.v1_port.sources import REGISTRY, fetch_data_file
 
 _DIGITS = re.compile(r"^\d+$")
@@ -54,6 +60,27 @@ def test_state_from_weight_reproduces_sign_semantics():
 )
 def test_to_slash_genotype(raw, expected):
     assert to_slash_genotype(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "row, ref_alt, expected",
+    [
+        # hom → two copies of the curated effect allele (Ensembl ref/alt irrelevant)
+        ({"allele": "T", "state": "alt", "zygosity": "hom"}, ("C", "T"), "T/T"),
+        # het, effect is an alt: pair with the Ensembl reference — NOT the multiallelic alt list
+        ({"allele": "G", "state": "alt", "zygosity": "het"}, ("T", "A|G"), "G/T"),
+        # het, effect equals the reference: pair with a single-base alt from the list
+        ({"allele": "C", "state": "ref", "zygosity": "het"}, ("C", "T"), "C/T"),
+        # spec-state het spells the genotype out directly in a two-base allele
+        ({"allele": "CT", "state": "spec", "zygosity": "het"}, ("C", "G|T"), "C/T"),
+        ({"allele": "AG", "state": "spec", "zygosity": "het"}, ("C", "A|G|T"), "A/G"),
+        # unusable: no single complement resolvable and not a clean two-base pair
+        ({"allele": "N", "state": "alt", "zygosity": "het"}, ("A", "G"), None),
+    ],
+)
+def test_longevitymap_genotype_reconstruction(row, ref_alt, expected):
+    """Het genotypes come from the curated effect allele, never Ensembl's multiallelic alt list."""
+    assert _longevitymap_genotype(row, ref_alt) == expected
 
 
 # ------------------------------------------------------------------ adapter tests (need source data)
@@ -111,6 +138,30 @@ def test_all_study_pmids_are_digit_only(name, sources_cache):
     assert studies, f"{name} should produce grounded studies"
     for s in studies:
         assert _DIGITS.match(s.pmid), f"{name} pmid not digit-only: {s.pmid!r}"
+
+
+def test_longevitymap_reconstructs_every_source_rsid(sources_cache):
+    """With the Ensembl cache present, every distinct rsid in allele_weights must be reproduced."""
+    if not DEFAULT_ENSEMBL_CACHE.exists():
+        pytest.skip(f"Ensembl cache not present at {DEFAULT_ENSEMBL_CACHE}")
+    db = _fetch("longevitymap", sources_cache)
+
+    con = sqlite3.connect(db)
+    try:
+        rows = con.execute("SELECT DISTINCT rsid FROM allele_weights WHERE rsid LIKE 'rs%'").fetchall()
+    finally:
+        con.close()
+    source_rsids = {str(r[0]).strip() for r in rows}
+
+    _, variants, _, warnings = adapt_longevitymap(
+        REGISTRY["longevitymap"], db, DEFAULT_ENSEMBL_CACHE
+    )
+    ported_rsids = {v.rsid for v in variants}
+
+    assert source_rsids, "expected curated longevitymap rsids in source"
+    missing = source_rsids - ported_rsids
+    assert not missing, f"rsids dropped during port: {sorted(missing)}"
+    assert not warnings, f"expected a clean port with no skipped rows, got: {warnings}"
 
 
 def test_thrombophilia_studies_cover_source_pubmed_ids(sources_cache):

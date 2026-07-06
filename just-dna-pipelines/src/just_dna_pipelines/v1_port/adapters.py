@@ -20,6 +20,12 @@ from just_dna_pipelines.module_compiler.models import (
 )
 from just_dna_pipelines.module_compiler.models import RSID_PATTERN
 from just_dna_pipelines.v1_port.alleles import lookup_alleles
+from just_dna_pipelines.v1_port.clinvar import (
+    CLINVAR_RESOURCE_PMID,
+    MAX_ALLELE_LEN,
+    ClinVarVariant,
+    load_gene_panel_variants,
+)
 from just_dna_pipelines.v1_port.genotype import (
     genotype_from_allele_zygosity,
     state_from_weight,
@@ -261,16 +267,42 @@ def _three_table_studies(
 
 # ------------------------------------------------------------------- adapter C: longevitymap
 
+_ACGT = frozenset("ACGT")
+
+
+def _is_base(a: Optional[str]) -> bool:
+    """True only for a single uppercase ACGT base (rejects 2-base ``spec`` alleles and indels)."""
+    return bool(a) and len(a) == 1 and a in _ACGT
+
+
 def _longevitymap_genotype(
     row: dict[str, object], ref_alt: tuple[Optional[str], Optional[str]]
 ) -> Optional[str]:
-    """hom → two copies of the effect allele; het → the Ensembl ref/alt pair."""
+    """Reconstruct the genotype from the curated effect allele + zygosity.
+
+    hom → two copies of the curated effect allele. het → the effect allele paired with its
+    complement: the Ensembl reference allele when the effect is an alt (the common case), else a
+    single-base Ensembl alt when the effect *is* the reference. The Ensembl ``alt`` column is a
+    ``|``-joined multiallelic list (e.g. ``A|G``), so we never concatenate it blindly — we pair the
+    curated allele with its single complement. ``spec``-state rows spell the heterozygous genotype
+    out directly in the two-base ``allele`` field (e.g. ``CT`` → ``C/T``), so we parse that verbatim.
+    """
     zyg = str(row.get("zygosity") or "").strip().lower()
+    allele = str(row.get("allele") or "").strip().upper()
     if zyg.startswith("hom"):
-        return to_slash_genotype(f"{row.get('allele')}{row.get('allele')}")
+        return to_slash_genotype(f"{allele}{allele}")
     if zyg.startswith("het"):
+        if not _is_base(allele):
+            # A two-base curated allele is the heterozygous genotype spelled out ("CT" → C/T).
+            return to_slash_genotype(allele)
         ref, alt = ref_alt
-        return to_slash_genotype(f"{ref}{alt}") if ref and alt else None
+        ref = (ref or "").strip().upper()
+        if _is_base(ref) and ref != allele:
+            return to_slash_genotype(f"{ref}{allele}")
+        # effect allele is the reference: pair it with a single-base alt from the Ensembl list.
+        for candidate in str(alt or "").upper().split("|"):
+            if _is_base(candidate) and candidate != allele:
+                return to_slash_genotype(f"{allele}{candidate}")
     return None
 
 
@@ -422,11 +454,89 @@ def adapt_superhuman(
     return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
 
 
+# -------------------------------------------------------------- adapter E: ClinVar gene panel
+
+def _panel_conclusion(cv: ClinVarVariant) -> str:
+    sig = cv.significance.replace("_", " ").replace("|", ", ")
+    generic = {"", "not specified", "not provided"}
+    cond = f" — {cv.condition}" if cv.condition and cv.condition.lower() not in generic else ""
+    return f"ClinVar {sig} variant in {cv.gene}{cond}"
+
+
+def adapt_gene_panel(
+    module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
+) -> AdapterResult:
+    """cardio / cancer: a gene list flagging ClinVar pathogenic variants in those genes.
+
+    Reference implementation for the gene-panel module type (just-dna-format ROADMAP item 7). The
+    authored source is just a gene list; ClinVar supplies the actual pathogenic variants, which we
+    enumerate as risk-state rows (both heterozygous and homozygous-alt carrier genotypes) so any
+    carrier is flagged. Every variant is grounded to the ClinVar resource paper.
+    """
+    warnings: list[str] = []
+    genes = {line.strip() for line in Path(db).read_text().splitlines() if line.strip()}
+    if not genes:
+        return _build_spec(module), [], [], [f"empty gene list in {db.name}"]
+
+    try:
+        cv_variants, stats = load_gene_panel_variants(genes)
+    except FileNotFoundError as exc:
+        return _build_spec(module), [], [], [f"ClinVar VCF unavailable ({exc}); gene-panel not built"]
+
+    # An rsid can map to more than one position across ClinVar records (indel anchor-base shifts);
+    # the compiler requires one position per rsid, so null the rsid for those and key by position.
+    positions_per_rsid: dict[str, set[tuple[str, int]]] = {}
+    for cv in cv_variants:
+        if cv.rsid:
+            positions_per_rsid.setdefault(cv.rsid, set()).add((cv.chrom, cv.pos))
+    ambiguous_rsids = {rs for rs, pos in positions_per_rsid.items() if len(pos) > 1}
+
+    variants: list[VariantRow] = []
+    studies: list[StudyRow] = []
+    study_seen: set[str] = set()
+    for cv in cv_variants:
+        rsid = cv.rsid if cv.rsid and cv.rsid not in ambiguous_rsids else None
+        conclusion = _panel_conclusion(cv)
+        het = "/".join(sorted((cv.ref, cv.alt)))
+        hom = "/".join(sorted((cv.alt, cv.alt)))
+        for genotype in (het, hom):
+            variants.append(VariantRow(
+                rsid=rsid, chrom=cv.chrom, start=cv.pos, ref=cv.ref, alts=cv.alt,
+                genotype=genotype, weight=None, state="risk", conclusion=conclusion,
+                gene=cv.gene, phenotype=cv.condition, clinvar=True, pathogenic=True,
+            ))
+        key = rsid or f"{cv.chrom}:{cv.pos}:{cv.ref}"
+        if key not in study_seen:
+            study_seen.add(key)
+            studies.append(StudyRow(
+                rsid=rsid,
+                chrom=None if rsid else cv.chrom,
+                start=None if rsid else cv.pos,
+                ref=None if rsid else cv.ref,
+                pmid=CLINVAR_RESOURCE_PMID, conclusion=cv.condition,
+                study_design="ClinVar aggregate germline classification",
+            ))
+    if ambiguous_rsids:
+        warnings.append(
+            f"{len(ambiguous_rsids)} rsid(s) mapped to multiple positions (indel anchoring) — "
+            f"keyed by chrom:pos:ref instead"
+        )
+
+    warnings.append(
+        f"gene-panel over ClinVar: {stats['matched']} pathogenic variant record(s) across "
+        f"{len(genes)} panel gene(s); {stats['skipped_non_acgt']} non-ACGT/symbolic and "
+        f"{stats['skipped_too_long']} structural (>{MAX_ALLELE_LEN}bp) allele(s) skipped (not "
+        f"matchable as a two-allele genotype); grounded to ClinVar resource PMID {CLINVAR_RESOURCE_PMID}"
+    )
+    return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
+
+
 ADAPTERS = {
     "coronary": adapt_coronary,
     "three_table": adapt_three_table,
     "longevitymap": adapt_longevitymap,
     "superhuman": adapt_superhuman,
+    "gene_panel": adapt_gene_panel,
 }
 
 
