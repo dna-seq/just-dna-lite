@@ -30,11 +30,11 @@ See the [Quick start](https://github.com/dna-seq/just-dna-lite#quick-start) sect
 
 ### What file format does it accept?
 
-VCF (Variant Call Format) files with `.vcf` or `.vcf.gz` extensions from whole genome (WGS) or whole exome (WES) sequencing. Only GRCh38-aligned VCFs are fully supported. GRCh37/hg19 and T2T support are planned.
+VCF (Variant Call Format) files with `.vcf` or `.vcf.gz` extensions from whole genome (WGS) or whole exome (WES) sequencing. GRCh38-aligned VCFs are the primary supported path, and GRCh37/hg19 is handled through liftover. T2T support is planned.
 
 ### Does it work with 23andMe / AncestryDNA / MyHeritage data?
 
-Not yet. Those services use microarray chips that read a few hundred thousand pre-selected positions. just-dna-lite needs a file from whole genome or whole exome sequencing, which covers millions of positions. Microarray support is on the roadmap.
+Experimentally. Those services use microarray chips that read a few hundred thousand pre-selected positions, so results are much sparser than whole genome or whole exome sequencing. just-dna-lite works best with WGS/WES VCF files, but consumer microarray data can be explored with lower coverage.
 
 ### Where can I get my genome sequenced?
 
