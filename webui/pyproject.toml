@@ -1,6 +1,6 @@
 [project]
 name = "webui"
-version = "0.2.5"
+version = "0.2.6"
 description = "Reflex Web UI for just-dna-lite"
 readme = "README.md"
 requires-python = ">=3.13"
