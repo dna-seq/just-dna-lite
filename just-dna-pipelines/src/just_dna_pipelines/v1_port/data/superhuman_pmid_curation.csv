@@ -3,24 +3,24 @@ ABCC11,rs17822931,rsid,,16444273,founding,primary,,,,,A SNP in the ABCC11 gene i
 ADRB1,rs776439595,rsid,,31473062,primary,insource,,,,,A Rare Mutation of beta1-Adrenergic Receptor Affects Sleep/Wake Behaviors
 ANGPTL3,rs1168015,rsid,,28538136,primary,insource,,,,,Genetic and Pharmacologic Inactivation of ANGPTL3 and Cardiovascular Disease
 APOA2,rs5082,rsid,,17446329,primary,insource,,,APOA2 -265T>C promoter variant: gene-diet interaction affecting body mass index and food intake (not coronary disease; label corrected per Corella 2007),,The -256T>C polymorphism in the apolipoprotein A-II gene promoter is associated with body mass index and food intake in the GOLDN study
-APOE,rs121918393,rsid,A/C,31686034,primary,arep,,,"APOE Christchurch (R136S) carrier: resistance to autosomal-dominant Alzheimer's; profound protection shown in a homozygote (Arboleda-Velasquez 2019), heterozygote protection under study",,Resistance to autosomal dominant Alzheimer's disease in an APOE3 Christchurch homozygote: a case report
+APOE,rs121918393,rsid,A/C,31686034,primary,arep,,,Resilience to dominant Alzheimer's (PSEN1-E280A) — APOE Christchurch R136S.,,Resistance to autosomal dominant Alzheimer's disease in an APOE3 Christchurch homozygote: a case report
 APOE,rs7412,rsid,,16603077,primary,insource,,,,,Variation at APOE and STH loci and Alzheimer's disease
 APOL1,rs60910145,rsid,,20647424,founding,primary,,,,,Association of trypanolytic ApoL1 variants with kidney disease in African Americans
 APOL1,rs71785313,rsid,,20647424,founding,primary,,,,,Association of trypanolytic ApoL1 variants with kidney disease in African Americans
 APOL1,rs73885319,rsid,,20647424,founding,primary,,,,,Association of trypanolytic ApoL1 variants with kidney disease in African Americans
 APP,rs63750847,rsid,,22801501,founding,insource,,,,,A mutation in APP protects against Alzheimer's disease and age-related cognitive decline
 BDKRB2,rs7158863,rsid,,29677510,primary,insource,,,,,Physiological and Genetic Adaptations to Diving in Sea Nomads
-BDNF,rs6265,rsid,C/C,12553913,primary,arep,,,BDNF Val66 (C/C): normal activity-dependent BDNF secretion and episodic memory (Met/T carriers show reduced secretion),,The BDNF val66met polymorphism affects activity-dependent secretion of BDNF and human memory and hippocampal function
+BDNF,rs6265,rsid,C/C,12553913,primary,arep,,,Learning (BDNF M66V).,,The BDNF val66met polymorphism affects activity-dependent secretion of BDNF and human memory and hippocampal function
 BHLHE41,rs121912617,rsid,,19679812,founding,insource,,,,,The transcriptional repressor DEC2 regulates sleep length in mammals
 CCR5,rs333,rsid,,8751444,founding,primary,,,,,Resistance to HIV-1 infection in caucasian individuals bearing mutant alleles of the CCR-5 chemokine receptor gene
-CETP,rs5882,rsid,G/G,14559957,primary,arep,,,"CETP Val405 (I405V) homozygosity: larger lipoprotein particle size, associated with exceptional longevity and preserved cognition",,Unique lipoprotein phenotype and genotype associated with exceptional longevity
+CETP,rs5882,rsid,G/G,14559957,primary,arep,,,Exceptional longevity & cognition (CETP I405V).,,Unique lipoprotein phenotype and genotype associated with exceptional longevity
 CFTR,rs1797973431,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
 CFTR,rs397508136,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
 CFTR,rs397508328,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
 CFTR,rs397508476,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
 CFTR,rs397508657,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
 CFTR,rs74571530,rsid,,28499359,primary,insource,,,,,Cystic fibrosis carriership and tuberculosis: hints toward an evolutionary selective advantage of the mutated CFTR gene
-COMT,rs4680,rsid,G/G,12595695,primary,arep,,,COMT Val158 (G/G): higher enzyme activity; associated with attenuated mu-opioid stress/pain response and greater stress resilience (contested 'warrior' phenotype),,COMT val158met genotype affects mu-opioid neurotransmitter responses to a pain stressor
+COMT,rs4680,rsid,G/G,12595695,primary,arep,,,"Low anxiety, high risk tolerance (COMT V158M). Adverse effects: ADHD, headaches, etc.",,COMT val158met genotype affects mu-opioid neurotransmitter responses to a pain stressor
 EGLN1,rs78561501,rsid,,28373541,primary,insource,,,,,Genetic signatures of high-altitude adaptation in Tibetans
 EPAS1,rs116611511,rsid,,28373541,primary,insource,,,,,Genetic signatures of high-altitude adaptation in Tibetans
 EPOR,rs121918116,rsid,,8506290,founding,insource,,,,,Truncated erythropoietin receptor causes dominantly inherited benign human erythrocytosis
@@ -60,4 +60,4 @@ PRNP,rs267606980,rsid,,26061765,founding,insource,,,,,A naturally occurring vari
 RIMS1,,gene-indel,,35022694,primary,primary,,,,,The human cognition-enhancing CORD7 mutation increases active zone number and synaptic release
 SCN9A,,gene-indel,,17167479,founding,primary,,,,,An SCN9A channelopathy causes congenital inability to experience pain
 SLC30A8,rs200185429,rsid,,24584071,founding,insource,,,,,Loss-of-function mutations in SLC30A8 protect against type 2 diabetes
-TPH2,rs4570625,rsid,T/T,28342337,primary,arep,,,TPH2 -703 T/T (minor allele homozygous): low aggressiveness / anxiety (Laas 2017),,Nice guys: Homozygocity for the TPH2 -703G/T (rs4570625) minor allele promotes low aggressiveness and low anxiety
+TPH2,rs4570625,rsid,T/T,28342337,primary,arep,,,Low aggressiveness / anxiety (TPH2 -703 g/t).,,Nice guys: Homozygocity for the TPH2 -703G/T (rs4570625) minor allele promotes low aggressiveness and low anxiety
