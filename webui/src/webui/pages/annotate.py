@@ -15,6 +15,7 @@ from typing import Any, Optional
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
+from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
 from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
 from reflex_mui_datagrid import data_grid, lazyframe_grid
@@ -2697,130 +2698,234 @@ def no_file_selected_message() -> rx.Component:
 
 
 
+
+# CSS injected once for drag-and-drop tab behaviour
+TAB_DRAG_CSS = """
+#right-panel-tab-menu .item {
+    cursor: grab;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+}
+#right-panel-tab-menu .item:active {
+    cursor: grabbing;
+}
+#right-panel-tab-menu .item.tab-drag-over {
+    box-shadow: -3px 0 0 0 #6435c9 inset;
+    background: rgba(100, 53, 201, 0.06);
+}
+#right-panel-tab-menu .item.tab-dragging {
+    opacity: 0.4;
+}
+"""
+
+TAB_DRAG_JS = """
+(function () {
+    if (window.__tabDndInit) return;
+    window.__tabDndInit = true;
+    var SEL = '#right-panel-tab-menu .item';
+    var clearMarks = function () {
+        document.querySelectorAll(
+            '#right-panel-tab-menu .tab-dragging, #right-panel-tab-menu .tab-drag-over'
+        ).forEach(function (el) { el.classList.remove('tab-dragging', 'tab-drag-over'); });
+    };
+    document.addEventListener('dragstart', function (e) {
+        var item = e.target.closest ? e.target.closest(SEL) : null;
+        if (!item) return;
+        // Firefox requires dataTransfer.setData() for the drag to begin at all.
+        try { e.dataTransfer.setData('text/plain', item.dataset.tabId || ''); } catch (_) {}
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        item.classList.add('tab-dragging');
+    });
+    document.addEventListener('dragover', function (e) {
+        var item = e.target.closest ? e.target.closest(SEL) : null;
+        if (!item) return;
+        // Required to make the element a valid drop target.
+        e.preventDefault();
+        document.querySelectorAll('#right-panel-tab-menu .tab-drag-over')
+            .forEach(function (el) { if (el !== item) el.classList.remove('tab-drag-over'); });
+        item.classList.add('tab-drag-over');
+    });
+    document.addEventListener('dragleave', function (e) {
+        var item = e.target.closest ? e.target.closest(SEL) : null;
+        if (item) item.classList.remove('tab-drag-over');
+    });
+    document.addEventListener('drop', function (e) {
+        var item = e.target.closest ? e.target.closest(SEL) : null;
+        if (!item) return;
+        // Stop the browser's default drop handling; the React on_drop handler
+        // on the draggable_div element still fires and calls drop_tab_onto.
+        e.preventDefault();
+        clearMarks();
+    });
+    document.addEventListener('dragend', clearMarks);
+})();
+"""
+
+
+def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
+    """Render one draggable tab <div> matched from tab_id.
+
+    All five tab variants are inlined here via rx.match so Reflex can
+    evaluate the conditional at render time against the reactive var.
+    """
+    drag_style = {
+        **RIGHT_PANEL_TAB_STYLE,
+        "WebkitUserDrag": "element",
+    }
+    return rx.match(
+        tab_id,
+        (
+            "input",
+            draggable_div(
+                fomantic_icon(
+                    "database",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "input", "#6435c9", "#888"),
+                ),
+                " Input",
+                rx.cond(
+                    UploadState.vcf_preview_row_count > 0,
+                    rx.el.span(
+                        UploadState.vcf_preview_row_count,
+                        " rows",
+                        class_name="ui mini circular violet label",
+                        style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                    ),
+                    rx.fragment(),
+                ),
+                class_name=rx.cond(UploadState.right_panel_active_tab == "input", "active item", "item"),
+                on_click=UploadState.switch_to_input_tab,
+                on_drag_start=UploadState.drag_tab_start("input"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("input"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="input",
+            ),
+        ),
+        (
+            "prs",
+            draggable_div(
+                fomantic_icon(
+                    "chart-bar",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "prs", "#f2711c", "#888"),
+                ),
+                " PRS",
+                rx.cond(
+                    PRSState.prs_results.length() > 0,
+                    rx.el.span(
+                        PRSState.prs_results.length(),
+                        class_name="ui mini circular orange label",
+                        style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                    ),
+                    rx.fragment(),
+                ),
+                class_name=rx.cond(UploadState.right_panel_active_tab == "prs", "active item", "item"),
+                on_click=UploadState.switch_to_prs_tab,
+                on_drag_start=UploadState.drag_tab_start("prs"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("prs"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="prs",
+            ),
+        ),
+        (
+            "annotated_files",
+            draggable_div(
+                fomantic_icon(
+                    "folder-output",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "#00b5ad", "#888"),
+                ),
+                " Annotated Files",
+                rx.el.span(
+                    UploadState.output_file_count,
+                    class_name="ui mini circular teal label",
+                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                ),
+                class_name=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "active item", "item"),
+                on_click=UploadState.switch_to_annotated_files_tab,
+                on_drag_start=UploadState.drag_tab_start("annotated_files"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("annotated_files"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="annotated_files",
+            ),
+        ),
+        (
+            "reports",
+            draggable_div(
+                fomantic_icon(
+                    "file-text",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "reports", "#e03997", "#888"),
+                ),
+                " Reports",
+                rx.cond(
+                    UploadState.has_report_files,
+                    rx.el.span(
+                        UploadState.report_file_count,
+                        class_name="ui mini circular pink label",
+                        style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                    ),
+                    rx.fragment(),
+                ),
+                class_name=rx.cond(UploadState.right_panel_active_tab == "reports", "active item", "item"),
+                on_click=UploadState.switch_to_reports_tab,
+                on_drag_start=UploadState.drag_tab_start("reports"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("reports"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="reports",
+            ),
+        ),
+        (
+            "analysis",
+            draggable_div(
+                fomantic_icon(
+                    "plus-circle",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "analysis", "#2185d0", "#888"),
+                ),
+                " New Analysis",
+                rx.cond(
+                    UploadState.selected_modules.length() > 0,
+                    rx.el.span(
+                        UploadState.selected_modules.length(),
+                        " selected",
+                        class_name="ui mini circular blue label",
+                        style=RIGHT_PANEL_TAB_BADGE_STYLE,
+                    ),
+                    rx.fragment(),
+                ),
+                class_name=rx.cond(UploadState.right_panel_active_tab == "analysis", "active item", "item"),
+                on_click=UploadState.switch_to_analysis_tab,
+                on_drag_start=UploadState.drag_tab_start("analysis"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("analysis"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="analysis",
+            ),
+        ),
+        rx.fragment(),  # default / unknown tab id
+    )
+
+
 def _right_panel_tab_menu() -> rx.Component:
     """Top-level horizontal tab menu for the right panel.
 
-    Tabs are flat: Input | PRS | Annotated Files | Reports | New Analysis.
+    Tabs are flat and drag-reorderable: order is persisted in
+    UploadState.tab_order. Drag a tab left/right to rearrange.
     """
     return rx.el.div(
-        rx.el.a(
-            fomantic_icon(
-                "database",
-                size=16,
-                color=rx.cond(UploadState.right_panel_active_tab == "input", "#6435c9", "#888"),
-            ),
-            " Input",
-            rx.cond(
-                UploadState.vcf_preview_row_count > 0,
-                rx.el.span(
-                    UploadState.vcf_preview_row_count,
-                    " rows",
-                    class_name="ui mini circular violet label",
-                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.right_panel_active_tab == "input",
-                "active item",
-                "item",
-            ),
-            on_click=UploadState.switch_to_input_tab,
-            style=RIGHT_PANEL_TAB_STYLE,
-        ),
-        rx.el.a(
-            fomantic_icon(
-                "chart-bar",
-                size=16,
-                color=rx.cond(UploadState.right_panel_active_tab == "prs", "#f2711c", "#888"),
-            ),
-            " PRS",
-            rx.cond(
-                PRSState.prs_results.length() > 0,
-                rx.el.span(
-                    PRSState.prs_results.length(),
-                    class_name="ui mini circular orange label",
-                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.right_panel_active_tab == "prs",
-                "active item",
-                "item",
-            ),
-            on_click=UploadState.switch_to_prs_tab,
-            style=RIGHT_PANEL_TAB_STYLE,
-        ),
-        rx.el.a(
-            fomantic_icon(
-                "folder-output",
-                size=16,
-                color=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "#00b5ad", "#888"),
-            ),
-            " Annotated Files",
-            rx.el.span(
-                UploadState.output_file_count,
-                class_name="ui mini circular teal label",
-                style=RIGHT_PANEL_TAB_BADGE_STYLE,
-            ),
-            class_name=rx.cond(
-                UploadState.right_panel_active_tab == "annotated_files",
-                "active item",
-                "item",
-            ),
-            on_click=UploadState.switch_to_annotated_files_tab,
-            style=RIGHT_PANEL_TAB_STYLE,
-        ),
-        rx.el.a(
-            fomantic_icon(
-                "file-text",
-                size=16,
-                color=rx.cond(UploadState.right_panel_active_tab == "reports", "#e03997", "#888"),
-            ),
-            " Reports",
-            rx.cond(
-                UploadState.has_report_files,
-                rx.el.span(
-                    UploadState.report_file_count,
-                    class_name="ui mini circular pink label",
-                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.right_panel_active_tab == "reports",
-                "active item",
-                "item",
-            ),
-            on_click=UploadState.switch_to_reports_tab,
-            style=RIGHT_PANEL_TAB_STYLE,
-        ),
-        rx.el.a(
-            fomantic_icon(
-                "plus-circle",
-                size=16,
-                color=rx.cond(UploadState.right_panel_active_tab == "analysis", "#2185d0", "#888"),
-            ),
-            " New Analysis",
-            rx.cond(
-                UploadState.selected_modules.length() > 0,
-                rx.el.span(
-                    UploadState.selected_modules.length(),
-                    " selected",
-                    class_name="ui mini circular blue label",
-                    style=RIGHT_PANEL_TAB_BADGE_STYLE,
-                ),
-                rx.fragment(),
-            ),
-            class_name=rx.cond(
-                UploadState.right_panel_active_tab == "analysis",
-                "active item",
-                "item",
-            ),
-            on_click=UploadState.switch_to_analysis_tab,
-            style=RIGHT_PANEL_TAB_STYLE,
-        ),
+        rx.el.style(TAB_DRAG_CSS),
+        rx.script(TAB_DRAG_JS),
+        rx.foreach(UploadState.tab_order, _tab_item),
         class_name="ui top attached tabular menu",
         style={"marginBottom": "0"},
         id="right-panel-tab-menu",

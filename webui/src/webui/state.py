@@ -315,6 +315,11 @@ def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_
     )
 
 
+# Canonical tab order — single source of truth used both as the default for the
+# tab_order state var and as the validation set in drop_tab_onto.
+DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis"]
+
+
 class UploadState(LazyFrameGridMixin, rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
@@ -1313,6 +1318,8 @@ class UploadState(LazyFrameGridMixin, rx.State):
     run_history_expanded: bool = True  # Whether the run history section is expanded
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
     right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis"
+    tab_order: list[str] = DEFAULT_TAB_ORDER  # drag-reorderable tab list
+    _drag_tab_id: str = ""  # internal: id of the tab being dragged (cleared after drop)
     show_input_tab_info: bool = True
     show_prs_tab_info: bool = True
     show_annotated_files_tab_info: bool = True
@@ -2998,6 +3005,35 @@ class UploadState(LazyFrameGridMixin, rx.State):
     def switch_to_analysis_tab(self):
         """Switch the right panel to the new analysis tab."""
         self.right_panel_active_tab = "analysis"
+
+    def drag_tab_start(self, tab_id: str):
+        """Record which tab the user started dragging."""
+        self._drag_tab_id = tab_id
+
+    def drop_tab_onto(self, target_tab_id: str):
+        """Reorder tabs: move the dragged tab before or after the target.
+
+        When dragging left-to-right the user expects the source to land *after*
+        the target; right-to-left it should land *before*.  We detect direction
+        from the current order so either gesture feels natural.
+        """
+        src = self._drag_tab_id
+        dst = target_tab_id
+        if not src or src == dst or src not in self.tab_order or dst not in self.tab_order:
+            self._drag_tab_id = ""
+            return
+        order = list(self.tab_order)
+        src_idx = order.index(src)
+        dst_idx = order.index(dst)
+        order.remove(src)
+        # Re-compute dst index after removal, then offset by drag direction.
+        insert_at = order.index(dst)
+        if src_idx < dst_idx:
+            # Dragging right: land after the target.
+            insert_at += 1
+        order.insert(insert_at, src)
+        self.tab_order = order
+        self._drag_tab_id = ""
 
     def close_right_panel_tab_info(self, tab_name: str):
         """Hide the explanatory message for one right-panel tab."""
