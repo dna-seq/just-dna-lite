@@ -2810,8 +2810,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 ),
                 class_name=rx.cond(UploadState.right_panel_active_tab == "input", "active item", "item"),
                 on_click=UploadState.switch_to_input_tab,
+                on_drag_start=UploadState.drag_tab_start("input"),
                 on_drag_over=rx.prevent_default,
-                on_drop=UploadState.move_tab,
+                on_drop=UploadState.drop_tab_onto("input"),
                 draggable=True,
                 style=drag_style,
                 data_tab_id="input",
@@ -2821,11 +2822,11 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
             "prs",
             draggable_div(
                 fomantic_icon(
-                    "chart-bar",
+                    "chart bar",
                     size=16,
-                    color=rx.cond(UploadState.right_panel_active_tab == "prs", "#f2711c", "#888"),
+                    color=rx.cond(UploadState.right_panel_active_tab == "prs", "#6435c9", "#888"),
                 ),
-                " PRS",
+                " Polygenic Risk Scores",
                 rx.cond(
                     PRSState.prs_results.length() > 0,
                     rx.el.span(
@@ -2837,8 +2838,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 ),
                 class_name=rx.cond(UploadState.right_panel_active_tab == "prs", "active item", "item"),
                 on_click=UploadState.switch_to_prs_tab,
+                on_drag_start=UploadState.drag_tab_start("prs"),
                 on_drag_over=rx.prevent_default,
-                on_drop=UploadState.move_tab,
+                on_drop=UploadState.drop_tab_onto("prs"),
                 draggable=True,
                 style=drag_style,
                 data_tab_id="prs",
@@ -2848,9 +2850,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
             "annotated_files",
             draggable_div(
                 fomantic_icon(
-                    "folder-output",
+                    "file code outline",
                     size=16,
-                    color=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "#00b5ad", "#888"),
+                    color=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "#6435c9", "#888"),
                 ),
                 " Annotated Files",
                 rx.el.span(
@@ -2860,8 +2862,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 ),
                 class_name=rx.cond(UploadState.right_panel_active_tab == "annotated_files", "active item", "item"),
                 on_click=UploadState.switch_to_annotated_files_tab,
+                on_drag_start=UploadState.drag_tab_start("annotated_files"),
                 on_drag_over=rx.prevent_default,
-                on_drop=UploadState.move_tab,
+                on_drop=UploadState.drop_tab_onto("annotated_files"),
                 draggable=True,
                 style=drag_style,
                 data_tab_id="annotated_files",
@@ -2871,9 +2874,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
             "reports",
             draggable_div(
                 fomantic_icon(
-                    "file-text",
+                    "file alternate outline",
                     size=16,
-                    color=rx.cond(UploadState.right_panel_active_tab == "reports", "#e03997", "#888"),
+                    color=rx.cond(UploadState.right_panel_active_tab == "reports", "#6435c9", "#888"),
                 ),
                 " Reports",
                 rx.cond(
@@ -2887,8 +2890,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 ),
                 class_name=rx.cond(UploadState.right_panel_active_tab == "reports", "active item", "item"),
                 on_click=UploadState.switch_to_reports_tab,
+                on_drag_start=UploadState.drag_tab_start("reports"),
                 on_drag_over=rx.prevent_default,
-                on_drop=UploadState.move_tab,
+                on_drop=UploadState.drop_tab_onto("reports"),
                 draggable=True,
                 style=drag_style,
                 data_tab_id="reports",
@@ -2898,11 +2902,11 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
             "analysis",
             draggable_div(
                 fomantic_icon(
-                    "plus-circle",
+                    "stethoscope",
                     size=16,
-                    color=rx.cond(UploadState.right_panel_active_tab == "analysis", "#2185d0", "#888"),
+                    color=rx.cond(UploadState.right_panel_active_tab == "analysis", "#6435c9", "#888"),
                 ),
-                " New Analysis",
+                " Analysis Tools",
                 rx.cond(
                     UploadState.selected_modules.length() > 0,
                     rx.el.span(
@@ -2915,8 +2919,9 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 ),
                 class_name=rx.cond(UploadState.right_panel_active_tab == "analysis", "active item", "item"),
                 on_click=UploadState.switch_to_analysis_tab,
+                on_drag_start=UploadState.drag_tab_start("analysis"),
                 on_drag_over=rx.prevent_default,
-                on_drop=UploadState.move_tab,
+                on_drop=UploadState.drop_tab_onto("analysis"),
                 draggable=True,
                 style=drag_style,
                 data_tab_id="analysis",
