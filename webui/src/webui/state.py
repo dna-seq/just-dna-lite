@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 import gc
 import logging
 import os
 import queue
+import re
 import shutil
 import asyncio
 import tarfile
@@ -47,7 +49,12 @@ from just_dna_marketplace import MarketplaceClient, MarketplaceError
 from just_dna_marketplace.client import VersionMismatchError
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
-from webui.marketplace_identity import ensure_install_id, load_identity
+from webui.marketplace_identity import (
+    ensure_install_id, load_identity, save_identity, derive_handle, set_env_var,
+)
+
+# Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
+_DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
 
 # Shown when the marketplace server's contract (API / just-dna-format / compiler) is newer than
 # this app's client — swapping compiled artifacts would collide, so we refuse and tell the user.
@@ -5147,11 +5154,27 @@ class MarketplaceState(rx.State):
     action_message: str = ""
     pending_action: Dict[str, Any] = {}   # {} = none
 
-    # --- Publication identity + roles (0.7.1: namespace membership owner/contributor) ---
+    # --- Publication identity + profile ---
     install_id: str = ""
     token: str = ""
-    account: str = ""              # marketplace account, once registered
-    namespaces: List[str] = []     # namespaces this account may publish to
+    account: str = ""              # immutable account handle, once registered
+    namespaces: List[str] = []     # namespaces this account owns / belongs to
+    display_name: str = ""         # mandatory-to-register, regex-guarded
+    email: str = ""
+    avatar_local: str = ""         # local-only avatar (data URI); never uploaded
+    roles: List[Dict[str, str]] = []       # [{namespace, role}] from members()
+    account_stats: Dict[str, Any] = {}     # summed catalog_stats over owned namespaces
+    profile_message: str = ""
+
+    # --- Publication flow ---
+    publish_namespace: str = ""    # target namespace for publishing
+    new_namespace: str = ""        # create-namespace input
+    ns_available: str = ""         # "" | checking | yes | no | invalid
+    publish_state: str = ""        # new | new_version | published_identical | yanked | conflict
+    publish_version: str = ""
+    published_digest: str = ""
+    publish_busy: bool = False
+    publish_message: str = ""
 
     # ------------------------------------------------------------------ helpers
 
@@ -5246,8 +5269,14 @@ class MarketplaceState(rx.State):
     def set_query(self, value: str) -> None:
         self.query = value
 
-    def switch_marketplace_tab(self, tab: str) -> None:
-        self.marketplace_active_tab = tab
+    @rx.event(background=True)
+    async def switch_marketplace_tab(self, tab: str):
+        async with self:
+            self.marketplace_active_tab = tab
+        if tab == "publication":
+            if self.token:
+                await self._refresh_account()
+            await self._load_publish_state()
 
     def set_selected_version(self, version: str) -> None:
         self.selected_version = version
@@ -5369,6 +5398,9 @@ class MarketplaceState(rx.State):
         token = data.get("token", "")
         account = data.get("account", "")
         namespaces = data.get("namespaces", []) or []
+        display_name = data.get("display_name", "")
+        email = data.get("email", "")
+        avatar_local = data.get("avatar_local", "")
         if not install_id:
             install_id = await loop.run_in_executor(None, ensure_install_id)  # ~1s proof-of-work
         async with self:
@@ -5377,12 +5409,27 @@ class MarketplaceState(rx.State):
                 self.token = token
             self.account = account
             self.namespaces = namespaces
+            self.display_name = display_name
+            self.email = email
+            self.avatar_local = avatar_local
+            if namespaces and not self.publish_namespace:
+                self.publish_namespace = namespaces[0]
+
+    def _persist_identity(self) -> None:
+        """Write the current identity+profile back to the JSON store (call inside a sync context)."""
+        save_identity({
+            "install_id": self.install_id, "token": self.token, "account": self.account,
+            "namespaces": list(self.namespaces), "display_name": self.display_name,
+            "email": self.email, "avatar_local": self.avatar_local,
+        })
 
     @rx.event(background=True)
     async def load_marketplace(self):
         await self._ensure_identity()
         await self._refresh_local()
         await self._do_search()
+        if self.token:
+            await self._refresh_account()
 
     @rx.event(background=True)
     async def search(self):
@@ -5727,6 +5774,509 @@ class MarketplaceState(rx.State):
             await self._do_install(pa["namespace"], pa["name"], pa["version"])
         elif kind == "upload":
             await self._do_register_temp(pa["spec_dir"])
+
+    # ================================================================== publication
+    # ---- computed ----
+    @rx.var
+    def is_registered(self) -> bool:
+        return bool(self.token) and bool(self.account)
+
+    @rx.var
+    def display_name_valid(self) -> bool:
+        return bool(_DISPLAY_NAME_RE.match(self.display_name or ""))
+
+    @rx.var
+    def namespaces_full(self) -> bool:
+        return len(self.namespaces) >= 5
+
+    @rx.var
+    def can_create_namespace(self) -> bool:
+        return self.display_name_valid and len(self.namespaces) < 5
+
+    @rx.var
+    def token_masked(self) -> str:
+        t = self.token or ""
+        return (t[:8] + "…" + t[-4:]) if len(t) > 16 else ("•" * len(t))
+
+    @rx.var
+    def publish_has_spec(self) -> bool:
+        li = self._selected_local
+        return bool(li) and li.get("has_spec", False)
+
+    @rx.var
+    def can_publish(self) -> bool:
+        return self.publish_state in ("new", "new_version") and self.publish_has_spec
+
+    @rx.var
+    def publish_is_published(self) -> bool:
+        return self.publish_state in ("published_identical", "yanked", "conflict")
+
+    @rx.var
+    def show_yank(self) -> bool:
+        return self.publish_state == "published_identical"
+
+    @rx.var
+    def show_unyank(self) -> bool:
+        return self.publish_state == "yanked"
+
+    @rx.var
+    def can_update_meta(self) -> bool:
+        return self.publish_state in ("published_identical", "yanked")
+
+    token_revealed: bool = False
+
+    # ---- setters ----
+    def set_new_namespace(self, value: str) -> None:
+        self.new_namespace = value
+        self.ns_available = ""
+
+    def toggle_token(self) -> None:
+        self.token_revealed = not self.token_revealed
+
+    @rx.var
+    def token_display(self) -> str:
+        return self.token if self.token_revealed else self.token_masked
+
+    @rx.event
+    async def set_avatar(self, files: list[rx.UploadFile]):
+        """Store a local-only avatar as a data URI (never uploaded to the server)."""
+        if not files:
+            return
+        f = files[0]
+        data = await f.read()
+        mime = "image/png" if str(f.filename).lower().endswith("png") else "image/jpeg"
+        self.avatar_local = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+        self._persist_identity()
+
+    # ---- profile ----
+    @rx.event
+    def save_profile(self, form_data: dict):
+        name = (form_data.get("display_name") or "").strip()
+        email = (form_data.get("email") or "").strip()
+        if not _DISPLAY_NAME_RE.match(name):
+            self.profile_message = "Display name must be 2–32 chars: letters, digits, or underscore only."
+            return
+        self.display_name = name
+        self.email = email
+        self._persist_identity()
+        self.profile_message = "Saved."
+        if self.token:
+            return MarketplaceState.push_profile
+
+    @rx.event(background=True)
+    async def push_profile(self):
+        async with self:
+            url, token = self._client_args()
+            display_name, email = self.display_name, self.email
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with MarketplaceClient(url, token) as c:
+                return c.update_profile(display_name=display_name, email=email)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.profile_message = f"Saved locally; server profile update failed: {e}"
+            return
+        async with self:
+            self.profile_message = "Profile updated."
+
+    # ---- namespace availability + creation ----
+    @rx.event(background=True)
+    async def check_namespace(self):
+        """Check availability of the current `new_namespace` (reads state; on_blur triggers it)."""
+        async with self:
+            value = (self.new_namespace or "").strip().lower()
+            self.new_namespace = value
+            if not value:
+                self.ns_available = ""
+                return
+            self.ns_available = "checking"
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with MarketplaceClient(url, token) as c:
+                return c.namespace_available(value)
+
+        try:
+            res = await loop.run_in_executor(None, _do)
+        except Exception:  # noqa: BLE001
+            async with self:
+                self.ns_available = ""
+            return
+        async with self:
+            if not res.get("valid", False):
+                self.ns_available = "invalid"
+            else:
+                self.ns_available = "yes" if res.get("available", False) else "no"
+
+    @rx.event
+    def create_namespace(self, form_data: dict):
+        ns = (form_data.get("new_namespace") or "").strip().lower()
+        if not self.display_name_valid:
+            self.publish_message = "Set a valid display name in the account pane first."
+            return
+        if not ns:
+            self.publish_message = "Enter a namespace name."
+            return
+        if len(self.namespaces) >= 5:
+            self.publish_message = "Namespace limit reached (5 per account)."
+            return
+        return MarketplaceState.do_create_namespace(ns)
+
+    @rx.event(background=True)
+    async def do_create_namespace(self, ns: str):
+        async with self:
+            self.publish_busy = True
+            self.publish_message = f"Creating namespace {ns}…"
+            url, token = self._client_args()
+            install_id, display_name = self.install_id, self.display_name
+        loop = asyncio.get_event_loop()
+
+        # 1. Register the account (mint token) if this is the first namespace.
+        if not token:
+            def _register():
+                last = None
+                with MarketplaceClient(url, None) as c:
+                    for _ in range(6):
+                        handle = derive_handle(display_name)
+                        try:
+                            return c.register(install_id, handle)
+                        except MarketplaceError as e:
+                            if e.status_code == 409:  # handle collision → new suffix
+                                last = e
+                                continue
+                            raise
+                raise last or RuntimeError("could not register account")
+            try:
+                reg = await loop.run_in_executor(None, _register)
+            except Exception as e:  # noqa: BLE001
+                async with self:
+                    self.publish_busy = False
+                    self.publish_message = f"Registration failed: {e}"
+                return
+            async with self:
+                self.token = reg.get("token", "")
+                self.account = reg.get("account", "")
+                self.namespaces = reg.get("namespaces", []) or []
+                token = self.token
+                self._persist_identity()
+            if token:
+                await loop.run_in_executor(None, set_env_var, "MARKETPLACE_TOKEN", token)
+
+        # 2. Claim the namespace.
+        def _claim():
+            with MarketplaceClient(url, token) as c:
+                avail = c.namespace_available(ns)
+                if not avail.get("valid", False):
+                    raise RuntimeError("invalid namespace name")
+                if not avail.get("available", False):
+                    raise RuntimeError("namespace already taken")
+                return c.claim_namespace(ns)
+
+        try:
+            await loop.run_in_executor(None, _claim)
+        except MarketplaceError as e:
+            async with self:
+                self.publish_busy = False
+                self.publish_message = (
+                    "Namespace limit reached (5 per account)."
+                    if e.status_code == 403 else f"Could not claim namespace: {e.detail}"
+                )
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Could not claim namespace: {e}"
+            return
+        async with self:
+            if ns not in self.namespaces:
+                self.namespaces = self.namespaces + [ns]
+            self.publish_namespace = ns
+            self.new_namespace = ""
+            self.ns_available = ""
+            self._persist_identity()
+            self.publish_busy = False
+            self.publish_message = f"Created namespace {ns}."
+        await self._refresh_account()
+        await self._load_publish_state()
+
+    @rx.event(background=True)
+    async def set_publish_namespace(self, value: str):
+        async with self:
+            self.publish_namespace = value
+        await self._load_publish_state()
+
+    # ---- publish state machine ----
+    async def _load_publish_state(self) -> None:
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            local_version = li.get("version", "") if li else ""
+            local_digest = li.get("digest", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and li):
+            async with self:
+                self.publish_state = ""
+                self.published_digest = ""
+                self.publish_version = local_version
+            return
+        loop = asyncio.get_event_loop()
+
+        def _versions():
+            with MarketplaceClient(url, token) as c:
+                try:
+                    return c.versions(ns, catalog_name).get("items", [])
+                except MarketplaceError as e:
+                    if e.status_code == 404:
+                        return []
+                    raise
+
+        try:
+            vers = await loop.run_in_executor(None, _versions)
+        except Exception:  # noqa: BLE001 - unknown; leave state blank
+            async with self:
+                self.publish_state = ""
+                self.publish_version = local_version
+            return
+        match = next((v for v in vers if v.get("version") == local_version), None)
+        async with self:
+            self.publish_version = local_version
+            if match is None:
+                self.publish_state = "new_version" if vers else "new"
+                self.published_digest = ""
+            else:
+                self.published_digest = match.get("artifact_digest", "")
+                if match.get("yanked", False):
+                    self.publish_state = "yanked"
+                elif self.published_digest == local_digest:
+                    self.publish_state = "published_identical"
+                else:
+                    self.publish_state = "conflict"
+
+    @rx.event(background=True)
+    async def publish_selected(self):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            key = li.get("name", "") if li else ""
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            has_spec = li.get("has_spec", False) if li else False
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        if not has_spec:
+            async with self:
+                self.publish_message = "This module has no spec files to publish."
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = f"Publishing {catalog_name} {version} to {ns}…"
+        loop = asyncio.get_event_loop()
+
+        def _pub():
+            with MarketplaceClient(url, token) as c:
+                return c.publish(ns, catalog_name, version, CUSTOM_MODULES_DIR / key, changelog="")
+
+        try:
+            await loop.run_in_executor(None, _pub)
+        except VersionMismatchError as e:
+            async with self:
+                self.publish_busy = False
+                self.server_incompatible = True
+                self.publish_message = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+            return
+        except MarketplaceError as e:
+            async with self:
+                self.publish_busy = False
+                if e.status_code == 409:
+                    self.publish_message = (
+                        f"Version {version} already exists in {ns} — bump the version (Edit) to publish changes."
+                    )
+                else:
+                    self.publish_message = f"Publish failed: {e.detail}"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Publish failed: {e}"
+            return
+        await self._refresh_local()
+        await self._refresh_account()
+        await self._load_publish_state()
+        async with self:
+            self.publish_busy = False
+            self.publish_message = f"Published {ns}/{catalog_name}@{version}."
+
+    async def _set_yank(self, yanked: bool) -> None:
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = ("Yanking " if yanked else "Restoring ") + version + "…"
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with MarketplaceClient(url, token) as c:
+                return c.yank(ns, catalog_name, version) if yanked else c.unyank(ns, catalog_name, version)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"{'Yank' if yanked else 'Restore'} failed: {e}"
+            return
+        await self._load_publish_state()
+        async with self:
+            self.publish_busy = False
+            self.publish_message = ("Yanked " if yanked else "Restored ") + version + "."
+
+    @rx.event(background=True)
+    async def yank_selected(self):
+        await self._set_yank(True)
+
+    @rx.event(background=True)
+    async def unyank_selected(self):
+        await self._set_yank(False)
+
+    # ---- metadata (out-of-digest; no version bump) ----
+    @rx.event
+    def update_meta(self, form_data: dict):
+        changelog = (form_data.get("changelog") or "").strip()
+        if not changelog:
+            self.publish_message = "Enter release notes to update."
+            return
+        return MarketplaceState.do_update_changelog(changelog)
+
+    @rx.event(background=True)
+    async def do_update_changelog(self, changelog: str):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = "Updating release notes…"
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with MarketplaceClient(url, token) as c:
+                return c.amend_changelog(ns, catalog_name, version, changelog)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Metadata update failed: {e}"
+            return
+        async with self:
+            self.publish_busy = False
+            self.publish_message = "Release notes updated — no version bump needed."
+
+    @rx.event
+    async def update_logo(self, files: list[rx.UploadFile]):
+        if not files:
+            return
+        f = files[0]
+        data = await f.read()
+        tmp = Path(tempfile.mkdtemp(prefix="mp_logo_")) / Path(f.filename).name
+        tmp.write_bytes(data)
+        return MarketplaceState.do_update_logo(str(tmp))
+
+    @rx.event(background=True)
+    async def do_update_logo(self, logo_path: str):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with MarketplaceClient(url, token) as c:
+                return c.amend_logo(ns, catalog_name, version, Path(logo_path))
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_message = f"Logo update failed: {e}"
+            return
+        async with self:
+            self.publish_message = "Logo updated — out-of-digest, no version bump."
+
+    # ---- account refresh (roles + stats) ----
+    async def _refresh_account(self) -> None:
+        async with self:
+            url, token = self._client_args()
+            fallback_ns = list(self.namespaces)
+            fallback_account = self.account
+        if not token:
+            return
+        loop = asyncio.get_event_loop()
+
+        def _fetch():
+            roles: List[Dict[str, str]] = []
+            stats = {"modules": 0, "downloads": 0, "stars": 0, "reviews": 0}
+            with MarketplaceClient(url, token) as c:
+                try:
+                    who = c.whoami()
+                except Exception:  # noqa: BLE001
+                    who = {}
+                acct = who.get("account") or fallback_account
+                ns_list = who.get("namespaces", fallback_ns) or fallback_ns
+                for ns in ns_list:
+                    try:
+                        members = c.members(ns)
+                        role = next((m.get("role") for m in members if m.get("account") == acct), "member")
+                    except Exception:  # noqa: BLE001
+                        role = "owner"
+                    roles.append({"namespace": ns, "role": role})
+                    try:
+                        st = c.catalog_stats(namespace=ns)
+                        for k in ("modules", "downloads", "stars", "reviews"):
+                            stats[k] += int(st.get(k, 0) or 0)
+                    except Exception:  # noqa: BLE001
+                        pass
+                return who, ns_list, roles, stats
+
+        try:
+            who, ns_list, roles, stats = await loop.run_in_executor(None, _fetch)
+        except Exception:  # noqa: BLE001
+            return
+        async with self:
+            if who:
+                self.account = who.get("account", self.account)
+                if who.get("display_name"):
+                    self.display_name = who.get("display_name")
+                if who.get("email"):
+                    self.email = who.get("email")
+            self.namespaces = ns_list
+            self.roles = roles
+            self.account_stats = stats
+            if ns_list and not self.publish_namespace:
+                self.publish_namespace = ns_list[0]
+            self._persist_identity()
 
     # ------------------------------------------------------------------ edit (cross-page)
 

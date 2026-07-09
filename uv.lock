@@ -1884,7 +1884,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.71.0,<2.0" },
     { name = "grpcio", specifier = "<1.82" },
     { name = "grpcio-health-checking", specifier = "<1.82" },
-    { name = "just-dna-marketplace", specifier = ">=0.8.0" },
+    { name = "just-dna-marketplace", specifier = ">=0.8.1" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
     { name = "just-prs", specifier = ">=0.7.5" },
     { name = "pyyaml", specifier = ">=6.0.3" },
@@ -1901,7 +1901,7 @@ dev = [
 
 [[package]]
 name = "just-dna-marketplace"
-version = "0.8.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -1909,9 +1909,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/37/10f2c57af409532cefc86671a0b2c01c9f0595c38f35ea7a53af7d88b3f8/just_dna_marketplace-0.8.0.tar.gz", hash = "sha256:be12a1eba5dd5718018c6ede84d699524db229f7ab24e7caa11a231a18516fac", size = 53661, upload-time = "2026-07-09T00:10:50.926Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8f/c0/f547e4df795571bfe9c52dcda0396d196a6c2bd3e2b1851fc84a81253d50/just_dna_marketplace-0.8.1.tar.gz", hash = "sha256:632245b903e27c119d9cea486908b5365cdd36c32ca6af6c6cb92bc42d2b9bef", size = 56058, upload-time = "2026-07-09T00:58:55.558Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/06/188a16b2d6cbd2efe95bf0cff2f27cba7a744a31c3ff81989692459a6e89/just_dna_marketplace-0.8.0-py3-none-any.whl", hash = "sha256:55e7587042f28e38c571a5ee4a88aa97e0530c57b238080ac148051cdf5d76ca", size = 71982, upload-time = "2026-07-09T00:10:52.286Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/d9/24076ec1ead38a16be43a8142a9a03bb7921162bf90e5d5e1b6a52c59e2c/just_dna_marketplace-0.8.1-py3-none-any.whl", hash = "sha256:3503f678ec3aef6704aa098a61fb56a2f7aa331c8a743fe0bdebbf43d1fd720d", size = 74357, upload-time = "2026-07-09T00:58:54.115Z" },
 ]
 
 [[package]]

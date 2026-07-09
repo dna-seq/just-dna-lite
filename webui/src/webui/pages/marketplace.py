@@ -624,55 +624,419 @@ def _catalog_tab() -> rx.Component:
     )
 
 
-def _publication_tab() -> rx.Component:
-    """Deferred: message when nothing selected, WIP pane when a module is selected."""
-    return rx.cond(
-        MarketplaceState.has_selection,
+_INPUT_STYLE: dict = {
+    "width": "100%", "padding": "6px 9px", "border": "1px solid #ddd", "borderRadius": "5px",
+    "fontSize": "0.85rem", "boxSizing": "border-box",
+}
+
+
+# ---- Account pane ---------------------------------------------------------
+
+def _profile_form() -> rx.Component:
+    return rx.el.form(
+        rx.el.label("Display name", style={"fontSize": "0.75rem", "fontWeight": "600", "color": "#555"}),
+        rx.el.input(
+            name="display_name", default_value=MarketplaceState.display_name,
+            placeholder="e.g. anton_k", auto_complete="off", style=_INPUT_STYLE,
+        ),
         rx.el.div(
-            fomantic_icon("wrench", size=32, color="#d6c4e8"),
-            rx.el.div(
-                "Publication — work in progress",
-                style={"fontSize": "1rem", "fontWeight": "600", "color": "#6435c9", "marginTop": "10px"},
+            "letters, digits, underscore · 2–32 chars · used to derive your account handle",
+            style={"fontSize": "0.68rem", "color": "#aaa", "margin": "2px 0 8px"},
+        ),
+        rx.el.label("Email (optional)", style={"fontSize": "0.75rem", "fontWeight": "600", "color": "#555"}),
+        rx.el.input(
+            name="email", type="email", default_value=MarketplaceState.email,
+            placeholder="you@example.com", auto_complete="off",
+            style={**_INPUT_STYLE, "marginBottom": "8px"},
+        ),
+        rx.el.button(
+            fomantic_icon("save", size=12), " Save profile",
+            type="submit", class_name="ui tiny primary button", style={"width": "100%"},
+        ),
+        on_submit=MarketplaceState.save_profile,
+        style={"marginBottom": "6px"},
+    )
+
+
+def _avatar_block() -> rx.Component:
+    return rx.el.div(
+        rx.cond(
+            MarketplaceState.avatar_local != "",
+            rx.el.img(src=MarketplaceState.avatar_local,
+                      style={"width": "52px", "height": "52px", "borderRadius": "50%",
+                             "objectFit": "cover", "border": "2px solid #d6c4e8"}),
+            rx.el.div(fomantic_icon("user", size=24, color="#c9b3e6"),
+                      style={"width": "52px", "height": "52px", "borderRadius": "50%",
+                             "background": "#f3eeff", "display": "flex", "alignItems": "center",
+                             "justifyContent": "center", "border": "2px solid #d6c4e8"}),
+        ),
+        rx.upload(
+            rx.el.span("Picture", style={"fontSize": "0.72rem", "color": "#6435c9", "cursor": "pointer"}),
+            id="mp_avatar", multiple=False,
+            accept={"image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"]},
+            on_drop=MarketplaceState.set_avatar(rx.upload_files(upload_id="mp_avatar")),
+            style={"display": "contents"},
+        ),
+        rx.el.span(" local only", style={"fontSize": "0.66rem", "color": "#bbb"}),
+        style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "10px"},
+    )
+
+
+def _token_row() -> rx.Component:
+    return rx.el.div(
+        rx.el.div("API token", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
+        rx.el.div(
+            rx.el.code(MarketplaceState.token_display,
+                       style={"flex": "1", "fontSize": "0.72rem", "overflow": "hidden",
+                              "textOverflow": "ellipsis", "whiteSpace": "nowrap"}),
+            rx.el.button(fomantic_icon("eye", size=12), on_click=MarketplaceState.toggle_token,
+                         class_name="ui mini icon button", title="Reveal / hide",
+                         style={"background": "none", "padding": "2px 5px"}),
+            rx.el.button(fomantic_icon("copy", size=12),
+                         on_click=rx.set_clipboard(MarketplaceState.token),
+                         class_name="ui mini icon button", title="Copy token",
+                         style={"background": "none", "padding": "2px 5px"}),
+            style={"display": "flex", "alignItems": "center", "gap": "4px",
+                   "border": "1px solid #eee", "borderRadius": "5px", "padding": "3px 6px",
+                   "background": "#fafafa"},
+        ),
+        rx.el.div("one token for all your namespaces — back it up",
+                  style={"fontSize": "0.66rem", "color": "#bbb", "marginTop": "2px"}),
+        style={"marginBottom": "10px"},
+    )
+
+
+def _namespaces_list() -> rx.Component:
+    return rx.el.div(
+        rx.el.div("Namespaces", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888",
+                                       "marginBottom": "4px"}),
+        rx.foreach(
+            MarketplaceState.roles,
+            lambda r: rx.el.div(
+                fomantic_icon("hashtag", size=11, color="#a333c8"),
+                rx.el.span(r["namespace"], style={"flex": "1", "marginLeft": "5px", "fontSize": "0.82rem",
+                                                  "fontFamily": "monospace"}),
+                rx.el.span(r["role"], class_name="ui mini label", style={"fontSize": "0.62rem"}),
+                on_click=lambda: MarketplaceState.set_publish_namespace(r["namespace"].to(str)),
+                class_name=rx.cond(MarketplaceState.publish_namespace == r["namespace"],
+                                   "mp-ns-item mp-ns-item-active", "mp-ns-item"),
+                style={"display": "flex", "alignItems": "center", "padding": "4px 6px",
+                       "borderRadius": "4px", "cursor": "pointer", "marginBottom": "2px"},
             ),
+        ),
+        style={"marginBottom": "10px"},
+    )
+
+
+def _stats_block() -> rx.Component:
+    _stat = lambda label, key: rx.el.div(
+        rx.el.div(MarketplaceState.account_stats[key].to(int),
+                  style={"fontSize": "1.1rem", "fontWeight": "700", "color": "#6435c9"}),
+        rx.el.div(label, style={"fontSize": "0.64rem", "color": "#999"}),
+        style={"textAlign": "center", "flex": "1"},
+    )
+    return rx.el.div(
+        _stat("modules", "modules"), _stat("downloads", "downloads"),
+        _stat("stars", "stars"), _stat("reviews", "reviews"),
+        style={"display": "flex", "gap": "6px", "padding": "8px", "background": "#faf6ff",
+               "borderRadius": "6px", "border": "1px solid #eee"},
+    )
+
+
+def _account_pane() -> rx.Component:
+    return rx.el.div(
+        rx.el.style(
+            ".mp-ns-item:hover{background:#f4eefe}"
+            " .mp-ns-item-active{background:#efe6fd;box-shadow:inset 3px 0 0 #a333c8}"
+        ),
+        rx.el.div(
+            fomantic_icon("user circle", size=16, color="#a333c8"),
+            rx.el.span(" Account", style={"fontSize": "0.95rem", "fontWeight": "700",
+                                          "marginLeft": "4px", "color": "#a333c8"}),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
+        ),
+        _avatar_block(),
+        rx.cond(
+            MarketplaceState.is_registered,
             rx.el.div(
-                rx.el.span("Selected: "),
-                rx.el.strong(MarketplaceState.selected_title),
-                style={"fontSize": "0.85rem", "color": "#777", "marginTop": "6px"},
+                rx.el.div("Handle", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
+                rx.el.code(MarketplaceState.account,
+                           style={"fontSize": "0.82rem", "color": "#a333c8", "display": "block",
+                                  "marginBottom": "10px"}),
             ),
-            # Roles / connection (0.7.1 namespace membership)
+            rx.fragment(),
+        ),
+        _profile_form(),
+        rx.cond(
+            MarketplaceState.profile_message != "",
+            rx.el.div(MarketplaceState.profile_message,
+                      style={"fontSize": "0.72rem", "color": "#777", "marginBottom": "8px"}),
+            rx.fragment(),
+        ),
+        rx.cond(
+            MarketplaceState.is_registered,
+            rx.el.div(_token_row(), _namespaces_list(), _stats_block()),
+            rx.el.div("Not registered yet — set a display name, then create your first namespace "
+                      "to register and get a token.",
+                      style={"fontSize": "0.75rem", "color": "#aaa", "lineHeight": "1.4"}),
+        ),
+        class_name="ui segment",
+        style={"flex": "0 0 300px", "minWidth": "260px", "padding": "12px",
+               "border": "1px solid #d6c4e8", "backgroundColor": "#fdfbff"},
+    )
+
+
+# ---- Publish pane ---------------------------------------------------------
+
+def _create_namespace_form() -> rx.Component:
+    _hint = rx.match(
+        MarketplaceState.ns_available,
+        ("checking", rx.el.span("checking…", style={"color": "#999", "fontSize": "0.72rem"})),
+        ("yes", rx.el.span("✓ available", style={"color": "#21ba45", "fontSize": "0.72rem"})),
+        ("no", rx.el.span("✗ taken", style={"color": "#db2828", "fontSize": "0.72rem"})),
+        ("invalid", rx.el.span("invalid name", style={"color": "#f2711c", "fontSize": "0.72rem"})),
+        rx.el.span(""),
+    )
+    return rx.el.form(
+        rx.el.div("Create a namespace", style={"fontSize": "0.8rem", "fontWeight": "600", "color": "#555"}),
+        rx.el.div("up to 5 per account · lowercase, digits, hyphens",
+                  style={"fontSize": "0.68rem", "color": "#aaa", "margin": "2px 0 6px"}),
+        rx.el.div(
+            rx.el.input(
+                name="new_namespace", default_value=MarketplaceState.new_namespace,
+                placeholder="my-namespace", auto_complete="off",
+                on_change=MarketplaceState.set_new_namespace,
+                on_blur=MarketplaceState.check_namespace, style={**_INPUT_STYLE, "flex": "1"},
+            ),
+            rx.el.button(fomantic_icon("plus", size=12), " Create", type="submit",
+                         disabled=~MarketplaceState.can_create_namespace | MarketplaceState.publish_busy,
+                         class_name="ui tiny primary button", style={"flexShrink": "0"}),
+            style={"display": "flex", "gap": "6px", "alignItems": "center"},
+        ),
+        _hint,
+        rx.cond(
+            MarketplaceState.namespaces_full,
+            rx.el.div("Namespace limit reached (5).", style={"fontSize": "0.7rem", "color": "#f2711c"}),
+            rx.fragment(),
+        ),
+        on_submit=MarketplaceState.create_namespace,
+        style={"padding": "10px 12px", "border": "1px dashed #c9b3e6", "borderRadius": "8px",
+               "background": "#faf6ff", "marginBottom": "12px"},
+    )
+
+
+def _publish_preview() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
             rx.cond(
-                MarketplaceState.account != "",
-                rx.el.div(
-                    fomantic_icon("user", size=12, color="#21ba45"),
-                    rx.el.span(" Connected as ", MarketplaceState.account,
-                               " · can publish to: ", MarketplaceState.namespaces.join(", "),
-                               style={"marginLeft": "4px"}),
-                    style={"fontSize": "0.8rem", "color": "#21ba45", "marginTop": "8px",
-                           "display": "flex", "alignItems": "center", "justifyContent": "center"},
-                ),
-                rx.el.div(
-                    "Not connected — account onboarding (install-id → register → claim namespace) "
-                    "lands here. Owner and contributor roles will gate publishing.",
-                    style={"fontSize": "0.78rem", "color": "#aaa", "marginTop": "8px", "maxWidth": "420px",
-                           "lineHeight": "1.4"},
-                ),
+                MarketplaceState.selected_logo_url != "",
+                rx.el.img(src=MarketplaceState.selected_logo_url,
+                          style={"width": "28px", "height": "28px", "objectFit": "contain",
+                                 "borderRadius": "4px"}),
+                fomantic_icon("box", size=20, color="#6435c9"),
             ),
             rx.el.div(
-                "Publishing this module to the marketplace (onboarding, namespace claim, upload) "
-                "will land here in a future update.",
-                style={"fontSize": "0.82rem", "color": "#999", "marginTop": "8px", "maxWidth": "420px",
-                       "lineHeight": "1.4"},
+                rx.el.div(MarketplaceState.selected_title,
+                          style={"fontWeight": "700", "fontSize": "0.95rem"}),
+                rx.el.code(MarketplaceState.publish_namespace + "/" + MarketplaceState.selected_catalog_name
+                           + "@" + MarketplaceState.publish_version,
+                           style={"fontSize": "0.74rem", "color": "#6435c9"}),
+                style={"marginLeft": "8px"},
             ),
-            style={"textAlign": "center", "padding": "40px 16px"},
+            style={"display": "flex", "alignItems": "center"},
         ),
         rx.el.div(
-            fomantic_icon("hand point left outline", size=28, color="#ccc"),
-            rx.el.div(
-                "Select a module on the left to publish it.",
-                style={"color": "#999", "fontSize": "0.9rem", "marginTop": "10px"},
-            ),
-            style={"textAlign": "center", "padding": "40px 16px"},
+            "Will appear publicly as ",
+            rx.el.strong(MarketplaceState.publish_namespace + "/" + MarketplaceState.selected_catalog_name),
+            ", authored by ", rx.el.strong(MarketplaceState.account), ".",
+            style={"fontSize": "0.76rem", "color": "#777", "marginTop": "8px", "lineHeight": "1.4"},
         ),
+        rx.el.div(
+            rx.el.span(MarketplaceState.selected_variant_count, " variants", class_name="ui mini label"),
+            rx.el.span(MarketplaceState.selected_gene_count, " genes", class_name="ui mini label",
+                       style={"marginLeft": "4px"}),
+            style={"marginTop": "6px"},
+        ),
+        style={"padding": "12px", "border": "1px solid #d6c4e8", "borderRadius": "8px",
+               "background": "linear-gradient(135deg,#faf6ff,#f4f8fe)", "marginBottom": "10px"},
+    )
+
+
+def _publish_controls() -> rx.Component:
+    return rx.el.div(
+        # New / new-version → publish enabled
+        rx.cond(
+            MarketplaceState.can_publish,
+            rx.el.div(
+                rx.el.div(
+                    rx.match(
+                        MarketplaceState.publish_state,
+                        ("new", "This creates the module in the marketplace."),
+                        ("new_version", "Adds this version on top; existing versions stay published."),
+                        "",
+                    ),
+                    style={"fontSize": "0.76rem", "color": "#777", "marginBottom": "6px"},
+                ),
+                rx.el.button(
+                    rx.cond(MarketplaceState.publish_busy,
+                            rx.el.i("", class_name="spinner loading icon"),
+                            fomantic_icon("cloud upload", size=13)),
+                    " Publish " + MarketplaceState.publish_version,
+                    on_click=MarketplaceState.publish_selected,
+                    disabled=MarketplaceState.publish_busy,
+                    class_name="ui primary button", style={"width": "100%"},
+                ),
+            ),
+            rx.fragment(),
+        ),
+        # Already published (identical or yanked) → immutability + yank/unyank
+        rx.cond(
+            MarketplaceState.publish_is_published,
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("lock", size=12, color="#888"),
+                    rx.el.span(" Published & immutable", style={"marginLeft": "4px", "fontWeight": "600"}),
+                    style={"fontSize": "0.8rem", "color": "#555", "marginBottom": "4px"},
+                ),
+                rx.el.code(MarketplaceState.published_digest,
+                           style={"fontSize": "0.68rem", "color": "#999", "wordBreak": "break-all",
+                                  "display": "block", "marginBottom": "6px"}),
+                rx.el.div(
+                    rx.match(
+                        MarketplaceState.publish_state,
+                        ("conflict", "Your local copy differs from the published bytes. Bump the version "
+                                     "(Edit) to publish changes — published versions never change."),
+                        "This exact version is published. To publish changes, bump the version (Edit) — "
+                        "a published version's bytes never change.",
+                    ),
+                    style={"fontSize": "0.74rem", "color": "#777", "lineHeight": "1.4", "marginBottom": "8px"},
+                ),
+                rx.el.button("Publish (locked)", disabled=True, class_name="ui button",
+                             style={"width": "100%", "marginBottom": "6px", "opacity": "0.5"}),
+                rx.cond(
+                    MarketplaceState.show_yank,
+                    rx.el.button(fomantic_icon("ban", size=12), " Yank this version",
+                                 on_click=MarketplaceState.yank_selected,
+                                 disabled=MarketplaceState.publish_busy,
+                                 class_name="ui red button", style={"width": "100%"}),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    MarketplaceState.show_unyank,
+                    rx.el.div(
+                        rx.el.div("This version is yanked (hidden from listings).",
+                                  style={"fontSize": "0.74rem", "color": "#f2711c", "marginBottom": "4px"}),
+                        rx.el.button(fomantic_icon("undo", size=12), " Unyank",
+                                     on_click=MarketplaceState.unyank_selected,
+                                     disabled=MarketplaceState.publish_busy,
+                                     class_name="ui orange button", style={"width": "100%"}),
+                    ),
+                    rx.fragment(),
+                ),
+            ),
+            rx.fragment(),
+        ),
+    )
+
+
+def _meta_section() -> rx.Component:
+    return rx.cond(
+        MarketplaceState.can_update_meta,
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("edit", size=12, color="#2185d0"),
+                rx.el.span(" Update metadata", style={"marginLeft": "4px", "fontWeight": "600"}),
+                style={"fontSize": "0.82rem", "color": "#2185d0", "marginTop": "14px", "marginBottom": "4px"},
+            ),
+            rx.el.div("Release notes and logo are out-of-digest — updating them needs no version bump.",
+                      style={"fontSize": "0.72rem", "color": "#999", "marginBottom": "6px"}),
+            rx.el.form(
+                rx.el.textarea(name="changelog", placeholder="Release notes for this version…",
+                               rows="3", style={**_INPUT_STYLE, "resize": "vertical", "fontFamily": "inherit"}),
+                rx.el.button(fomantic_icon("save", size=12), " Update release notes", type="submit",
+                             class_name="ui tiny button", style={"marginTop": "6px"}),
+                on_submit=MarketplaceState.update_meta,
+            ),
+            rx.upload(
+                rx.el.span(fomantic_icon("image", size=12), " Replace logo",
+                           style={"fontSize": "0.76rem", "color": "#2185d0", "cursor": "pointer"}),
+                id="mp_logo", multiple=False,
+                accept={"image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"]},
+                on_drop=MarketplaceState.update_logo(rx.upload_files(upload_id="mp_logo")),
+                style={"display": "contents"},
+            ),
+            style={"borderTop": "1px solid #eee", "paddingTop": "6px"},
+        ),
+        rx.fragment(),
+    )
+
+
+def _publish_pane() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("cloud upload", size=16, color="#6435c9"),
+            rx.el.span(" Publish", style={"fontSize": "0.95rem", "fontWeight": "700",
+                                          "marginLeft": "4px", "color": "#6435c9"}),
+            style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
+        ),
+        rx.cond(
+            ~MarketplaceState.has_selection,
+            rx.el.div(
+                fomantic_icon("hand point left outline", size=24, color="#ccc"),
+                rx.el.div("Select a module on the left to publish it.",
+                          style={"color": "#999", "fontSize": "0.85rem", "marginTop": "8px"}),
+                style={"textAlign": "center", "padding": "30px 16px"},
+            ),
+            rx.cond(
+                ~MarketplaceState.display_name_valid,
+                rx.el.div(
+                    fomantic_icon("arrow left", size=18, color="#a333c8"),
+                    rx.el.span(" Set a valid display name in the Account pane to start publishing.",
+                               style={"marginLeft": "6px", "fontSize": "0.85rem", "color": "#777"}),
+                    style={"padding": "20px 8px"},
+                ),
+                rx.el.div(
+                    _create_namespace_form(),
+                    rx.cond(
+                        MarketplaceState.namespaces.length() > 0,
+                        rx.el.div(
+                            rx.el.label("Publish to namespace",
+                                        style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
+                            rx.el.select(
+                                rx.foreach(MarketplaceState.namespaces,
+                                           lambda ns: rx.el.option(ns, value=ns)),
+                                value=MarketplaceState.publish_namespace,
+                                on_change=MarketplaceState.set_publish_namespace,
+                                style={**_INPUT_STYLE, "marginBottom": "10px"},
+                            ),
+                            _publish_preview(),
+                            _publish_controls(),
+                            _meta_section(),
+                        ),
+                        rx.fragment(),
+                    ),
+                ),
+            ),
+        ),
+        rx.cond(
+            MarketplaceState.publish_message != "",
+            rx.el.div(MarketplaceState.publish_message,
+                      style={"fontSize": "0.76rem", "color": "#555", "marginTop": "10px",
+                             "padding": "6px 8px", "background": "#f8f8f8", "borderRadius": "5px"}),
+            rx.fragment(),
+        ),
+        class_name="ui segment",
+        style={"flex": "1 1 380px", "minWidth": "320px", "padding": "12px",
+               "border": "1px solid #c5daf5", "backgroundColor": "#fdfdff"},
+    )
+
+
+def _publication_tab() -> rx.Component:
+    """Two panes: Account (identity/namespaces/stats) + Publish (create-namespace + publish flow)."""
+    return rx.el.div(
+        _account_pane(),
+        _publish_pane(),
+        style={"display": "flex", "gap": "16px", "flexWrap": "wrap", "alignItems": "flex-start"},
     )
 
 
