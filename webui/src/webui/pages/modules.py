@@ -427,80 +427,84 @@ def _api_key_field(label: str, name: str, placeholder: rx.Var, configured: rx.Va
 
 
 def _settings_pane() -> rx.Component:
-    """API key settings — Reflex-controlled collapsible, open by default."""
-    return rx.el.div(
-        # Header / toggle row
-        rx.el.div(
+    """API key settings — hidden until the header gear button toggles it on.
+
+    Rendered as a beveled panel (raised segment look) so it reads as a distinct
+    settings surface rather than inline clutter.
+    """
+    return rx.cond(
+        AgentState.settings_expanded,
+        rx.el.form(
             rx.el.div(
-                fomantic_icon("key", size=14, color=rx.cond(AgentState.gemini_key_configured, "#888", "#e67e22")),
-                rx.el.span(
-                    " API Keys",
-                    style={"fontSize": "0.85rem", "fontWeight": "600", "marginLeft": "4px",
-                           "color": rx.cond(AgentState.gemini_key_configured, "#888", "#e67e22")},
-                ),
-                rx.cond(
-                    ~AgentState.gemini_key_configured,
-                    rx.el.span(
-                        " — Gemini key required",
-                        style={"fontSize": "0.75rem", "color": "#e67e22", "marginLeft": "4px"},
-                    ),
-                ),
-                style={"display": "flex", "alignItems": "center", "flex": "1"},
-            ),
-            fomantic_icon(
-                rx.cond(AgentState.settings_expanded, "chevron-up", "chevron-down"),
-                size=14, color="#aaa",
-            ),
-            on_click=AgentState.toggle_settings,
-            style={
-                "display": "flex",
-                "alignItems": "center",
-                "cursor": "pointer",
-                "userSelect": "none",
-                "padding": "8px 12px",
-                "border": rx.cond(AgentState.gemini_key_configured, "1px solid #e8e8e8", "1px solid #f5cba7"),
-                "borderRadius": rx.cond(AgentState.settings_expanded, "4px 4px 0 0", "4px"),
-                "backgroundColor": rx.cond(AgentState.gemini_key_configured, "#fafafa", "#fff8f0"),
-            },
-        ),
-        # Collapsible body
-        rx.cond(
-            AgentState.settings_expanded,
-            rx.el.form(
+                # Title row with close button
                 rx.el.div(
-                    _api_key_field(
-                        "Gemini (required)",
-                        "gemini_key",
-                        AgentState.settings_gemini_placeholder,
-                        AgentState.gemini_key_configured,
+                    fomantic_icon("key", size=14, color=rx.cond(AgentState.gemini_key_configured, "#a333c8", "#e67e22")),
+                    rx.el.span(
+                        " API Keys",
+                        style={"fontSize": "0.85rem", "fontWeight": "600", "marginLeft": "4px",
+                               "color": rx.cond(AgentState.gemini_key_configured, "#a333c8", "#e67e22")},
                     ),
-                    _api_key_field(
-                        "OpenAI (optional — adds GPT researcher)",
-                        "openai_key",
-                        AgentState.settings_openai_placeholder,
-                        AgentState.openai_key_configured,
-                    ),
-                    _api_key_field(
-                        "Anthropic (optional — adds Claude researcher)",
-                        "anthropic_key",
-                        AgentState.settings_anthropic_placeholder,
-                        AgentState.anthropic_key_configured,
+                    rx.cond(
+                        ~AgentState.gemini_key_configured,
+                        rx.el.span(
+                            " — Gemini key required",
+                            style={"fontSize": "0.75rem", "color": "#e67e22", "marginLeft": "4px"},
+                        ),
                     ),
                     rx.el.button(
-                        fomantic_icon("save", size=13),
-                        " Save to .env",
-                        type="submit",
-                        class_name="ui mini primary button",
-                        style={"width": "100%", "marginTop": "4px", "boxSizing": "border-box"},
+                        fomantic_icon("x", size=13, color="#999"),
+                        type="button",
+                        on_click=AgentState.toggle_settings,
+                        class_name="ui mini icon button",
+                        title="Close",
+                        style={"marginLeft": "auto", "background": "none", "border": "none",
+                               "cursor": "pointer", "padding": "2px 4px"},
                     ),
-                    style={"padding": "10px 12px 12px", "width": "100%", "boxSizing": "border-box"},
+                    style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
                 ),
-                on_submit=AgentState.save_api_keys,
-                reset_on_submit=True,
+                _api_key_field(
+                    "Gemini (required)",
+                    "gemini_key",
+                    AgentState.settings_gemini_placeholder,
+                    AgentState.gemini_key_configured,
+                ),
+                _api_key_field(
+                    "OpenAI (optional — adds GPT researcher)",
+                    "openai_key",
+                    AgentState.settings_openai_placeholder,
+                    AgentState.openai_key_configured,
+                ),
+                _api_key_field(
+                    "Anthropic (optional — adds Claude researcher)",
+                    "anthropic_key",
+                    AgentState.settings_anthropic_placeholder,
+                    AgentState.anthropic_key_configured,
+                ),
+                rx.el.button(
+                    fomantic_icon("save", size=13),
+                    " Save to .env",
+                    type="submit",
+                    class_name="ui mini primary button",
+                    style={"width": "100%", "marginTop": "4px", "boxSizing": "border-box"},
+                ),
+                style={"padding": "12px 14px 14px", "width": "100%", "boxSizing": "border-box"},
             ),
-            rx.fragment(),
+            on_submit=AgentState.save_api_keys,
+            reset_on_submit=True,
+            style={
+                "border": "1px solid #c9b3e6",
+                "borderRadius": "8px",
+                "backgroundColor": "#faf6ff",
+                # Bevel: inset top highlight + bottom shadow, plus a soft drop shadow
+                "boxShadow": (
+                    "inset 0 1px 0 rgba(255,255,255,0.9), "
+                    "inset 0 -2px 4px rgba(100,53,201,0.08), "
+                    "0 6px 18px rgba(100,53,201,0.18)"
+                ),
+                "marginBottom": "16px",
+            },
         ),
-        style={"marginTop": "4px"},
+        rx.fragment(),
     )
 
 
@@ -532,9 +536,6 @@ def modules_left_panel() -> rx.Component:
             class_name="ui segment",
             style={"padding": "12px", "marginBottom": "10px", "border": "1px solid #c5daf5", "backgroundColor": "#f4f8fe"},
         ),
-
-        # Settings (collapsed by default)
-        _settings_pane(),
 
         id="modules-left-panel",
     )
@@ -709,9 +710,9 @@ def _module_manager_readme() -> rx.Component:
             style={"marginBottom": "6px"},
         ),
         rx.el.div(
-            "Toggle the ",
-            rx.el.strong("Research team"),
-            " checkbox below the input bar to switch modes.",
+            "Use the ",
+            rx.el.strong("Team | Single"),
+            " toggle in the header to switch modes.",
             style={"fontSize": "0.78rem", "color": "#888", "marginBottom": "10px"},
         ),
 
@@ -845,6 +846,56 @@ def _module_manager_readme() -> rx.Component:
     )
 
 
+# Shared style for header buttons (gear, Clear) so they match the segmented
+# toggle: same 32px height, same translucent-white surface, no Fomantic hover.
+_HEADER_BTN_STYLE: dict = {
+    "height": "32px",
+    "display": "inline-flex",
+    "alignItems": "center",
+    "justifyContent": "center",
+    "gap": "5px",
+    "borderRadius": "6px",
+    "border": "none",
+    "outline": "none",
+    "boxShadow": "0 0 0 1px rgba(255,255,255,0.35)",
+    "backgroundColor": "rgba(255,255,255,0.16)",
+    "color": "#fff",
+    "fontSize": "0.85rem",
+    "fontWeight": "600",
+    "cursor": "pointer",
+    "flexShrink": "0",
+    "boxSizing": "border-box",
+}
+_HEADER_BTN_HOVER: dict = {"backgroundColor": "rgba(255,255,255,0.30)"}
+
+
+def _mode_toggle() -> rx.Component:
+    """Single/team segmented toggle — always visible in the header, next to Clear."""
+    return rx.el.div(
+        rx.segmented_control.root(
+            rx.segmented_control.item("Team", value="team"),
+            rx.segmented_control.item("Single", value="single"),
+            value=rx.cond(AgentState.agent_use_team, "team", "single"),
+            on_change=AgentState.set_agent_mode,
+            size="2",
+            color_scheme="purple",
+            style={
+                "backgroundColor": "rgba(255,255,255,0.16)",
+                "boxShadow": "0 0 0 1px rgba(255,255,255,0.35)",
+            },
+        ),
+        title=rx.cond(AgentState.agent_use_team, "Research team mode", "Single agent mode"),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "flexShrink": "0",
+            "marginRight": "10px",
+            "opacity": rx.cond(AgentState.agent_processing, "0.55", "1"),
+            "pointerEvents": rx.cond(AgentState.agent_processing, "none", "auto"),
+        },
+    )
+
+
 def agent_chat_panel() -> rx.Component:
     """Full chat panel for the Module Creator agent."""
     return rx.el.div(
@@ -861,12 +912,37 @@ def agent_chat_panel() -> rx.Component:
                 ),
                 style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "8px", "color": "#fff", "flex": "1"},
             ),
+            # Settings gear — opens the API Keys pane. Turns amber when the
+            # required Gemini key is missing so first-time users notice it.
+            rx.el.button(
+                fomantic_icon(
+                    "cog", size=24,
+                    color=rx.cond(AgentState.gemini_key_configured, "#fff", "#ffd27f"),
+                    # Fomantic's `i.icon` rule (specificity 0,0,1,1) sets a fixed
+                    # 1.18em width + 0.25rem right margin (reserved for trailing
+                    # text). Reflex's style compiles to an Emotion class (0,0,1,0)
+                    # which loses, so we must use !important to center the glyph.
+                    style={
+                        "width": "auto !important",
+                        "height": "auto !important",
+                        "margin": "0 !important",
+                        "lineHeight": "1",
+                    },
+                ),
+                on_click=AgentState.toggle_settings,
+                title="API keys",
+                _hover=_HEADER_BTN_HOVER,
+                style={**_HEADER_BTN_STYLE, "width": "32px", "padding": "0", "marginRight": "8px"},
+            ),
+            # Mode toggle (Team | Single) — always visible, to the left of Clear
+            _mode_toggle(),
             rx.el.button(
                 fomantic_icon("trash-2", size=14, color="#fff"),
                 " Clear",
                 on_click=AgentState.clear_agent_chat,
-                class_name="ui mini inverted button",
-                style={"padding": "4px 10px", "flexShrink": "0"},
+                title="Clear chat",
+                _hover=_HEADER_BTN_HOVER,
+                style={**_HEADER_BTN_STYLE, "padding": "0 12px"},
             ),
             style={
                 "display": "flex",
@@ -879,6 +955,9 @@ def agent_chat_panel() -> rx.Component:
                 "width": "100%",
             },
         ),
+
+        # API Keys (collapsible) — moved from left panel
+        _settings_pane(),
 
         # Messages area (scrollable)
         rx.el.div(
@@ -965,32 +1044,6 @@ def agent_chat_panel() -> rx.Component:
 
         # Input bar with attach + file chip + send
         rx.el.div(
-            # Mode toggle
-            rx.el.div(
-                rx.el.label(
-                    rx.el.input(
-                        type="checkbox",
-                        checked=AgentState.agent_use_team,
-                        on_change=AgentState.set_agent_use_team,
-                        disabled=AgentState.agent_processing,
-                        style={"marginRight": "6px", "cursor": "pointer", "accentColor": "#a333c8"},
-                    ),
-                    rx.cond(
-                        AgentState.agent_use_team,
-                        "Research team (multi-agent)",
-                        "Single agent",
-                    ),
-                    style={
-                        "fontSize": "0.8rem",
-                        "color": "#888",
-                        "cursor": "pointer",
-                        "userSelect": "none",
-                        "display": "flex",
-                        "alignItems": "center",
-                    },
-                ),
-                style={"marginBottom": "6px"},
-            ),
             # Attachment row — separate from input so textarea gets full width
             rx.el.div(
                 rx.upload(
