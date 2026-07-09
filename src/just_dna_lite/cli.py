@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 from typing import Annotated, Dict, Optional
 
+_IS_WINDOWS = sys.platform == "win32"
+
 import typer
 from dotenv import load_dotenv
 
@@ -122,70 +124,92 @@ def _find_workspace_root(start: Path) -> Optional[Path]:
 
 
 def _kill_process_group(proc: Optional[subprocess.Popen]) -> None:
-    """Kill a process and its entire process group."""
+    """Kill a process and its entire process group (cross-platform)."""
     if proc is None or proc.poll() is not None:
         return
-    
+
     try:
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGTERM)
-        proc.wait(timeout=5)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
+        if _IS_WINDOWS:
+            proc.terminate()
+            proc.wait(timeout=5)
+        else:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
         try:
-            os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
+            if _IS_WINDOWS:
+                proc.kill()
+            else:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, OSError):
             pass
     except Exception as e:
         typer.secho(f"Error killing process group: {e}", fg=typer.colors.RED, err=True)
 
 
 def _kill_port_owner(port: int) -> None:
-    """Kill the process listening on the specified port."""
+    """Kill the process listening on the specified port (cross-platform)."""
     import socket
-    
-    # Check if port is actually in use by trying to connect to it
+
+    # Check if port is actually in use
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.25)
         try:
             s.connect(("127.0.0.1", port))
-            # If we reach here, the port is in use
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, OSError):
             # Port is free
             return
-        except Exception:
-            # Some other error, better to check with tools
-            pass
+
+    typer.secho(f"🔍 Port {port} is in use, searching for owner...", fg=typer.colors.CYAN)
 
     try:
-        typer.secho(f"🔍 Port {port} is in use, searching for owner...", fg=typer.colors.CYAN)
-        
-        # Try lsof with more specific flags
-        result = subprocess.run(
-            ["lsof", "-t", "-n", "-P", f"-iTCP:{port}", "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        pids = result.stdout.strip().split()
-        
-        if not pids:
-            # Try fuser as backup
-            result = subprocess.run(
-                ["fuser", f"{port}/tcp"],
-                capture_output=True,
-                text=True,
-                check=False
+        if _IS_WINDOWS:
+            # Use netstat + taskkill on Windows
+            out = subprocess.check_output(
+                ["netstat", "-ano", "-p", "TCP"],
+                text=True, stderr=subprocess.DEVNULL,
             )
-            # fuser output: 3000/tcp:  1234 5678
-            if result.returncode == 0:
-                output = result.stdout.split(":")[-1].strip()
-                pids = output.split()
-
-        if not pids:
-            typer.secho(f"⚠️  Port {port} is busy (maybe in TIME_WAIT?) but owner PID could not be found.", fg=typer.colors.YELLOW)
-            return
-
-        for pid_str in pids:
-            if pid_str:
+            pids: list[int] = []
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) < 5 or "LISTENING" not in parts:
+                    continue
+                if not parts[1].endswith(f":{port}"):
+                    continue
+                try:
+                    pid = int(parts[-1])
+                    if pid > 0 and pid != os.getpid():
+                        pids.append(pid)
+                except ValueError:
+                    pass
+            for pid in pids:
+                typer.secho(f"Stopping process {pid} on port {port}...", fg=typer.colors.YELLOW)
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(pid)],
+                    check=False, capture_output=True,
+                )
+        else:
+            # Unix: lsof / fuser
+            result = subprocess.run(
+                ["lsof", "-t", "-n", "-P", f"-iTCP:{port}", "-sTCP:LISTEN"],
+                capture_output=True, text=True, check=False,
+            )
+            pid_strs = result.stdout.strip().split()
+            if not pid_strs:
+                result = subprocess.run(
+                    ["fuser", f"{port}/tcp"],
+                    capture_output=True, text=True, check=False,
+                )
+                if result.returncode == 0:
+                    pid_strs = result.stdout.split(":")[-1].strip().split()
+            if not pid_strs:
+                typer.secho(
+                    f"⚠️  Port {port} busy but owner PID not found.",
+                    fg=typer.colors.YELLOW,
+                )
+                return
+            for pid_str in pid_strs:
                 try:
                     pid = int(pid_str)
                     if pid == os.getpid():
@@ -265,12 +289,15 @@ def start_dagster(
     _kill_port_owner(dagster_port)
     
     typer.secho(f"\n💡 Dagster UI will be available at: http://{dagster_host}:{dagster_port}\n", fg=typer.colors.GREEN, bold=True)
-    
-    dg_path = Path(sys.executable).parent / "dg"
-    os.execvp(
-        str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host]
+
+    dg_name = "dg.exe" if _IS_WINDOWS else "dg"
+    dg_path = Path(sys.executable).parent / dg_name
+    dg_cmd = str(dg_path) if dg_path.exists() else ("dg.exe" if _IS_WINDOWS else "dg")
+    result = subprocess.run(
+        [dg_cmd, "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
+        cwd=str(dagster_file.parent),
     )
+    raise SystemExit(result.returncode)
 
 
 @app.command("start")
@@ -344,13 +371,36 @@ def start_all(
         )
 
     # 1. Start the UI in the background via the workspace script
+    # Use the uv binary relative to this Python executable so it works both
+    # in a dev workspace (uv in PATH) and in the installed app (uv.exe next to app/).
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
-    subprocess.Popen(["uv", "run", "--package", "webui", "run"])
+    uv_name = "uv.exe" if _IS_WINDOWS else "uv"
+    # Prefer the bundled uv.exe path exported by the .bat launcher,
+    # then the venv Scripts/ folder, then fall back to name-only (PATH lookup).
+    uv_env = os.getenv("JUST_DNA_UV_EXE", "")
+    uv_path_from_env = Path(uv_env) if uv_env else None
+    uv_path_from_scripts = Path(sys.executable).parent / uv_name
+    if uv_path_from_env and uv_path_from_env.exists():
+        uv_cmd = str(uv_path_from_env)
+    elif uv_path_from_scripts.exists():
+        uv_cmd = str(uv_path_from_scripts)
+    else:
+        uv_cmd = uv_name
+    webui_popen_kwargs: dict = {}
+    if _IS_WINDOWS:
+        webui_popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        webui_popen_kwargs["start_new_session"] = True
+    webui_proc = subprocess.Popen(
+        [uv_cmd, "run", "--package", "webui", "run"],
+        cwd=str(root),
+        **webui_popen_kwargs,
+    )
 
     # Give it a moment to initialize
     time.sleep(2)
 
-    # 2. Start Dagster by REPLACING this process (exec)
+    # 2. Prepare and start Dagster (blocking — keeps the console alive)
     typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
     typer.echo(f"📁 Dagster home: {dagster_home}")
     dagster_file_path = root / dagster_file
@@ -382,14 +432,20 @@ def start_all(
                 typer.echo(f"  ✓ Canceled {run.run_id[:8]}...")
     except Exception:
         pass
-    
-    # KeyboardInterrupt tracebacks from Dagster's internal watch_orphans.py scripts
-    # are normal behavior - those scripts don't have signal handlers
-    dg_path = Path(sys.executable).parent / "dg"
-    os.execvp(
-        str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host]
+
+    # Run Dagster in the foreground (subprocess.run keeps this process alive).
+    # os.execvp is avoided because on Windows it exits the parent process immediately
+    # which closes the console window before Dagster can run.
+    dg_name = "dg.exe" if _IS_WINDOWS else "dg"
+    dg_path = Path(sys.executable).parent / dg_name
+    dg_cmd = str(dg_path) if dg_path.exists() else ("dg.exe" if _IS_WINDOWS else "dg")
+    result = subprocess.run(
+        [dg_cmd, "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host],
+        cwd=str(root),
     )
+    # Dagster exited — also stop the webui background process
+    _kill_process_group(webui_proc)
+    raise SystemExit(result.returncode)
 
 
 def _resolve_ensembl_cache(cache_dir_override: Optional[str]) -> Path:
