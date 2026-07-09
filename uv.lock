@@ -944,11 +944,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.29.6"
+version = "3.29.7"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e0/c8/35bdf04fb30755e2ed758f877edf3eb4a243c2463d3a258cc28b18b7a6e2/filelock-3.29.6.tar.gz", hash = "sha256:895c532ef3f4ef04972b9446a8c4e2931a5c399ff3c4be4c9369f2639b80f793", size = 70301, upload-time = "2026-07-06T23:08:08.577Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/94/00f2059e4835eace3ae8fde680b932c496f8ec7bdc99168dfa53fb2e6b79/filelock-3.29.7.tar.gz", hash = "sha256:5b481979797ae69e72f0b389d89a80bdd585c260c5b3f1fb9c0a5ba9bb3f195d", size = 71521, upload-time = "2026-07-08T05:46:58.716Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/49/7467c2946ccd9617f7da38187071bdc45bb9a95df51f4d63d6622432ce4e/filelock-3.29.6-py3-none-any.whl", hash = "sha256:14d5f5597d2e0c4dbd774cfb6d8132da1db44da83732aab679d54f7dcf97ab65", size = 45478, upload-time = "2026-07-06T23:08:07.197Z" },
+    { url = "https://files.pythonhosted.org/packages/60/02/be4a57b60c7149b55b9e3b3c13f609cd8eb5307c751f22bd8fb8d262e75b/filelock-3.29.7-py3-none-any.whl", hash = "sha256:987db6f789a3a2a59f55081801b2b3697cb97e2a736b5f1a9e99b559285fbc51", size = 46036, upload-time = "2026-07-08T05:46:57.53Z" },
 ]
 
 [[package]]
@@ -1070,15 +1070,15 @@ wheels = [
 
 [[package]]
 name = "google-auth"
-version = "2.55.1"
+version = "2.55.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "pyasn1-modules" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/6f/f3f4ac177c67bbee8fe8e88f2ab4f36af88c44a096e165c5217accf6e5d3/google_auth-2.55.1.tar.gz", hash = "sha256:fb2d9b730f2c9b8d326ec8d7222f21aef2ead15bf0513793d6442485d87af0a1", size = 349527, upload-time = "2026-06-25T23:39:27.182Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/b9/e370d86fea3da13ec0256df30323dd26c0cb9c8c85f0c6ec42ac9df0106b/google_auth-2.55.2.tar.gz", hash = "sha256:97ae7790ff740f2bc9db60eb864a7804f4ac19f5f02c38b3d942f2fea6e9b9ae", size = 361414, upload-time = "2026-07-07T18:43:21.227Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/1d/f6d3ca1ad0725f2e08a1c6915640748a52de2e66596160a4d53b010cccf0/google_auth-2.55.1-py3-none-any.whl", hash = "sha256:eada68dfd52b3b81191827601e2a0c3fa12540c818534b630ddc5355769c3995", size = 252349, upload-time = "2026-06-25T23:38:52.946Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/c6/02eb5a337ac316a4c30c012e747bad5cea36e1a876efecdf80865541f7d8/google_auth-2.55.2-py3-none-any.whl", hash = "sha256:d715f265f2cafc6a5f1bf0dc19870d20e3119f6f6682785a250bce3d03d38a3b", size = 256778, upload-time = "2026-07-07T18:43:19.52Z" },
 ]
 
 [package.optional-dependencies]
@@ -1826,7 +1826,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-compiler"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "duckdb" },
@@ -1836,27 +1836,27 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/91/f676c6e7eb3253af0e176db068a9769a6071f7c20087f657360583d111ef/just_dna_compiler-0.2.0.tar.gz", hash = "sha256:cacb3c58b006e2d94cb7dd3fa95c1c5243c0ef09d5398eb857e528ecc4cd9680", size = 12677, upload-time = "2026-07-07T03:07:07.022Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/0a/128dc3e875c370c80fccd225948356b91f13844d8769822635078331b553/just_dna_compiler-0.3.0.tar.gz", hash = "sha256:6dea45cbf1898eb0a0a519ac62d9646bc254477acc760837eba8d9fcca7707ee", size = 14596, upload-time = "2026-07-08T20:32:57.367Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/34/cdc89c065a41972fe29943828c906064e3da479add41ab0862c4521693b5/just_dna_compiler-0.2.0-py3-none-any.whl", hash = "sha256:25767e6ffde188cb7b57153fa472a27c76e05facc4f63d7df2a0352864cadae9", size = 15104, upload-time = "2026-07-07T03:07:08.043Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/1b/d417c42a0bcb688f8b81339bfcd037402db5fa8d90c16f9bd3272c209218/just_dna_compiler-0.3.0-py3-none-any.whl", hash = "sha256:4b774593ec86feb873feca3c77868275b33196d4739975958b7196f9c8e2845c", size = 17007, upload-time = "2026-07-08T20:32:56.127Z" },
 ]
 
 [[package]]
 name = "just-dna-format"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/3d/a83a32d4abdd2e9f0908b7c6a1d7352abef5961f012deb58a5bcf93b7727/just_dna_format-0.2.0.tar.gz", hash = "sha256:96685e7d8fb969865df52dd01fa4413063bce956e7cb3d0422a6c8c39a0fd0e2", size = 13418, upload-time = "2026-07-07T03:07:09.195Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/66/cd03b88382d40bb2f270f274f296bbf22cbecb74f82aded1cd0d444fcfcc/just_dna_format-0.3.0.tar.gz", hash = "sha256:ef8f7e512ef6846ae9994bed69f7d06998bce244c2606c2337a3a355c0661aa4", size = 17663, upload-time = "2026-07-08T20:32:58.499Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/fe/7246999c507cda013aff9789f212b38762b82b8f0bdd258e767863673a96/just_dna_format-0.2.0-py3-none-any.whl", hash = "sha256:eea2bcc0525cacd9992c786506ab40f968fa5b802dda2b0d40e4eef5e5cb54bf", size = 17481, upload-time = "2026-07-07T03:07:05.871Z" },
+    { url = "https://files.pythonhosted.org/packages/84/05/a3968ac45a003d2c698827bc64525d870774b01ca7e3ab13da0bf5ee0ffe/just_dna_format-0.3.0-py3-none-any.whl", hash = "sha256:3e2e0115f6af8b7790383b0aa9994804322577c3f88fbf35c3e64e4bd7c9bb4f", size = 22153, upload-time = "2026-07-08T20:32:59.553Z" },
 ]
 
 [[package]]
 name = "just-dna-lite"
-version = "0.3.15"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "dagster-dg-cli" },
@@ -1884,7 +1884,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.71.0,<2.0" },
     { name = "grpcio", specifier = "<1.82" },
     { name = "grpcio-health-checking", specifier = "<1.82" },
-    { name = "just-dna-marketplace", specifier = ">=0.5.0" },
+    { name = "just-dna-marketplace", specifier = ">=0.8.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
     { name = "just-prs", specifier = ">=0.7.5" },
     { name = "pyyaml", specifier = ">=6.0.3" },
@@ -1901,7 +1901,7 @@ dev = [
 
 [[package]]
 name = "just-dna-marketplace"
-version = "0.5.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -1909,9 +1909,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/f4/dcae4ffada9ec1b6b71c9891a2566a86e34349fafb5b201eb531aa0938bb/just_dna_marketplace-0.5.0.tar.gz", hash = "sha256:053f88a25efb854bb72fa6ed2459cd298018476799c97fec43c5696c7b5d91b7", size = 37573, upload-time = "2026-07-07T03:08:02.684Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/37/10f2c57af409532cefc86671a0b2c01c9f0595c38f35ea7a53af7d88b3f8/just_dna_marketplace-0.8.0.tar.gz", hash = "sha256:be12a1eba5dd5718018c6ede84d699524db229f7ab24e7caa11a231a18516fac", size = 53661, upload-time = "2026-07-09T00:10:50.926Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/91/ebc84acf1f189330f28eb66603788ef5f0e85e97a5a24aa98ecc11cb1f90/just_dna_marketplace-0.5.0-py3-none-any.whl", hash = "sha256:e5fef443e9c3ba03487fbc38f5463bf9773ac3c4f6a91589c90304a43d55a857", size = 52733, upload-time = "2026-07-07T03:08:00.985Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/06/188a16b2d6cbd2efe95bf0cff2f27cba7a744a31c3ff81989692459a6e89/just_dna_marketplace-0.8.0-py3-none-any.whl", hash = "sha256:55e7587042f28e38c571a5ee4a88aa97e0530c57b238080ac148051cdf5d76ca", size = 71982, upload-time = "2026-07-09T00:10:52.286Z" },
 ]
 
 [[package]]
@@ -4047,20 +4047,19 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.50.2"
+version = "0.51.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/f6/cc9aadc0e481344a42095d222bfa764122fb8cfba708d1922917bd8bfb01/uvicorn-0.50.2.tar.gz", hash = "sha256:b92bf03509b82bcb9d49e7335b4fd364518ad021c2dc18b4e6a2fec8c955a0bb", size = 93716, upload-time = "2026-07-06T10:38:31.984Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/65/b7c6c443ccc58678c91e1e973bbe2a878591538655d6e1d47f24ba1c51f3/uvicorn-0.51.0.tar.gz", hash = "sha256:f6f4b69b657c312f516dd2d268ab9ae6f254b11e4bac504f37b2ab58b24dd0b0", size = 94412, upload-time = "2026-07-08T10:59:05.962Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/f0/7c228ee10c7ab8fd3a21d06579a6f7c6075c6ce72594a20fb5d2f206ff24/uvicorn-0.50.2-py3-none-any.whl", hash = "sha256:4ae72a385630bcc17a0adb8290f26c993865e0b43a2114c2aab96420172c056a", size = 72846, upload-time = "2026-07-06T10:38:30.543Z" },
+    { url = "https://files.pythonhosted.org/packages/45/ec/dbb7e5a6b91f86bfb9eb7d2988a2730907b6a729875b949c7f022e8b88fa/uvicorn-0.51.0-py3-none-any.whl", hash = "sha256:5d38af6cd620f2ae3849fb44fd4879e0890aa1febe8d47eb355fb45d93fe6a5b", size = 73219, upload-time = "2026-07-08T10:59:04.44Z" },
 ]
 
 [package.optional-dependencies]
 standard = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "httptools" },
     { name = "python-dotenv" },
     { name = "pyyaml" },

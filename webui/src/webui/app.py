@@ -25,6 +25,7 @@ from webui.pages.index import index_page  # noqa: E402
 from webui.pages.analysis import analysis_page  # noqa: E402
 from webui.pages.annotate import annotate_page  # noqa: E402
 from webui.pages.modules import modules_page  # noqa: E402
+from webui.pages.marketplace import marketplace_page  # noqa: E402
 from webui.pages.faq import faq_page  # noqa: E402
 
 # Note: Shutdown cleanup of STARTED runs is handled by the parent `uv run start` command,
@@ -98,6 +99,7 @@ def check_hf_authentication() -> None:
 # check_hf_authentication()
 
 from just_dna_pipelines.annotation.resources import get_generated_modules_dir  # noqa: E402
+from just_dna_pipelines.module_registry import CUSTOM_MODULES_DIR  # noqa: E402
 
 _GENERATED_MODULES_DIR = get_generated_modules_dir()
 
@@ -222,6 +224,30 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
         buf,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
+    )
+
+
+@api.get("/api/module-zip/{module_name}")
+async def download_module_zip(module_name: str) -> StreamingResponse:
+    """Download a locally-registered module's files as a zip (excludes compiled parquets)."""
+    if ".." in module_name or "/" in module_name:
+        raise HTTPException(status_code=400, detail="Invalid module name")
+
+    module_dir = CUSTOM_MODULES_DIR / module_name
+    if not module_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Module not found: {module_name} (looked at {module_dir})")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(module_dir.rglob("*")):
+            if f.is_file() and f.suffix != ".parquet":
+                zf.write(f, f.relative_to(module_dir).as_posix())
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{module_name}.zip"'},
     )
 
 
@@ -417,4 +443,5 @@ app.add_page(index_page)
 app.add_page(analysis_page)
 app.add_page(annotate_page)
 app.add_page(modules_page)
+app.add_page(marketplace_page)
 app.add_page(faq_page)

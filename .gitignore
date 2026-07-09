@@ -214,6 +214,9 @@ marimo/_lsp/
 __marimo__/
 .just_dna_pipelines.code-workspace
 
+# Reflex static frontend export (build artifact from `reflex export`)
+webui/frontend.zip
+
 # Repo-local runtime state / caches
 data/interim/
 data/input/

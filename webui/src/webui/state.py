@@ -6,13 +6,14 @@ import os
 import queue
 import shutil
 import asyncio
+import tarfile
 import tempfile
 import time
 import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import polars as pl
 import reflex as rx
@@ -37,9 +38,21 @@ from just_dna_pipelines.module_config import (
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
     register_custom_module,
+    register_downloaded_module,
     unregister_custom_module,
     list_custom_modules,
     refresh_module_registry,
+)
+from just_dna_marketplace import MarketplaceClient, MarketplaceError
+from just_dna_marketplace.client import VersionMismatchError
+from just_dna_format.integrity import IntegrityError, build_artifact
+from just_dna_format.manifest import read_manifest
+from webui.marketplace_identity import ensure_install_id, load_identity
+
+# Shown when the marketplace server's contract (API / just-dna-format / compiler) is newer than
+# this app's client — swapping compiled artifacts would collide, so we refuse and tell the user.
+_MARKETPLACE_MISMATCH_HINT: str = (
+    "This app is out of date with the marketplace server — update just-dna-lite to continue."
 )
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
@@ -4403,7 +4416,7 @@ class AgentState(rx.State):
     slot_replace_pending_name: str = ""   # module name queued for confirm-replace
 
     # -- API key settings UI --------------------------------------------------
-    settings_expanded: bool = True   # open by default so first-time users see it
+    settings_expanded: bool = False  # hidden; opened via the header gear button
 
     def toggle_settings(self):
         self.settings_expanded = not self.settings_expanded
@@ -4475,6 +4488,11 @@ class AgentState(rx.State):
     def set_agent_use_team(self, value: bool) -> None:
         """Explicit setter for agent_use_team (avoids deprecation warning)."""
         self.agent_use_team = value
+
+    def set_agent_mode(self, value: Union[str, List[str]]) -> None:
+        """Set module creator mode from segmented control value."""
+        mode = value[0] if isinstance(value, list) and value else value
+        self.agent_use_team = mode == "team"
 
     def _reset_agent_input(self) -> None:
         """Clear chat input and remount uncontrolled textarea."""
@@ -5003,3 +5021,718 @@ class AgentState(rx.State):
         self.slot_module_icon = ""
         self.slot_module_color = ""
         self.slot_version = 0
+
+
+# ============================================================================
+# MARKETPLACE STATE
+# ============================================================================
+
+def _marketplace_url() -> str:
+    """Base URL of the module marketplace server (env-overridable)."""
+    return os.getenv("MARKETPLACE_URL", "https://module-marketplace.just-dna.life").rstrip("/")
+
+
+# Compiled artifact files the digest is computed over — mirrors
+# just_dna_compiler.compiler._OUTPUT_FILES. `build_artifact` skips any that are absent.
+_ARTIFACT_FILES: tuple = ("weights.parquet", "annotations.parquet", "studies.parquet")
+
+
+def _local_key(namespace: str, name: str) -> str:
+    """Local registry key for a marketplace module: ``{namespace}__{name}``.
+
+    Namespacing keeps a marketplace install from colliding with (and being shadowed by) a
+    same-named HF module or a same-named module from a different namespace — they install and
+    appear in annotation as distinct modules. Locally-authored modules (no namespace) keep their
+    bare name. The namespace is sanitized to ``[a-z0-9_]`` (e.g. ``just-dna-seq`` → ``just_dna_seq``)
+    so the key stays a valid module-name token.
+    """
+    if not namespace:
+        return name
+    safe_ns = "".join(ch if ch.isalnum() else "_" for ch in namespace.lower()).strip("_")
+    return f"{safe_ns}__{name}"
+
+
+def _scan_local_modules() -> List[Dict[str, Any]]:
+    """Scan the local custom-modules dir → one dict per registered module.
+
+    The artifact ``digest`` is **computed from the compiled files on disk** (not read from
+    ``manifest.json``), so a metadata-stripped import whose content matches a catalog module is
+    still classified as catalog-present by digest. ``manifest.json`` is used only for optional
+    display metadata (version/namespace/title). ``has_spec`` marks whether spec files are present
+    (needed for Edit-into-slot). Pure function — safe to run in an executor.
+    """
+    out: List[Dict[str, Any]] = []
+    if not CUSTOM_MODULES_DIR.exists():
+        return out
+    for d in sorted(CUSTOM_MODULES_DIR.iterdir()):
+        if not (d.is_dir() and (d / "weights.parquet").exists()):
+            continue
+        name = d.name
+        try:
+            digest = build_artifact(d, list(_ARTIFACT_FILES)).digest
+        except Exception:  # noqa: BLE001 - unreadable artifact → no digest, treat as unclassified
+            digest = ""
+        entry: Dict[str, Any] = {
+            "name": name, "version": "", "digest": digest, "namespace": "",
+            "catalog_name": name, "title": name, "icon": "database", "color": "#6435c9",
+            "has_spec": (d / "module_spec.yaml").exists(), "in_catalog": False,
+        }
+        manifest_path = d / "manifest.json"
+        if manifest_path.exists():
+            try:
+                mf = read_manifest(manifest_path)
+                entry["version"] = mf.identity.version or ""
+                entry["namespace"] = mf.identity.namespace or ""
+                entry["catalog_name"] = mf.identity.name or name
+                entry["title"] = mf.display.title or name
+                entry["icon"] = mf.display.icon or "database"
+                entry["color"] = mf.display.color or "#6435c9"
+            except Exception:  # noqa: BLE001 - manifest is best-effort metadata
+                pass
+        out.append(entry)
+    return out
+
+
+class MarketplaceState(rx.State):
+    """Module Marketplace: local registry cross-referenced against the remote catalog.
+
+    Network calls run in ``@rx.event(background=True)`` handlers off the Reflex state lock.
+    """
+
+    # --- Right-pane tab ---
+    marketplace_active_tab: str = "catalog"
+
+    # --- Catalog (Catalog tab) ---
+    query: str = ""
+    sort: str = "name"
+    group_filter: str = ""                # 0.8.0 listing group ("" = default; test spaces hidden)
+    namespace_filter: str = ""            # "" = all namespaces
+    namespace_options: List[str] = []     # namespaces discovered from catalog results
+    page: int = 1
+    per_page: int = 24
+    cards: List[Dict[str, Any]] = []
+    total: int = 0
+    catalog_loading: bool = False
+    catalog_error: str = ""
+    server_incompatible: bool = False   # server contract newer than this client (0.7.1 guard)
+
+    # --- Local registry snapshot (name -> metadata + in_catalog flag) ---
+    local_modules: List[Dict[str, Any]] = []
+    _local_names: List[str] = []
+
+    # --- Selection (left pane) ---
+    selected_name: str = ""              # local registry key (namespaced for marketplace modules)
+    selected_catalog_name: str = ""      # catalog module name (for API calls)
+    selected_namespace: str = ""
+    selected_title: str = ""
+    selected_description: str = ""
+    selected_author: str = ""
+    selected_icon: str = "database"
+    selected_color: str = "#6435c9"
+    selected_variant_count: int = 0
+    selected_gene_count: int = 0
+    selected_logo_url: str = ""          # absolute logo URL (schema 0.3.0), "" → fall back to icon
+    selected_clinvar_count: int = 0
+    selected_pathogenic_count: int = 0
+    selected_benign_count: int = 0
+    selected_version: str = ""
+    selected_versions: List[str] = []
+    _remote_versions: List[str] = []
+    _remote_digests: Dict[str, str] = {}
+    detail_loading: bool = False
+    detail_error: str = ""
+
+    # --- Action status + gating ---
+    action_busy: bool = False
+    action_message: str = ""
+    pending_action: Dict[str, Any] = {}   # {} = none
+
+    # --- Publication identity + roles (0.7.1: namespace membership owner/contributor) ---
+    install_id: str = ""
+    token: str = ""
+    account: str = ""              # marketplace account, once registered
+    namespaces: List[str] = []     # namespaces this account may publish to
+
+    # ------------------------------------------------------------------ helpers
+
+    @rx.var
+    def _selected_local(self) -> Dict[str, Any]:
+        for m in self.local_modules:
+            if m.get("name") == self.selected_name:
+                return m
+        return {}
+
+    @rx.var
+    def has_selection(self) -> bool:
+        return self.selected_name != ""
+
+    @rx.var
+    def sel_status(self) -> str:
+        """State machine for (selected_name, selected_version) vs local + catalog."""
+        if not self.selected_name:
+            return "none"
+        li = self._selected_local
+        installed_here = bool(li) and li.get("version", "") == self.selected_version
+        remote_here = self.selected_version in self._remote_versions
+        if installed_here:
+            if li.get("in_catalog"):
+                return "installed"
+            return "mismatch" if remote_here else "local_only"
+        return "not_installed" if remote_here else "not_available"
+
+    @rx.var
+    def sel_status_label(self) -> str:
+        return {
+            "installed": "Installed",
+            "mismatch": "Version mismatch",
+            "local_only": "Local only",
+            "not_installed": "Not installed",
+            "not_available": "Not available",
+        }.get(self.sel_status, "")
+
+    @rx.var
+    def sel_status_color(self) -> str:
+        return {
+            "installed": "#21ba45",
+            "mismatch": "#f2711c",
+            "local_only": "#a333c8",
+            "not_installed": "#2185d0",
+            "not_available": "#767676",
+        }.get(self.sel_status, "#767676")
+
+    @rx.var
+    def show_download(self) -> bool:
+        # Only remote-present + local-absent, per name+version.
+        return self.sel_status == "not_installed"
+
+    @rx.var
+    def show_local_actions(self) -> bool:
+        # Edit/Export/Uninstall/Upload apply when the selected version is the installed one.
+        li = self._selected_local
+        return bool(li) and li.get("version", "") == self.selected_version
+
+    @rx.var
+    def edit_enabled(self) -> bool:
+        li = self._selected_local
+        return bool(li) and li.get("has_spec", False) and li.get("version", "") == self.selected_version
+
+    @rx.var
+    def export_url(self) -> str:
+        if not self.selected_name:
+            return ""
+        return f"{_backend_api_url()}/api/module-zip/{self.selected_name}"
+
+    @rx.var
+    def has_pending(self) -> bool:
+        return bool(self.pending_action)
+
+    @rx.var
+    def pending_warn(self) -> str:
+        return self.pending_action.get("warn", "")
+
+    @rx.var
+    def can_prev(self) -> bool:
+        return self.page > 1
+
+    @rx.var
+    def can_next(self) -> bool:
+        return self.page * self.per_page < self.total
+
+    def _client_args(self):
+        return _marketplace_url(), (self.token or None)
+
+    # ------------------------------------------------------------------ setters
+
+    def set_query(self, value: str) -> None:
+        self.query = value
+
+    def switch_marketplace_tab(self, tab: str) -> None:
+        self.marketplace_active_tab = tab
+
+    def set_selected_version(self, version: str) -> None:
+        self.selected_version = version
+
+    def cancel_pending(self) -> None:
+        self.pending_action = {}
+
+    # ------------------------------------------------------------------ loaders
+
+    async def _refresh_upload_ui(self) -> None:
+        """Refresh the annotate-page module list after an install/uninstall.
+
+        Must acquire the state context: in a background task, ``get_state`` on another state is
+        only valid inside ``async with self`` (StateProxy is immutable otherwise).
+        """
+        async with self:
+            upload_state = await self.get_state(UploadState)
+            upload_state._refresh_module_ui_state()
+
+    async def _refresh_local(self) -> None:
+        """Rescan local registry and classify each module's digest against the catalog."""
+        async with self:
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+        local = await loop.run_in_executor(None, _scan_local_modules)
+        digests = [m["digest"] for m in local if m["digest"]]
+        matches: Dict[str, list] = {}
+        if digests:
+            def _lookup():
+                with MarketplaceClient(url, token) as c:
+                    return c.lookup_by_digests(digests)
+            try:
+                matches = await loop.run_in_executor(None, _lookup)
+            except Exception:  # noqa: BLE001 - offline classification degrades to local-only
+                matches = {}
+        for m in local:
+            ms = matches.get(m["digest"]) or []
+            m["in_catalog"] = bool(ms)
+            if ms:
+                # Content matched the catalog by digest — backfill identity the local copy is
+                # missing (covers metadata-stripped imports shared peer-to-peer).
+                best = ms[0]
+                if not m["namespace"]:
+                    m["namespace"] = best.get("namespace", "")
+                if not m["version"]:
+                    m["version"] = best.get("version", "")
+                m["catalog_name"] = best.get("name", m["name"])
+        names = [m["name"] for m in local]
+        async with self:
+            self.local_modules = local
+            self._local_names = names
+
+    async def _do_search(self) -> None:
+        async with self:
+            self.catalog_loading = True
+            self.catalog_error = ""
+            q, sort, page, per_page = self.query, self.sort, self.page, self.per_page
+            group = self.group_filter
+            ns_filter = self.namespace_filter
+            url, token = self._client_args()
+            local_names = list(self._local_names)
+        loop = asyncio.get_event_loop()
+
+        def _list():
+            # Reads are contract-tolerant, so we do NOT gate them on the version guard: a flaky
+            # or unwired `/version` (502/404) must never block browsing. The compatibility guard
+            # is applied only where it matters — installing an artifact (see `_do_install`).
+            with MarketplaceClient(url, token) as c:
+                return c.list_modules(
+                    q=(q or None), sort=sort, group=(group or None),
+                    namespace=(ns_filter or None), page=page, per_page=per_page,
+                )
+
+        try:
+            body = await loop.run_in_executor(None, _list)
+        except VersionMismatchError as e:
+            async with self:
+                self.catalog_loading = False
+                self.server_incompatible = True
+                self.catalog_error = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+                self.cards = []
+                self.total = 0
+            return
+        except Exception as e:  # noqa: BLE001 - surface a message, don't crash the page
+            async with self:
+                self.catalog_loading = False
+                self.catalog_error = f"Could not reach the marketplace: {e}"
+                self.cards = []
+                self.total = 0
+            return
+        items = body.get("items", []) or []
+        local_keys = set(local_names)
+        for card in items:
+            stats = card.get("stats") or {}
+            card["installed"] = _local_key(card.get("namespace", ""), card.get("name", "")) in local_keys
+            card["variant_count"] = int(stats.get("variant_count") or 0)
+            card["gene_count"] = int(stats.get("gene_count") or 0)
+            card["clinvar_count"] = int(stats.get("clinvar_count") or 0)
+            card["pathogenic_count"] = int(stats.get("pathogenic_count") or 0)
+            # Server-relative logo → absolute URL for the browser (schema 0.3.0 surfacing).
+            logo = card.get("logo_url") or ""
+            card["logo_full"] = (url + logo) if logo.startswith("/") else logo
+        async with self:
+            self.cards = items
+            self.total = int(body.get("total", 0) or 0)
+            # Grow the namespace filter options from whatever we've seen (only when unfiltered,
+            # so the option set stays complete rather than collapsing to the active filter).
+            if not ns_filter:
+                seen = set(self.namespace_options) | {c.get("namespace", "") for c in items}
+                self.namespace_options = sorted(n for n in seen if n)
+            self.server_incompatible = False
+            self.catalog_loading = False
+
+    async def _ensure_identity(self) -> None:
+        """Load (or mint + persist) the publishing install-id. Backend groundwork only."""
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, load_identity)
+        install_id = data.get("install_id", "")
+        token = data.get("token", "")
+        account = data.get("account", "")
+        namespaces = data.get("namespaces", []) or []
+        if not install_id:
+            install_id = await loop.run_in_executor(None, ensure_install_id)  # ~1s proof-of-work
+        async with self:
+            self.install_id = install_id
+            if token:
+                self.token = token
+            self.account = account
+            self.namespaces = namespaces
+
+    @rx.event(background=True)
+    async def load_marketplace(self):
+        await self._ensure_identity()
+        await self._refresh_local()
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def search(self):
+        async with self:
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_sort(self, value: str):
+        async with self:
+            self.sort = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_group_filter(self, value: str):
+        async with self:
+            self.group_filter = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_namespace_filter(self, value: str):
+        async with self:
+            self.namespace_filter = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def next_page(self):
+        async with self:
+            if not (self.page * self.per_page < self.total):
+                return
+            self.page += 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def prev_page(self):
+        async with self:
+            if self.page <= 1:
+                return
+            self.page -= 1
+        await self._do_search()
+
+    # ------------------------------------------------------------------ selection
+
+    async def _load_detail(self, namespace: str, name: str, registry_name: str = "") -> None:
+        # `name` is the catalog name used for the API; `registry_name` (if given) is the local
+        # registry key the selection should track (they differ for peer-shared imports).
+        selection_key = registry_name or name
+        async with self:
+            self.detail_loading = True
+            self.detail_error = ""
+            url, token = self._client_args()
+            li = next((m for m in self.local_modules if m.get("name") == selection_key), {})
+            installed_version = li.get("version", "")
+        loop = asyncio.get_event_loop()
+
+        def _detail():
+            with MarketplaceClient(url, token) as c:
+                return c.get_module(namespace, name)
+
+        try:
+            detail = await loop.run_in_executor(None, _detail)
+        except VersionMismatchError as e:
+            async with self:
+                self.detail_loading = False
+                self.server_incompatible = True
+                self.detail_error = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.detail_loading = False
+                self.detail_error = f"Could not load details: {e}"
+            return
+        versions = detail.get("versions", []) or []
+        # Only offer versions that match the current schema/compiler contract. The live catalog
+        # holds a mix; the `revalidate` audit sets `needs_upgrade=True` on stale ones (which show
+        # up as the un-bumped `x.y.0` releases), and re-published ones clear it. Filtering here
+        # keeps the version dropdown to installable, current-schema releases.
+        compatible = [v for v in versions if v.get("version") and not v.get("needs_upgrade", False)]
+        remote_versions = [v.get("version") for v in compatible]
+        remote_digests = {v.get("version"): (v.get("artifact_digest") or "") for v in compatible}
+        stats = detail.get("stats") or {}
+        union = list(remote_versions)
+        if installed_version and installed_version not in union:
+            union.append(installed_version)  # always keep what's actually installed selectable
+        # Default to the newest compatible version (catalog `latest_version` may be a stale one).
+        latest_compatible = remote_versions[0] if remote_versions else ""
+        default_v = installed_version if installed_version in union else latest_compatible
+        async with self:
+            self.selected_name = selection_key
+            self.selected_catalog_name = name
+            self.selected_namespace = namespace
+            self.selected_title = detail.get("title") or name
+            self.selected_description = detail.get("description") or ""
+            self.selected_author = detail.get("owner") or ""
+            self.selected_icon = detail.get("icon") or "database"
+            self.selected_color = detail.get("color") or "#6435c9"
+            self.selected_variant_count = int(stats.get("variant_count") or 0)
+            self.selected_gene_count = int(stats.get("gene_count") or 0)
+            self.selected_clinvar_count = int(stats.get("clinvar_count") or 0)
+            self.selected_pathogenic_count = int(stats.get("pathogenic_count") or 0)
+            self.selected_benign_count = int(stats.get("benign_count") or 0)
+            logo = detail.get("logo_url") or ""
+            self.selected_logo_url = (url + logo) if logo.startswith("/") else logo
+            self._remote_versions = remote_versions
+            self._remote_digests = remote_digests
+            self.selected_versions = union
+            self.selected_version = default_v
+            self.detail_loading = False
+
+    @rx.event(background=True)
+    async def select_catalog(self, namespace: str, name: str):
+        # Track selection under the namespaced local key so status/install line up whether or not
+        # it's installed (an installed copy lives at CUSTOM_MODULES_DIR/{namespace}__{name}).
+        await self._load_detail(namespace, name, registry_name=_local_key(namespace, name))
+
+    @rx.event(background=True)
+    async def select_local(self, name: str):
+        async with self:
+            li = next((m for m in self.local_modules if m.get("name") == name), {})
+            namespace = li.get("namespace", "")
+            catalog_name = li.get("catalog_name", name)
+        if namespace:
+            await self._load_detail(namespace, catalog_name, registry_name=name)
+            return
+        async with self:
+            self.selected_name = name
+            self.selected_catalog_name = li.get("catalog_name", name)
+            self.selected_namespace = ""
+            self.selected_title = li.get("title", name)
+            self.selected_description = ""
+            self.selected_author = ""
+            self.selected_icon = li.get("icon", "database")
+            self.selected_color = li.get("color", "#6435c9")
+            self.selected_logo_url = ""
+            self.selected_variant_count = 0
+            self.selected_gene_count = 0
+            self.selected_clinvar_count = 0
+            self.selected_pathogenic_count = 0
+            self.selected_benign_count = 0
+            version = li.get("version", "")
+            self.selected_version = version
+            self.selected_versions = [version] if version else []
+            self._remote_versions = []
+            self._remote_digests = {}
+
+    # ------------------------------------------------------------------ install
+
+    async def _do_install(self, namespace: str, name: str, version: str) -> None:
+        # `name` is the catalog module name; the local install lives under a namespaced key so it
+        # never collides with a same-named HF module or another namespace's module.
+        key = _local_key(namespace, name)
+        async with self:
+            self.action_busy = True
+            self.action_message = f"Downloading {name} {version}…"
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+
+        def _install():
+            dest = CUSTOM_MODULES_DIR / key
+            with tempfile.TemporaryDirectory() as td:
+                tarball = Path(td) / f"{key}.tar.gz"
+                with MarketplaceClient(url, token) as c:
+                    # get_tarball does not self-guard (unlike download/publish), so check first:
+                    # a format/compiler mismatch would otherwise yield an unusable artifact.
+                    # Only a genuine mismatch blocks; a flaky/unwired /version (5xx/404) must not —
+                    # let the download itself surface any real transport error.
+                    try:
+                        c.assert_compatible()
+                    except VersionMismatchError:
+                        raise
+                    except MarketplaceError:
+                        pass
+                    c.get_tarball(namespace, name, version, tarball)
+                if dest.exists():
+                    shutil.rmtree(dest)
+                dest.mkdir(parents=True, exist_ok=True)
+                with tarfile.open(tarball, "r:gz") as tf:
+                    tf.extractall(dest, filter="data")
+            register_downloaded_module(dest)
+
+        try:
+            await loop.run_in_executor(None, _install)
+        except VersionMismatchError as e:
+            async with self:
+                self.action_busy = False
+                self.server_incompatible = True
+                self.action_message = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Install failed: {e}"
+            return
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = f"Installed {name} {version}."
+
+    @rx.event(background=True)
+    async def request_download(self):
+        async with self:
+            key = self.selected_name                       # local registry key
+            catalog_name = self.selected_catalog_name      # name for the API
+            ns = self.selected_namespace
+            version = self.selected_version
+            li = next((m for m in self.local_modules if m.get("name") == key), {})
+            installed_v = li.get("version", "")
+            unmirrored = bool(li) and not li.get("in_catalog", False)
+        if li and installed_v and installed_v != version and unmirrored:
+            async with self:
+                self.pending_action = {
+                    "kind": "download", "name": catalog_name, "namespace": ns, "version": version,
+                    "warn": (f"Installing {catalog_name} {version} will replace your local copy of "
+                             f"{installed_v}, which has no matching catalog copy to restore."),
+                }
+            return
+        await self._do_install(ns, catalog_name, version)
+
+    @rx.event(background=True)
+    async def quick_install(self, namespace: str, name: str, version: str):
+        async with self:
+            already = _local_key(namespace, name) in {m.get("name") for m in self.local_modules}
+        if already:
+            return
+        await self._do_install(namespace, name, version)
+        # Land the freshly-installed module in the left details pane (under its namespaced key).
+        await self._load_detail(namespace, name, registry_name=_local_key(namespace, name))
+
+    # ------------------------------------------------------------------ uninstall
+
+    async def _do_uninstall(self, name: str) -> None:
+        async with self:
+            self.action_busy = True
+            self.action_message = f"Uninstalling {name}…"
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, unregister_custom_module, name)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Uninstall failed: {e}"
+            return
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = f"Uninstalled {name}."
+
+    @rx.event(background=True)
+    async def request_uninstall(self):
+        async with self:
+            name = self.selected_name
+            gate = self.sel_status in ("local_only", "mismatch")
+        if gate:
+            async with self:
+                self.pending_action = {
+                    "kind": "uninstall", "name": name,
+                    "warn": (f"Uninstalling {name} removes it permanently — it has no matching "
+                             f"catalog copy to reinstall."),
+                }
+            return
+        await self._do_uninstall(name)
+
+    # ------------------------------------------------------------------ import / upload
+
+    async def _do_register_temp(self, spec_dir: str) -> None:
+        async with self:
+            self.action_busy = True
+            self.action_message = "Importing module…"
+        loop = asyncio.get_event_loop()
+        try:
+            result = await loop.run_in_executor(None, register_custom_module, Path(spec_dir))
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Import failed: {e}"
+            return
+        ok = getattr(result, "success", False)
+        errs = "; ".join(getattr(result, "errors", []) or [])
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = "Imported module." if ok else f"Import failed: {errs}"
+
+    @rx.event
+    async def upload_import(self, files: list[rx.UploadFile]):
+        """Persist uploaded spec files, decide gating, then chain to the background importer.
+
+        Upload handlers cannot be ``background=True``, so this only does the quick file save +
+        gate decision; the heavy compile happens in ``start_import``.
+        """
+        tmp = Path(tempfile.mkdtemp(prefix="mp_import_"))
+        for f in files:
+            data = await f.read()
+            (tmp / Path(f.filename).name).write_bytes(data)
+        zips = list(tmp.glob("*.zip"))
+        if len(zips) == 1 and len(list(tmp.iterdir())) == 1:
+            with zipfile.ZipFile(zips[0]) as zf:
+                zf.extractall(tmp)
+            zips[0].unlink()
+        spec_dir = tmp
+        if not (spec_dir / "module_spec.yaml").exists():
+            subs = [d for d in tmp.iterdir() if d.is_dir() and (d / "module_spec.yaml").exists()]
+            if subs:
+                spec_dir = subs[0]
+        if not (spec_dir / "module_spec.yaml").exists():
+            self.action_message = "Import needs module_spec.yaml (+ variants.csv), or a .zip containing them."
+            return
+        raw = yaml.safe_load((spec_dir / "module_spec.yaml").read_text(encoding="utf-8")) or {}
+        name = ((raw.get("module") or {}).get("name")) or ""
+        li = next((m for m in self.local_modules if m.get("name") == name), {})
+        unmirrored = bool(li) and not li.get("in_catalog", False)
+        if unmirrored:
+            self.pending_action = {
+                "kind": "upload", "name": name, "spec_dir": str(spec_dir),
+                "warn": (f"Importing will overwrite your installed {name}, which has no "
+                         f"matching catalog copy to restore."),
+            }
+            return
+        return MarketplaceState.start_import(str(spec_dir))
+
+    @rx.event(background=True)
+    async def start_import(self, spec_dir: str):
+        await self._do_register_temp(spec_dir)
+
+    # ------------------------------------------------------------------ gating dispatch
+
+    @rx.event(background=True)
+    async def confirm_pending(self):
+        async with self:
+            pa = dict(self.pending_action)
+            self.pending_action = {}
+        kind = pa.get("kind")
+        if kind == "uninstall":
+            await self._do_uninstall(pa["name"])
+        elif kind == "download":
+            await self._do_install(pa["namespace"], pa["name"], pa["version"])
+        elif kind == "upload":
+            await self._do_register_temp(pa["spec_dir"])
+
+    # ------------------------------------------------------------------ edit (cross-page)
+
+    @rx.event
+    async def edit_selected(self):
+        # Load into the Module Manager editing slot, then switch to that page/tab.
+        agent = await self.get_state(AgentState)
+        agent._do_load_custom_module(self.selected_name)
+        return rx.redirect("/modules")
