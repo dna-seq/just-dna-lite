@@ -54,6 +54,12 @@ PUBLIC_ROUTES: tuple[RouteMetadata, ...] = (
         priority="0.8",
     ),
     RouteMetadata(
+        path="/marketplace",
+        title="Module Marketplace",
+        description="Browse, install, and manage annotation modules from the shared module marketplace.",
+        priority="0.8",
+    ),
+    RouteMetadata(
         path="/faq",
         title="FAQ",
         description="Answers about privacy, supported genome files, public demo mode, and responsible use.",
