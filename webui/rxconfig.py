@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -9,16 +10,49 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-import reflex as rx  # noqa: E402
-from reflex.plugins.sitemap import SitemapPlugin  # noqa: E402
-
 _IS_WINDOWS = sys.platform == "win32"
 
-# SSR is disabled on Windows because @mui/x-data-grid ships a bare CSS import
-# that Node.js cannot resolve during the Vite SSR build (bun handles it on
-# Linux/macOS).  Upstream fix needed in reflex-mui-datagrid / reflex.
-os.environ.setdefault("REFLEX_SSR", "false" if _IS_WINDOWS else "true")
+
+def _bun_available() -> bool:
+    """Whether reflex can find a bun binary to run the Vite SSR pass.
+
+    @mui/x-data-grid ships a bare `.css` import that bun resolves transparently
+    but Node's ESM loader cannot (``Unknown file extension ".css"``).  Reflex
+    runs SSR through bun when present and falls back to Node otherwise, so bun
+    availability — not the OS — decides whether SSR is safe here.  We mirror the
+    locations reflex searches without importing reflex (which must not happen
+    before REFLEX_SSR is set, or the setting would miss the process fork).
+    """
+    exe = "bun.exe" if _IS_WINDOWS else "bun"
+    if shutil.which(exe):
+        return True
+    roots: list[Path] = []
+    bun_install = os.environ.get("BUN_INSTALL")
+    if bun_install:
+        roots.append(Path(bun_install))
+    reflex_dir = os.environ.get("REFLEX_DIR")
+    if reflex_dir:
+        roots.append(Path(reflex_dir) / "bun")
+    try:
+        from platformdirs import user_data_dir
+
+        roots.append(Path(user_data_dir("reflex")) / "bun")
+    except ImportError:
+        pass
+    return any((root / "bin" / exe).exists() for root in roots)
+
+
+# Resolve REFLEX_SSR *before* importing reflex, so the value is in place before
+# reflex forks its frontend/backend processes.  Default SSR off when bun is not
+# available (Node would crash on the @mui/x-data-grid CSS import); leave the
+# user's / reflex's own choice untouched when bun is present or REFLEX_SSR is
+# set explicitly.  Upstream fix needed in reflex-mui-datagrid / reflex.
+if os.environ.get("REFLEX_SSR") is None and not _bun_available():
+    os.environ["REFLEX_SSR"] = "false"
 os.environ.setdefault("REFLEX_SOCKET_MAX_HTTP_BUFFER_SIZE", "50000000")
+
+import reflex as rx  # noqa: E402
+from reflex.plugins.sitemap import SitemapPlugin  # noqa: E402
 
 _IN_CONTAINER = os.path.exists("/.dockerenv") or os.environ.get("container") == "podman"
 
