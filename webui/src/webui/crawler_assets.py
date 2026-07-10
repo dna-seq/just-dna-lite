@@ -54,7 +54,7 @@ PUBLIC_ROUTES: tuple[RouteMetadata, ...] = (
         priority="0.8",
     ),
     RouteMetadata(
-        path="/marketplace",
+        path="/registry",
         title="Module Catalog",
         description="Browse, install, and manage annotation modules from the shared module catalog (free).",
         priority="0.8",

@@ -53,7 +53,7 @@ from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
 from webui.dagster_env import get_dagster_instance
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
-from webui.marketplace_identity import (
+from webui.registry_identity import (
     ensure_install_id, load_identity, save_identity, derive_handle, set_env_var,
 )
 
@@ -5441,7 +5441,7 @@ class AgentState(rx.State):
 
 
 # ============================================================================
-# MARKETPLACE STATE
+# REGISTRY STATE
 # ============================================================================
 
 def _registry_url() -> str:
@@ -5455,9 +5455,9 @@ _ARTIFACT_FILES: tuple = ("weights.parquet", "annotations.parquet", "studies.par
 
 
 def _local_key(namespace: str, name: str) -> str:
-    """Local registry key for a marketplace module: ``{namespace}__{name}``.
+    """Local registry key for a registry module: ``{namespace}__{name}``.
 
-    Namespacing keeps a marketplace install from colliding with (and being shadowed by) a
+    Namespacing keeps a registry install from colliding with (and being shadowed by) a
     same-named HF module or a same-named module from a different namespace — they install and
     appear in annotation as distinct modules. Locally-authored modules (no namespace) keep their
     bare name. The namespace is sanitized to ``[a-z0-9_]`` (e.g. ``just-dna-seq`` → ``just_dna_seq``)
@@ -5510,14 +5510,14 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
     return out
 
 
-class MarketplaceState(rx.State):
-    """Module Marketplace: local registry cross-referenced against the remote catalog.
+class RegistryState(rx.State):
+    """Module Registry: local registry cross-referenced against the remote catalog.
 
     Network calls run in ``@rx.event(background=True)`` handlers off the Reflex state lock.
     """
 
     # --- Right-pane tab ---
-    marketplace_active_tab: str = "catalog"
+    registry_active_tab: str = "catalog"
 
     # --- Catalog (Catalog tab) ---
     query: str = ""
@@ -5538,7 +5538,7 @@ class MarketplaceState(rx.State):
     _local_names: List[str] = []
 
     # --- Selection (left pane) ---
-    selected_name: str = ""              # local registry key (namespaced for marketplace modules)
+    selected_name: str = ""              # local registry key (namespaced for registry modules)
     selected_catalog_name: str = ""      # catalog module name (for API calls)
     selected_namespace: str = ""
     selected_title: str = ""
@@ -5680,9 +5680,9 @@ class MarketplaceState(rx.State):
         self.query = value
 
     @rx.event(background=True)
-    async def switch_marketplace_tab(self, tab: str):
+    async def switch_registry_tab(self, tab: str):
         async with self:
-            self.marketplace_active_tab = tab
+            self.registry_active_tab = tab
         if tab == "publication":
             if self.token:
                 await self._refresh_account()
@@ -5773,7 +5773,7 @@ class MarketplaceState(rx.State):
         except Exception as e:  # noqa: BLE001 - surface a message, don't crash the page
             async with self:
                 self.catalog_loading = False
-                self.catalog_error = f"Could not reach the marketplace: {e}"
+                self.catalog_error = f"Could not reach the registry: {e}"
                 self.cards = []
                 self.total = 0
             return
@@ -5834,7 +5834,7 @@ class MarketplaceState(rx.State):
         })
 
     @rx.event(background=True)
-    async def load_marketplace(self):
+    async def load_registry(self):
         await self._ensure_identity()
         await self._refresh_local()
         await self._do_search()
@@ -6164,7 +6164,7 @@ class MarketplaceState(rx.State):
                          f"matching catalog copy to restore."),
             }
             return
-        return MarketplaceState.start_import(str(spec_dir))
+        return RegistryState.start_import(str(spec_dir))
 
     @rx.event(background=True)
     async def start_import(self, spec_dir: str):
@@ -6271,7 +6271,7 @@ class MarketplaceState(rx.State):
         self._persist_identity()
         self.profile_message = "Saved."
         if self.token:
-            return MarketplaceState.push_profile
+            return RegistryState.push_profile
 
     @rx.event(background=True)
     async def push_profile(self):
@@ -6335,7 +6335,7 @@ class MarketplaceState(rx.State):
         if len(self.namespaces) >= 5:
             self.publish_message = "Namespace limit reached (5 per account)."
             return
-        return MarketplaceState.do_create_namespace(ns)
+        return RegistryState.do_create_namespace(ns)
 
     @rx.event(background=True)
     async def do_create_namespace(self, ns: str):
@@ -6568,7 +6568,7 @@ class MarketplaceState(rx.State):
         if not changelog:
             self.publish_message = "Enter release notes to update."
             return
-        return MarketplaceState.do_update_changelog(changelog)
+        return RegistryState.do_update_changelog(changelog)
 
     @rx.event(background=True)
     async def do_update_changelog(self, changelog: str):
@@ -6606,9 +6606,9 @@ class MarketplaceState(rx.State):
             return
         f = files[0]
         data = await f.read()
-        tmp = Path(tempfile.mkdtemp(prefix="mp_logo_")) / Path(f.filename).name
+        tmp = Path(tempfile.mkdtemp(prefix="reg_logo_")) / Path(f.filename).name
         tmp.write_bytes(data)
-        return MarketplaceState.do_update_logo(str(tmp))
+        return RegistryState.do_update_logo(str(tmp))
 
     @rx.event(background=True)
     async def do_update_logo(self, logo_path: str):

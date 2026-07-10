@@ -96,7 +96,7 @@ def fetch_data_file(module: V1Module, cache_dir: Path) -> Path:
     return local_path
 
 
-# Logo filenames discovery/publish already understand (hf_modules scans these; HF/marketplace
+# Logo filenames discovery/publish already understand (hf_modules scans these; HF/registry
 # publish upload them). Gen-I repos ship a root-level logo image; carry it into the ported module.
 LOGO_NAMES = ("logo.png", "logo.jpg", "logo.jpeg")
 
