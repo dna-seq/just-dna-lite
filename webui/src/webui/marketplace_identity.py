@@ -2,7 +2,7 @@
 Marketplace identity — backend groundwork for publishing.
 
 Persists a proof-of-work *install-id* (and, once minted, an account token) so the
-publishing flow can later call ``MarketplaceClient.register(install_id, account)``
+publishing flow can later call ``RegistryClient.register(install_id, account)``
 without re-grinding the PoW. Pure backend: no UI wiring here.
 
 Stored as JSON next to the working modules config (``data/interim/marketplace_identity.json``,
@@ -17,7 +17,7 @@ import secrets
 from pathlib import Path
 from typing import Any, Dict
 
-from just_dna_marketplace import generate_install_id, validate_install_id
+from just_dna_registry import generate_install_id, validate_install_id
 from just_dna_pipelines.module_config import get_config_path
 
 _DIFFICULTY: int = 20
@@ -43,7 +43,7 @@ def derive_handle(display_name: str) -> str:
 def set_env_var(name: str, value: str) -> None:
     """Mirror a value into ``os.environ`` and the workspace ``.env`` (read-modify-write).
 
-    Used to back up the marketplace token as ``MARKETPLACE_TOKEN`` so it's copyable/portable,
+    Used to back up the registry token as ``REGISTRY_TOKEN`` so it's copyable/portable,
     mirroring how API keys are persisted. The identity JSON remains the source of truth.
     """
     os.environ[name] = value

@@ -20,7 +20,11 @@ from just_dna_pipelines.annotation.module_cache import (
 )
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
-from just_dna_marketplace.client_cli import app as marketplace_client_app
+from just_dna_registry.client_cli import app as registry_client_app
+from just_dna_lite.registry_org_cli import app as registry_org_app
+
+# Organization management (0.9.1) as a nested group: `pipelines registry org …`.
+registry_client_app.add_typer(registry_org_app, name="org")
 
 app = typer.Typer(
     name="pipelines",
@@ -30,9 +34,9 @@ app = typer.Typer(
 )
 app.add_typer(module_compiler_app, name="module")
 app.add_typer(v1_port_app, name="v1-port")
-# Marketplace reference client (list/download/publish/import-module/find-by-hash/
-# update-module-version). Reads MARKETPLACE_URL / MARKETPLACE_TOKEN from flags, env, or .env.
-app.add_typer(marketplace_client_app, name="marketplace")
+# Registry reference client (list/download/publish/import-module/find-by-hash/
+# update-module-version). Reads REGISTRY_URL / REGISTRY_TOKEN from flags, env, or .env.
+app.add_typer(registry_client_app, name="registry")
 
 
 @app.command("clear-module-cache")

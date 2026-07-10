@@ -201,7 +201,7 @@ def topbar() -> rx.Component:
         rx.el.div(
             _nav_tab("Annotation", "dna", "/", (current_path != "/modules") & (current_path != "/marketplace") & (current_path != "/faq")),
             _nav_tab("Module Manager", "boxes", "/modules", current_path == "/modules"),
-            _nav_tab("Module Marketplace", "shopping bag", "/marketplace", current_path == "/marketplace"),
+            _nav_tab("Module Catalog", "book", "/marketplace", current_path == "/marketplace"),
             _nav_tab("FAQ", "help circle", "/faq", current_path == "/faq"),
             style={"display": "flex", "alignItems": "center", "gap": "8px", "flex": "1 1 auto", "justifyContent": "center"},
         ),

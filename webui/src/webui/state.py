@@ -45,8 +45,8 @@ from just_dna_pipelines.module_registry import (
     list_custom_modules,
     refresh_module_registry,
 )
-from just_dna_marketplace import MarketplaceClient, MarketplaceError
-from just_dna_marketplace.client import VersionMismatchError
+from just_dna_registry import RegistryClient, RegistryError
+from just_dna_registry.client import VersionMismatchError
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.marketplace_identity import (
@@ -56,10 +56,10 @@ from webui.marketplace_identity import (
 # Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
 _DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
 
-# Shown when the marketplace server's contract (API / just-dna-format / compiler) is newer than
+# Shown when the catalog server's contract (API / just-dna-format / compiler) is newer than
 # this app's client — swapping compiled artifacts would collide, so we refuse and tell the user.
-_MARKETPLACE_MISMATCH_HINT: str = (
-    "This app is out of date with the marketplace server — update just-dna-lite to continue."
+_REGISTRY_MISMATCH_HINT: str = (
+    "This app is out of date with the catalog server — update just-dna-lite to continue."
 )
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
@@ -5034,9 +5034,9 @@ class AgentState(rx.State):
 # MARKETPLACE STATE
 # ============================================================================
 
-def _marketplace_url() -> str:
-    """Base URL of the module marketplace server (env-overridable)."""
-    return os.getenv("MARKETPLACE_URL", "https://module-marketplace.just-dna.life").rstrip("/")
+def _registry_url() -> str:
+    """Base URL of the module registry server (env-overridable)."""
+    return os.getenv("REGISTRY_URL", "https://module-marketplace.just-dna.life").rstrip("/")
 
 
 # Compiled artifact files the digest is computed over — mirrors
@@ -5262,7 +5262,7 @@ class MarketplaceState(rx.State):
         return self.page * self.per_page < self.total
 
     def _client_args(self):
-        return _marketplace_url(), (self.token or None)
+        return _registry_url(), (self.token or None)
 
     # ------------------------------------------------------------------ setters
 
@@ -5306,7 +5306,7 @@ class MarketplaceState(rx.State):
         matches: Dict[str, list] = {}
         if digests:
             def _lookup():
-                with MarketplaceClient(url, token) as c:
+                with RegistryClient(url, token) as c:
                     return c.lookup_by_digests(digests)
             try:
                 matches = await loop.run_in_executor(None, _lookup)
@@ -5344,7 +5344,7 @@ class MarketplaceState(rx.State):
             # Reads are contract-tolerant, so we do NOT gate them on the version guard: a flaky
             # or unwired `/version` (502/404) must never block browsing. The compatibility guard
             # is applied only where it matters — installing an artifact (see `_do_install`).
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.list_modules(
                     q=(q or None), sort=sort, group=(group or None),
                     namespace=(ns_filter or None), page=page, per_page=per_page,
@@ -5356,7 +5356,7 @@ class MarketplaceState(rx.State):
             async with self:
                 self.catalog_loading = False
                 self.server_incompatible = True
-                self.catalog_error = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+                self.catalog_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
                 self.cards = []
                 self.total = 0
             return
@@ -5489,7 +5489,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _detail():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.get_module(namespace, name)
 
         try:
@@ -5498,7 +5498,7 @@ class MarketplaceState(rx.State):
             async with self:
                 self.detail_loading = False
                 self.server_incompatible = True
-                self.detail_error = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+                self.detail_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
             return
         except Exception as e:  # noqa: BLE001
             async with self:
@@ -5594,7 +5594,7 @@ class MarketplaceState(rx.State):
             dest = CUSTOM_MODULES_DIR / key
             with tempfile.TemporaryDirectory() as td:
                 tarball = Path(td) / f"{key}.tar.gz"
-                with MarketplaceClient(url, token) as c:
+                with RegistryClient(url, token) as c:
                     # get_tarball does not self-guard (unlike download/publish), so check first:
                     # a format/compiler mismatch would otherwise yield an unusable artifact.
                     # Only a genuine mismatch blocks; a flaky/unwired /version (5xx/404) must not —
@@ -5603,7 +5603,7 @@ class MarketplaceState(rx.State):
                         c.assert_compatible()
                     except VersionMismatchError:
                         raise
-                    except MarketplaceError:
+                    except RegistryError:
                         pass
                     c.get_tarball(namespace, name, version, tarball)
                 if dest.exists():
@@ -5619,7 +5619,7 @@ class MarketplaceState(rx.State):
             async with self:
                 self.action_busy = False
                 self.server_incompatible = True
-                self.action_message = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+                self.action_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
             return
         except Exception as e:  # noqa: BLE001
             async with self:
@@ -5871,7 +5871,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _do():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.update_profile(display_name=display_name, email=email)
 
         try:
@@ -5898,7 +5898,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _do():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.namespace_available(value)
 
         try:
@@ -5940,12 +5940,12 @@ class MarketplaceState(rx.State):
         if not token:
             def _register():
                 last = None
-                with MarketplaceClient(url, None) as c:
+                with RegistryClient(url, None) as c:
                     for _ in range(6):
                         handle = derive_handle(display_name)
                         try:
                             return c.register(install_id, handle)
-                        except MarketplaceError as e:
+                        except RegistryError as e:
                             if e.status_code == 409:  # handle collision → new suffix
                                 last = e
                                 continue
@@ -5965,11 +5965,11 @@ class MarketplaceState(rx.State):
                 token = self.token
                 self._persist_identity()
             if token:
-                await loop.run_in_executor(None, set_env_var, "MARKETPLACE_TOKEN", token)
+                await loop.run_in_executor(None, set_env_var, "REGISTRY_TOKEN", token)
 
         # 2. Claim the namespace.
         def _claim():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 avail = c.namespace_available(ns)
                 if not avail.get("valid", False):
                     raise RuntimeError("invalid namespace name")
@@ -5979,7 +5979,7 @@ class MarketplaceState(rx.State):
 
         try:
             await loop.run_in_executor(None, _claim)
-        except MarketplaceError as e:
+        except RegistryError as e:
             async with self:
                 self.publish_busy = False
                 self.publish_message = (
@@ -6028,10 +6028,10 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _versions():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 try:
                     return c.versions(ns, catalog_name).get("items", [])
-                except MarketplaceError as e:
+                except RegistryError as e:
                     if e.status_code == 404:
                         return []
                     raise
@@ -6080,7 +6080,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _pub():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.publish(ns, catalog_name, version, CUSTOM_MODULES_DIR / key, changelog="")
 
         try:
@@ -6089,9 +6089,9 @@ class MarketplaceState(rx.State):
             async with self:
                 self.publish_busy = False
                 self.server_incompatible = True
-                self.publish_message = f"{_MARKETPLACE_MISMATCH_HINT} ({e.detail})"
+                self.publish_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
             return
-        except MarketplaceError as e:
+        except RegistryError as e:
             async with self:
                 self.publish_busy = False
                 if e.status_code == 409:
@@ -6128,7 +6128,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _do():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.yank(ns, catalog_name, version) if yanked else c.unyank(ns, catalog_name, version)
 
         try:
@@ -6176,7 +6176,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _do():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.amend_changelog(ns, catalog_name, version, changelog)
 
         try:
@@ -6213,7 +6213,7 @@ class MarketplaceState(rx.State):
         loop = asyncio.get_event_loop()
 
         def _do():
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 return c.amend_logo(ns, catalog_name, version, Path(logo_path))
 
         try:
@@ -6238,7 +6238,7 @@ class MarketplaceState(rx.State):
         def _fetch():
             roles: List[Dict[str, str]] = []
             stats = {"modules": 0, "downloads": 0, "stars": 0, "reviews": 0}
-            with MarketplaceClient(url, token) as c:
+            with RegistryClient(url, token) as c:
                 try:
                     who = c.whoami()
                 except Exception:  # noqa: BLE001

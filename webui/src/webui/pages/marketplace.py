@@ -110,7 +110,7 @@ def _action_buttons() -> rx.Component:
                     rx.el.i("", class_name="spinner loading icon"),
                     fomantic_icon("download", size=13),
                 ),
-                " Get from marketplace",
+                " Get from catalog",
                 on_click=MarketplaceState.request_download,
                 disabled=MarketplaceState.action_busy,
                 class_name="ui small primary button",
@@ -366,9 +366,9 @@ _TAB_STYLE: dict = {
 def _tab_menu() -> rx.Component:
     return rx.el.div(
         rx.el.a(
-            fomantic_icon("shopping bag", size=16,
+            fomantic_icon("book", size=16,
                           color=rx.cond(MarketplaceState.marketplace_active_tab == "catalog", "#00b5ad", "#888")),
-            " Catalog",
+            " Browse",
             class_name=rx.cond(MarketplaceState.marketplace_active_tab == "catalog", "active item", "item"),
             on_click=lambda: MarketplaceState.switch_marketplace_tab("catalog"),
             style=_TAB_STYLE,
@@ -552,7 +552,7 @@ def _wip_hf_notice() -> rx.Component:
     return rx.el.div(
         fomantic_icon("info circle", size=15, color="#2185d0"),
         rx.el.div(
-            rx.el.strong("Marketplace is a work in progress. "),
+            rx.el.strong("The module catalog is a work in progress. "),
             "Modules here that share a name with the built-in Hugging Face annotators "
             "(e.g. coronary, longevitymap, superhuman) are ",
             rx.el.strong("the same module"),
@@ -871,7 +871,7 @@ def _publish_controls() -> rx.Component:
                 rx.el.div(
                     rx.match(
                         MarketplaceState.publish_state,
-                        ("new", "This creates the module in the marketplace."),
+                        ("new", "This publishes the module to the catalog."),
                         ("new_version", "Adds this version on top; existing versions stay published."),
                         "",
                     ),
@@ -1047,7 +1047,7 @@ def _incompatible_banner() -> rx.Component:
         rx.el.div(
             fomantic_icon("exclamation triangle", size=16, color="#9f3a38"),
             rx.el.span(
-                " Marketplace server is newer than this app — update just-dna-lite to browse or install.",
+                " Catalog server is newer than this app — update just-dna-lite to browse or install.",
                 style={"marginLeft": "6px"},
             ),
             class_name="ui small error message",
@@ -1080,7 +1080,7 @@ def marketplace_right_panel() -> rx.Component:
 
 @rx.page(
     route="/marketplace",
-    title="Module Marketplace | Just DNA Lite",
+    title="Module Catalog | Just DNA Lite",
     on_load=MarketplaceState.load_marketplace,
     meta=page_meta("/marketplace"),
     image=page_image_url(),
