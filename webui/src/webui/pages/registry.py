@@ -1,5 +1,5 @@
 """
-Module Marketplace page — browse the remote catalog, install/uninstall modules,
+Module Registry page — browse the remote catalog, install/uninstall modules,
 and inspect the local registry cross-referenced against the catalog.
 
 Left panel:  fixed selected-module details card (status-aware controls) + narrow local list.
@@ -11,7 +11,7 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
-from webui.state import MarketplaceState
+from webui.state import RegistryState
 
 
 # ============================================================================
@@ -21,7 +21,7 @@ from webui.state import MarketplaceState
 def _status_badge() -> rx.Component:
     """Colored pill reflecting the selected module's install/catalog status."""
     return rx.el.span(
-        MarketplaceState.sel_status_label,
+        RegistryState.sel_status_label,
         style={
             "display": "inline-block",
             "fontSize": "0.72rem",
@@ -29,7 +29,7 @@ def _status_badge() -> rx.Component:
             "padding": "2px 10px",
             "borderRadius": "10px",
             "color": "#fff",
-            "backgroundColor": MarketplaceState.sel_status_color,
+            "backgroundColor": RegistryState.sel_status_color,
         },
     )
 
@@ -37,12 +37,12 @@ def _status_badge() -> rx.Component:
 def _gate_banner() -> rx.Component:
     """Confirm/cancel banner shown before a destructive/replacing action."""
     return rx.cond(
-        MarketplaceState.has_pending,
+        RegistryState.has_pending,
         rx.el.div(
             rx.el.div(
                 fomantic_icon("exclamation triangle", size=14, color="#b58105"),
                 rx.el.span(
-                    MarketplaceState.pending_warn,
+                    RegistryState.pending_warn,
                     style={"fontSize": "0.82rem", "color": "#7a5c00", "marginLeft": "6px"},
                 ),
                 style={"display": "flex", "alignItems": "flex-start"},
@@ -50,13 +50,13 @@ def _gate_banner() -> rx.Component:
             rx.el.div(
                 rx.el.button(
                     "Proceed",
-                    on_click=MarketplaceState.confirm_pending,
+                    on_click=RegistryState.confirm_pending,
                     class_name="ui mini red button",
                     style={"marginRight": "6px"},
                 ),
                 rx.el.button(
                     "Cancel",
-                    on_click=MarketplaceState.cancel_pending,
+                    on_click=RegistryState.cancel_pending,
                     class_name="ui mini button",
                 ),
                 style={"marginTop": "8px"},
@@ -81,11 +81,11 @@ def _version_selector() -> rx.Component:
         ),
         rx.el.select(
             rx.foreach(
-                MarketplaceState.selected_versions,
+                RegistryState.selected_versions,
                 lambda v: rx.el.option(v, value=v),
             ),
-            value=MarketplaceState.selected_version,
-            on_change=MarketplaceState.set_selected_version,
+            value=RegistryState.selected_version,
+            on_change=RegistryState.set_selected_version,
             style={
                 "padding": "4px 8px",
                 "border": "1px solid #ddd",
@@ -103,16 +103,16 @@ def _action_buttons() -> rx.Component:
     return rx.el.div(
         # Download (remote present + local absent)
         rx.cond(
-            MarketplaceState.show_download,
+            RegistryState.show_download,
             rx.el.button(
                 rx.cond(
-                    MarketplaceState.action_busy,
+                    RegistryState.action_busy,
                     rx.el.i("", class_name="spinner loading icon"),
                     fomantic_icon("download", size=13),
                 ),
                 " Get from catalog",
-                on_click=MarketplaceState.request_download,
-                disabled=MarketplaceState.action_busy,
+                on_click=RegistryState.request_download,
+                disabled=RegistryState.action_busy,
                 class_name="ui small primary button",
                 style={"flex": "1"},
             ),
@@ -120,13 +120,13 @@ def _action_buttons() -> rx.Component:
         ),
         # Local actions
         rx.cond(
-            MarketplaceState.show_local_actions,
+            RegistryState.show_local_actions,
             rx.fragment(
                 rx.el.button(
                     fomantic_icon("edit", size=13),
                     " Edit",
-                    on_click=MarketplaceState.edit_selected,
-                    disabled=~MarketplaceState.edit_enabled,
+                    on_click=RegistryState.edit_selected,
+                    disabled=~RegistryState.edit_enabled,
                     class_name="ui small button",
                     style={"flex": "1"},
                     title="Load into the Module Manager editing slot",
@@ -134,15 +134,15 @@ def _action_buttons() -> rx.Component:
                 rx.el.a(
                     fomantic_icon("download", size=13),
                     " Export",
-                    href=MarketplaceState.export_url,
+                    href=RegistryState.export_url,
                     class_name="ui small teal button",
                     style={"flex": "1", "textAlign": "center"},
                 ),
                 rx.el.button(
                     fomantic_icon("trash alternate", size=13),
                     " Uninstall",
-                    on_click=MarketplaceState.request_uninstall,
-                    disabled=MarketplaceState.action_busy,
+                    on_click=RegistryState.request_uninstall,
+                    disabled=RegistryState.action_busy,
                     class_name="ui small red button",
                     style={"flex": "1"},
                 ),
@@ -169,7 +169,7 @@ def _upload_import_button(upload_id: str) -> rx.Component:
             "text/csv": [".csv"],
             "application/zip": [".zip"],
         },
-        on_drop=MarketplaceState.upload_import(rx.upload_files(upload_id=upload_id)),
+        on_drop=RegistryState.upload_import(rx.upload_files(upload_id=upload_id)),
         style={"display": "contents"},
     )
 
@@ -186,32 +186,32 @@ def _selected_card() -> rx.Component:
         ),
         _gate_banner(),
         rx.cond(
-            MarketplaceState.has_selection,
+            RegistryState.has_selection,
             rx.el.div(
                 # Title + status
                 rx.el.div(
                     rx.cond(
-                        MarketplaceState.selected_logo_url != "",
+                        RegistryState.selected_logo_url != "",
                         rx.el.img(
-                            src=MarketplaceState.selected_logo_url,
+                            src=RegistryState.selected_logo_url,
                             style={"width": "22px", "height": "22px", "objectFit": "contain",
                                    "borderRadius": "3px", "marginRight": "6px"},
                         ),
                         rx.fragment(),
                     ),
                     rx.el.span(
-                        MarketplaceState.selected_title,
+                        RegistryState.selected_title,
                         style={"fontSize": "1rem", "fontWeight": "700", "color": "#333", "flex": "1"},
                     ),
                     _status_badge(),
                     style={"display": "flex", "alignItems": "center", "gap": "8px"},
                 ),
                 rx.el.div(
-                    MarketplaceState.selected_name,
+                    RegistryState.selected_name,
                     rx.cond(
-                        MarketplaceState.selected_namespace != "",
+                        RegistryState.selected_namespace != "",
                         rx.el.span(
-                            " · ", MarketplaceState.selected_namespace,
+                            " · ", RegistryState.selected_namespace,
                             style={"color": "#a333c8"},
                         ),
                         rx.fragment(),
@@ -219,31 +219,31 @@ def _selected_card() -> rx.Component:
                     style={"fontSize": "0.78rem", "color": "#999", "fontFamily": "monospace", "marginTop": "2px"},
                 ),
                 rx.cond(
-                    MarketplaceState.selected_author != "",
+                    RegistryState.selected_author != "",
                     rx.el.div(
                         fomantic_icon("user", size=11, color="#888"),
-                        rx.el.span(" ", MarketplaceState.selected_author, style={"marginLeft": "3px"}),
+                        rx.el.span(" ", RegistryState.selected_author, style={"marginLeft": "3px"}),
                         style={"fontSize": "0.78rem", "color": "#888", "marginTop": "4px", "display": "flex", "alignItems": "center"},
                     ),
                     rx.fragment(),
                 ),
                 rx.cond(
-                    MarketplaceState.selected_description != "",
+                    RegistryState.selected_description != "",
                     rx.el.div(
-                        MarketplaceState.selected_description,
+                        RegistryState.selected_description,
                         style={"fontSize": "0.8rem", "color": "#666", "marginTop": "6px", "lineHeight": "1.4"},
                     ),
                     rx.fragment(),
                 ),
                 # Stats
                 rx.el.div(
-                    rx.el.span(MarketplaceState.selected_variant_count, " variants", class_name="ui mini label"),
-                    rx.el.span(MarketplaceState.selected_gene_count, " genes", class_name="ui mini label", style={"marginLeft": "4px"}),
+                    rx.el.span(RegistryState.selected_variant_count, " variants", class_name="ui mini label"),
+                    rx.el.span(RegistryState.selected_gene_count, " genes", class_name="ui mini label", style={"marginLeft": "4px"}),
                     rx.cond(
-                        MarketplaceState.selected_clinvar_count > 0,
+                        RegistryState.selected_clinvar_count > 0,
                         rx.el.span(
-                            MarketplaceState.selected_pathogenic_count, " path / ",
-                            MarketplaceState.selected_benign_count, " benign",
+                            RegistryState.selected_pathogenic_count, " path / ",
+                            RegistryState.selected_benign_count, " benign",
                             class_name="ui mini red label", style={"marginLeft": "4px"},
                             title="ClinVar pathogenic / benign variants",
                         ),
@@ -254,9 +254,9 @@ def _selected_card() -> rx.Component:
                 _version_selector(),
                 _action_buttons(),
                 rx.cond(
-                    MarketplaceState.action_message != "",
+                    RegistryState.action_message != "",
                     rx.el.div(
-                        MarketplaceState.action_message,
+                        RegistryState.action_message,
                         style={"fontSize": "0.75rem", "color": "#777", "marginTop": "8px"},
                     ),
                     rx.fragment(),
@@ -295,11 +295,11 @@ def _local_list_item(mod: rx.Var[dict]) -> rx.Component:
             rx.el.span("catalog", class_name="ui mini green label"),
             rx.el.span("local", class_name="ui mini label"),
         ),
-        on_click=lambda: MarketplaceState.select_local(name),
+        on_click=lambda: RegistryState.select_local(name),
         class_name=rx.cond(
-            MarketplaceState.selected_name == name,
-            "marketplace-local-item marketplace-local-item-active",
-            "marketplace-local-item",
+            RegistryState.selected_name == name,
+            "registry-local-item registry-local-item-active",
+            "registry-local-item",
         ),
         style={
             "display": "flex", "alignItems": "center", "padding": "6px 8px",
@@ -311,8 +311,8 @@ def _local_list_item(mod: rx.Var[dict]) -> rx.Component:
 def _local_list() -> rx.Component:
     return rx.el.div(
         rx.el.style(
-            ".marketplace-local-item:hover { background-color: #f0f4fb; }"
-            " .marketplace-local-item-active { background-color: #e8f0fe; box-shadow: inset 3px 0 0 #2185d0; }"
+            ".registry-local-item:hover { background-color: #f0f4fb; }"
+            " .registry-local-item-active { background-color: #e8f0fe; box-shadow: inset 3px 0 0 #2185d0; }"
         ),
         rx.el.div(
             fomantic_icon("folder open", size=15, color="#2185d0"),
@@ -321,15 +321,15 @@ def _local_list() -> rx.Component:
                 style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px", "color": "#2185d0"},
             ),
             rx.el.span(
-                MarketplaceState.local_modules.length(),
+                RegistryState.local_modules.length(),
                 class_name="ui mini label",
                 style={"marginLeft": "auto"},
             ),
             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
         ),
         rx.cond(
-            MarketplaceState.local_modules.length() > 0,
-            rx.foreach(MarketplaceState.local_modules, _local_list_item),
+            RegistryState.local_modules.length() > 0,
+            rx.foreach(RegistryState.local_modules, _local_list_item),
             rx.el.div(
                 "No modules installed yet.",
                 style={"fontSize": "0.8rem", "color": "#aaa", "padding": "6px 4px"},
@@ -340,16 +340,16 @@ def _local_list() -> rx.Component:
     )
 
 
-def marketplace_left_panel() -> rx.Component:
+def registry_left_panel() -> rx.Component:
     return rx.el.div(
         _selected_card(),
         # Upload/import sits between the details pane and the list, separating them.
         rx.el.div(
-            _upload_import_button("marketplace_import"),
+            _upload_import_button("registry_import"),
             style={"margin": "4px 0 14px"},
         ),
         _local_list(),
-        id="marketplace-left-panel",
+        id="registry-left-panel",
     )
 
 
@@ -367,23 +367,23 @@ def _tab_menu() -> rx.Component:
     return rx.el.div(
         rx.el.a(
             fomantic_icon("book", size=16,
-                          color=rx.cond(MarketplaceState.marketplace_active_tab == "catalog", "#00b5ad", "#888")),
+                          color=rx.cond(RegistryState.registry_active_tab == "catalog", "#00b5ad", "#888")),
             " Browse",
-            class_name=rx.cond(MarketplaceState.marketplace_active_tab == "catalog", "active item", "item"),
-            on_click=lambda: MarketplaceState.switch_marketplace_tab("catalog"),
+            class_name=rx.cond(RegistryState.registry_active_tab == "catalog", "active item", "item"),
+            on_click=lambda: RegistryState.switch_registry_tab("catalog"),
             style=_TAB_STYLE,
         ),
         rx.el.a(
             fomantic_icon("upload", size=16,
-                          color=rx.cond(MarketplaceState.marketplace_active_tab == "publication", "#2185d0", "#888")),
+                          color=rx.cond(RegistryState.registry_active_tab == "publication", "#2185d0", "#888")),
             " Publication",
-            class_name=rx.cond(MarketplaceState.marketplace_active_tab == "publication", "active item", "item"),
-            on_click=lambda: MarketplaceState.switch_marketplace_tab("publication"),
+            class_name=rx.cond(RegistryState.registry_active_tab == "publication", "active item", "item"),
+            on_click=lambda: RegistryState.switch_registry_tab("publication"),
             style=_TAB_STYLE,
         ),
         class_name="ui top attached tabular menu",
         style={"marginBottom": "0"},
-        id="marketplace-tab-menu",
+        id="registry-tab-menu",
     )
 
 
@@ -442,7 +442,7 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
         rx.el.div(
             rx.el.button(
                 "Details",
-                on_click=lambda: MarketplaceState.select_catalog(namespace, name),
+                on_click=lambda: RegistryState.select_catalog(namespace, name),
                 class_name="ui tiny button",
                 style={"flex": "1"},
             ),
@@ -457,8 +457,8 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
                 rx.el.button(
                     fomantic_icon("download", size=12),
                     " Get",
-                    on_click=lambda: MarketplaceState.quick_install(namespace, name, latest),
-                    disabled=MarketplaceState.action_busy,
+                    on_click=lambda: RegistryState.quick_install(namespace, name, latest),
+                    disabled=RegistryState.action_busy,
                     class_name="ui tiny primary button",
                     style={"flex": "1"},
                 ),
@@ -490,8 +490,8 @@ def _catalog_toolbar() -> rx.Component:
                 rx.el.option("Popular", value="popular"),
                 rx.el.option("New", value="new"),
                 rx.el.option("Test / sandbox", value="test"),
-                value=MarketplaceState.group_filter,
-                on_change=MarketplaceState.set_group_filter,
+                value=RegistryState.group_filter,
+                on_change=RegistryState.set_group_filter,
                 style={"padding": "5px 8px", "border": "1px solid #ddd", "borderRadius": "6px",
                        "fontSize": "0.85rem", "flex": "1"},
             ),
@@ -503,11 +503,11 @@ def _catalog_toolbar() -> rx.Component:
             rx.el.select(
                 rx.el.option("All namespaces", value=""),
                 rx.foreach(
-                    MarketplaceState.namespace_options,
+                    RegistryState.namespace_options,
                     lambda ns: rx.el.option(ns, value=ns),
                 ),
-                value=MarketplaceState.namespace_filter,
-                on_change=MarketplaceState.set_namespace_filter,
+                value=RegistryState.namespace_filter,
+                on_change=RegistryState.set_namespace_filter,
                 style={"padding": "5px 8px", "border": "1px solid #ddd", "borderRadius": "6px",
                        "fontSize": "0.85rem", "flex": "1"},
             ),
@@ -519,14 +519,14 @@ def _catalog_toolbar() -> rx.Component:
                 fomantic_icon("search", size=14, color="#999"),
                 rx.el.input(
                     placeholder="Search modules…",
-                    default_value=MarketplaceState.query,
-                    on_change=MarketplaceState.set_query,
-                    on_blur=MarketplaceState.search,
+                    default_value=RegistryState.query,
+                    on_change=RegistryState.set_query,
+                    on_blur=RegistryState.search,
                     style={"border": "none", "outline": "none", "flex": "1", "fontSize": "0.9rem", "marginLeft": "6px"},
                 ),
                 rx.el.button(
                     "Search",
-                    on_click=MarketplaceState.search,
+                    on_click=RegistryState.search,
                     class_name="ui tiny primary button",
                 ),
                 style={"display": "flex", "alignItems": "center", "border": "1px solid #ddd",
@@ -537,8 +537,8 @@ def _catalog_toolbar() -> rx.Component:
                 rx.el.option("Downloads", value="downloads"),
                 rx.el.option("Recent", value="recent"),
                 rx.el.option("Popular", value="popular"),
-                value=MarketplaceState.sort,
-                on_change=MarketplaceState.set_sort,
+                value=RegistryState.sort,
+                on_change=RegistryState.set_sort,
                 style={"padding": "6px 8px", "border": "1px solid #ddd", "borderRadius": "6px", "fontSize": "0.85rem"},
             ),
             style={"display": "flex", "alignItems": "center", "gap": "8px"},
@@ -572,26 +572,26 @@ def _catalog_tab() -> rx.Component:
         _wip_hf_notice(),
         _catalog_toolbar(),
         rx.cond(
-            MarketplaceState.catalog_error != "",
+            RegistryState.catalog_error != "",
             rx.el.div(
                 fomantic_icon("exclamation circle", size=14, color="#db2828"),
-                rx.el.span(" ", MarketplaceState.catalog_error, style={"marginLeft": "4px"}),
+                rx.el.span(" ", RegistryState.catalog_error, style={"marginLeft": "4px"}),
                 class_name="ui small warning message",
                 style={"display": "block"},
             ),
             rx.fragment(),
         ),
         rx.cond(
-            MarketplaceState.catalog_loading,
+            RegistryState.catalog_loading,
             rx.el.div(
                 rx.el.i("", class_name="spinner loading icon"),
                 " Loading catalog…",
                 style={"padding": "20px", "color": "#888"},
             ),
             rx.cond(
-                MarketplaceState.cards.length() > 0,
+                RegistryState.cards.length() > 0,
                 rx.el.div(
-                    rx.foreach(MarketplaceState.cards, _catalog_card),
+                    rx.foreach(RegistryState.cards, _catalog_card),
                     style={"display": "flex", "flexWrap": "wrap", "gap": "12px"},
                 ),
                 rx.el.div(
@@ -604,18 +604,18 @@ def _catalog_tab() -> rx.Component:
         rx.el.div(
             rx.el.button(
                 "‹ Prev",
-                on_click=MarketplaceState.prev_page,
-                disabled=~MarketplaceState.can_prev,
+                on_click=RegistryState.prev_page,
+                disabled=~RegistryState.can_prev,
                 class_name="ui tiny button",
             ),
             rx.el.span(
-                "Page ", MarketplaceState.page,
+                "Page ", RegistryState.page,
                 style={"fontSize": "0.82rem", "color": "#777", "margin": "0 10px"},
             ),
             rx.el.button(
                 "Next ›",
-                on_click=MarketplaceState.next_page,
-                disabled=~MarketplaceState.can_next,
+                on_click=RegistryState.next_page,
+                disabled=~RegistryState.can_next,
                 class_name="ui tiny button",
             ),
             style={"display": "flex", "alignItems": "center", "justifyContent": "center", "marginTop": "16px"},
@@ -636,7 +636,7 @@ def _profile_form() -> rx.Component:
     return rx.el.form(
         rx.el.label("Display name", style={"fontSize": "0.75rem", "fontWeight": "600", "color": "#555"}),
         rx.el.input(
-            name="display_name", default_value=MarketplaceState.display_name,
+            name="display_name", default_value=RegistryState.display_name,
             placeholder="e.g. anton_k", auto_complete="off", style=_INPUT_STYLE,
         ),
         rx.el.div(
@@ -645,7 +645,7 @@ def _profile_form() -> rx.Component:
         ),
         rx.el.label("Email (optional)", style={"fontSize": "0.75rem", "fontWeight": "600", "color": "#555"}),
         rx.el.input(
-            name="email", type="email", default_value=MarketplaceState.email,
+            name="email", type="email", default_value=RegistryState.email,
             placeholder="you@example.com", auto_complete="off",
             style={**_INPUT_STYLE, "marginBottom": "8px"},
         ),
@@ -653,7 +653,7 @@ def _profile_form() -> rx.Component:
             fomantic_icon("save", size=12), " Save profile",
             type="submit", class_name="ui tiny primary button", style={"width": "100%"},
         ),
-        on_submit=MarketplaceState.save_profile,
+        on_submit=RegistryState.save_profile,
         style={"marginBottom": "6px"},
     )
 
@@ -661,8 +661,8 @@ def _profile_form() -> rx.Component:
 def _avatar_block() -> rx.Component:
     return rx.el.div(
         rx.cond(
-            MarketplaceState.avatar_local != "",
-            rx.el.img(src=MarketplaceState.avatar_local,
+            RegistryState.avatar_local != "",
+            rx.el.img(src=RegistryState.avatar_local,
                       style={"width": "52px", "height": "52px", "borderRadius": "50%",
                              "objectFit": "cover", "border": "2px solid #d6c4e8"}),
             rx.el.div(fomantic_icon("user", size=24, color="#c9b3e6"),
@@ -672,9 +672,9 @@ def _avatar_block() -> rx.Component:
         ),
         rx.upload(
             rx.el.span("Picture", style={"fontSize": "0.72rem", "color": "#6435c9", "cursor": "pointer"}),
-            id="mp_avatar", multiple=False,
+            id="reg_avatar", multiple=False,
             accept={"image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"]},
-            on_drop=MarketplaceState.set_avatar(rx.upload_files(upload_id="mp_avatar")),
+            on_drop=RegistryState.set_avatar(rx.upload_files(upload_id="reg_avatar")),
             style={"display": "contents"},
         ),
         rx.el.span(" local only", style={"fontSize": "0.66rem", "color": "#bbb"}),
@@ -686,14 +686,14 @@ def _token_row() -> rx.Component:
     return rx.el.div(
         rx.el.div("API token", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
         rx.el.div(
-            rx.el.code(MarketplaceState.token_display,
+            rx.el.code(RegistryState.token_display,
                        style={"flex": "1", "fontSize": "0.72rem", "overflow": "hidden",
                               "textOverflow": "ellipsis", "whiteSpace": "nowrap"}),
-            rx.el.button(fomantic_icon("eye", size=12), on_click=MarketplaceState.toggle_token,
+            rx.el.button(fomantic_icon("eye", size=12), on_click=RegistryState.toggle_token,
                          class_name="ui mini icon button", title="Reveal / hide",
                          style={"background": "none", "padding": "2px 5px"}),
             rx.el.button(fomantic_icon("copy", size=12),
-                         on_click=rx.set_clipboard(MarketplaceState.token),
+                         on_click=rx.set_clipboard(RegistryState.token),
                          class_name="ui mini icon button", title="Copy token",
                          style={"background": "none", "padding": "2px 5px"}),
             style={"display": "flex", "alignItems": "center", "gap": "4px",
@@ -711,15 +711,15 @@ def _namespaces_list() -> rx.Component:
         rx.el.div("Namespaces", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888",
                                        "marginBottom": "4px"}),
         rx.foreach(
-            MarketplaceState.roles,
+            RegistryState.roles,
             lambda r: rx.el.div(
                 fomantic_icon("hashtag", size=11, color="#a333c8"),
                 rx.el.span(r["namespace"], style={"flex": "1", "marginLeft": "5px", "fontSize": "0.82rem",
                                                   "fontFamily": "monospace"}),
                 rx.el.span(r["role"], class_name="ui mini label", style={"fontSize": "0.62rem"}),
-                on_click=lambda: MarketplaceState.set_publish_namespace(r["namespace"].to(str)),
-                class_name=rx.cond(MarketplaceState.publish_namespace == r["namespace"],
-                                   "mp-ns-item mp-ns-item-active", "mp-ns-item"),
+                on_click=lambda: RegistryState.set_publish_namespace(r["namespace"].to(str)),
+                class_name=rx.cond(RegistryState.publish_namespace == r["namespace"],
+                                   "reg-ns-item reg-ns-item-active", "reg-ns-item"),
                 style={"display": "flex", "alignItems": "center", "padding": "4px 6px",
                        "borderRadius": "4px", "cursor": "pointer", "marginBottom": "2px"},
             ),
@@ -730,7 +730,7 @@ def _namespaces_list() -> rx.Component:
 
 def _stats_block() -> rx.Component:
     _stat = lambda label, key: rx.el.div(
-        rx.el.div(MarketplaceState.account_stats[key].to(int),
+        rx.el.div(RegistryState.account_stats[key].to(int),
                   style={"fontSize": "1.1rem", "fontWeight": "700", "color": "#6435c9"}),
         rx.el.div(label, style={"fontSize": "0.64rem", "color": "#999"}),
         style={"textAlign": "center", "flex": "1"},
@@ -746,8 +746,8 @@ def _stats_block() -> rx.Component:
 def _account_pane() -> rx.Component:
     return rx.el.div(
         rx.el.style(
-            ".mp-ns-item:hover{background:#f4eefe}"
-            " .mp-ns-item-active{background:#efe6fd;box-shadow:inset 3px 0 0 #a333c8}"
+            ".reg-ns-item:hover{background:#f4eefe}"
+            " .reg-ns-item-active{background:#efe6fd;box-shadow:inset 3px 0 0 #a333c8}"
         ),
         rx.el.div(
             fomantic_icon("user circle", size=16, color="#a333c8"),
@@ -757,10 +757,10 @@ def _account_pane() -> rx.Component:
         ),
         _avatar_block(),
         rx.cond(
-            MarketplaceState.is_registered,
+            RegistryState.is_registered,
             rx.el.div(
                 rx.el.div("Handle", style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
-                rx.el.code(MarketplaceState.account,
+                rx.el.code(RegistryState.account,
                            style={"fontSize": "0.82rem", "color": "#a333c8", "display": "block",
                                   "marginBottom": "10px"}),
             ),
@@ -768,13 +768,13 @@ def _account_pane() -> rx.Component:
         ),
         _profile_form(),
         rx.cond(
-            MarketplaceState.profile_message != "",
-            rx.el.div(MarketplaceState.profile_message,
+            RegistryState.profile_message != "",
+            rx.el.div(RegistryState.profile_message,
                       style={"fontSize": "0.72rem", "color": "#777", "marginBottom": "8px"}),
             rx.fragment(),
         ),
         rx.cond(
-            MarketplaceState.is_registered,
+            RegistryState.is_registered,
             rx.el.div(_token_row(), _namespaces_list(), _stats_block()),
             rx.el.div("Not registered yet — set a display name, then create your first namespace "
                       "to register and get a token.",
@@ -790,7 +790,7 @@ def _account_pane() -> rx.Component:
 
 def _create_namespace_form() -> rx.Component:
     _hint = rx.match(
-        MarketplaceState.ns_available,
+        RegistryState.ns_available,
         ("checking", rx.el.span("checking…", style={"color": "#999", "fontSize": "0.72rem"})),
         ("yes", rx.el.span("✓ available", style={"color": "#21ba45", "fontSize": "0.72rem"})),
         ("no", rx.el.span("✗ taken", style={"color": "#db2828", "fontSize": "0.72rem"})),
@@ -803,23 +803,23 @@ def _create_namespace_form() -> rx.Component:
                   style={"fontSize": "0.68rem", "color": "#aaa", "margin": "2px 0 6px"}),
         rx.el.div(
             rx.el.input(
-                name="new_namespace", default_value=MarketplaceState.new_namespace,
+                name="new_namespace", default_value=RegistryState.new_namespace,
                 placeholder="my-namespace", auto_complete="off",
-                on_change=MarketplaceState.set_new_namespace,
-                on_blur=MarketplaceState.check_namespace, style={**_INPUT_STYLE, "flex": "1"},
+                on_change=RegistryState.set_new_namespace,
+                on_blur=RegistryState.check_namespace, style={**_INPUT_STYLE, "flex": "1"},
             ),
             rx.el.button(fomantic_icon("plus", size=12), " Create", type="submit",
-                         disabled=~MarketplaceState.can_create_namespace | MarketplaceState.publish_busy,
+                         disabled=~RegistryState.can_create_namespace | RegistryState.publish_busy,
                          class_name="ui tiny primary button", style={"flexShrink": "0"}),
             style={"display": "flex", "gap": "6px", "alignItems": "center"},
         ),
         _hint,
         rx.cond(
-            MarketplaceState.namespaces_full,
+            RegistryState.namespaces_full,
             rx.el.div("Namespace limit reached (5).", style={"fontSize": "0.7rem", "color": "#f2711c"}),
             rx.fragment(),
         ),
-        on_submit=MarketplaceState.create_namespace,
+        on_submit=RegistryState.create_namespace,
         style={"padding": "10px 12px", "border": "1px dashed #c9b3e6", "borderRadius": "8px",
                "background": "#faf6ff", "marginBottom": "12px"},
     )
@@ -829,17 +829,17 @@ def _publish_preview() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.cond(
-                MarketplaceState.selected_logo_url != "",
-                rx.el.img(src=MarketplaceState.selected_logo_url,
+                RegistryState.selected_logo_url != "",
+                rx.el.img(src=RegistryState.selected_logo_url,
                           style={"width": "28px", "height": "28px", "objectFit": "contain",
                                  "borderRadius": "4px"}),
                 fomantic_icon("box", size=20, color="#6435c9"),
             ),
             rx.el.div(
-                rx.el.div(MarketplaceState.selected_title,
+                rx.el.div(RegistryState.selected_title,
                           style={"fontWeight": "700", "fontSize": "0.95rem"}),
-                rx.el.code(MarketplaceState.publish_namespace + "/" + MarketplaceState.selected_catalog_name
-                           + "@" + MarketplaceState.publish_version,
+                rx.el.code(RegistryState.publish_namespace + "/" + RegistryState.selected_catalog_name
+                           + "@" + RegistryState.publish_version,
                            style={"fontSize": "0.74rem", "color": "#6435c9"}),
                 style={"marginLeft": "8px"},
             ),
@@ -847,13 +847,13 @@ def _publish_preview() -> rx.Component:
         ),
         rx.el.div(
             "Will appear publicly as ",
-            rx.el.strong(MarketplaceState.publish_namespace + "/" + MarketplaceState.selected_catalog_name),
-            ", authored by ", rx.el.strong(MarketplaceState.account), ".",
+            rx.el.strong(RegistryState.publish_namespace + "/" + RegistryState.selected_catalog_name),
+            ", authored by ", rx.el.strong(RegistryState.account), ".",
             style={"fontSize": "0.76rem", "color": "#777", "marginTop": "8px", "lineHeight": "1.4"},
         ),
         rx.el.div(
-            rx.el.span(MarketplaceState.selected_variant_count, " variants", class_name="ui mini label"),
-            rx.el.span(MarketplaceState.selected_gene_count, " genes", class_name="ui mini label",
+            rx.el.span(RegistryState.selected_variant_count, " variants", class_name="ui mini label"),
+            rx.el.span(RegistryState.selected_gene_count, " genes", class_name="ui mini label",
                        style={"marginLeft": "4px"}),
             style={"marginTop": "6px"},
         ),
@@ -866,11 +866,11 @@ def _publish_controls() -> rx.Component:
     return rx.el.div(
         # New / new-version → publish enabled
         rx.cond(
-            MarketplaceState.can_publish,
+            RegistryState.can_publish,
             rx.el.div(
                 rx.el.div(
                     rx.match(
-                        MarketplaceState.publish_state,
+                        RegistryState.publish_state,
                         ("new", "This publishes the module to the catalog."),
                         ("new_version", "Adds this version on top; existing versions stay published."),
                         "",
@@ -878,12 +878,12 @@ def _publish_controls() -> rx.Component:
                     style={"fontSize": "0.76rem", "color": "#777", "marginBottom": "6px"},
                 ),
                 rx.el.button(
-                    rx.cond(MarketplaceState.publish_busy,
+                    rx.cond(RegistryState.publish_busy,
                             rx.el.i("", class_name="spinner loading icon"),
                             fomantic_icon("cloud upload", size=13)),
-                    " Publish " + MarketplaceState.publish_version,
-                    on_click=MarketplaceState.publish_selected,
-                    disabled=MarketplaceState.publish_busy,
+                    " Publish " + RegistryState.publish_version,
+                    on_click=RegistryState.publish_selected,
+                    disabled=RegistryState.publish_busy,
                     class_name="ui primary button", style={"width": "100%"},
                 ),
             ),
@@ -891,19 +891,19 @@ def _publish_controls() -> rx.Component:
         ),
         # Already published (identical or yanked) → immutability + yank/unyank
         rx.cond(
-            MarketplaceState.publish_is_published,
+            RegistryState.publish_is_published,
             rx.el.div(
                 rx.el.div(
                     fomantic_icon("lock", size=12, color="#888"),
                     rx.el.span(" Published & immutable", style={"marginLeft": "4px", "fontWeight": "600"}),
                     style={"fontSize": "0.8rem", "color": "#555", "marginBottom": "4px"},
                 ),
-                rx.el.code(MarketplaceState.published_digest,
+                rx.el.code(RegistryState.published_digest,
                            style={"fontSize": "0.68rem", "color": "#999", "wordBreak": "break-all",
                                   "display": "block", "marginBottom": "6px"}),
                 rx.el.div(
                     rx.match(
-                        MarketplaceState.publish_state,
+                        RegistryState.publish_state,
                         ("conflict", "Your local copy differs from the published bytes. Bump the version "
                                      "(Edit) to publish changes — published versions never change."),
                         "This exact version is published. To publish changes, bump the version (Edit) — "
@@ -914,21 +914,21 @@ def _publish_controls() -> rx.Component:
                 rx.el.button("Publish (locked)", disabled=True, class_name="ui button",
                              style={"width": "100%", "marginBottom": "6px", "opacity": "0.5"}),
                 rx.cond(
-                    MarketplaceState.show_yank,
+                    RegistryState.show_yank,
                     rx.el.button(fomantic_icon("ban", size=12), " Yank this version",
-                                 on_click=MarketplaceState.yank_selected,
-                                 disabled=MarketplaceState.publish_busy,
+                                 on_click=RegistryState.yank_selected,
+                                 disabled=RegistryState.publish_busy,
                                  class_name="ui red button", style={"width": "100%"}),
                     rx.fragment(),
                 ),
                 rx.cond(
-                    MarketplaceState.show_unyank,
+                    RegistryState.show_unyank,
                     rx.el.div(
                         rx.el.div("This version is yanked (hidden from listings).",
                                   style={"fontSize": "0.74rem", "color": "#f2711c", "marginBottom": "4px"}),
                         rx.el.button(fomantic_icon("undo", size=12), " Unyank",
-                                     on_click=MarketplaceState.unyank_selected,
-                                     disabled=MarketplaceState.publish_busy,
+                                     on_click=RegistryState.unyank_selected,
+                                     disabled=RegistryState.publish_busy,
                                      class_name="ui orange button", style={"width": "100%"}),
                     ),
                     rx.fragment(),
@@ -941,7 +941,7 @@ def _publish_controls() -> rx.Component:
 
 def _meta_section() -> rx.Component:
     return rx.cond(
-        MarketplaceState.can_update_meta,
+        RegistryState.can_update_meta,
         rx.el.div(
             rx.el.div(
                 fomantic_icon("edit", size=12, color="#2185d0"),
@@ -955,14 +955,14 @@ def _meta_section() -> rx.Component:
                                rows="3", style={**_INPUT_STYLE, "resize": "vertical", "fontFamily": "inherit"}),
                 rx.el.button(fomantic_icon("save", size=12), " Update release notes", type="submit",
                              class_name="ui tiny button", style={"marginTop": "6px"}),
-                on_submit=MarketplaceState.update_meta,
+                on_submit=RegistryState.update_meta,
             ),
             rx.upload(
                 rx.el.span(fomantic_icon("image", size=12), " Replace logo",
                            style={"fontSize": "0.76rem", "color": "#2185d0", "cursor": "pointer"}),
-                id="mp_logo", multiple=False,
+                id="reg_logo", multiple=False,
                 accept={"image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"]},
-                on_drop=MarketplaceState.update_logo(rx.upload_files(upload_id="mp_logo")),
+                on_drop=RegistryState.update_logo(rx.upload_files(upload_id="reg_logo")),
                 style={"display": "contents"},
             ),
             style={"borderTop": "1px solid #eee", "paddingTop": "6px"},
@@ -980,7 +980,7 @@ def _publish_pane() -> rx.Component:
             style={"display": "flex", "alignItems": "center", "marginBottom": "10px"},
         ),
         rx.cond(
-            ~MarketplaceState.has_selection,
+            ~RegistryState.has_selection,
             rx.el.div(
                 fomantic_icon("hand point left outline", size=24, color="#ccc"),
                 rx.el.div("Select a module on the left to publish it.",
@@ -988,7 +988,7 @@ def _publish_pane() -> rx.Component:
                 style={"textAlign": "center", "padding": "30px 16px"},
             ),
             rx.cond(
-                ~MarketplaceState.display_name_valid,
+                ~RegistryState.display_name_valid,
                 rx.el.div(
                     fomantic_icon("arrow left", size=18, color="#a333c8"),
                     rx.el.span(" Set a valid display name in the Account pane to start publishing.",
@@ -998,15 +998,15 @@ def _publish_pane() -> rx.Component:
                 rx.el.div(
                     _create_namespace_form(),
                     rx.cond(
-                        MarketplaceState.namespaces.length() > 0,
+                        RegistryState.namespaces.length() > 0,
                         rx.el.div(
                             rx.el.label("Publish to namespace",
                                         style={"fontSize": "0.72rem", "fontWeight": "600", "color": "#888"}),
                             rx.el.select(
-                                rx.foreach(MarketplaceState.namespaces,
+                                rx.foreach(RegistryState.namespaces,
                                            lambda ns: rx.el.option(ns, value=ns)),
-                                value=MarketplaceState.publish_namespace,
-                                on_change=MarketplaceState.set_publish_namespace,
+                                value=RegistryState.publish_namespace,
+                                on_change=RegistryState.set_publish_namespace,
                                 style={**_INPUT_STYLE, "marginBottom": "10px"},
                             ),
                             _publish_preview(),
@@ -1019,8 +1019,8 @@ def _publish_pane() -> rx.Component:
             ),
         ),
         rx.cond(
-            MarketplaceState.publish_message != "",
-            rx.el.div(MarketplaceState.publish_message,
+            RegistryState.publish_message != "",
+            rx.el.div(RegistryState.publish_message,
                       style={"fontSize": "0.76rem", "color": "#555", "marginTop": "10px",
                              "padding": "6px 8px", "background": "#f8f8f8", "borderRadius": "5px"}),
             rx.fragment(),
@@ -1041,9 +1041,9 @@ def _publication_tab() -> rx.Component:
 
 
 def _incompatible_banner() -> rx.Component:
-    """Prominent banner when the marketplace server's contract is newer than this client."""
+    """Prominent banner when the registry server's contract is newer than this client."""
     return rx.cond(
-        MarketplaceState.server_incompatible,
+        RegistryState.server_incompatible,
         rx.el.div(
             fomantic_icon("exclamation triangle", size=16, color="#9f3a38"),
             rx.el.span(
@@ -1057,13 +1057,13 @@ def _incompatible_banner() -> rx.Component:
     )
 
 
-def marketplace_right_panel() -> rx.Component:
+def registry_right_panel() -> rx.Component:
     return rx.el.div(
         _incompatible_banner(),
         _tab_menu(),
         rx.el.div(
             rx.match(
-                MarketplaceState.marketplace_active_tab,
+                RegistryState.registry_active_tab,
                 ("catalog", _catalog_tab()),
                 ("publication", _publication_tab()),
                 _catalog_tab(),
@@ -1079,17 +1079,17 @@ def marketplace_right_panel() -> rx.Component:
 # ============================================================================
 
 @rx.page(
-    route="/marketplace",
+    route="/registry",
     title="Module Catalog | Just DNA Lite",
-    on_load=MarketplaceState.load_marketplace,
-    meta=page_meta("/marketplace"),
+    on_load=RegistryState.load_registry,
+    meta=page_meta("/registry"),
     image=page_image_url(),
 )
-def marketplace_page() -> rx.Component:
-    """Module Marketplace — catalog browse/install + local registry management."""
+def registry_page() -> rx.Component:
+    """Module Registry — catalog browse/install + local registry management."""
     return template(
         two_column_layout(
-            left=marketplace_left_panel(),
-            right=marketplace_right_panel(),
+            left=registry_left_panel(),
+            right=registry_right_panel(),
         ),
     )

@@ -25,7 +25,7 @@ from webui.pages.index import index_page  # noqa: E402
 from webui.pages.analysis import analysis_page  # noqa: E402
 from webui.pages.annotate import annotate_page  # noqa: E402
 from webui.pages.modules import modules_page  # noqa: E402
-from webui.pages.marketplace import marketplace_page  # noqa: E402
+from webui.pages.registry import registry_page  # noqa: E402
 from webui.pages.faq import faq_page  # noqa: E402
 
 # Note: Shutdown cleanup of STARTED runs is handled by the parent `uv run start` command,
@@ -443,5 +443,5 @@ app.add_page(index_page)
 app.add_page(analysis_page)
 app.add_page(annotate_page)
 app.add_page(modules_page)
-app.add_page(marketplace_page)
+app.add_page(registry_page)
 app.add_page(faq_page)

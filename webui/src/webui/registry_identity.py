@@ -1,11 +1,11 @@
 """
-Marketplace identity — backend groundwork for publishing.
+Registry identity — backend groundwork for publishing.
 
 Persists a proof-of-work *install-id* (and, once minted, an account token) so the
 publishing flow can later call ``RegistryClient.register(install_id, account)``
 without re-grinding the PoW. Pure backend: no UI wiring here.
 
-Stored as JSON next to the working modules config (``data/interim/marketplace_identity.json``,
+Stored as JSON next to the working modules config (``data/interim/registry_identity.json``,
 gitignored). The install-id is machine-local and non-secret; the token, once present, is a
 bearer credential and must not be exposed to the frontend.
 """
@@ -22,7 +22,7 @@ from just_dna_pipelines.module_config import get_config_path
 
 _DIFFICULTY: int = 20
 
-# Account handle slug rule (marketplace): ^[a-z0-9][a-z0-9-]*$ — lowercase alnum + hyphens.
+# Account handle slug rule (registry): ^[a-z0-9][a-z0-9-]*$ — lowercase alnum + hyphens.
 # Note this differs from the display-name rule ([A-Za-z0-9_]), so underscores map to hyphens.
 
 
@@ -60,7 +60,7 @@ def set_env_var(name: str, value: str) -> None:
 
 def identity_path() -> Path:
     """Location of the persisted identity file (alongside the working modules.yaml)."""
-    return get_config_path().parent / "marketplace_identity.json"
+    return get_config_path().parent / "registry_identity.json"
 
 
 def load_identity() -> Dict[str, Any]:

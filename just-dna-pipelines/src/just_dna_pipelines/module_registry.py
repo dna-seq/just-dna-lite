@@ -249,7 +249,7 @@ def unregister_custom_module(module_name: str) -> bool:
 def register_downloaded_module(module_dir: Path) -> str:
     """Wire an already-compiled module dir into local discovery WITHOUT recompiling.
 
-    Used for marketplace installs: the tarball we extract into ``CUSTOM_MODULES_DIR/{name}``
+    Used for registry installs: the tarball we extract into ``CUSTOM_MODULES_DIR/{name}``
     already contains ``weights.parquet`` + ``manifest.json`` (the server-compiled artifact) plus
     the spec inputs. Recompiling here would produce a fresh parquet whose digest no longer matches
     the catalog's, so we only ensure the local collection source exists, copy display metadata from
