@@ -31,7 +31,11 @@ from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_enricher.cli import app as enricher_app
-from just_dna_registry.client_cli import app as marketplace_client_app
+from just_dna_registry.client_cli import app as registry_client_app
+from just_dna_lite.registry_org_cli import app as registry_org_app
+
+# Organization management (0.9.1) as a nested group: `pipelines registry org …`.
+registry_client_app.add_typer(registry_org_app, name="org")
 
 app = typer.Typer(
     name="pipelines",
@@ -48,9 +52,9 @@ app.add_typer(agent_app, name="agent")
 # DuckDB, which just-dna-compiler deprecates for removal at 1.0. Mounting the app whole
 # means new enricher commands surface here without further wiring.
 app.add_typer(enricher_app, name="enrich")
-# Marketplace reference client (list/download/publish/import-module/find-by-hash/
-# update-module-version). Reads MARKETPLACE_URL / MARKETPLACE_TOKEN from flags, env, or .env.
-app.add_typer(marketplace_client_app, name="marketplace")
+# Registry reference client (list/download/publish/import-module/find-by-hash/
+# update-module-version). Reads REGISTRY_URL / REGISTRY_TOKEN from flags, env, or .env.
+app.add_typer(registry_client_app, name="registry")
 
 # Same callback as ``uv run annotate``; discovery stays inside the command body.
 app.command("annotate")(annotate_cmd)

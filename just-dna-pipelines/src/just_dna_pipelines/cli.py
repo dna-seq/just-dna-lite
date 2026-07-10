@@ -19,7 +19,7 @@ from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_enricher.cli import app as enricher_app
-from just_dna_registry.client_cli import app as marketplace_client_app
+from just_dna_registry.client_cli import app as registry_client_app
 
 app = typer.Typer(
     name="pipelines",
@@ -34,7 +34,7 @@ app.add_typer(v1_port_app, name="v1-port")
 # `pipelines module compile` then consumes with no reference and no network.
 # Mounting it means new enricher commands appear here without further wiring.
 app.add_typer(enricher_app, name="enrich")
-app.add_typer(marketplace_client_app, name="marketplace")
+app.add_typer(registry_client_app, name="registry")
 
 console = Console()
 

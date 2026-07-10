@@ -3,7 +3,7 @@ Compatibility shim — the schema now lives in the published ``just-dna-format``
 
 This module used to hold the DSL/schema models. Those were extracted to ``just-dna-format``
 (``just_dna_format.spec`` for the authored DSL, ``just_dna_compiler.models`` for the compile
-result types) so the schema is shared verbatim by just-dna-pipelines, just-dna-marketplace, and
+result types) so the schema is shared verbatim by just-dna-pipelines, just-dna-registry, and
 just-dna-agents. Import sites inside this repo keep working via these re-exports; new code should
 import from ``just_dna_format`` / ``just_dna_compiler`` directly.
 

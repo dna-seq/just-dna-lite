@@ -3,7 +3,7 @@ Compatibility shim — the reference compiler now lives in ``just-dna-compiler``
 
 ``validate_spec`` / ``compile_module`` / ``reverse_module`` were extracted verbatim to
 ``just_dna_compiler.compiler`` so the transform is shared by just-dna-pipelines,
-just-dna-marketplace, and just-dna-agents. Import sites inside this repo keep working via these
+just-dna-registry, and just-dna-agents. Import sites inside this repo keep working via these
 re-exports; new code should import from ``just_dna_compiler.compiler`` directly.
 
 Ensembl resolution differs by design: ``just-dna-compiler`` is inject-only (it never downloads a
