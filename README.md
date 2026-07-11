@@ -77,7 +77,7 @@ Everything runs locally on your computer. You can install it on a laptop, a desk
 
 You need a `.vcf` or `.vcf.gz` file from whole genome (WGS) or whole exome (WES) sequencing. If you had your genome sequenced through a company like DNA Complete (Nebula), Dante Labs, or Sequencing.com, log into your account and look for a **"Download Raw Data"** or **"Download VCF"** option. The file you want ends in `.vcf` or `.vcf.gz`. You may also see `.bam` or `.fastq` files — you don't need those, just the VCF. Most providers deliver GRCh38 by default. If unsure, check with your provider.
 
-> **23andMe, AncestryDNA, MyHeritage?** These services use microarray chips that read a few hundred thousand pre-selected positions — a tiny fraction of your genome. just-dna-lite needs a file from whole genome or whole exome sequencing, which covers millions of positions. If your data comes from a chip-based service, it won't work here yet (microarray support is planned). Not sure what you have? Check with your provider.
+> **23andMe, AncestryDNA, MyHeritage?** These services use microarray chips that read a few hundred thousand pre-selected positions — a tiny fraction of your genome. just-dna-lite works best with whole genome or whole exome VCF files, which cover millions of positions. Consumer microarray support is experimental and lower-coverage, so results will be much sparser than WGS/WES. Not sure what you have? Check with your provider.
 
 **Where to get your genome sequenced?**
 If you want to sequence your own genome, there are several commercial providers. As of early 2026, popular and accessible options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure the provider allows you to download your raw `.vcf` or `.vcf.gz` file. *(Disclaimer: We provide these links only as examples and are in no way affiliated with any of these companies or services).*
@@ -402,11 +402,13 @@ uv run pytest just-dna-pipelines/tests/ # Pipeline tests only
 
 ## Roadmap
 
-GRCh38 VCF files (WGS and WES) are fully supported, along with PRS and AI-assisted module creation. GRCh37/hg19 support, T2T reference genomes, microarray data (23andMe, AncestryDNA), and multi-species support are planned but not yet available.
+GRCh38 VCF files (WGS and WES) are the primary supported path, along with PRS and AI-assisted module creation. GRCh37/hg19 is handled through liftover, and consumer microarray data (23andMe, AncestryDNA, MyHeritage) is supported experimentally with much lower coverage. T2T reference genomes and multi-species support remain planned.
 
 ## Related projects
 
 - [just-prs](https://github.com/antonkulaga/just-prs) — Polygenic Risk Score library and UI ([PyPI](https://pypi.org/project/just-prs/))
+- [just-dna-format](https://github.com/dna-seq/just-dna-format) — annotation module schema, manifest/integrity contract, and reference compiler
+- [just-dna-marketplace](https://github.com/dna-seq/just-dna-marketplace) — catalog, publish, and download REST API for annotation modules
 - [prepare-annotations](https://github.com/dna-seq/prepare-annotations) — upstream pipeline for Ensembl and module annotation data
 - [Just-DNA-Seq](https://just-dna.life/) — the original project
 
