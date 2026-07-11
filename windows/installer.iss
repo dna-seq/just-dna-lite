@@ -1,6 +1,6 @@
 #define MyAppName "Just DNA Lite"
 #ifndef APP_VERSION
-  #define APP_VERSION "0.2.1"
+  #define APP_VERSION "0.3.15"
 #endif
 #define MyAppVersion APP_VERSION
 #define MyAppPublisher "dna-seq"
@@ -42,6 +42,7 @@ Source: "uv.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Application source (excluding dev/runtime artifacts)
 Source: "..\pyproject.toml"; DestDir: "{app}\app"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\uv.lock"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\modules.yaml"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\.python-version"; DestDir: "{app}\app"; Flags: ignoreversion
@@ -49,7 +50,7 @@ Source: "..\.env.template"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\dagster.yaml.template"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\src\*"; DestDir: "{app}\app\src"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\just-dna-pipelines\*"; DestDir: "{app}\app\just-dna-pipelines"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.ruff_cache"
-Source: "..\webui\*"; DestDir: "{app}\app\webui"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.web,.ruff_cache"
+Source: "..\webui\*"; DestDir: "{app}\app\webui"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.web,.ruff_cache,.states,.venv"
 Source: "..\images\*"; DestDir: "{app}\app\images"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Launcher script
