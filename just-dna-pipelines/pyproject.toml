@@ -8,7 +8,10 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "agno",
+    # >=2.7.0 is the first PyPI release containing agno-agi/agno#7674
+    # (AccuracyResult stat-field fix); previously pinned to a git rev because
+    # the fix was unreleased. See docs/reviews/pr-28-windows-installer.md.
+    "agno>=2.7.2",
     "aiohttp>=3.13.5",
     "anthropic>=0.92.0",
     "dagster>=1.12.22",
@@ -16,7 +19,7 @@ dependencies = [
     "dagster-webserver>=1.12.22",
     "eliot>=1.17.5",
     "fsspec>=2026.2.0",
-    "google-genai>=1.71.0,<2.0",
+    "google-genai>=1.71.0",
     "huggingface-hub>=1.10.0",
     "just-dna-compiler>=0.2.0",
     "just-dna-format>=0.2.0",

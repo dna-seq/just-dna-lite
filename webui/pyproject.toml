@@ -11,7 +11,7 @@ dependencies = [
   "fastapi>=0.135.3",
   "prs-ui>=0.3.12",
   "gunicorn>=26.0.0",
-  "google-genai>=1.71.0,<2.0",
+  "google-genai>=1.71.0",
 ]
 
 [tool.uv.sources]
