@@ -794,7 +794,8 @@ def _create_namespace_form() -> rx.Component:
         ("checking", rx.el.span("checking…", style={"color": "#999", "fontSize": "0.72rem"})),
         ("yes", rx.el.span("✓ available", style={"color": "#21ba45", "fontSize": "0.72rem"})),
         ("no", rx.el.span("✗ taken", style={"color": "#db2828", "fontSize": "0.72rem"})),
-        ("invalid", rx.el.span("invalid name", style={"color": "#f2711c", "fontSize": "0.72rem"})),
+        ("invalid", rx.el.span("✗ use lowercase letters, digits and hyphens only (e.g. my-namespace)",
+                               style={"color": "#f2711c", "fontSize": "0.72rem"})),
         rx.el.span(""),
     )
     return rx.el.form(

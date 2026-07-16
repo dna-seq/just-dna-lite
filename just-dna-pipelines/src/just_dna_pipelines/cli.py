@@ -15,6 +15,10 @@ from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
 )
+from just_dna_pipelines.annotation.ensembl_download import (
+    EnsemblDownloadError,
+    download_ensembl_cache,
+)
 from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
@@ -71,7 +75,7 @@ def download_ensembl(
     force: bool = typer.Option(
         False,
         "--force", "-f",
-        help="Force re-download even if files are already complete.",
+        help="Force re-download even if files pass SHA256 validation.",
     ),
 ) -> None:
     """
@@ -80,7 +84,7 @@ def download_ensembl(
     Files are saved to:
       {cache_dir}/ensembl_variations/data/
 
-    Already-complete files (correct byte size) are skipped.
+    Each file is validated by SHA256 (from HF LFS metadata). Already-valid files are skipped.
 
     The destination is read from JUST_DNA_PIPELINES_CACHE_DIR (or ~/.cache/just-dna-pipelines
     if not set). Pass --cache-dir to override.
@@ -96,113 +100,12 @@ def download_ensembl(
         # Custom cache directory
         uv run pipelines download-ensembl --cache-dir /data/my-cache
     """
-    import os
-    import requests as req
-    from huggingface_hub import list_repo_tree, get_token, hf_hub_url
-    from platformdirs import user_cache_dir
-    from rich.progress import (
-        Progress, BarColumn, DownloadColumn, TextColumn,
-        TransferSpeedColumn, TimeRemainingColumn, TaskProgressColumn,
-    )
-
-    # ── Resolve cache directory ────────────────────────────────────────────────
-    if cache_dir:
-        resolved_cache = Path(cache_dir)
-    else:
-        env_cache = os.getenv("JUST_DNA_PIPELINES_CACHE_DIR")
-        resolved_cache = Path(env_cache) if env_cache else Path(user_cache_dir(appname="just-dna-pipelines"))
-
-    target_dir = resolved_cache / "ensembl_variations" / "data"
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    console.print(f"\n[bold]Ensembl Variations Downloader[/bold]")
-    console.print(f"  Repo   : [cyan]{repo_id}[/cyan]")
-    console.print(f"  Target : [cyan]{target_dir}[/cyan]")
-    console.print()
-
-    # ── Fetch remote file manifest with sizes ──────────────────────────────────
-    token = get_token()
-    console.print("[dim]Fetching remote file manifest…[/dim]")
-    remote_files = {
-        Path(entry.path).name: entry.lfs.size if entry.lfs else entry.size
-        for entry in list_repo_tree(repo_id, repo_type="dataset", token=token, recursive=True)
-        if hasattr(entry, "path") and entry.path.startswith("data/") and entry.path.endswith(".parquet")
-    }
-    if not remote_files:
-        console.print(f"[red]Error: no parquet files found in repo {repo_id}[/red]")
+    # Single source of truth lives in just_dna_pipelines.annotation.ensembl_download.
+    try:
+        download_ensembl_cache(repo_id=repo_id, cache_dir=cache_dir, force=force, console=console)
+    except EnsemblDownloadError as exc:
+        console.print(f"[red]Error: {exc}[/red]")
         raise typer.Exit(1)
-
-    console.print(f"Manifest: [bold]{len(remote_files)}[/bold] files, "
-                  f"[bold]{sum(remote_files.values()) / (1024**3):.1f} GB[/bold] total\n")
-
-    # ── Classify each file ─────────────────────────────────────────────────────
-    to_download: Dict[str, int] = {}
-
-    def _is_valid(path: Path, expected_size: int) -> bool:
-        return path.exists() and path.stat().st_size == expected_size
-
-    skipped = 0
-    for filename, size in remote_files.items():
-        dest = target_dir / filename
-        if not force and _is_valid(dest, size):
-            skipped += 1
-            continue
-        to_download[filename] = size
-
-    if skipped:
-        console.print(f"[green]✓ {skipped} file(s) already complete — skipping.[/green]")
-    if not to_download:
-        total_gb = sum(f.stat().st_size for f in target_dir.glob("*.parquet")) / (1024**3)
-        console.print(f"\n[bold green]✓ All done![/bold green]  {len(remote_files)} files, {total_gb:.2f} GB at {target_dir}\n")
-        return
-
-    console.print(f"\nDownloading [bold]{len(to_download)}[/bold] missing file(s)…\n")
-
-    # ── Per-file download with byte-level progress bar ─────────────────────────
-    errors: list[str] = []
-    with Progress(
-        TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
-        BarColumn(bar_width=None),
-        TaskProgressColumn(),
-        DownloadColumn(),
-        TransferSpeedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        for filename, expected_size in to_download.items():
-            url = hf_hub_url(repo_id, filename=f"data/{filename}", repo_type="dataset")
-            dest = target_dir / filename
-            tmp = dest.with_suffix(".part")
-
-            task = progress.add_task("", filename=filename, total=expected_size)
-
-            headers = {"Authorization": f"Bearer {token}"} if token else {}
-            with req.get(url, headers=headers, stream=True, timeout=120) as resp:
-                resp.raise_for_status()
-                with open(tmp, "wb") as fh:
-                    for chunk in resp.iter_content(chunk_size=1024 * 1024):
-                        fh.write(chunk)
-                        progress.update(task, advance=len(chunk))
-
-            actual_size = tmp.stat().st_size
-            if actual_size != expected_size:
-                tmp.unlink(missing_ok=True)
-                errors.append(f"{filename}: expected {expected_size} bytes, got {actual_size}")
-                progress.update(task, description=f"[red]✗ {filename}")
-            else:
-                tmp.rename(dest)
-                progress.update(task, description=f"[green]✓ {filename}")
-
-    # ── Summary ────────────────────────────────────────────────────────────────
-    if errors:
-        console.print(f"\n[bold red]✗ {len(errors)} file(s) failed:[/bold red]")
-        for e in errors:
-            console.print(f"  {e}")
-        raise typer.Exit(1)
-
-    final_files = list(target_dir.glob("*.parquet"))
-    total_gb = sum(f.stat().st_size for f in final_files) / (1024**3)
-    console.print(f"\n[bold green]✓ Done![/bold green]  {len(final_files)} files, {total_gb:.2f} GB at {target_dir}\n")
 
 
 @app.command()

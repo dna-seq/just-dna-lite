@@ -48,6 +48,7 @@ from just_dna_pipelines.module_registry import (
 )
 from just_dna_registry import RegistryClient, RegistryError
 from just_dna_registry.client import VersionMismatchError
+from just_dna_format.identity import is_valid_namespace
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
@@ -6201,7 +6202,11 @@ class RegistryState(rx.State):
 
     @rx.var
     def can_create_namespace(self) -> bool:
-        return self.display_name_valid and len(self.namespaces) < 5
+        return (
+            self.display_name_valid
+            and is_valid_namespace((self.new_namespace or "").strip().lower())
+            and len(self.namespaces) < 5
+        )
 
     @rx.var
     def token_masked(self) -> str:
@@ -6238,7 +6243,9 @@ class RegistryState(rx.State):
     # ---- setters ----
     def set_new_namespace(self, value: str) -> None:
         self.new_namespace = value
-        self.ns_available = ""
+        # Live client-side check so the hint shows while typing; on_blur then checks availability.
+        norm = (value or "").strip().lower()
+        self.ns_available = "invalid" if norm and not is_valid_namespace(norm) else ""
 
     def toggle_token(self) -> None:
         self.token_revealed = not self.token_revealed
