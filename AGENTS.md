@@ -826,6 +826,49 @@ assert valid_states == {"active", "inactive", "pending"}  # from API spec
 
 ---
 
+## Process Model & Fork Safety (MANDATORY)
+
+**Never `fork()` a process that has already used Polars, polars-bio, or DuckDB.**
+
+Polars' Rayon pool is created on the **first Polars operation**, not at import. A
+forked child inherits the pool's latches but none of its worker threads, so the first
+parallel op parks forever. It parks with the GIL released, so Python signal handlers
+never run: no traceback, SIGTERM ignored, SIGKILL only. Rayon workers are named
+`polars-<n>` in `/proc/self/task/*/comm` and are invisible to Python's `threading`
+module, which is why this ships unnoticed. CPython's own
+`DeprecationWarning: ... fork() may lead to deadlocks` is swallowed by the default
+`ignore::DeprecationWarning` filter because the fork happens outside `__main__`.
+
+Full write-up and reproductions: **[docs/GRANIAN_POLARS_FORK_DEADLOCK.md](docs/GRANIAN_POLARS_FORK_DEADLOCK.md)**.
+
+### Rules
+
+- **`serve()` calls `apply_process_model_guards()` from `webui/src/webui/forksafety.py`
+  before importing reflex.** It pins `REFLEX_USE_GRANIAN` (Reflex's `should_use_granian()`
+  is a `find_spec` heuristic that otherwise silently selects `gunicorn --preload`,
+  which forks after importing the app), forces the `spawn` start method, unmutes the
+  fork warning, and installs an `os.register_at_fork` tripwire. Do not remove or reorder.
+- **Any `multiprocessing` use must pass a `spawn` context explicitly** —
+  `mp_context=multiprocessing.get_context("spawn")`. Never rely on the platform default.
+- **Spawned children re-import `__main__`,** so every entry point must be
+  `__main__`-guarded or the worker dies with the `freeze_support()` RuntimeError.
+  uv-generated console scripts already are; bare scripts are not.
+- **`POLARS_MAX_THREADS=1` does not fix this.** Measured at 1, 4 and 16 threads, a forked
+  child hangs every time — even one Rayon worker is lost to the fork. It is the intuitive
+  mitigation and it is ineffective, while costing all Polars parallelism. Use spawn.
+- **`run_in_executor(None, ...)` does NOT make native-parallel work safe.** It moves the
+  Python frame to another thread; Rayon/Tokio/DuckDB pools are process-global. Use it for
+  blocking I/O only, never as the answer to a native deadlock or to CPU-heavy Polars work.
+- **All Polars / DuckDB / polars-bio / Dagster work goes through `webui.compute`** —
+  `compute.pool` for short queries, `compute.jobs` for Dagster runs. The ASGI process
+  marshals arguments and results and nothing else.
+- **Grid pages must be O(page), not O(rows).** `lf.sort(...).slice(offset, n)` re-sorts the
+  whole frame on every click (Polars only pushes a dynamic predicate down for single-key
+  sorts; multi-key sorts fully materialize). Sort once to a temp parquet, then slice pages
+  off that artifact.
+
+---
+
 ## Reflex UI Framework
 
 The webui uses **Reflex** (Python-based React framework). See **[docs/DESIGN.md](docs/DESIGN.md)** for visual design.
@@ -979,8 +1022,10 @@ rx.box(class="ui segment")
 - **Wrong icon order** - It's `circle-check` not `check-circle`
 - **Python conditionals for state** - Use `rx.cond()` instead
 - **Missing `.to()` casts in foreach** - Can cause type errors
-- **Awaiting long-running tasks in event handlers** - Blocks entire UI; use `loop.run_in_executor()` for background execution
-- **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap"; use `run_in_executor()` instead
+- **Awaiting long-running tasks in event handlers** - Blocks entire UI. Submit to `webui.compute`; `loop.run_in_executor()` is for blocking I/O only
+- **Treating `run_in_executor(None, ...)` as making native work safe** - It moves the Python frame to another thread, but Rayon/Tokio/DuckDB pools are process-global. It neither prevents a fork deadlock nor bounds memory. See Process Model & Fork Safety
+- **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap". Dagster runs belong in `webui.compute.jobs` (a spawned child), not in any thread of the ASGI process
+- **Forking after Polars/polars-bio/DuckDB has been used** - Silent, unkillable deadlock on the next parallel op. See Process Model & Fork Safety
 - **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
 - **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
 - **Using `@rx.background`** - Does NOT exist in Reflex 0.8.x. Use `@rx.event(background=True)` instead.

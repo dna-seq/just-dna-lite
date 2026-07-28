@@ -13,6 +13,8 @@ from pathlib import Path
 _IS_WINDOWS = sys.platform == "win32"
 
 from just_dna_pipelines.runtime import load_env
+from webui import serve_watchdog
+from webui.forksafety import apply_process_model_guards
 
 DEFAULT_DAGSTER_FILE = "just-dna-pipelines/src/just_dna_pipelines/annotation/definitions.py"
 DEFAULT_DAGSTER_PORT = 3005
@@ -142,6 +144,40 @@ def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
 
 
+def _start_serve_watchdog(port: int) -> subprocess.Popen[bytes] | None:
+    """Start the external liveness watchdog for this serve process.
+
+    Runs as a separate process on purpose: a wedged ASGI worker cannot detect or
+    recover from its own wedge, because a thread parked in a native thread pool runs no
+    Python at all.  See ``webui/serve_watchdog.py``.
+    """
+    if os.getenv("SERVE_HEALTH_WATCHDOG", "1").strip() == "0":
+        print("Serve watchdog disabled via SERVE_HEALTH_WATCHDOG=0.", flush=True)
+        return None
+
+    host = os.getenv("SERVE_HEALTH_HOST", "127.0.0.1")
+    env = {
+        **os.environ,
+        "SERVE_WATCHDOG_PID": str(os.getpid()),
+        "SERVE_WATCHDOG_URL": f"http://{host}:{port}{serve_watchdog.PROBE_PATH}",
+    }
+    popen_kwargs: dict[str, object] = {}
+    if _IS_WINDOWS:
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        # Its own session, so the watchdog survives anything that takes down the
+        # server's own group — it is the thing that has to outlive the wedge.
+        popen_kwargs["start_new_session"] = True
+
+    process = subprocess.Popen(
+        [sys.executable, "-m", "webui.serve_watchdog"],
+        env=env,
+        **popen_kwargs,
+    )
+    print(f"Started serve watchdog (pid {process.pid}) probing {env['SERVE_WATCHDOG_URL']}", flush=True)
+    return process
+
+
 def main() -> None:
     """Start the Reflex development server.
 
@@ -166,6 +202,20 @@ def serve() -> None:
     Supports ``--immutable`` flag for public demo mode.
     """
     _consume_immutable_flag()
+
+    # Before anything imports reflex (and therefore before any worker process is
+    # created): pin the ASGI server and force ``spawn``.  Reflex compiles the app
+    # in *this* process and then hands off to a worker; forking that worker while
+    # Polars' Rayon pool is warm wedges it permanently.  See webui.forksafety.
+    guards = apply_process_model_guards()
+    print(
+        "Process model: "
+        f"server={guards['asgi_server']}, "
+        f"mp_start_method={guards['mp_start_method']}, "
+        f"native_pools_live={guards['native_pools_live']}",
+        flush=True,
+    )
+
     _setup()
 
     web_dir = Path(".web")
@@ -186,10 +236,24 @@ def serve() -> None:
 
     from reflex import constants
     from reflex.constants.base import RunningMode
+    from reflex.utils import processes
     from reflex_base.config import environment
 
+    # Resolve the port here instead of letting reflex auto-increment it later, so the
+    # watchdog knows which URL to probe.
     port_str = os.getenv("APP_PORT", "").strip()
-    port = int(port_str) if port_str else None
+    port = (
+        int(port_str)
+        if port_str
+        else processes.handle_port(
+            "fullstack",
+            constants.DefaultPorts.FRONTEND_PORT,
+            auto_increment=True,
+        )
+    )
+
+    watchdog_process = _start_serve_watchdog(port)
+    atexit.register(_stop_process, watchdog_process)
 
     environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
     _run_reflex(

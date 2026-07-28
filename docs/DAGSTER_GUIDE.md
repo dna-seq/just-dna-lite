@@ -140,7 +140,7 @@ Example: `data/output/users/anonymous/other_livia/user_vcf_normalized.parquet`
 - `annotate_ensembl_only_job`: Ensembl only (normalize → Ensembl DuckDB, no HF modules or report)
 
 **When normalize runs:**
-- On upload: The Web UI runs `normalize_vcf_job` in-process after each VCF upload.
+- On upload: the Web UI runs `normalize_vcf_job` in a **compute child** (see below) after each VCF upload.
 - With full pipeline: `annotate_and_report_job` materializes `user_vcf_normalized` first, then downstream assets.
 
 **If normalized parquet is missing:**
@@ -152,7 +152,7 @@ Example: `data/output/users/anonymous/other_livia/user_vcf_normalized.parquet`
 # From workspace root, with DAGSTER_HOME set
 uv run dg asset materialize --select user_vcf_normalized --partition "user_id/sample_name"
 ```
-Or use a small script that calls `job_def.execute_in_process()` with the correct run config and partition tag (see `webui/state.py` `_normalize_vcf_sync` for the pattern).
+Or use a small script that calls `job_def.execute_in_process()` with the correct run config and partition tag — see `webui/src/webui/compute/jobs.py` (`_child_execute`) for the pattern. Note that in the Web UI that call always happens in a **spawned child process**, never in the web process; see below.
 
 **Known quirk (polars-bio) — FIXED:** The `ALLELE_ID` INFO field (Number=R, common in DRAGEN VCFs) triggers a Rust panic in `OptionalField::append_array_string_iter` when REF has value `.` (e.g. `ALLELE_ID=.,NM_000157.4:c.1604G>A`). We exclude `ALLELE_ID` from auto-detected INFO fields in `io.get_info_fields()` via `_VCF_INFO_BLOCKLIST`. If you see similar panics with other fields, add them to the blocklist in `just_dna_pipelines/io.py`.
 
@@ -160,6 +160,52 @@ Or use a small script that calls `job_def.execute_in_process()` with the correct
 - `generate_longevity_report_job`: Generate report only (requires prior annotation materialization)
 - `annotate_and_report_job`: Full pipeline — normalize + HF annotate + report
 - `annotate_all_job`: Full pipeline — normalize + HF annotate + Ensembl DuckDB + report
+
+### How the Web UI executes jobs (compute children, not in-process)
+
+The Web UI **never** calls `job_def.execute_in_process()` in its own process. Every run is
+handed to `webui.compute.jobs.submit_job()`, which starts one **spawn-context**
+`multiprocessing.Process` per run. The child builds its own `DagsterInstance` from the
+inherited `DAGSTER_HOME` (`webui.dagster_env.get_dagster_instance`), runs the job, and
+reports `(success, run_id, error)` back over a pipe.
+
+Two reasons, both load-bearing:
+
+1. **Fork safety.** Polars' Rayon pool and polars-bio's Tokio runtime do not survive
+   `fork()`; a forked child parks forever on its first parallel call, ignores SIGTERM, and
+   produces no traceback. A *spawned* child builds its own pools. See
+   [GRANIAN_POLARS_FORK_DEADLOCK.md](GRANIAN_POLARS_FORK_DEADLOCK.md).
+2. **Liveness.** Production runs a single ASGI worker (`_get_backend_workers()` returns 1
+   without Redis), so a minutes-long pipeline on the event loop stops every request,
+   WebSocket event and health probe in the process.
+
+State-side, the pattern is a background event that polls the handle:
+
+```python
+@rx.event(background=True)
+async def execute_job_in_compute(self, job_name, run_config, partition_key, ...):
+    handle = submit_job(token, job_name, run_config, partition_key, user_vcf_partitions.name)
+    result = await await_job(handle)      # asyncio.sleep loop; never blocks the loop
+    async with self:                      # brief lock, only to publish
+        ...
+```
+
+`await_job` polls a non-blocking `handle.poll()`, so the worker keeps serving throughout.
+A child that dies without reporting (OOM kill, SIGKILL) yields a failure result instead of
+hanging the caller. `cancel_job(token)` SIGKILLs the child — SIGTERM is useless against a
+thread parked in a native pool — and the app lifespan kills every surviving child on
+shutdown.
+
+**What this replaced.** The old path tried `instance.submit_run(run_id, workspace=None)`
+first and fell back to `execute_in_process` inside a `run_in_executor` thread. That
+fallback ran the whole pipeline in the web process *and* wrote Reflex state from a bare
+thread with no state lock (its own docstring warned that concurrent events could see torn
+state). The daemon-submission attempt and the placeholder-run-id reconciliation remain, so
+runs still appear in the Dagster UI as before.
+
+**Still true:** runs created this way are `execute_in_process` runs, so re-executing them
+from the Dagster UI is not supported (no `remote_job_origin`). Cleaning up orphans is
+unchanged: `uv run pipelines cleanup-runs --status STARTED`.
 
 ### Why both assets and jobs?
 

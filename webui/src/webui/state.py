@@ -41,6 +41,9 @@ from just_dna_pipelines.module_registry import (
     list_custom_modules,
     refresh_module_registry,
 )
+from webui.compute.jobs import await_job, forget_job, submit_job
+from webui.dagster_env import get_dagster_instance
+from webui.grid import SafeGridMixin
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
 
@@ -115,44 +118,9 @@ TISSUE_OPTIONS: List[str] = [
 MODULE_METADATA: Dict[str, Dict[str, str]] = build_module_metadata_dict(DISCOVERED_MODULES)
 
 
-def _ensure_dagster_config(dagster_home: Path) -> None:
-    """
-    Ensure dagster.yaml exists with proper configuration.
-    
-    Creates the config file if missing, enabling auto-materialization
-    and other important features.
-    """
-    config_file = dagster_home / "dagster.yaml"
-    
-    if config_file.exists():
-        return
-    
-    dagster_home.mkdir(parents=True, exist_ok=True)
-    
-    config_content = """# Dagster instance configuration
-# Storage defaults to DAGSTER_HOME
-
-# Enable auto-materialization for assets with AutoMaterializePolicy
-auto_materialize:
-  enabled: true
-  minimum_interval_seconds: 60
-"""
-    
-    config_file.write_text(config_content, encoding="utf-8")
-
-
-def get_dagster_instance() -> DagsterInstance:
-    """Get the Dagster instance, ensuring DAGSTER_HOME is set."""
-    # Find workspace root
-    root = Path(__file__).resolve().parents[3]
-    dagster_home = os.getenv("DAGSTER_HOME", "data/interim/dagster")
-    if not Path(dagster_home).is_absolute():
-        dagster_home = str((root / dagster_home).resolve())
-    
-    dagster_home_path = Path(dagster_home)
-    _ensure_dagster_config(dagster_home_path)
-    os.environ["DAGSTER_HOME"] = dagster_home
-    return DagsterInstance.get()
+# Dagster instance resolution lives in webui.dagster_env so compute-tier children can
+# reach the same instance without importing this module (and with it reflex, agno and
+# the module registry). get_dagster_instance is imported above for existing callers.
 
 
 def get_dagster_web_url() -> str:
@@ -251,12 +219,16 @@ def _parquet_is_ready(path: Path) -> bool:
     return not _parquet_is_empty(path)
 
 
-def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_key: str) -> None:
-    """Ensure normalized parquet exists and is fresh — pure function, no Reflex state.
+def _normalize_run_config_if_stale(
+    safe_user_id: str, selected_file: str, partition_key: str
+) -> dict | None:
+    """Return a ``normalize_vcf_job`` run config if normalization is needed, else None.
 
-    Checks the Dagster materialization hash against the current quality filter
-    config.  If stale or missing, runs the normalize_vcf_job in-process.
-    Safe to call from ``run_in_executor`` (no state lock needed).
+    Only the *decision* happens here — Dagster metadata plus a parquet footer read, both
+    cheap.  Running the job is the caller's job, via ``webui.compute.jobs``, so the
+    normalization pipeline never executes inside the ASGI process.
+
+    Pure function, no Reflex state: safe to call from ``run_in_executor``.
     """
     from just_dna_pipelines.module_config import _load_config
 
@@ -290,29 +262,19 @@ def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_
         needs_normalize = True
 
     if not needs_normalize:
-        return
+        return None
 
     vcf_path = get_user_input_dir() / safe_user_id / selected_file
     if not vcf_path.exists():
-        return
+        return None
 
-    run_config = {
+    return {
         "ops": {
             "user_vcf_normalized": {
                 "config": {"vcf_path": str(vcf_path.absolute())}
             }
         }
     }
-    job_def = defs.resolve_job_def("normalize_vcf_job")
-    existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
-    if partition_key not in existing:
-        instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
-
-    job_def.execute_in_process(
-        run_config=run_config,
-        instance=instance,
-        tags={"dagster/partition": partition_key, "source": "webui"},
-    )
 
 
 # Canonical tab order — single source of truth used both as the default for the
@@ -320,7 +282,7 @@ def _ensure_normalized_parquet(safe_user_id: str, selected_file: str, partition_
 DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis"]
 
 
-class UploadState(LazyFrameGridMixin, rx.State):
+class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     """Handle VCF uploads and Dagster lineage."""
 
     uploading: bool = False
@@ -346,7 +308,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
     # Custom module registry (managed by AgentState slot, kept here for remove/refresh)
 
     # Class variable to track active in-process runs (for SIGTERM cleanup)
-    # Maps run_id -> partition_key for runs executing via execute_in_process
+    # Maps token/run_id -> partition_key for jobs running in compute children
     _active_inproc_runs: Dict[str, str] = {}
 
     # Zenodo import state
@@ -891,34 +853,50 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.zenodo_url_input = zenodo_url
         return UploadState.handle_zenodo_import
 
-    def _execute_job_in_process(self, instance: DagsterInstance, job_name: str, run_config: dict, partition_key: str):
-        """Execute a Dagster job in-process (like prepare-annotations does).
+    @rx.event(background=True)
+    async def execute_job_in_compute(
+        self,
+        job_name: str,
+        run_config: dict,
+        partition_key: str,
+        sample_name: str,
+        status_field: str,
+        label: str = "",
+    ):
+        """Run a Dagster job in a compute child, tracking ``asset_statuses``.
 
-        This avoids all the daemon/workspace mismatch issues that submit_run has.
-        The job runs synchronously in the current process.
-
-        Note: We cannot track the run_id before execution because execute_in_process
-        creates the run internally. For orphaned STARTED runs from crashes,
-        use the CLI cleanup command: `uv run pipelines cleanup-runs --status STARTED`
+        The job used to run via ``execute_in_process`` directly inside the event
+        handler, which put the entire annotation pipeline — Polars ``sink_parquet``,
+        ``polars_bio.scan_vcf`` and its Tokio runtime, DuckDB joins — on the single ASGI
+        worker's event loop for minutes at a time.  Now it runs in a spawned child and
+        this handler only polls, so the UI stays responsive and the run is killable.
         """
-        job_def = defs.resolve_job_def(job_name)
-        
-        # Ensure the partition exists before running
-        existing_partitions = instance.get_dynamic_partitions(user_vcf_partitions.name)
-        if partition_key not in existing_partitions:
-            instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
-        
-        # Execute in-process - this creates and runs the job atomically
-        # Tag with source=webui so shutdown handler only cancels our runs
-        result = job_def.execute_in_process(
-            run_config=run_config,
-            instance=instance,
-            tags={
-                "dagster/partition": partition_key,
-                "source": "webui",
-            },
+        token = f"{status_field}:{partition_key}"
+        handle = submit_job(
+            token, job_name, run_config, partition_key, user_vcf_partitions.name
         )
-        return result
+        async with self:
+            UploadState._active_inproc_runs[token] = partition_key
+        try:
+            result = await await_job(handle)
+        finally:
+            forget_job(token)
+            async with self:
+                UploadState._active_inproc_runs.pop(token, None)
+
+        async with self:
+            statuses = dict(self.asset_statuses)
+            per_partition = dict(statuses.get(partition_key, {}))
+            per_partition[status_field] = "completed" if result.success else "failed"
+            statuses[partition_key] = per_partition
+            self.asset_statuses = statuses
+
+        suffix = f" with {label}" if label else ""
+        if result.success:
+            yield rx.toast.success(f"Annotation completed for {sample_name}{suffix}")
+        else:
+            detail = f": {result.error}" if result.error else ""
+            yield rx.toast.error(f"Annotation failed for {sample_name}{detail}")
 
     async def run_annotation(self, filename: str = ""):
         """Trigger materialization of user_annotated_vcf_duckdb for a file."""
@@ -934,20 +912,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
         sample_name = filename.replace(".vcf.gz", "").replace(".vcf", "")
         partition_key = f"{self.safe_user_id}/{sample_name}"
         
-        root = Path(__file__).resolve().parents[3]
         vcf_path = get_user_input_dir() / self.safe_user_id / filename
-        
-        instance = get_dagster_instance()
-        
+
         # Update status to running immediately
         if partition_key not in self.asset_statuses:
             self.asset_statuses[partition_key] = {}
         self.asset_statuses[partition_key]["annotated"] = "running"
         yield
-        
-        job_name = "annotate_vcf_duckdb_job"
-        
-        # Use Dagster API to submit run instead of execute_in_process
+
         run_config = {
             "ops": {
                 "annotate_user_vcf_duckdb_op": {
@@ -960,16 +932,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
             }
         }
 
-        # Execute job in-process (like prepare-annotations does)
-        # This avoids daemon/workspace mismatch issues
-        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
-        
-        if result.success:
-            self.asset_statuses[partition_key]["annotated"] = "completed"
-            yield rx.toast.success(f"Annotation completed for {sample_name}")
-        else:
-            self.asset_statuses[partition_key]["annotated"] = "failed"
-            yield rx.toast.error(f"Annotation failed for {sample_name}")
+        # Hand off to a compute child; execute_job_in_compute polls it without blocking.
+        yield UploadState.execute_job_in_compute(
+            "annotate_vcf_duckdb_job",
+            run_config,
+            partition_key,
+            sample_name,
+            "annotated",
+        )
 
     def toggle_module(self, module: str) -> Any:
         """Toggle a module on/off in the selection."""
@@ -1138,14 +1108,14 @@ class UploadState(LazyFrameGridMixin, rx.State):
             }
 
         modules_info = ", ".join(modules_to_use) if modules_to_use else ("Ensembl only" if has_ensembl else "all modules")
-        result = self._execute_job_in_process(instance, job_name, run_config, partition_key)
-        
-        if result.success:
-            self.asset_statuses[partition_key]["hf_annotated"] = "completed"
-            yield rx.toast.success(f"HF annotation completed for {sample_name} with {modules_info}")
-        else:
-            self.asset_statuses[partition_key]["hf_annotated"] = "failed"
-            yield rx.toast.error(f"HF annotation failed for {sample_name}")
+        yield UploadState.execute_job_in_compute(
+            job_name,
+            run_config,
+            partition_key,
+            sample_name,
+            "hf_annotated",
+            modules_info,
+        )
 
     vcf_exporting: bool = False
     vcf_export_run_id: str = ""
@@ -1255,13 +1225,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 updated_runs.append(r)
             self.runs = updated_runs
 
-            loop = asyncio.get_event_loop()
-            loop.run_in_executor(
-                None,
-                self._execute_inproc_with_state_update,
-                instance, job_name, run_config, partition_key, run_id, sample_name,
+            yield UploadState.execute_job_with_run_discovery(
+                job_name, run_config, partition_key, run_id, sample_name
             )
-            yield
 
     @rx.var
     def file_statuses(self) -> Dict[str, str]:
@@ -1285,7 +1251,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
     active_run_id: str = ""
     run_logs: List[str] = []
     polling_active: bool = False
-    # When set, poll_run_status will search for the real run created by execute_in_process
+    # When set, poll_run_status will search for the real run created in the compute child
     _inproc_discover_partition: str = ""
     _inproc_discover_since: float = 0.0
     _inproc_original_run_id: str = ""
@@ -1456,6 +1422,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.lf_grid_selected_info = "Click a row to see details."
         self._lf_grid_filter = {}
         self._lf_grid_sort = []
+        self.clear_grid_source()
         self.vcf_preview_error = ""
         self.vcf_preview_loading = False
         self.preview_source_label = ""
@@ -2053,10 +2020,32 @@ class UploadState(LazyFrameGridMixin, rx.State):
         partition_key = f"{safe_user_id}/{sample_name}"
 
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
+        normalize_config = await loop.run_in_executor(
             None,
-            lambda: _ensure_normalized_parquet(safe_user_id, selected_file, partition_key),
+            lambda: _normalize_run_config_if_stale(safe_user_id, selected_file, partition_key),
         )
+        if normalize_config is not None:
+            # Normalization is a full Polars/polars-bio pass over the genome: run it in a
+            # spawned child, not here.  Awaiting the handle does not block the loop.
+            token = f"normalize:{partition_key}"
+            handle = submit_job(
+                token,
+                "normalize_vcf_job",
+                normalize_config,
+                partition_key,
+                user_vcf_partitions.name,
+            )
+            try:
+                result = await await_job(handle)
+            finally:
+                forget_job(token)
+            if not result.success:
+                async with self:
+                    self.progress_status = ""
+                    self.vcf_preview_error = (
+                        f"VCF normalization failed: {result.error or 'see Dagster UI'}"
+                    )
+                return
 
         async with self:
             self.progress_status = "Loading VCF preview..."
@@ -2087,6 +2076,9 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 lf = pl.scan_parquet(str(normalized))
                 for _ in self.set_lazyframe(lf, {}, chunk_size=300):
                     pass
+                # Tell SafeGridMixin how a compute worker can reopen this data, so
+                # sorting and filtering happen out-of-process instead of on the loop.
+                self.register_grid_source("scan_file", normalized)
                 _inject_rsid_link_renderer(self)
                 self.preview_source_label = f"{self.selected_file} (normalized)"
                 self.vcf_preview_loading = False
@@ -2105,6 +2097,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             descriptions = extract_vcf_descriptions(lazy_vcf)
             for _ in self.set_lazyframe(lazy_vcf, descriptions, chunk_size=300):
                 pass
+            self.register_grid_source("prepare_vcf", vcf_path)
             _inject_rsid_link_renderer(self)
             self.preview_source_label = f"{vcf_path.name} (raw VCF fallback)"
         except Exception as e:
@@ -2545,90 +2538,75 @@ class UploadState(LazyFrameGridMixin, rx.State):
         if self.vcf_export_run_id == old_id:
             self.vcf_export_run_id = new_id
 
-    def _execute_inproc_with_state_update(
+    @rx.event(background=True)
+    async def execute_job_with_run_discovery(
         self,
-        instance: DagsterInstance,
         job_name: str,
         run_config: dict,
         partition_key: str,
         original_run_id: str,
-        sample_name: str
+        sample_name: str,
     ) -> None:
-        """
-        Execute job in-process and update UI state with result.
+        """Run a Dagster job in a compute child and reconcile the placeholder run id.
 
-        This method runs synchronously but is called from a background thread/executor
-        to avoid blocking the UI. DO NOT use asyncio.to_thread() here - causes
-        Python/Rust interop panics with Dagster objects.
+        Replaces the old thread-based ``_execute_inproc_with_state_update``, which had two
+        defects this fixes: it ran the whole pipeline inside the ASGI process, and it
+        wrote Reflex state from a bare thread with no state lock (its own docstring
+        warned that concurrent events could see torn state).  Here every state write is
+        inside ``async with self:``, and the pipeline is in another process entirely.
 
-        WARNING: Modifies Reflex state directly from a thread without the async
-        state lock.  The poll_run_status handler is the primary state-update
-        mechanism; the writes here are best-effort fallbacks.  Concurrent
-        events on the same session may see stale/torn state.
+        Dagster assigns the real run id inside the child, so the placeholder created for
+        the UI is swapped once the child reports back.  ``poll_run_status`` may discover
+        the real run first via the partition-key hint; both paths converge.
         """
-        actual_run_id = None
+        handle = submit_job(
+            original_run_id, job_name, run_config, partition_key, user_vcf_partitions.name
+        )
+        async with self:
+            UploadState._active_inproc_runs[original_run_id] = partition_key
+            self._add_log(f"Job running in compute child pid={handle.pid}")
+
         try:
-            result = self._execute_job_in_process(
-                instance, job_name, run_config, partition_key
-            )
-            
-            actual_run_id = result.run_id
-            UploadState._active_inproc_runs[actual_run_id] = partition_key
-            
-            self._add_log(f"Job completed via in-process execution with run ID: {actual_run_id}")
-            
-            # Clear discovery state (poller may or may not have found it already)
+            result = await await_job(handle)
+        finally:
+            forget_job(original_run_id)
+
+        async with self:
+            UploadState._active_inproc_runs.pop(original_run_id, None)
             self._inproc_discover_partition = ""
             self._inproc_discover_since = 0.0
             self._inproc_original_run_id = ""
-            
-            # Final update with real run ID and terminal status
-            self._swap_run_id(original_run_id, actual_run_id)
-            updated_runs = []
-            for r in self.runs:
-                if r["run_id"] == actual_run_id:
-                    r["status"] = "SUCCESS" if result.success else "FAILURE"
-                    r["ended_at"] = datetime.now().isoformat()
-                    if not result.success:
-                        r["error"] = "Job failed - check Dagster UI for details"
-                    if result.success:
-                        output_dir = get_user_output_dir() / self.safe_user_id / sample_name / "modules"
-                        if output_dir.exists():
-                            r["output_path"] = str(output_dir)
-                updated_runs.append(r)
-            self.runs = updated_runs
-            
             self.running = False
             self.vcf_exporting = False
             self.vcf_export_run_id = ""
             self.polling_active = False
             self.last_run_success = result.success
-            self._load_output_files_sync()
-            
-        except Exception as e:
-            error_message = str(e)
-            self._add_log(f"In-process execution failed: {error_message}")
-            
-            self._inproc_discover_partition = ""
-            self._inproc_discover_since = 0.0
-            self._inproc_original_run_id = ""
-            self.running = False
-            self.vcf_exporting = False
-            self.vcf_export_run_id = ""
-            self.polling_active = False
-            self.last_run_success = False
-            
+
+            if result.run_id:
+                self._add_log(f"Job finished with Dagster run ID: {result.run_id}")
+                self._swap_run_id(original_run_id, result.run_id)
+            terminal_id = result.run_id or original_run_id
+
             updated_runs = []
             for r in self.runs:
-                if r["run_id"] == original_run_id:
-                    r["status"] = "FAILURE"
+                if r["run_id"] == terminal_id:
+                    r["status"] = "SUCCESS" if result.success else "FAILURE"
                     r["ended_at"] = datetime.now().isoformat()
-                    r["error"] = f"Execution failed: {error_message}"
+                    if result.success:
+                        output_dir = (
+                            get_user_output_dir() / self.safe_user_id / sample_name / "modules"
+                        )
+                        if output_dir.exists():
+                            r["output_path"] = str(output_dir)
+                    else:
+                        r["error"] = result.error or "Job failed - check Dagster UI for details"
                 updated_runs.append(r)
             self.runs = updated_runs
-        finally:
-            if actual_run_id and actual_run_id in UploadState._active_inproc_runs:
-                del UploadState._active_inproc_runs[actual_run_id]
+
+            if not result.success and result.error:
+                self._add_log(f"Job execution failed: {result.error}")
+            if result.success:
+                self._load_output_files_sync()
 
     async def start_annotation_run(self):
         """Start annotation for the selected file with selected modules and/or Ensembl."""
@@ -2798,7 +2776,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
             self._add_log("Starting in-process execution (this will take a few minutes)...")
             yield rx.toast.info(f"Running in-process for {sample_name} - please wait...")
             
-            # Delete the dummy run — execute_in_process will create a real one.
+            # Delete the dummy run — the compute child will create a real one.
             instance.delete_run(run_id)
             
             # Tell the poller to discover the real run ID by partition key + timestamp.
@@ -2816,14 +2794,12 @@ class UploadState(LazyFrameGridMixin, rx.State):
                 updated_runs.append(r)
             self.runs = updated_runs
             
-            # Execute in thread pool to avoid blocking UI and Python GIL issues
-            loop = asyncio.get_event_loop()
-            loop.run_in_executor(
-                None,  # Use default executor
-                self._execute_inproc_with_state_update,
-                instance, job_name, run_config, partition_key, run_id, sample_name
+            # Hand off to a spawned compute child.  The old code ran this in a thread of
+            # the ASGI process, which put the whole pipeline on this worker and wrote
+            # state without the lock.
+            yield UploadState.execute_job_with_run_discovery(
+                job_name, run_config, partition_key, run_id, sample_name
             )
-            # Don't await - let it run in background and update state when done
     
     def _add_log(self, message: str):
         """Add a timestamped log entry."""
@@ -2841,7 +2817,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         When ``_inproc_discover_partition`` is set, the active_run_id points to
         a deleted placeholder. We search all recent Dagster runs (any status)
         matching the partition key and created after ``_inproc_discover_since``
-        to discover the real run created by execute_in_process.
+        to discover the real run created in the compute child.
         """
         if not self.polling_active:
             return
@@ -3330,7 +3306,7 @@ class UploadState(LazyFrameGridMixin, rx.State):
         self.runs = run_list
 
 
-class OutputPreviewState(LazyFrameGridMixin, rx.State):
+class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     """Independent state for the output file preview grid.
 
     Inherits its own ``LazyFrameGridMixin`` so the output grid has a
@@ -3381,6 +3357,7 @@ class OutputPreviewState(LazyFrameGridMixin, rx.State):
 
         lf, descriptions = scan_file(path)
         yield from self.set_lazyframe(lf, descriptions, chunk_size=300)
+        self.register_grid_source("scan_file", path)
         _inject_rsid_link_renderer(self)
 
         self.output_preview_label = path.name
@@ -3629,7 +3606,7 @@ def _classify_sample_type(variant_count: int) -> tuple[str, float]:
     return "array", 0.85
 
 
-class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
+class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     """PRS computation state — delegates entirely to PRSComputeStateMixin.
 
     The mixin handles score loading, selection, batch compute, quality
@@ -4201,7 +4178,7 @@ def _build_trait_column_overrides() -> dict:
     }
 
 
-class PRSTraitState(LazyFrameGridMixin, rx.State):
+class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     """Trait-grouped PRS selection grid.
 
     Groups PGS Catalog scores by EFO trait so the user can select traits

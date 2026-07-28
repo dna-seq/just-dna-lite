@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import io
 import sys
+from collections.abc import AsyncIterator
 from pathlib import Path
 import zipfile
 
@@ -11,6 +13,9 @@ from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingRes
 from just_dna_pipelines.annotation.analytics import inject_umami_tracker, umami_config
 from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.annotation.resources import get_user_output_dir
+from webui.compute.jobs import kill_all_jobs
+from webui.compute.pool import start_pool, stop_pool
+from webui.grid import clear_grid_artifacts
 from reflex import constants
 from reflex_base.config import get_config
 from starlette.datastructures import MutableHeaders
@@ -109,6 +114,12 @@ _GENERATED_MODULES_DIR = get_generated_modules_dir()
 
 # Create a FastAPI app for custom API routes
 api = FastAPI()
+
+# No liveness route is defined here on purpose.  Reflex already registers `/ping`
+# (JSONResponse("pong"), no dependency checks) and `/_health` (which also probes the
+# DB and Redis and returns 503 when they fail).  The serve watchdog polls `/ping`:
+# a 503 from `/_health` would make it SIGKILL a perfectly live server over an
+# unrelated dependency hiccup.  See webui/serve_watchdog.py.
 
 
 @api.get("/api/download/{user_id}/{sample_name}/{filename}")
@@ -410,6 +421,31 @@ app = rx.App(
     # so future FastAPI websocket routes can still be handled explicitly.
     api_transformer=[_close_unmatched_websockets, _disable_stale_frontend_cache, api],
 )
+
+
+@contextlib.asynccontextmanager
+async def _compute_tier_lifespan() -> AsyncIterator[None]:
+    """Own the compute tier for the lifetime of the ASGI app.
+
+    Bringing the pool up here rather than on first use means the spawn cost and the
+    workers' polars import are paid at startup, not by whoever clicks a column header
+    first.  On the way out, workers and job children are SIGKILLed: a child parked in a
+    native thread pool never runs a Python signal handler, so a polite shutdown would
+    leave orphans behind.
+    """
+    clear_grid_artifacts()  # a SIGKILLed previous run leaves ownerless sorted parquet
+    start_pool()
+    try:
+        yield
+    finally:
+        stop_pool()
+        killed = kill_all_jobs()
+        if killed:
+            print(f"[compute] killed {len(killed)} job child(ren) on shutdown", flush=True)
+        clear_grid_artifacts()
+
+
+app.register_lifespan_task(_compute_tier_lifespan)
 
 # Ensure pages are registered.
 app.add_page(dashboard_page)
