@@ -1,20 +1,24 @@
 """
 Ensembl rsid <-> position resolution for just-dna-pipelines.
 
-The rsid/position *lookup* logic now lives in ``just-dna-compiler`` (``just_dna_compiler.resolver``),
+The rsid/position *lookup* logic lives in ``just-dna-enricher`` (``just_dna_enricher.resolver``),
 which is deliberately inject-only — it never downloads a reference. This module keeps the
 pipelines-specific *provisioning* the library omits: ``ensure_resolver_db`` builds the Ensembl
 DuckDB from the local parquet cache, downloading it from HuggingFace Hub if absent. ``resolve_variants``
 here provisions that DuckDB on demand and then delegates the actual lookup to the library, so direct
 callers keep the pre-extraction behavior. See just-dna-format/docs/{CHANGELOG,ROADMAP}.md.
+
+As of the 0.5 line the lookup moved out of ``just-dna-compiler`` into the enricher's network/reference
+tier; ``just_dna_compiler.resolution`` is now purely table-injected (``resolve_from_table``) and carries
+no DuckDB path.
 """
 
 import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from just_dna_compiler.resolver import EnsemblReferenceError
-from just_dna_compiler.resolver import resolve_variants as _lib_resolve_variants
+from just_dna_enricher.resolver import EnsemblReferenceError
+from just_dna_enricher.resolver import resolve_variants as _lib_resolve_variants
 
 from just_dna_pipelines.module_compiler.models import VariantRow
 

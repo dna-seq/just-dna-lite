@@ -5,6 +5,10 @@ Uploads the compiled artifacts (weights/annotations/studies.parquet + manifest.j
 present) to ``datasets/<collection>/data/<name>/`` in a single commit, matching the layout the
 discovery machinery scans (``annotation.hf_modules``). Requires a HuggingFace token with write access
 to the collection (``hf auth login`` or the ``HF_TOKEN`` env var).
+
+**Canonical home (0.5+):** ``just_dna_enricher.upload`` / ``just-dna-enricher upload``
+(``pip install 'just-dna-enricher[dev]'``). This module stays until pipelines adopts the enricher
+tier and then becomes a thin modules.yaml-aware re-export.
 """
 
 from pathlib import Path

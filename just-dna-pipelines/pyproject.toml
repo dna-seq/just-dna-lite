@@ -19,11 +19,18 @@ dependencies = [
     "dagster-webserver>=1.12.22",
     "eliot>=1.17.5",
     "fsspec>=2026.2.0",
-    "google-genai>=1.71.0",
+    "google-genai>=1.71.0,<2.0",
     "huggingface-hub>=1.10.0",
-    "just-dna-compiler>=0.2.0",
-    "just-dna-format>=0.2.0",
-    "mcp>=1.27.0",
+    # The 0.5 line closed the digest window: anything that moves a compiled module's
+    # artifact.digest is 1.0 from here, so 0.5.x is a stable target to sit on.
+    "just-dna-compiler>=0.5.1",
+    "just-dna-enricher>=0.5.1",
+    "just-dna-format>=0.5.0",
+    # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
+    # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
+    # mcp 2.0.0 removed both, so `from agno.tools.mcp import MCPTools` raises ImportError.
+    # Verified still broken on agno 2.8.5. Drop the cap once agno supports mcp 2.x.
+    "mcp>=1.27.0,<2.0",
     "numpy>=2.4.3",
     "openai>=2.31.0",
     "pillow>=12.2.0",

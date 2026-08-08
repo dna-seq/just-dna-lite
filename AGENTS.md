@@ -124,8 +124,10 @@ this repo into two published libraries. **Do not re-vendor or fork them here.**
   - `integrity` — `sha256_file`, `artifact_digest` (Merkle root), `build_artifact`, `verify_manifest`
   - `identity` — name/namespace rules, SemVer `Version`, `canonical_id`, legacy `vN → N.0.0`
 - **`just-dna-compiler`** (`just_dna_compiler`, adds polars/duckdb): `validate_spec`,
-  `compile_module` (emits `manifest.json` with input/artifact hashes + digest), `reverse_module`,
-  and an **inject-only** Ensembl `resolver` (never downloads a reference).
+  `compile_module` (emits `manifest.json` with input/artifact hashes + digest), `reverse_module`.
+- **`just-dna-enricher`** (`just_dna_enricher`, added in the 0.5 line): the network/reference tier —
+  Ensembl/ClinVar/gnomAD/PGx enrichment, and the Ensembl `resolver` (`EnsemblReferenceError`,
+  `resolve_variants`). Still **inject-only**: it never downloads a reference.
 
 These libraries are **shared by three repos**: `just-dna-lite` (this one), `just-dna-marketplace`,
 and `just-dna-agents`. Treat them as an external contract; **do not assume a symbol is unused** just
@@ -140,6 +142,30 @@ because grep finds no consumer in this repo — the other repos may use it.
   `register_custom_module` and the pipelines `resolve_variants` wrapper auto-provision the cache and
   inject it; the bare `compile_module` re-export and the `pipelines module compile` CLI stay
   inject-only (skip resolution with a warning if no cache is present).
+
+### Where things moved in the 0.5 line (format 0.5.0 / compiler 0.5.1 / enricher 0.5.1)
+
+Two import sites in this repo had to move; both are one-liners, but neither is greppable from the
+old name, so check here first:
+
+- `RSID_PATTERN` left `just_dna_format.spec` for **`just_dna_format.vocab`** (0.4.0), where the
+  identifier grammars now live shared across the authored models. `ALLELE_PATTERN` is still
+  re-exported from `spec` for backwards compatibility — `RSID_PATTERN` is not.
+- `just_dna_compiler.resolver` is **gone**. The DuckDB-backed lookup moved to
+  **`just_dna_enricher.resolver`** (same `resolve_variants(variants, ensembl_cache=...)` signature
+  and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
+  which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
+
+**The 0.5 digest window is closed:** anything that moves a compiled module's `artifact.digest` — a
+new column, a requiredness or identity change — is a 1.0 in the format repo, so 0.5.x is a stable
+target. Note the three packages version independently (enricher can take a patch on its own).
+
+**Still outstanding from the 0.4.0 schema change:** compiled artifacts gained ~14 columns
+(`variant_key`, `effect_size`, `clin_sig`, `acmg_sf`, …), so freshly compiled modules no longer
+match the modules published on HuggingFace under 0.3.x. `VariantRow.variant_key` is also frozen at
+load, so the resolver no longer backfills `chrom`/`start` onto a keyed row, and `ModuleInfo` no
+longer accepts `version`. Migrating means republishing the HF modules and updating the AI module
+creator's spec template — the roundtrip/compiler tests fail until that happens.
 
 ### Contract facts (0.1.0 libs)
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
