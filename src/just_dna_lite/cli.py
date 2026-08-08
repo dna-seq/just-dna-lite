@@ -139,6 +139,59 @@ def _kill_process_group(proc: Optional[subprocess.Popen]) -> None:
         typer.secho(f"Error killing process group: {e}", fg=typer.colors.RED, err=True)
 
 
+def _signal_process_group(proc: subprocess.Popen, sig: signal.Signals) -> None:
+    """Send a signal to a child process group."""
+
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(os.getpgid(proc.pid), sig)
+    except ProcessLookupError:
+        return
+
+
+def _wait_for_processes(processes: list[subprocess.Popen], timeout: float) -> list[subprocess.Popen]:
+    """Wait for child processes, returning those still running after timeout."""
+
+    deadline = time.monotonic() + timeout
+    remaining = [proc for proc in processes if proc.poll() is None]
+    for proc in remaining:
+        wait_timeout = max(0.0, deadline - time.monotonic())
+        try:
+            proc.wait(timeout=wait_timeout)
+        except subprocess.TimeoutExpired:
+            pass
+    return [proc for proc in processes if proc.poll() is None]
+
+
+def _shutdown_processes(processes: list[subprocess.Popen]) -> None:
+    """Gracefully stop all managed child process groups before exiting."""
+
+    live = [proc for proc in processes if proc.poll() is None]
+    if not live:
+        return
+
+    for proc in live:
+        _signal_process_group(proc, signal.SIGTERM)
+
+    live = _wait_for_processes(live, timeout=30)
+    for proc in live:
+        _signal_process_group(proc, signal.SIGKILL)
+
+    _wait_for_processes(live, timeout=5)
+
+
+def _run_managed_foreground(command: list[str]) -> int:
+    """Run a foreground child and let it finish cleanly on Ctrl+C."""
+
+    proc = subprocess.Popen(command, start_new_session=True)
+    try:
+        return proc.wait()
+    except KeyboardInterrupt:
+        _shutdown_processes([proc])
+        return 0
+
+
 def _kill_port_owner(port: int) -> None:
     """Kill the process listening on the specified port."""
     import socket
@@ -267,10 +320,11 @@ def start_dagster(
     typer.secho(f"\n💡 Dagster UI will be available at: http://{dagster_host}:{dagster_port}\n", fg=typer.colors.GREEN, bold=True)
     
     dg_path = Path(sys.executable).parent / "dg"
-    os.execvp(
-        str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host]
+    exit_code = _run_managed_foreground(
+        [str(dg_path), "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host]
     )
+    if exit_code != 0:
+        raise typer.Exit(exit_code)
 
 
 @app.command("start")
@@ -345,12 +399,19 @@ def start_all(
 
     # 1. Start the UI in the background via the workspace script
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
-    subprocess.Popen(["uv", "run", "--package", "webui", "run"])
+    child_processes: list[subprocess.Popen] = []
+    ui_proc = subprocess.Popen(
+        ["uv", "run", "--package", "webui", "run"],
+        cwd=root,
+        start_new_session=True,
+    )
+    child_processes.append(ui_proc)
 
     # Give it a moment to initialize
     time.sleep(2)
 
-    # 2. Start Dagster by REPLACING this process (exec)
+    # 2. Start Dagster as the foreground child. The root launcher owns shutdown
+    # ordering so child processes can flush and exit before the root exits.
     typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
     typer.echo(f"📁 Dagster home: {dagster_home}")
     dagster_file_path = root / dagster_file
@@ -383,13 +444,23 @@ def start_all(
     except Exception:
         pass
     
-    # KeyboardInterrupt tracebacks from Dagster's internal watch_orphans.py scripts
-    # are normal behavior - those scripts don't have signal handlers
     dg_path = Path(sys.executable).parent / "dg"
-    os.execvp(
-        str(dg_path),
-        ["dg", "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host]
+    dagster_proc = subprocess.Popen(
+        [str(dg_path), "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host],
+        cwd=root,
+        start_new_session=True,
     )
+    child_processes.append(dagster_proc)
+    try:
+        exit_code = dagster_proc.wait()
+    except KeyboardInterrupt:
+        _shutdown_processes(child_processes)
+        return
+    finally:
+        _shutdown_processes([proc for proc in child_processes if proc is not dagster_proc])
+
+    if exit_code != 0:
+        raise typer.Exit(exit_code)
 
 
 def _resolve_ensembl_cache(cache_dir_override: Optional[str]) -> Path:
