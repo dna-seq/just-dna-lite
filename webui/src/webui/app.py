@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import logging
 import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -17,6 +18,7 @@ from webui.compute.jobs import kill_all_jobs
 from webui.compute.pool import start_pool, stop_pool
 from webui.grid import clear_grid_artifacts
 from reflex import constants
+from reflex.app import default_frontend_exception_handler
 from reflex_base.config import get_config
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -34,6 +36,18 @@ from webui.pages.faq import faq_page  # noqa: E402
 
 # Note: Shutdown cleanup of STARTED runs is handled by the parent `uv run start` command,
 # which catches Ctrl+C and cleans up before killing subprocesses.
+
+logger = logging.getLogger(__name__)
+_SUPPRESSED_STALE_CLIENT_FRONTEND_ERROR_MARKERS = (
+    "typeerror: t is not a function",
+)
+_SUPPRESSED_STALE_CLIENT_STACK_MARKERS = (
+    "connect/<@",
+    "socket.<anonymous>",
+    "/assets/context-",
+    "/assets/helmet-",
+)
+_logged_suppressed_frontend_errors: set[str] = set()
 
 
 # ============================================================================
@@ -332,20 +346,73 @@ def _is_reflex_event_websocket(path: str) -> bool:
     return path == event_path or path.startswith(f"{event_path}/")
 
 
-def _close_unmatched_websockets(asgi_app: ASGIApp) -> ASGIApp:
-    """Prevent websocket fallthrough into Reflex's catch-all static frontend.
+def _handle_frontend_exception(exception: Exception) -> None:
+    """Suppress known stale-client frontend errors; keep normal Reflex logging."""
+
+    message = str(exception).lower()
+    if all(marker in message for marker in _SUPPRESSED_STALE_CLIENT_FRONTEND_ERROR_MARKERS) and any(
+        marker in message for marker in _SUPPRESSED_STALE_CLIENT_STACK_MARKERS
+    ):
+        if "reflex-version-mismatch" not in _logged_suppressed_frontend_errors:
+            logger.warning("Suppressing repeated stale Reflex frontend bundle errors")
+            _logged_suppressed_frontend_errors.add("reflex-version-mismatch")
+        return
+
+    default_frontend_exception_handler(exception)
+
+
+def _normalize_raw_path(raw_path: object, new_path: str) -> bytes:
+    """Return a raw_path compatible with a rewritten ASGI path."""
+
+    if isinstance(raw_path, bytes) and raw_path:
+        query_index = raw_path.find(b"?")
+        if query_index >= 0:
+            return new_path.encode("utf-8") + raw_path[query_index:]
+    return new_path.encode("utf-8")
+
+
+def _guard_reflex_event_websockets(asgi_app: ASGIApp) -> ASGIApp:
+    """Normalize Reflex event websockets and close stale frontend clients early.
 
     In production fullstack mode Reflex mounts the compiled frontend at `/`.
     Unknown websocket paths can otherwise reach Starlette StaticFiles, which
     asserts that the ASGI scope is HTTP-only and logs a server exception.
+
+    Reflex also only warns after accepting a frontend/backend version mismatch.
+    Closing stale clients with 1012 forces old browser bundles to reconnect
+    against the current hashed assets instead of spamming frontend exceptions.
     """
 
     async def guarded_app(scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "websocket" and not _is_reflex_event_websocket(
-            str(scope.get("path", ""))
-        ):
-            await send({"type": "websocket.close", "code": 1008})
-            return
+        if scope["type"] == "websocket":
+            path = str(scope.get("path", ""))
+            event_path = _event_websocket_path().rstrip("/")
+            if path == event_path:
+                normalized_path = f"{event_path}/"
+                scope = {
+                    **scope,
+                    "path": normalized_path,
+                    "raw_path": _normalize_raw_path(scope.get("raw_path"), normalized_path),
+                }
+                path = normalized_path
+
+            if not _is_reflex_event_websocket(path):
+                await send({"type": "websocket.close", "code": 1000})
+                return
+
+            subprotocols = scope.get("subprotocols") or []
+            frontend_version = str(subprotocols[0]) if subprotocols else ""
+            if frontend_version and frontend_version != constants.Reflex.VERSION:
+                if "stale-ws" not in _logged_suppressed_frontend_errors:
+                    logger.warning(
+                        "Closing stale Reflex frontend websocket: frontend=%s backend=%s "
+                        "(further occurrences suppressed)",
+                        frontend_version,
+                        constants.Reflex.VERSION,
+                    )
+                    _logged_suppressed_frontend_errors.add("stale-ws")
+                await send({"type": "websocket.close", "code": 1012})
+                return
 
         await asgi_app(scope, receive, send)
 
@@ -417,9 +484,10 @@ app = rx.App(
     # Disable Radix theme to let Fomantic UI styles work properly
     theme=None,
     head_components=_head_components(),
+    frontend_exception_handler=_handle_frontend_exception,
     # Guard the Reflex backend before mounting it under custom FastAPI routes,
     # so future FastAPI websocket routes can still be handled explicitly.
-    api_transformer=[_close_unmatched_websockets, _disable_stale_frontend_cache, api],
+    api_transformer=[_guard_reflex_event_websockets, _disable_stale_frontend_cache, api],
 )
 
 
