@@ -45,6 +45,8 @@ from agno.tools.nano_banana import NanoBananaTools
 from agno.utils.log import configure_agno_logging
 import agno.utils.log as _agno_log_module
 
+from just_dna_format.identity import is_valid_version, version_from_legacy
+
 from just_dna_pipelines.module_registry import validate_module_spec
 
 load_dotenv()
@@ -248,16 +250,21 @@ def _write_spec_files(
     color: str,
     variants_csv_content: str,
     studies_csv_content: Optional[str] = None,
-    version: int = 1,
+    version: int | str = 1,
 ) -> str:
     """Persist module_spec.yaml + CSV files to disk."""
     spec_dir.mkdir(parents=True, exist_ok=True)
+
+    # ModuleInfo.version is a SemVer *string*. Emitting the bare editing-slot integer
+    # produced `version: 1`, which YAML loads as an int and the spec then rejects with
+    # "Input should be a valid string". Quote it and widen `1` to `1.0.0`.
+    spec_version = _semver_string(version)
 
     yaml_content = (
         f'schema_version: "1.0"\n\n'
         f"module:\n"
         f"  name: {module_name}\n"
-        f"  version: {version}\n"
+        f'  version: "{spec_version}"\n'
         f'  title: "{title}"\n'
         f'  description: "{description}"\n'
         f'  report_title: "{report_title}"\n'
@@ -292,13 +299,40 @@ def _validate_spec(spec_dir: str) -> str:
         stats = result.stats or {}
         return (
             f"VALID. Module '{stats.get('module_name', '?')}': "
-            f"{stats.get('variant_rows', '?')} variant rows, "
+            # `variant_count`, not `variant_rows` — renamed in just-dna-format; the old
+            # key silently rendered as '?' in every validation message the agent saw.
+            f"{stats.get('variant_count', '?')} variant rows, "
             f"{stats.get('unique_rsids', '?')} unique rsids, "
+            f"{stats.get('gene_count', '?')} genes, "
             f"categories: {stats.get('categories', '?')}. "
             f"Warnings: {warnings_text}"
         )
     return f"INVALID. Errors: {result.errors}. Warnings: {warnings_text}"
 
+
+
+def _semver_string(version: int | str) -> str:
+    """Normalise an editing-slot version to the SemVer string ModuleInfo requires.
+
+    Accepts what the slot machinery uses (``1``), what a hand-edited spec may already
+    carry (``"1.0.0"``), and the legacy directory spelling (``"v1"``).
+    """
+    text = str(version).strip()
+    return text if is_valid_version(text) else version_from_legacy(text)
+
+
+def _major_version(raw: Any) -> int:
+    """Read the editing-slot integer back out of a spec's version field.
+
+    The slot model counts in whole numbers (``next = current + 1``), so a SemVer
+    ``2.3.1`` reads back as ``2``. Anything unparseable falls back to 1 rather than
+    raising, matching the rest of this reader.
+    """
+    text = str(raw).strip().lstrip("v")
+    if not text:
+        return 1
+    head = text.split(".", 1)[0]
+    return int(head) if head.isdigit() else 1
 
 
 def read_spec_meta(spec_dir: Path) -> Dict[str, Any]:
@@ -318,7 +352,7 @@ def read_spec_meta(spec_dir: Path) -> Dict[str, Any]:
         return {}
     return {
         "name": module.get("name", ""),
-        "version": int(module.get("version", 1)),
+        "version": _major_version(module.get("version", 1)),
         "title": module.get("title", ""),
         "description": module.get("description", ""),
         "report_title": module.get("report_title", ""),
@@ -337,10 +371,14 @@ def bump_spec_version(spec_dir: Path, new_version: int) -> None:
     if not yaml_path.exists():
         return
     content = yaml_path.read_text(encoding="utf-8")
-    if re.search(r"^\s*version:\s*\d+", content, flags=re.MULTILINE):
+    # Matches the bare legacy integer, `v1`, and the quoted SemVer written today, so a
+    # spec produced before the SemVer switch still bumps instead of silently gaining a
+    # second version line.
+    replacement = _semver_string(new_version)
+    if re.search(r"""^\s*version:\s*["']?v?\d""", content, flags=re.MULTILINE):
         updated = re.sub(
-            r"^(\s*version:\s*)\d+",
-            rf"\g<1>{new_version}",
+            r"""^(\s*version:\s*)["']?v?[\d.]+["']?""",
+            rf'\g<1>"{replacement}"',
             content,
             count=1,
             flags=re.MULTILINE,
@@ -350,7 +388,7 @@ def bump_spec_version(spec_dir: Path, new_version: int) -> None:
         for i, line in enumerate(lines):
             if line.strip().startswith("name:"):
                 indent = " " * (len(line) - len(line.lstrip()))
-                lines.insert(i + 1, f"{indent}version: {new_version}")
+                lines.insert(i + 1, f'{indent}version: "{replacement}"')
                 break
         updated = "\n".join(lines)
     yaml_path.write_text(updated, encoding="utf-8")

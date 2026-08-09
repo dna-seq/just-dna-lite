@@ -80,8 +80,10 @@ def test_agent_creates_valid_module(agent_output_dir: Path) -> None:
     assert result.valid, f"Generated spec is invalid: {result.errors}"
 
     stats = result.stats or {}
-    assert stats.get("variant_rows", 0) > 0, "No variant rows generated"
-    assert stats.get("unique_rsids", 0) > 0, "No rsids generated"
+    # `variant_count`, not the pre-0.3 `variant_rows` — just-dna-format renamed the
+    # validate_spec stats keys (also unique_genes -> gene_count, study_rows -> study_count).
+    assert stats.get("variant_count", 0) > 0, f"No variant rows generated: {stats}"
+    assert stats.get("unique_rsids", 0) > 0, f"No rsids generated: {stats}"
 
     # Check that at least some of the expected rsids are present
     variants_text = (spec_dir / "variants.csv").read_text(encoding="utf-8")

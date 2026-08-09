@@ -77,7 +77,8 @@ def validate_module_spec(spec_dir: Path) -> ValidationResult:
 
     Use this as a dry-run check before calling ``register_custom_module``.
     Returns a ``ValidationResult`` with ``valid``, ``errors``, ``warnings``,
-    and ``stats`` (module_name, variant_rows, unique_rsids, categories, etc.).
+    and ``stats`` (module_name, variant_count, unique_rsids, gene_count, genes,
+    categories, study_count).
 
     Args:
         spec_dir: Path to a folder containing module_spec.yaml + CSVs.

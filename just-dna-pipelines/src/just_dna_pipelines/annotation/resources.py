@@ -17,9 +17,19 @@ import requests
 from platformdirs import user_cache_dir
 
 from just_dna_pipelines.module_config import get_immutable_config
+from just_dna_pipelines.runtime import load_env
 
 LOGGER = logging.getLogger(__name__)
 logger = LOGGER
+
+# Every path helper below reads a JUST_DNA_PIPELINES_* variable, so .env has to be loaded
+# before the first of them runs — not just by whichever entry point happens to call
+# load_env() early. The webui does; pytest and any direct library use do not, and the
+# failure is silent and expensive: get_default_ensembl_cache_dir() falls back to the
+# platform user-cache dir, creates it, and re-downloads gigabytes of Ensembl parquet to a
+# different disk than the configured one. load_env() does not override variables already
+# set in the environment, so an explicit export still wins.
+load_env()
 
 PERMISSIVE_LICENSES = {
     "cc-zero", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0",

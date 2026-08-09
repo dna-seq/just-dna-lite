@@ -18,8 +18,10 @@ from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
 )
+from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
+from just_dna_enricher.cli import app as enricher_app
 from just_dna_marketplace.client_cli import app as marketplace_client_app
 
 app = typer.Typer(
@@ -30,6 +32,13 @@ app = typer.Typer(
 )
 app.add_typer(module_compiler_app, name="module")
 app.add_typer(v1_port_app, name="v1-port")
+app.add_typer(agent_app, name="agent")
+# The enricher's own Typer app, mounted whole rather than re-declared. It is the authoring
+# tier that fills `resolution.csv` and the 0.5 fact sidecars, which `module compile` then
+# consumes with no reference and no network — the replacement for injecting an Ensembl
+# DuckDB, which just-dna-compiler deprecates for removal at 1.0. Mounting the app whole
+# means new enricher commands surface here without further wiring.
+app.add_typer(enricher_app, name="enrich")
 # Marketplace reference client (list/download/publish/import-module/find-by-hash/
 # update-module-version). Reads MARKETPLACE_URL / MARKETPLACE_TOKEN from flags, env, or .env.
 app.add_typer(marketplace_client_app, name="marketplace")
