@@ -8,9 +8,6 @@ the variants were drafted from and then compiles offline. Ensembl is not involve
 carries the coordinates — which is why these modules build while an Ensembl cache is still syncing.
 """
 
-import csv
-import io
-import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -36,28 +33,6 @@ DEFAULT_DOWNLOAD_CACHE = Path("data/interim/v1_port/_sources")
 #: pointing the resolver at a cache would let a coordinate arrive from a second source — which would
 #: make the compiled bytes depend on which cache happened to be present.
 _NO_ENSEMBL = Path("/nonexistent")
-
-#: Authored rows per `enrich` call. **Not a tuning knob — a workaround for quadratic scaling.**
-#:
-#: `clinvar.lookup_clin_sig` and `_lookup_rsid_candidates` build one OR'd four-column predicate per
-#: allele, which DuckDB evaluates per row per predicate rather than as a hash join. Measured on this
-#: snapshot: 5,000 alleles as an OR-list takes **127 s**; the identical 5,000 as a temp table joined
-#: against `clinvar` takes **0.13 s**. That thousandfold gap is why `cardio` unbatched had not
-#: finished after two hours. Since the cost grows with the square of the alleles per call, capping
-#: the call size makes the whole panel linear again. Reported upstream — see
-#: `just-dna-format/docs/ROADMAP.md`; the fix there is the join, and then this cap can go.
-ENRICH_BATCH_ROWS = 10_000
-
-#: Panels skip the ClinVar `clin_sig` cross-check, and only panels may.
-#:
-#: The check re-reads every resolved allele's clinical significance and compares it to the authored
-#: one — the dominant cost in a panel resolve (27.1 s → 2.6 s on a 7,818-row panel with it off, for
-#: byte-identical output). For a *hand-authored* module that is money well spent: a human typed the
-#: `clin_sig` and may have typed it wrong. For a panel it is tautological — `draft_gene_panel` copied
-#: the value out of this same snapshot, so it cannot disagree with itself, and 0 conflicts is the
-#: only answer the check can return. Paying ninety percent of the runtime to be told that is not
-#: rigour, it is a round trip. Anything authored by hand keeps `verify_clinsig` on.
-PANEL_VERIFY_CLIN_SIG = False
 
 
 class ClinVarModuleResult(BaseModel):
@@ -134,125 +109,6 @@ def build_clinvar_modules(
     return results
 
 
-def _rows_of(source: "Path | io.StringIO") -> list[list[str]]:
-    """A CSV's parsed rows, so two spellings of the same table compare equal."""
-    if isinstance(source, Path):
-        with source.open(newline="", encoding="utf-8") as handle:
-            return list(csv.reader(handle))
-    return list(csv.reader(source))
-
-
-def enrich_in_batches(
-    spec_dir: Path,
-    reference: Optional[Path],
-    *,
-    batch_rows: int = ENRICH_BATCH_ROWS,
-    resume: bool = True,
-    console: Optional[Console] = None,
-) -> tuple[int, int]:
-    """Resolve a large panel by enriching slices of ``variants.csv`` and concatenating the results.
-
-    Returns ``(resolved_rows, unresolved_rows)``. Each slice is a spec directory holding the module's
-    own yaml, its share of the authored rows, and a header-only ``studies.csv`` — the resolver reads
-    the variant table and nothing else, so that is a complete input for it. The slices'
-    ``resolution.csv`` files are concatenated into the real spec directory, deduplicated on the whole
-    row, and the compile then consumes that one table as usual.
-
-    Batching is safe because every decision the resolver makes is **per locus**: the allele-aware
-    genotype fit, the one-to-many rsID expansion, the pseudoautosomal representative. Slicing on row
-    boundaries can only separate loci from each other, never a locus from its own alleles — and the
-    authored order that decides the compiled bytes is preserved, because slices are written and read
-    back in order.
-
-    ``resume`` (the default) reuses any batch that already carries a ``resolution.csv`` whose slice
-    of ``variants.csv`` is byte-identical to the one this run would write. `pathogenic` is 62 batches
-    and about an hour; losing all of it to a crash on batch 11 — which is exactly what happened once
-    — is not a cost worth paying twice. The identity check is what makes it safe: a re-run after an
-    edit to the authored table rewrites the slice, so the stale result is discarded rather than
-    silently reused.
-    """
-    variants_csv = spec_dir / "variants.csv"
-    with variants_csv.open(newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        fieldnames = list(reader.fieldnames or [])
-        rows = list(reader)
-
-    if len(rows) <= batch_rows:
-        result = enrich(
-            spec_dir, offline=True, ensembl_cache=_NO_ENSEMBL, clinvar_cache=reference,
-            use_clinvar=True, use_gnomad=False, download=False,
-            verify_clinsig=PANEL_VERIFY_CLIN_SIG,
-        )
-        return len(result.rows), len(result.unresolved)
-
-    work_dir = spec_dir / "_enrich_batches"
-    if not resume:
-        shutil.rmtree(work_dir, ignore_errors=True)
-    work_dir.mkdir(parents=True, exist_ok=True)
-
-    header: Optional[str] = None
-    body: list[str] = []
-    resolved = unresolved = 0
-    reused = 0
-    batches = range(0, len(rows), batch_rows)
-    for index, start in enumerate(batches, start=1):
-        batch_dir = work_dir / f"batch{index:03d}"
-        batch_dir.mkdir(exist_ok=True)
-        shutil.copyfile(spec_dir / "module_spec.yaml", batch_dir / "module_spec.yaml")
-
-        slice_csv = io.StringIO()
-        writer = csv.DictWriter(slice_csv, fieldnames=fieldnames, lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows[start:start + batch_rows])
-        wanted = slice_csv.getvalue()
-
-        batch_variants, produced = batch_dir / "variants.csv", batch_dir / "resolution.csv"
-        # Compared as parsed rows, not bytes: a slice written by an earlier version of this function
-        # may differ only in line terminator, and re-resolving an hour of work over `\r\n` would be
-        # a silly way to lose it.
-        already_done = (
-            produced.exists()
-            and batch_variants.exists()
-            and _rows_of(batch_variants) == _rows_of(io.StringIO(wanted))
-        )
-        if already_done:
-            reused += 1
-        else:
-            batch_variants.write_text(wanted, encoding="utf-8")
-            (batch_dir / "studies.csv").write_text("rsid,chrom,start,ref,pmid\n", encoding="utf-8")
-            produced.unlink(missing_ok=True)
-            if console:
-                console.print(
-                    f"  resolving batch {index}/{len(batches)} "
-                    f"({min(batch_rows, len(rows) - start):,} rows)…"
-                )
-            result = enrich(
-                batch_dir, offline=True, ensembl_cache=_NO_ENSEMBL, clinvar_cache=reference,
-                use_clinvar=True, use_gnomad=False, download=False,
-                verify_clinsig=PANEL_VERIFY_CLIN_SIG,
-            )
-            unresolved += len(result.unresolved)
-
-        if produced.exists():
-            lines = produced.read_text(encoding="utf-8").splitlines()
-            if lines:
-                header = header or lines[0]
-                body.extend(lines[1:])
-                resolved += len(lines) - 1
-
-    if console and reused:
-        console.print(f"  reused {reused}/{len(batches)} batch(es) resolved by an earlier run")
-    if header is not None:
-        seen: set[str] = set()
-        unique = [line for line in body if not (line in seen or seen.add(line))]
-        (spec_dir / "resolution.csv").write_text(
-            "\n".join([header, *unique]) + "\n", encoding="utf-8"
-        )
-    # Only now: the slices are the resume point, so they outlive every batch but not the run.
-    shutil.rmtree(work_dir, ignore_errors=True)
-    return resolved, unresolved
-
-
 def _finish(
     build: PanelBuild,
     reference: Optional[Path],
@@ -277,14 +133,34 @@ def _finish(
     if do_enrich:
         if console:
             console.print(f"[cyan]{build.name}[/cyan]: resolving from the ClinVar snapshot…")
-        resolved, unresolved = enrich_in_batches(
-            build.output_dir, reference, console=console
+        # One call, whole panel. Until enricher 0.5.2 this had to be sliced into 10k-row batches:
+        # the ClinVar reader OR-chained one predicate per allele, which DuckDB could not hash, so
+        # cost grew with alleles × rows and `cardio` never finished. 0.5.2 joins a probe table
+        # instead — 76,078 rows now resolve in 13 s, and the rate *improves* with size.
+        enrichment = enrich(
+            build.output_dir,
+            offline=True,
+            ensembl_cache=_NO_ENSEMBL,
+            clinvar_cache=reference,
+            use_clinvar=True,
+            use_gnomad=False,
+            download=False,
         )
-        result.resolved_rows = resolved
-        result.unresolved_rows = unresolved
-        if unresolved:
+        result.resolved_rows = len(enrichment.rows)
+        result.unresolved_rows = len(enrichment.unresolved)
+        # The `clin_sig` cross-check is tautological for a panel drafted from the snapshot it is
+        # checked against, and 0.5.2 detects that from the `panel:` pin and skips it — but only on
+        # an established match, so a hand-authored module or one pinned to another release still
+        # gets checked. Record which happened; an empty conflict list alone is ambiguous.
+        if getattr(enrichment, "clin_sig_not_checked", None):
+            result.warnings.append(f"clin_sig not checked: {enrichment.clin_sig_not_checked}")
+        elif enrichment.clin_sig_conflicts:
             result.warnings.append(
-                f"{unresolved} variant(s) unresolved against the ClinVar snapshot"
+                f"{len(enrichment.clin_sig_conflicts)} clin_sig conflict(s) against the snapshot"
+            )
+        if enrichment.unresolved:
+            result.warnings.append(
+                f"{len(enrichment.unresolved)} variant(s) unresolved against the ClinVar snapshot"
             )
 
     if do_compile:

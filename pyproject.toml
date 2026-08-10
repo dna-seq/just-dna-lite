@@ -15,12 +15,13 @@ dependencies = [
   # old name and 0.8.1 its last release under it; the live server (just-dna-registry 0.11.0) renamed
   # `marketplace` to `registry` in `GET /api/v1/version`, so 0.8.1's compatibility guard raises a
   # pydantic ValidationError before any request is sent — every subcommand, publish included, is
-  # unusable against the current server. PyPI stops at 0.9.1, which connects but is two minors
-  # behind the server's surface, so this takes 0.11.1 from the local checkout (see tool.uv.sources).
-  # 0.11.1 is the floor rather than 0.11.0 because it adds the `archive=` part to /validate and
-  # /check — before it, a spec too large to send raw could be published but never rehearsed, which
-  # is exactly the state the three ClinVar panels were in.
-  "just-dna-registry>=0.11.1",
+  # unusable against the current server. PyPI stops at 0.9.1, which connects but is behind the
+  # server's surface, so this takes 0.11.2 from the local checkout (see tool.uv.sources).
+  # 0.11.1 added the `archive=` part to /validate and /check — before it, a spec too large to send
+  # raw could be published but never rehearsed, which is exactly where the three ClinVar panels
+  # sat. 0.11.2 adopts compiler/enricher 0.5.2 and distinguishes the empty lists a check can
+  # return, so the client and the deployed server stay on one version.
+  "just-dna-registry>=0.11.2",
   # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
   # but dagster caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
   # the gencode and dagster fails to import (VersionError in health_pb2). 1.81.1 is the

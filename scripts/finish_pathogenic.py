@@ -2,9 +2,9 @@
 Resume `pathogenic` from its authored spec: validate → resolve (batched) → compile.
 
 Separate from `pipelines v1-port clinvar --module pathogenic` because that command re-drafts first,
-and drafting 305,850 ClinVar records across 4,793 genes is half an hour this does not need to spend:
-`data/interim/v1_port/pathogenic/` already holds a complete, correct `variants.csv` + `studies.csv` +
-`sources.csv`. Resolution itself resumes per batch (see `clinvar_runner.enrich_in_batches`).
+and drafting 305,850 ClinVar records across 4,793 genes is half an hour this does not need to spend
+when `data/interim/v1_port/pathogenic/` already holds a complete, correct `variants.csv` +
+`studies.csv` + `sources.csv`.
 
     uv run python scripts/finish_pathogenic.py
 """
@@ -13,11 +13,12 @@ import sys
 from pathlib import Path
 
 from just_dna_compiler.compiler import compile_module, validate_spec
+from just_dna_enricher.enrich import enrich
 from just_dna_enricher.locations import resolve_clinvar_reference
 from rich.console import Console
 
 from just_dna_pipelines.runtime import load_env
-from just_dna_pipelines.v1_port.clinvar_runner import enrich_in_batches
+from just_dna_pipelines.v1_port.clinvar_runner import _NO_ENSEMBL
 
 MODULE_DIR = Path("data/interim/v1_port/pathogenic")
 
@@ -39,8 +40,14 @@ def main() -> int:
     console.print(f"valid — {validation.stats.get('variant_count', '?')} variants")
 
     console.print("resolving against the ClinVar snapshot…")
-    resolved, unresolved = enrich_in_batches(MODULE_DIR, reference, console=console)
-    console.print(f"resolution.csv: {resolved:,} rows, {unresolved:,} unresolved")
+    enrichment = enrich(
+        MODULE_DIR, offline=True, ensembl_cache=_NO_ENSEMBL, clinvar_cache=reference,
+        use_clinvar=True, use_gnomad=False, download=False,
+    )
+    console.print(
+        f"resolution.csv: {len(enrichment.rows):,} rows, "
+        f"{len(enrichment.unresolved):,} unresolved"
+    )
 
     console.print("compiling…")
     result = compile_module(

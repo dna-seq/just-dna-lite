@@ -77,19 +77,7 @@ _PMID_RE = re.compile(r"^\d{1,8}$")
 _GENOTYPE_NOTE = {
     "het": "heterozygous (one copy)",
     "hom": "homozygous (two copies)",
-    "single": "single copy (this contig is not diploid)",
 }
-
-#: Contigs where a two-allele genotype is a category error, so the fill emits one row, not two.
-#:
-#: The mitochondrial genome is haploid — many copies of one haplotype — so `A/G` asserts a diploidy
-#: that does not exist and `A/A` says "both copies" of something with no second copy. (Mixed
-#: mitochondrial populations are heteroplasmy, which has its own table; it is not a het genotype.)
-#: chrY is hemizygous wherever it is present at all. The compiler says the same thing on its own —
-#: *"chrom=MT is not diploid here — use a single-allele genotype for a homoplasmic/hemizygous call"*
-#: — which is how this was caught. chrX is deliberately **not** here: it is genuinely diploid outside
-#: the male hemizygous case, every annotation source calls it that way, and the compiler agrees.
-NON_DIPLOID_CONTIGS = frozenset({"MT", "Y"})
 
 
 class PanelBuild(BaseModel):
@@ -146,30 +134,24 @@ def panel_genes(
     return [r[0] for r in rows]
 
 
-def _allele_index(
-    records: Iterable[dict], ambiguous: set[str]
-) -> dict[tuple, tuple[str, str, str]]:
-    """Map each drafted row's identity to the ``(ref, alt, chrom)`` its genotype is written from.
+def _allele_index(records: Iterable[dict], ambiguous: set[str]) -> dict[tuple, tuple[str, str]]:
+    """Map each drafted row's identity to the ``(ref, alt)`` its genotype is written from.
 
     The identity is the rsID when the draft kept one, else the full coordinate — mirroring
     ``clinvar_draft._identity_cells``, which forces the coordinate for an rsID that names several
     alleles at one locus. Keyed the same way so a filled row is matched to the record it came from.
-
-    ``chrom`` rides along because the zygosity to write depends on it (:data:`NON_DIPLOID_CONTIGS`),
-    and an rsid-identified row does not carry a coordinate of its own to consult.
     """
-    index: dict[tuple, tuple[str, str, str]] = {}
+    index: dict[tuple, tuple[str, str]] = {}
     for record in records:
         ref, alt = (record.get("ref") or "").strip(), (record.get("alt") or "").strip()
         if not (ref and alt):
             continue
-        chrom = str(record.get("chrom") or "").strip()
         rsid = (record.get("rsid") or "").strip()
         if rsid and rsid not in ambiguous:
-            index.setdefault(("rsid", rsid), (ref, alt, chrom))
+            index.setdefault(("rsid", rsid), (ref, alt))
         else:
-            key = ("coord", chrom, str(record.get("start") or ""), ref, alt)
-            index.setdefault(key, (ref, alt, chrom))
+            key = ("coord", str(record.get("chrom") or ""), str(record.get("start") or ""), ref, alt)
+            index.setdefault(key, (ref, alt))
     return index
 
 
@@ -185,11 +167,14 @@ def _row_key(row: dict) -> Optional[tuple]:
 
 
 def fill_genotypes(spec_dir: Path, records: list[dict]) -> tuple[int, int]:
-    """Replace every ``<<REPLACE>>`` genotype with the zygosities a caller can emit at that locus.
+    """Expand each ``<<REPLACE>>`` genotype into the two zygosities a diploid caller can emit.
 
-    Two rows on a diploid contig — heterozygous ``ref/alt`` and homozygous ``alt/alt`` — and **one**
-    on a contig that is not diploid (:data:`NON_DIPLOID_CONTIGS`), where a two-allele genotype would
-    assert a second copy that does not exist.
+    Heterozygous ``ref/alt`` and homozygous ``alt/alt``. Only placeholders are touched, so a row the
+    provider already decided passes through untouched — which is how the non-diploid contigs are
+    handled: since enricher 0.5.2, ``draft_gene_panel`` writes the sole expressible genotype itself
+    on the mitochondrial genome and on hemizygous chrY, leaving the stub only where a zygosity
+    judgement genuinely remains. It decides chrY **per locus** against the pseudoautosomal regions,
+    which is finer than treating the whole contig as hemizygous.
 
     Returns ``(rows_written, rows_left_unfilled)``. A stub whose alleles cannot be found is left
     exactly as it is — an unfilled placeholder fails the compile loudly, which is the right outcome
@@ -215,17 +200,12 @@ def fill_genotypes(spec_dir: Path, records: list[dict]) -> tuple[int, int]:
             unfilled += 1
             out_rows.append(row)
             continue
-        ref, alt, chrom = alleles
+        ref, alt = alleles
         base_conclusion = (row.get("conclusion") or "").strip()
         # An unphased genotype is alphabetically sorted (`VariantRow` enforces it) — the pair is a
         # set, so `A/G` and `G/A` would otherwise be two spellings of one call.
         het = "/".join(sorted((ref, alt)))
-        zygosities = (
-            (("single", alt),)
-            if chrom in NON_DIPLOID_CONTIGS
-            else (("het", het), ("hom", f"{alt}/{alt}"))
-        )
-        for zygosity, genotype in zygosities:
+        for zygosity, genotype in (("het", het), ("hom", f"{alt}/{alt}")):
             filled = dict(row)
             filled["genotype"] = genotype
             filled["conclusion"] = f"{base_conclusion} | genotype: {_GENOTYPE_NOTE[zygosity]}"
