@@ -22,7 +22,7 @@ from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_enricher.cli import app as enricher_app
-from just_dna_marketplace.client_cli import app as marketplace_client_app
+from just_dna_registry.client_cli import app as marketplace_client_app
 
 app = typer.Typer(
     name="pipelines",

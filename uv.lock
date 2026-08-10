@@ -1882,8 +1882,8 @@ dependencies = [
     { name = "dagster-dg-cli" },
     { name = "grpcio" },
     { name = "grpcio-health-checking" },
-    { name = "just-dna-marketplace" },
     { name = "just-dna-pipelines" },
+    { name = "just-dna-registry" },
     { name = "just-prs" },
     { name = "pyyaml" },
     { name = "typer" },
@@ -1902,8 +1902,8 @@ requires-dist = [
     { name = "dagster-dg-cli", specifier = ">=1.12.22" },
     { name = "grpcio", specifier = "<1.82" },
     { name = "grpcio-health-checking", specifier = "<1.82" },
-    { name = "just-dna-marketplace", specifier = ">=0.8.1" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
+    { name = "just-dna-registry", editable = "../just-dna-marketplace" },
     { name = "just-prs", specifier = ">=0.7.5" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.24.1" },
@@ -1915,21 +1915,6 @@ dev = [
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
-]
-
-[[package]]
-name = "just-dna-marketplace"
-version = "0.8.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-    { name = "just-dna-format" },
-    { name = "python-dotenv" },
-    { name = "typer" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8f/c0/f547e4df795571bfe9c52dcda0396d196a6c2bd3e2b1851fc84a81253d50/just_dna_marketplace-0.8.1.tar.gz", hash = "sha256:632245b903e27c119d9cea486908b5365cdd36c32ca6af6c6cb92bc42d2b9bef", size = 56058, upload-time = "2026-07-09T00:58:55.558Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/d9/24076ec1ead38a16be43a8142a9a03bb7921162bf90e5d5e1b6a52c59e2c/just_dna_marketplace-0.8.1-py3-none-any.whl", hash = "sha256:3503f678ec3aef6704aa098a61fb56a2f7aa331c8a743fe0bdebbf43d1fd720d", size = 74357, upload-time = "2026-07-09T00:58:54.115Z" },
 ]
 
 [[package]]
@@ -2021,6 +2006,45 @@ dev = [
     { name = "sqlglot", specifier = ">=30.4.2" },
     { name = "vegafusion", specifier = ">=2.0.3" },
     { name = "vl-convert-python", specifier = ">=1.9.0" },
+]
+
+[[package]]
+name = "just-dna-registry"
+version = "0.11.1"
+source = { editable = "../just-dna-marketplace" }
+dependencies = [
+    { name = "httpx" },
+    { name = "just-dna-format" },
+    { name = "python-dotenv" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eliot", marker = "extra == 'server'", specifier = ">=1.17.5" },
+    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.139.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "huggingface-hub", marker = "extra == 'server'", specifier = ">=0.34.0" },
+    { name = "just-dna-compiler", marker = "extra == 'compiler'", specifier = ">=0.5.1" },
+    { name = "just-dna-compiler", marker = "extra == 'server'", specifier = ">=0.5.1" },
+    { name = "just-dna-enricher", marker = "extra == 'server'", specifier = ">=0.5.1" },
+    { name = "just-dna-format", specifier = ">=0.5.0" },
+    { name = "pydantic", marker = "extra == 'server'", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", marker = "extra == 'server'", specifier = ">=2.7.0" },
+    { name = "pyjwt", marker = "extra == 'server'", specifier = ">=2.10.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.9" },
+    { name = "pyyaml", marker = "extra == 'server'", specifier = ">=6.0.2" },
+    { name = "typer", specifier = ">=0.26.8" },
+    { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.34.0" },
+]
+provides-extras = ["compiler", "server"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "just-dna-registry", extras = ["server"] },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-asyncio", specifier = ">=1.4.0" },
 ]
 
 [[package]]
