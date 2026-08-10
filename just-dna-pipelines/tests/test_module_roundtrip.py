@@ -140,42 +140,48 @@ class TestReverseValidation:
 
 @pytest.mark.integration
 class TestRoundTripSchema:
-    """Compiled output must match the original HF module schemas."""
+    """Compiled output must carry every column the original HF module had.
 
-    @pytest.mark.parametrize("mod", MODULES)
-    def test_weights_columns_match(
-        self, hf_cache: Path, compiled_modules: Path, mod: str
-    ) -> None:
-        orig_path = hf_cache / mod / "weights.parquet"
-        comp_path = compiled_modules / mod / "weights.parquet"
-        if not orig_path.exists():
-            pytest.skip(f"{mod} not downloaded")
+    **Superset, not equality.** The modules on HuggingFace were compiled under `just-dna-format`
+    0.3; 0.5 emits strictly more (`weights` 19-20 → 37, `annotations` 5 → 8, `studies` 7 → 19 — see
+    ``docs/MODULE_FORMAT_0_5_MIGRATION.md``). Equality would fail on every module until they are
+    republished, and would fail again on the next additive release. What the round-trip actually
+    guarantees, and what a consumer actually depends on, is that **no column is ever dropped** —
+    so that is what is asserted.
+    """
 
-        orig = pl.read_parquet(orig_path)
-        comp = pl.read_parquet(comp_path)
-
-        orig_cols = set(orig.columns)
-        comp_cols = set(comp.columns)
-        assert comp_cols == orig_cols, (
-            f"{mod} weights column mismatch: "
-            f"missing={orig_cols - comp_cols}, extra={comp_cols - orig_cols}"
+    @staticmethod
+    def _assert_no_column_dropped(orig_path: Path, comp_path: Path, mod: str, table: str) -> None:
+        orig_cols = set(pl.read_parquet(orig_path).columns)
+        comp_cols = set(pl.read_parquet(comp_path).columns)
+        assert orig_cols <= comp_cols, (
+            f"{mod} {table}: round-trip dropped {sorted(orig_cols - comp_cols)}"
         )
 
     @pytest.mark.parametrize("mod", MODULES)
-    def test_annotations_columns_match(
+    def test_weights_columns_preserved(
+        self, hf_cache: Path, compiled_modules: Path, mod: str
+    ) -> None:
+        orig_path = hf_cache / mod / "weights.parquet"
+        if not orig_path.exists():
+            pytest.skip(f"{mod} not downloaded")
+        self._assert_no_column_dropped(
+            orig_path, compiled_modules / mod / "weights.parquet", mod, "weights"
+        )
+
+    @pytest.mark.parametrize("mod", MODULES)
+    def test_annotations_columns_preserved(
         self, hf_cache: Path, compiled_modules: Path, mod: str
     ) -> None:
         orig_path = hf_cache / mod / "annotations.parquet"
-        comp_path = compiled_modules / mod / "annotations.parquet"
         if not orig_path.exists():
             pytest.skip(f"{mod} not downloaded")
-
-        orig = pl.read_parquet(orig_path)
-        comp = pl.read_parquet(comp_path)
-        assert set(comp.columns) == set(orig.columns)
+        self._assert_no_column_dropped(
+            orig_path, compiled_modules / mod / "annotations.parquet", mod, "annotations"
+        )
 
     @pytest.mark.parametrize("mod", MODULES)
-    def test_studies_columns_match(
+    def test_studies_columns_preserved(
         self, hf_cache: Path, compiled_modules: Path, mod: str
     ) -> None:
         orig_path = hf_cache / mod / "studies.parquet"
@@ -184,10 +190,19 @@ class TestRoundTripSchema:
             pytest.skip(f"{mod} has no studies")
         if not comp_path.exists():
             pytest.fail(f"{mod} compiled output missing studies.parquet")
+        self._assert_no_column_dropped(orig_path, comp_path, mod, "studies")
 
-        orig = pl.read_parquet(orig_path)
-        comp = pl.read_parquet(comp_path)
-        assert set(comp.columns) == set(orig.columns)
+    @pytest.mark.parametrize("mod", MODULES)
+    def test_weights_carry_the_0_5_identity_columns(
+        self, compiled_modules: Path, mod: str
+    ) -> None:
+        """The columns 0.5 added that a consumer keys on, present on every rebuild."""
+        comp_path = compiled_modules / mod / "weights.parquet"
+        if not comp_path.exists():
+            pytest.skip(f"{mod} not downloaded")
+        columns = set(pl.read_parquet(comp_path).columns)
+        required = {"variant_key", "authored_ident", "clin_sig", "direction", "flags"}
+        assert required <= columns, f"{mod} weights missing {sorted(required - columns)}"
 
 
 @pytest.mark.integration
@@ -210,14 +225,19 @@ class TestRoundTripContent:
         )
 
     @pytest.mark.parametrize("mod", MODULES)
-    def test_annotations_row_count(
+    def test_annotations_cover_every_weight_linked_rsid(
         self, hf_cache: Path, compiled_modules: Path, mod: str
     ) -> None:
-        """Annotations for rsids that appear in weights must be preserved.
+        """Every rsid the original annotated (and still weights) must still be annotated.
 
-        Annotation-only rsids (in annotations.parquet but not weights.parquet)
-        cannot survive the round-trip because the DSL ties annotations to
-        weight entries.
+        **Set equality, not a row count.** 0.3 collapsed annotations per rsID; 0.5 keys them by
+        `variant_key`, so a variant carrying three genotypes now has three annotation rows where it
+        had one (coronary 27 → 77, lipidmetabolism 15 → 41, vo2max 13 → 28). The row count was
+        asserting the old collapse. The set of rsids covered is the thing that must not change, and
+        it catches a dropped variant, which a count of a growing table would not.
+
+        Annotation-only rsids (in annotations.parquet but not weights.parquet) cannot survive the
+        round-trip at all — the DSL ties annotations to weight entries — so they are excluded.
         """
         orig_ann_path = hf_cache / mod / "annotations.parquet"
         orig_wt_path = hf_cache / mod / "weights.parquet"
@@ -226,15 +246,28 @@ class TestRoundTripContent:
             pytest.skip(f"{mod} not downloaded")
 
         orig_ann = pl.read_parquet(orig_ann_path)
-        orig_wt = pl.read_parquet(orig_wt_path)
-        comp = pl.read_parquet(comp_path)
+        weight_rsids = set(pl.read_parquet(orig_wt_path)["rsid"].unique().to_list())
+        expected = set(orig_ann["rsid"].to_list()) & weight_rsids
+        got = set(pl.read_parquet(comp_path)["rsid"].to_list())
+        assert expected <= got, f"{mod}: annotations lost rsid(s) {sorted(expected - got)[:20]}"
 
-        weight_rsids = set(orig_wt["rsid"].unique().to_list())
-        expected_count = orig_ann.filter(pl.col("rsid").is_in(list(weight_rsids))).height
-        assert comp.height == expected_count, (
-            f"{mod}: compiled annotations {comp.height} != "
-            f"expected {expected_count} (weight-linked from original {orig_ann.height})"
-        )
+    @pytest.mark.parametrize("mod", MODULES)
+    def test_annotations_are_keyed_per_variant_and_conclusion(
+        self, compiled_modules: Path, mod: str
+    ) -> None:
+        """0.5's annotation identity is `(variant_key, conclusion)`, not the rsID.
+
+        Derived from the compiled weights, so it states the rule rather than a number: a variant
+        whose genotypes disagree about what they mean gets one annotation row per distinct
+        conclusion, instead of the single per-rsID row 0.3 collapsed them into.
+        """
+        comp_path = compiled_modules / mod / "annotations.parquet"
+        if not comp_path.exists():
+            pytest.skip(f"{mod} not downloaded")
+        comp = pl.read_parquet(comp_path)
+        weights = pl.read_parquet(compiled_modules / mod / "weights.parquet")
+        assert "variant_key" in comp.columns
+        assert comp.height == weights.select("variant_key", "conclusion").unique().height
 
     @pytest.mark.parametrize("mod", MODULES)
     def test_studies_row_count(
