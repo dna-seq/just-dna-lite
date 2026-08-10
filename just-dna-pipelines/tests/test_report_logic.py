@@ -75,3 +75,46 @@ def test_variant_color_protective_is_green_at_zero_weight():
     assert _variant_color(None, "significant") == "transparent"  # no direction
     # a weighted variant still colors by its weight
     assert _variant_color(0.5, None) == _weight_color(0.5)
+
+
+from just_dna_pipelines.annotation.report_logic import _effective_direction
+
+
+@pytest.mark.parametrize(
+    "weight, state, direction, expected_sign",
+    [
+        # 0.5 era: direction column empty, benefit derived from state (unchanged behavior)
+        (None, "protective", "", 1),
+        (None, "protective", None, 1),
+        (None, "risk", "", -1),
+        # 1.0 era: state dropped, direction is authoritative
+        (None, None, "protective", 1),
+        (None, None, "risk", -1),
+        (None, None, "neutral", 0),
+        (None, None, "unknown", 0),
+        # populated direction wins over a (transitional) state
+        (None, "risk", "protective", 1),
+        # a real weight still wins over everything (weighted modules)
+        (1.5, None, None, 1),
+        (-2.0, "protective", "protective", -1),
+    ],
+)
+def test_variant_sign_prefers_direction_then_state(weight, state, direction, expected_sign):
+    assert _variant_sign(weight, state, direction) == expected_sign
+
+
+def test_effective_direction_bridges_both_schemas():
+    # authored direction present -> used verbatim (1.0)
+    assert _effective_direction("protective", None, None) == "protective"
+    # direction empty -> derived from legacy state (0.5)
+    assert _effective_direction("", "protective", None) == "protective"
+    assert _effective_direction(None, "risk", None) == "risk"
+    # 'significant' + weight sign refinement, via the format's own leaf
+    assert _effective_direction("", "significant", 0.7) == "protective"
+    assert _effective_direction("", "significant", -0.7) == "risk"
+
+
+def test_variant_color_direction_only_is_green():
+    # a 1.0-style row (state gone, direction set, no weight) still colors green/red
+    assert _variant_color(None, None, "protective").startswith("rgba(0,")
+    assert _variant_color(None, None, "risk").startswith("rgba(180,")

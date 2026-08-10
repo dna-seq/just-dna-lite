@@ -11,6 +11,7 @@ from typing import Optional
 
 import polars as pl
 from eliot import log_message, start_action
+from just_dna_format.derive import direction_from_state
 
 from just_dna_pipelines.annotation.analytics import umami_script_tag
 from just_dna_pipelines.annotation.hf_modules import (
@@ -211,38 +212,56 @@ def _weight_color(weight: float) -> str:
     return "transparent"
 
 
-# Direction states for weight-less modules (no numeric effect size). superhuman carries
-# state='protective'; the ClinVar gene panels carry state='risk'.
-_BENEFIT_STATES = frozenset({"protective"})
-_RISK_STATES = frozenset({"risk"})
+def _effective_direction(
+    direction: Optional[str], state: Optional[str], weight: Optional[float]
+) -> str:
+    """The 0.3 `direction` axis for a **parquet** row, robust across the format transition.
+
+    Mirrors ``VariantRow.effective_direction`` (a Python-only accessor) for a row read from
+    ``weights.parquet`` with SQL/polars: the authored ``direction`` column when it carries a value,
+    else derived from the legacy ``state`` (+ ``weight`` sign) via the format's own pure leaf
+    ``direction_from_state``. Legacy/0.5 modules leave ``direction`` empty and populate ``state``;
+    format 1.0 drops ``state`` and populates ``direction`` — deriving here keeps a single code path
+    correct in both eras. Returns one of {protective, risk, neutral, unknown}.
+    """
+    d = (direction or "").strip().lower()
+    if d:
+        return d
+    return direction_from_state((state or "").strip().lower(), weight)
 
 
-def _variant_sign(weight: Optional[float], state: Optional[str]) -> int:
-    """Benefit direction: +1 beneficial, -1 risk, 0 neutral.
+def _variant_sign(
+    weight: Optional[float], state: Optional[str], direction: Optional[str] = None
+) -> int:
+    """Benefit sign: +1 beneficial, -1 risk, 0 neutral/unknown.
 
-    Prefers the numeric weight's sign; when there is no weight (weight-less modules like
-    superhuman / the ClinVar gene panels) falls back to ``state`` so a protective variant still
-    reads as beneficial without a fabricated effect size.
+    Prefers the numeric weight's sign (a weighted module states its own direction); when there is no
+    weight (weight-less modules like superhuman / the ClinVar gene panels) falls back to the
+    **effective direction** — the authored ``direction`` column, or ``state`` derived — so a
+    protective variant reads as beneficial without a fabricated effect size, in both the 0.5 (state)
+    and 1.0 (direction) schemas.
     """
     w = weight or 0.0
     if w > 0:
         return 1
     if w < 0:
         return -1
-    s = (state or "").strip().lower()
-    if s in _BENEFIT_STATES:
+    d = _effective_direction(direction, state, weight)
+    if d == "protective":
         return 1
-    if s in _RISK_STATES:
+    if d == "risk":
         return -1
     return 0
 
 
-def _variant_color(weight: Optional[float], state: Optional[str]) -> str:
-    """CSS color for a variant, weight-aware with a state fallback (see ``_variant_sign``)."""
+def _variant_color(
+    weight: Optional[float], state: Optional[str], direction: Optional[str] = None
+) -> str:
+    """CSS color for a variant, weight-aware with an effective-direction fallback (see ``_variant_sign``)."""
     w = weight or 0.0
     if w != 0:
         return _weight_color(w)
-    sign = _variant_sign(weight, state)
+    sign = _variant_sign(weight, state, direction)
     if sign > 0:
         return "rgba(0, 160, 0, 0.3)"  # protective — green
     if sign < 0:
@@ -431,8 +450,9 @@ def build_longevity_report_data(
                     "alt": "/".join(row.get("alts", []) or []),
                     "zygosity": _zygosity(genotype),
                     "weight": weight,
-                    "weight_color": _variant_color(weight, row.get("state")),
+                    "weight_color": _variant_color(weight, row.get("state"), row.get("direction")),
                     "state": row.get("state", ""),
+                    "direction": row.get("direction", ""),
                     "priority": row.get("priority", ""),
                     "conclusion": row.get("conclusion", ""),
                     "method": row.get("method", ""),
@@ -446,8 +466,8 @@ def build_longevity_report_data(
             # Sort by absolute weight descending for better readability
             variants.sort(key=lambda v: abs(v["weight"]), reverse=True)
 
-            positive = sum(1 for v in variants if _variant_sign(v["weight"], v["state"]) > 0)
-            negative = sum(1 for v in variants if _variant_sign(v["weight"], v["state"]) < 0)
+            positive = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) > 0)
+            negative = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) < 0)
 
             categories[cat_key] = {
                 "title": cat_meta["title"],
@@ -519,8 +539,9 @@ def build_module_report_data(
                 "alt": "/".join(row.get("alts", []) or []),
                 "zygosity": _zygosity(genotype),
                 "weight": weight,
-                "weight_color": _variant_color(weight, row.get("state")),
+                "weight_color": _variant_color(weight, row.get("state"), row.get("direction")),
                 "state": row.get("state", ""),
+                "direction": row.get("direction", ""),
                 "priority": row.get("priority", ""),
                 "conclusion": row.get("conclusion", ""),
                 "method": row.get("method", ""),
@@ -537,8 +558,8 @@ def build_module_report_data(
 
         # Direction counts are weight-aware with a state fallback so weight-less protective
         # modules (superhuman) still tally as beneficial rather than 0 positive / 0 negative.
-        positive = sum(1 for v in variants if _variant_sign(v["weight"], v["state"]) > 0)
-        negative = sum(1 for v in variants if _variant_sign(v["weight"], v["state"]) < 0)
+        positive = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) > 0)
+        negative = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) < 0)
 
         summary = {
             "total_variants": len(variants),
