@@ -17,23 +17,22 @@ from typing import Optional
 from huggingface_hub import HfApi, get_token
 from pydantic import BaseModel
 
-from just_dna_pipelines.module_config import MODULES_CONFIG
+from just_dna_pipelines.module_config import LEAD_TABLES, MODULES_CONFIG
 
-# weights/annotations/studies are what discovery needs; manifest.json + logo are additive.
-_REQUIRED = ("weights.parquet", "annotations.parquet", "studies.parquet")
-
-# The 0.4/0.5 side tables a compiled module may also carry. Additive: HuggingFace discovery ignores
-# what it does not know, and shipping them keeps the uploaded module a complete artifact.
-#
-# Ordered so the tables that can *lead* a module come first — the refusal below names the first one
-# present, and "led by sources.parquet" is not a useful thing to tell an author.
-_OPTIONAL_TABLES = (
-    "pharm_variants.parquet", "diplotypes.parquet", "haplotypes.parquet", "pgs.parquet",
-    "copynumbers.parquet", "heteroplasmy.parquet", "repeat_alleles.parquet",
-    "activity_phenotype.parquet", "allele_function.parquet",
+# A module must carry one of the LEAD_TABLES families — that is exactly what discovery probes for.
+# The rest are additive: discovery ignores what it does not know, and shipping them keeps the
+# uploaded module a complete artifact.
+_LEAD_PARQUETS = tuple(f"{t}.parquet" for t in LEAD_TABLES)
+_SIDE_TABLES = (
+    "annotations.parquet", "studies.parquet",
     "sources.parquet", "literature.parquet", "frequencies.parquet", "gene_metrics.parquet",
 )
-_ALLOW_PATTERNS = [*_REQUIRED, *_OPTIONAL_TABLES, "manifest.json", "logo.png", "logo.jpg"]
+_ALLOW_PATTERNS = [*_LEAD_PARQUETS, *_SIDE_TABLES, "manifest.json", "logo.png", "logo.jpg"]
+
+# What a weights-led module is expected to carry. A missing side table here is worth stopping for —
+# it means an interrupted or partial compile — but only for the weights-led shape, since a
+# pharm_variants-led module legitimately has neither annotations nor studies.
+_EXPECTED_WITH_WEIGHTS = ("annotations.parquet", "studies.parquet")
 
 
 class PublishPlan(BaseModel):
@@ -77,27 +76,29 @@ def plan_publish(module_dir: Path, name: str, repo_id: Optional[str] = None) -> 
     """Resolve the upload plan and validate the compiled artifacts are present."""
     repo_id = repo_id or default_collection_repo()
     present = [f for f in _ALLOW_PATTERNS if (module_dir / f).exists()]
-    missing = [f for f in _REQUIRED if f not in present]
-    if missing:
-        # A module led by a 0.4 table (pharm_variants, diplotypes, pgs, …) compiles fine and has no
-        # weights.parquet — but `annotation.hf_modules` probes for exactly that file to decide a
-        # directory *is* a module, so uploading one here would put files where the app cannot see
-        # them. The registry has no such constraint, so say which route the module has.
-        led_by = [f for f in _OPTIONAL_TABLES if f in present]
-        if led_by and "weights.parquet" in missing:
-            raise FileNotFoundError(
-                f"{name}: no weights.parquet — this module is led by {led_by[0]}, and HuggingFace "
-                f"discovery (annotation.hf_modules) keys on weights.parquet, so the upload would be "
-                f"invisible to the app. Publish it to the registry instead: "
-                f"`pipelines marketplace publish just-dna-seq {name} <version> {module_dir}`."
-            )
+
+    # The lead table is the whole requirement: it is exactly what discovery probes for, so a module
+    # led by a 0.4 family (pharm_variants, diplotypes, pgs, …) publishes here like any other.
+    lead = next((f for f in _LEAD_PARQUETS if f in present), None)
+    if lead is None:
         if not module_dir.is_dir():
             raise FileNotFoundError(f"{name}: no such module directory: {module_dir}")
         raise FileNotFoundError(
-            f"{name}: missing compiled artifact(s) {missing} in {module_dir} — this uploads the "
-            f"compiled parquet, so compile the spec first — in place, since that is where the "
-            f"upload reads from: `pipelines module compile {module_dir} --output {module_dir}`"
+            f"{name}: no compiled table in {module_dir} — expected one of {list(_LEAD_PARQUETS)}. "
+            f"This uploads the compiled parquet, so compile the spec first — in place, since that "
+            f"is where the upload reads from: "
+            f"`pipelines module compile {module_dir} --output {module_dir}`"
         )
+
+    if lead == "weights.parquet":
+        missing = [f for f in _EXPECTED_WITH_WEIGHTS if f not in present]
+        if missing:
+            raise FileNotFoundError(
+                f"{name}: missing compiled artifact(s) {missing} in {module_dir} — a weights-led "
+                f"module should carry these, so this looks like a partial compile. Rebuild with "
+                f"`pipelines module compile {module_dir} --output {module_dir}`"
+            )
+
     return PublishPlan(
         module=name, repo_id=repo_id, path_in_repo=f"data/{name}", files=present
     )

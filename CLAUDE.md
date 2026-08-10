@@ -98,7 +98,13 @@ This is the single source of truth for:
 ### Module vs Collection
 
 Each source can be a single module or a collection:
-- **Auto-detect** (default): `weights.parquet` at root = single module; subfolders with `weights.parquet` = collection
+- **Auto-detect** (default): a *lead table* at root = single module; subfolders with one = collection.
+  The lead table is any family in `module_config.LEAD_TABLES` — `weights.parquet` for most modules,
+  or a 0.4 family (`pharm_variants`, `diplotypes`, `pgs`, …) for one that has no weights. Probing for
+  `weights.parquet` alone used to make a pharmacogenomics module undiscoverable, and therefore
+  unpublishable to HuggingFace. Add a new family to that tuple and discovery and the publisher both
+  learn it at once. A 0.4-led table has no coordinates (the compiler applies `resolution.csv` to
+  `weights.parquet` only), so annotation joins it on rsid + genotype instead of by position.
 - **Override**: `kind: module` or `kind: collection` in the YAML source entry
 
 ### Important patterns

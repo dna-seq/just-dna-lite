@@ -134,10 +134,14 @@ the upgrade. Conclusions are ClinPGx's own published sentences, transcribed rath
 `sources.csv` records `commercial_use=false` / `declared_use=non_commercial` and the compiler refuses
 to build without that declaration.
 
-**It cannot go to HuggingFace.** A module led by `pharm_variants.parquet` has no `weights.parquet`,
-and `annotation.hf_modules` probes for exactly that file to decide a directory is a module — so the
-upload would be invisible to the app. `v1-port publish pharmgkb` refuses with that message. Registry
-only until discovery learns the 0.4 table families.
+**It publishes to HuggingFace like any other module.** It is led by `pharm_variants.parquet` and has
+no `weights.parquet`; discovery probes every family in `module_config.LEAD_TABLES`, so the lead table
+is whichever one the module actually has. Two things follow from the shape rather than from the
+route. The compiler materializes the 0.4 families verbatim from their authored CSV and applies
+`resolution.csv` to `weights.parquet` only, so every `pharm_variants` row reaches us with `chrom` and
+`start` null — annotation therefore joins it on **rsid + genotype**, and a VCF carrying no rsIDs in
+its `ID` column will match nothing from this module. And having no weights, its report rows sort by
+ClinPGx evidence level (1A strongest) rather than by effect size.
 
 ### 7. `pathogenic` (all-ClinVar) — ✅ folded into item 4
 `just_pathogenic` had no gene list. Its gene set is now derived from the snapshot itself

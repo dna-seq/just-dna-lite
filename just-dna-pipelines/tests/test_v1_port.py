@@ -374,15 +374,43 @@ def test_publish_remedy_for_an_uncompiled_spec_is_a_runnable_command(tmp_path):
     assert f"pipelines module compile {spec} --output {spec}" in message
 
 
-def test_publish_refuses_a_weightless_module_and_names_the_registry(tmp_path):
-    """HF discovery keys on weights.parquet, so a 0.4-table-led module goes to the registry."""
-    module_dir = tmp_path / "pharmgkb_cpic"
+def test_publish_accepts_a_module_led_by_a_04_table(tmp_path):
+    """A pharm_variants-led module publishes to HF like any other — no weights.parquet needed.
+
+    Discovery probes every family in LEAD_TABLES, so the old refusal (which sent these to the
+    registry) described a limitation that no longer exists.
+    """
+    module_dir = tmp_path / "pharmgkb"
     module_dir.mkdir()
-    for table in ("pharm_variants.parquet", "annotations.parquet", "studies.parquet"):
+    for table in ("pharm_variants.parquet", "sources.parquet", "manifest.json"):
         (module_dir / table).touch()
 
+    plan = plan_publish(module_dir, "pharmgkb")
+    assert plan.path_in_repo == "data/pharmgkb"
+    assert "pharm_variants.parquet" in plan.files
+    # side tables a pharm module does not have must not be demanded of it
+    assert "annotations.parquet" not in plan.files
+
+
+def test_publish_still_rejects_a_directory_with_no_lead_table(tmp_path):
+    """Accepting the 0.4 families must not degrade into accepting anything at all."""
+    module_dir = tmp_path / "not_a_module"
+    module_dir.mkdir()
+    (module_dir / "sources.parquet").touch()      # a side table alone does not make a module
+    (module_dir / "manifest.json").touch()
+
     with pytest.raises(FileNotFoundError) as excinfo:
-        plan_publish(module_dir, "pharmgkb_cpic")
+        plan_publish(module_dir, "not_a_module")
+    assert "no compiled table" in str(excinfo.value)
+
+
+def test_publish_still_catches_a_partial_weights_compile(tmp_path):
+    """A weights-led module missing its side tables is a partial compile, not a new shape."""
+    module_dir = tmp_path / "coronary"
+    module_dir.mkdir()
+    (module_dir / "weights.parquet").touch()
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        plan_publish(module_dir, "coronary")
     message = str(excinfo.value)
-    assert "pharm_variants.parquet" in message
-    assert "marketplace publish" in message
+    assert "annotations.parquet" in message and "studies.parquet" in message

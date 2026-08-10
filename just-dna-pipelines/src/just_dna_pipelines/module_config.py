@@ -480,6 +480,26 @@ def get_immutable_config() -> ImmutableModeConfig:
     """Return the immutable mode configuration from modules.yaml."""
     return MODULES_CONFIG.immutable_mode
 
+# The table families that can *lead* a compiled module — carry its rows in place of
+# weights.parquet. A directory holding any of these is a module; discovery and the HuggingFace
+# publisher both key on this list, so a new 0.4 family becomes discoverable and publishable by being
+# added here once. Order is priority: a module shipping several is led by the first.
+#
+# Lives here rather than in `annotation.hf_modules` because importing that module runs discovery
+# (and therefore network I/O) at import time, and the publisher must not pay for that.
+LEAD_TABLES: tuple[str, ...] = (
+    "weights",
+    "pharm_variants",
+    "diplotypes",
+    "haplotypes",
+    "pgs",
+    "copynumbers",
+    "repeat_alleles",
+    "heteroplasmy",
+    "activity_phenotype",
+    "allele_function",
+)
+
 # Backward-compatible: list of HF repo IDs extracted from sources
 DEFAULT_REPOS: list[str] = [
     s.hf_repo_id for s in MODULES_CONFIG.sources

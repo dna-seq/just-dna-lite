@@ -118,3 +118,49 @@ def test_variant_color_direction_only_is_green():
     # a 1.0-style row (state gone, direction set, no weight) still colors green/red
     assert _variant_color(None, None, "protective").startswith("rgba(0,")
     assert _variant_color(None, None, "risk").startswith("rgba(180,")
+
+
+# --------------------------------------------------------- 0.4 table families in the report
+
+from just_dna_pipelines.annotation.report_logic import (
+    _evidence_rank,
+    _genotype_alleles,
+    _genotype_str,
+    _zygosity,
+)
+
+
+@pytest.mark.parametrize(
+    "genotype, expected_str, expected_zygosity",
+    [
+        # weights.parquet spells a genotype as a list of alleles
+        (["G", "G"], "G/G", "hom"),
+        (["C", "T"], "C/T", "het"),
+        # the 0.4 families (pharm_variants and friends) carry the authored string. Splitting it
+        # character-wise produced "G///G" and read zygosity off the separator.
+        ("G/G", "G/G", "hom"),
+        ("C/T", "C/T", "het"),
+        # single-allele calls on MT/chrY have no zygosity to report
+        (["A"], "A", ""),
+        ("A", "A", ""),
+        (None, "", ""),
+    ],
+)
+def test_genotype_helpers_accept_both_representations(genotype, expected_str, expected_zygosity):
+    assert _genotype_str(genotype) == expected_str
+    assert _zygosity(genotype) == expected_zygosity
+
+
+def test_genotype_alleles_drops_empty_fragments():
+    """A trailing or doubled separator must not become a phantom allele."""
+    assert _genotype_alleles("G//G") == ["G", "G"]
+    assert _genotype_alleles("G/") == ["G"]
+
+
+def test_evidence_rank_orders_clinpgx_tiers_strongest_first():
+    levels = ["2B", "1A", "3", "1B", "2A", "4"]
+    assert sorted(levels, key=_evidence_rank, reverse=True) == ["1A", "1B", "2A", "2B", "3", "4"]
+    # every non-pharmacogenomics module carries an empty level and must not outrank a real one
+    assert _evidence_rank("") < _evidence_rank("4")
+    assert _evidence_rank(None) < _evidence_rank("4")
+    assert _evidence_rank("nonsense") < _evidence_rank("4")

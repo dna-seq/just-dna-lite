@@ -44,6 +44,24 @@ app.add_typer(enricher_app, name="enrich")
 app.add_typer(marketplace_client_app, name="marketplace")
 
 
+@app.command("list-modules")
+def list_modules() -> None:
+    """List the annotation modules discovered from the configured sources.
+
+    This is the check that matters after publishing: it answers whether the app can *see* a module,
+    not merely whether its files landed. A module that uploaded but does not appear here is not
+    discoverable, which for the app's purposes means not published.
+
+    `just_dna_pipelines.cli` defines the same command, but that entry point is shadowed by this one
+    (both packages install a `pipelines` script and the root package wins), so it was unreachable.
+    """
+    # Imported inside the command on purpose: `annotation.hf_modules` runs discovery — and therefore
+    # network I/O — at import time, and no other subcommand should pay for that.
+    from just_dna_pipelines.cli import list_modules as _list_modules
+
+    _list_modules()
+
+
 @app.command("clear-module-cache")
 def clear_module_cache() -> None:
     """Delete the locally cached HuggingFace annotator-module data.

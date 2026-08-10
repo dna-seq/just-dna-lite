@@ -169,8 +169,13 @@ def create_module_source_assets() -> list[AssetSpec]:
     """
     assets = []
     for module_name, info in MODULE_INFOS.items():
-        # Core tables
-        for table in MODULE_TABLES:
+        # Core tables, plus the module's own lead table when it is not weights — otherwise a
+        # pharm_variants-led module contributes no assets at all, since the weights lookup below
+        # raises and is skipped.
+        tables = list(MODULE_TABLES)
+        if info.lead_table not in tables:
+            tables.append(info.lead_table)
+        for table in tables:
             try:
                 url = get_module_table_url(module_name, table)
                 assets.append(

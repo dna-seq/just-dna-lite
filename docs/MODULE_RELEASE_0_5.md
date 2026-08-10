@@ -430,9 +430,9 @@ uv run pipelines marketplace update-module-version just-dna-seq superhuman 2.4.0
 
 ### 3b. HuggingFace collection (legacy mirror)
 
-Nine of the ten modules go here; `pharmgkb` cannot (see below). This uploads the **compiled**
-artifacts — not the spec — to `datasets/just-dna-seq/annotators/data/<name>/`, one commit per module.
-**39.6 MiB in total**, `pathogenic` being 27.3 MiB of it.
+All ten modules go here. This uploads the **compiled** artifacts — not the spec — to
+`datasets/just-dna-seq/annotators/data/<name>/`, one commit per module. **39.6 MiB in total**,
+`pathogenic` being 27.3 MiB of it.
 
 **Step 0 — authenticate.** There is no HF token on this machine right now (`get_token()` returns
 None), so this is a real prerequisite rather than a formality. The account needs *write* access to
@@ -446,7 +446,7 @@ uv run python -c "from huggingface_hub import whoami; print(whoami()['name'])"
 **Step 1 — dry run, and read the file lists.** Writes nothing and contacts nobody.
 
 ```bash
-MODULES="coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic"
+MODULES="coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman pharmgkb cardio cancer pathogenic"
 for m in $MODULES; do uv run pipelines v1-port publish "$m" --dry-run; done
 ```
 
@@ -456,10 +456,11 @@ same thing, and is how you publish a module built somewhere else. The name in th
 directory's own basename either way.
 
 Expect **7 files** for the six curated modules (`weights`, `annotations`, `studies`, `sources`,
-`literature`.parquet + `manifest.json` + `logo.png`) and **6** for the three panels, which have no
+`literature`.parquet + `manifest.json` + `logo.png`), **6** for the three panels, which have no
 `literature.parquet` because their grounding is per-variant ClinVar citations rather than a literature
-pass. A module printing fewer than that is missing an artifact — rebuild it rather than publishing a
-partial one.
+pass, and **3** for `pharmgkb` (`pharm_variants` + `sources`.parquet + `manifest.json`) — it is led by
+a 0.4 table and has neither annotations nor studies. A module printing fewer than its shape calls for
+is missing an artifact; rebuild it rather than publishing a partial one.
 
 **Step 2 — publish.** Sequential on purpose: each is its own commit, and a failure halfway leaves the
 earlier ones intact and re-runnable (`upload_folder` overwrites by path).
@@ -471,18 +472,17 @@ for m in $MODULES; do
 done
 ```
 
-**Step 3 — verify from the outside**, not from the log:
+**Step 3 — verify from the outside**, not from the log. Run discovery against the live collection,
+which is the check that matters: it answers "does the app see the module", not merely "did files
+land".
 
 ```bash
-uv run python - <<'PY'
-from huggingface_hub import HfFileSystem
-fs = HfFileSystem()
-for m in "coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic".split():
-    base = f"datasets/just-dna-seq/annotators/data/{m}"
-    files = sorted(p.split("/")[-1] for p in fs.ls(base, detail=False)) if fs.exists(base) else []
-    print(f"{m:16} {'ok ' if 'weights.parquet' in files else 'MISSING'} {files}")
-PY
+uv run pipelines clear-module-cache    # so this reads the collection, not yesterday's copy
+uv run pipelines list-modules
 ```
+
+Every published module must appear in that table. A module whose files uploaded but which is absent
+here is not discoverable, which for the app's purposes means not published.
 
 The enricher's own publisher is the canonical 0.5 surface and does the same upload, if you would
 rather not go through the port CLI:
@@ -491,10 +491,13 @@ rather not go through the port CLI:
 uv run just-dna-enricher upload data/interim/v1_port/coronary --repo just-dna-seq/annotators
 ```
 
-**`pharmgkb` cannot go to HuggingFace yet.** It is led by `pharm_variants.parquet` and has no
-`weights.parquet`, and `annotation.hf_modules` probes for exactly that file to decide a directory is
-a module — so the upload would land where the app cannot see it. `v1-port publish pharmgkb` refuses
-with that message and points here. Registry only until discovery learns the 0.4 table families.
+**`pharmgkb` is led by `pharm_variants.parquet` and has no `weights.parquet`**, which is fine:
+discovery probes every family in `module_config.LEAD_TABLES`, so it is found, published and annotated
+like any other module. Two consequences worth knowing. Its rows carry no coordinates — the compiler
+materializes the 0.4 families verbatim from their CSV and applies `resolution.csv` to
+`weights.parquet` only — so annotation joins it on **rsid + genotype** instead of by position; a VCF
+with no rsIDs in its `ID` column will match nothing from it. And its report rows are ordered by
+ClinPGx evidence level rather than by weight, since it has no weights to rank.
 
 ## 4. After publishing
 
