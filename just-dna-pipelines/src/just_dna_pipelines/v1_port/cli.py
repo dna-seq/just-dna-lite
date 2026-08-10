@@ -237,7 +237,9 @@ def v1_pharmgkb(
 
 @app.command("publish")
 def v1_publish(
-    module: str = typer.Argument(..., help="Compiled module name under the output root to publish."),
+    module: str = typer.Argument(
+        ..., help="Compiled module: a directory, or a name under the output root."
+    ),
     out_root: Path = typer.Option(
         Path("data/interim/v1_port"), "--out", help="Output root holding the compiled module dir."
     ),
@@ -249,13 +251,14 @@ def v1_publish(
     ),
 ) -> None:
     """Upload a compiled module's artifacts to the HuggingFace annotator collection."""
-    from just_dna_pipelines.v1_port.publish import plan_publish, publish_module
+    from just_dna_pipelines.v1_port.publish import plan_publish, publish_module, resolve_module_dir
 
-    module_dir = out_root / module
     # A module HuggingFace discovery cannot see is a refusal with an explanation, not a crash — the
-    # message names the registry route instead, so a traceback would only bury it.
+    # message names the registry route instead, so a traceback would only bury it. The same goes for
+    # a path that does not exist.
     try:
-        plan = plan_publish(module_dir, module, repo_id)
+        module_dir, name = resolve_module_dir(module, out_root)
+        plan = plan_publish(module_dir, name, repo_id)
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from None
@@ -267,8 +270,8 @@ def v1_publish(
             console.print(f"  • {f}")
         return
 
-    plan = publish_module(module_dir, module, repo_id)
+    plan = publish_module(module_dir, name, repo_id)
     console.print(
-        f"[bold green]✓ Published {module}[/bold green] → "
+        f"[bold green]✓ Published {name}[/bold green] → "
         f"{plan.repo_id}/{plan.path_in_repo} ({len(plan.files)} files)"
     )

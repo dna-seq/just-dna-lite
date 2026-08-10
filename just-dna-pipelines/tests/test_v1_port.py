@@ -26,6 +26,7 @@ from just_dna_pipelines.v1_port.adapters import (
 )
 from just_dna_pipelines.v1_port.genotype import state_from_weight, to_slash_genotype
 from just_dna_pipelines.v1_port.pmid import normalize_pmids
+from just_dna_pipelines.v1_port.publish import plan_publish, resolve_module_dir
 from just_dna_pipelines.v1_port.runner import DEFAULT_ENSEMBL_CACHE
 from just_dna_pipelines.v1_port.sources import REGISTRY, fetch_data_file
 
@@ -327,3 +328,61 @@ def test_superhuman_genotypes_hom_only_and_source_alleles():
         ("G", "A|C|T"),
     )
     assert set(src) == {"C/G", "C/C"}, src
+
+
+# ------------------------------------------------------------------ HF publish route
+
+def test_publish_accepts_a_directory_or_a_name_identically(tmp_path):
+    """A path and the equivalent bare name resolve to the same module.
+
+    Before, the argument was always joined onto the output root, so passing the path you were
+    looking at produced `<root>/<root>/<name>` and an error about the wrong directory.
+    """
+    root = tmp_path / "v1_port"
+    module_dir = root / "coronary"
+    module_dir.mkdir(parents=True)
+
+    by_name = resolve_module_dir("coronary", root)
+    by_path = resolve_module_dir(str(module_dir), root)
+    assert by_name == by_path == (module_dir, "coronary")
+
+
+def test_publish_rejects_a_mistyped_path_as_a_path(tmp_path):
+    """A path-shaped argument that does not exist is not retried as a name under the output root."""
+    with pytest.raises(FileNotFoundError) as excinfo:
+        resolve_module_dir(str(tmp_path / "v1_port" / "coronaryy"), tmp_path / "v1_port")
+    # the message names what was actually asked for, not some other absent directory
+    assert "coronaryy" in str(excinfo.value)
+    assert "v1_port/v1_port" not in str(excinfo.value)
+
+
+def test_publish_remedy_for_an_uncompiled_spec_is_a_runnable_command(tmp_path):
+    """The missing-artifact error must suggest a command that exists and lands where publish reads.
+
+    It used to suggest `v1-port port --module <arg>`, which cannot rebuild a module that was never
+    a Generation-I port, and which took a name where a path had been given.
+    """
+    spec = tmp_path / "my_module"
+    spec.mkdir()
+    (spec / "module_spec.yaml").write_text("name: my_module\n")
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        plan_publish(spec, "my_module")
+    message = str(excinfo.value)
+    assert "weights.parquet" in message
+    # compiling in place is what makes the artifacts visible to this uploader
+    assert f"pipelines module compile {spec} --output {spec}" in message
+
+
+def test_publish_refuses_a_weightless_module_and_names_the_registry(tmp_path):
+    """HF discovery keys on weights.parquet, so a 0.4-table-led module goes to the registry."""
+    module_dir = tmp_path / "pharmgkb_cpic"
+    module_dir.mkdir()
+    for table in ("pharm_variants.parquet", "annotations.parquet", "studies.parquet"):
+        (module_dir / table).touch()
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        plan_publish(module_dir, "pharmgkb_cpic")
+    message = str(excinfo.value)
+    assert "pharm_variants.parquet" in message
+    assert "marketplace publish" in message

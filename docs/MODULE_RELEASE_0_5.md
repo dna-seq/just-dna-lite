@@ -430,21 +430,62 @@ uv run pipelines marketplace update-module-version just-dna-seq superhuman 2.4.0
 
 ### 3b. HuggingFace collection (legacy mirror)
 
-Uploads the **compiled** artifacts to `datasets/just-dna-seq/annotators/data/<name>/`.
+Nine of the ten modules go here; `pharmgkb` cannot (see below). This uploads the **compiled**
+artifacts — not the spec — to `datasets/just-dna-seq/annotators/data/<name>/`, one commit per module.
+**39.6 MiB in total**, `pathogenic` being 27.3 MiB of it.
+
+**Step 0 — authenticate.** There is no HF token on this machine right now (`get_token()` returns
+None), so this is a real prerequisite rather than a formality. The account needs *write* access to
+the `just-dna-seq` org.
 
 ```bash
-hf auth login            # or export HF_TOKEN=…
+hf auth login                       # or: export HF_TOKEN=hf_…
+uv run python -c "from huggingface_hub import whoami; print(whoami()['name'])"
+```
 
-for m in coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic; do
-  uv run pipelines v1-port publish "$m" --dry-run     # inspect the file list first
-done
+**Step 1 — dry run, and read the file lists.** Writes nothing and contacts nobody.
 
-for m in coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic; do
-  uv run pipelines v1-port publish "$m"
+```bash
+MODULES="coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic"
+for m in $MODULES; do uv run pipelines v1-port publish "$m" --dry-run; done
+```
+
+The argument is a module **name** resolved under `--out` (default `data/interim/v1_port`), or a
+**directory** — `uv run pipelines v1-port publish data/interim/v1_port/coronary --dry-run` does the
+same thing, and is how you publish a module built somewhere else. The name in the collection is the
+directory's own basename either way.
+
+Expect **7 files** for the six curated modules (`weights`, `annotations`, `studies`, `sources`,
+`literature`.parquet + `manifest.json` + `logo.png`) and **6** for the three panels, which have no
+`literature.parquet` because their grounding is per-variant ClinVar citations rather than a literature
+pass. A module printing fewer than that is missing an artifact — rebuild it rather than publishing a
+partial one.
+
+**Step 2 — publish.** Sequential on purpose: each is its own commit, and a failure halfway leaves the
+earlier ones intact and re-runnable (`upload_folder` overwrites by path).
+
+```bash
+for m in $MODULES; do
+  echo "── $m"
+  uv run pipelines v1-port publish "$m" || { echo "FAILED: $m"; break; }
 done
 ```
 
-The enricher's own publisher does the same thing and is the canonical 0.5 surface:
+**Step 3 — verify from the outside**, not from the log:
+
+```bash
+uv run python - <<'PY'
+from huggingface_hub import HfFileSystem
+fs = HfFileSystem()
+for m in "coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman cardio cancer pathogenic".split():
+    base = f"datasets/just-dna-seq/annotators/data/{m}"
+    files = sorted(p.split("/")[-1] for p in fs.ls(base, detail=False)) if fs.exists(base) else []
+    print(f"{m:16} {'ok ' if 'weights.parquet' in files else 'MISSING'} {files}")
+PY
+```
+
+The enricher's own publisher is the canonical 0.5 surface and does the same upload, if you would
+rather not go through the port CLI:
 
 ```bash
 uv run just-dna-enricher upload data/interim/v1_port/coronary --repo just-dna-seq/annotators

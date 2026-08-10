@@ -53,6 +53,26 @@ def default_collection_repo() -> str:
     return "just-dna-seq/annotators"
 
 
+def resolve_module_dir(module: str, out_root: Path) -> tuple[Path, str]:
+    """Accept either a compiled module **directory** or a bare name under ``out_root``.
+
+    Returns ``(module_dir, name)``, where the name is the directory's own basename — that is what
+    the module is called in the collection, so a path and the equivalent name publish identically.
+
+    Taking only a name meant a path was silently joined onto the output root, producing
+    ``data/interim/v1_port/data/interim/v1_port/coronary`` and then an error advising a rebuild
+    command that could not work. A publish route should accept the thing you are looking at.
+    """
+    candidate = Path(module)
+    if candidate.is_dir():
+        return candidate, candidate.name
+    # Anything path-shaped that does not exist is a mistyped path, not a module name — say so
+    # rather than searching for it under the output root and reporting a different absence.
+    if len(candidate.parts) > 1:
+        raise FileNotFoundError(f"no such module directory: {candidate}")
+    return out_root / module, module
+
+
 def plan_publish(module_dir: Path, name: str, repo_id: Optional[str] = None) -> PublishPlan:
     """Resolve the upload plan and validate the compiled artifacts are present."""
     repo_id = repo_id or default_collection_repo()
@@ -71,9 +91,12 @@ def plan_publish(module_dir: Path, name: str, repo_id: Optional[str] = None) -> 
                 f"invisible to the app. Publish it to the registry instead: "
                 f"`pipelines marketplace publish just-dna-seq {name} <version> {module_dir}`."
             )
+        if not module_dir.is_dir():
+            raise FileNotFoundError(f"{name}: no such module directory: {module_dir}")
         raise FileNotFoundError(
-            f"{name}: missing compiled artifact(s) {missing} in {module_dir} — "
-            f"run `pipelines v1-port port --module {name} --compile` first"
+            f"{name}: missing compiled artifact(s) {missing} in {module_dir} — this uploads the "
+            f"compiled parquet, so compile the spec first — in place, since that is where the "
+            f"upload reads from: `pipelines module compile {module_dir} --output {module_dir}`"
         )
     return PublishPlan(
         module=name, repo_id=repo_id, path_in_repo=f"data/{name}", files=present
