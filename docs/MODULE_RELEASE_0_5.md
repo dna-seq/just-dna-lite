@@ -58,12 +58,11 @@ enricher's `resolution.csv` (+ `literature.csv` where studies exist), the compil
 Useful flags: `--offline` (no live Ensembl/gnomAD/PubMed — faster, but leaves indel VRS ids
 unminted), `--no-literature`, `--no-compile`, `--min-review-stars N` (ClinVar panels).
 
-**Panel resolution is batched and resumable.** `pathogenic` is 611,700 authored rows, resolved in 62
-slices of 10,000. That is a workaround for a quadratic query shape in the enricher, not a tuning
-choice — see `clinvar_runner.ENRICH_BATCH_ROWS`, and `CLAUDE.md` for the measurement. Re-running a
-panel reuses every slice already resolved, so an interrupted build resumes where it stopped rather
-than starting over; `scripts/finish_pathogenic.py` goes further and resumes from the authored spec
-without re-drafting.
+**Panel resolution is one call again.** It used to need slicing into 10k-row batches, because the
+enricher's ClinVar reader was quadratic in module size and `cardio` never finished; enricher **0.5.2**
+joins a probe table instead, and 76,078 rows now resolve in 13 s with the rate *improving* as the
+module grows. The batching and its resume logic are removed. `scripts/finish_pathogenic.py` remains
+for re-resolving and recompiling an already-drafted spec without paying for the draft again.
 
 **The ClinVar panels resolve offline by design, and that caps VRS coverage at about half.** A VRS
 allele id for a substitution mints from the allele strings alone; an indel or MNV has to be justified
@@ -84,9 +83,17 @@ built spec without `--offline`, which is a decision about time and API budget, n
 | longevitymap | 1,039 | 528 | 671 | 162 | 1,018/1,039 | `7ac6a922` |
 | superhuman | 190 | 101 | 103 | 37 | 190/190 | `c4bdab0c` |
 | pharmgkb | — | — | — | — | 147/147 loci (1,482 `pharm_variants` rows) | `cef74d5b` |
-| cardio | 115,060 | 115,060 | 121,467 | — | 115,060/115,060 | `ba252c7e` |
-| cancer | 139,254 | 139,254 | 138,240 | — | 139,254/139,254 | `8401e81b` |
-| pathogenic | 617,001 | 617,001 | 622,507 | — | 617,001/617,001 | `9fdce4eb` |
+| cardio | 115,060 | 115,060 | 121,467 | — | 115,060/115,060 | `a45a9926` |
+| cancer | 139,254 | 139,254 | 138,240 | — | 139,254/139,254 | `4e9e0dff` |
+| pathogenic | 617,001 | 617,001 | 622,507 | — | 617,001/617,001 | `8a291cad` |
+
+**Panel digests move on every rebuild, with or without a content change.** `sources.csv` carries a
+`fetched_at` stamped when the row is drafted, and `sources.parquet` is one of the four files
+`artifact.digest` is a Merkle root over — isolated by editing only that field and recompiling. So
+treat the hashes above as identifying *these* builds, not the content: a rebuild from the same
+snapshot produces different ones. Recompiling an untouched spec is reproducible; re-drafting is not.
+The six curated modules and `pharmgkb` were not re-drafted for 0.5.2 and keep the digests listed
+above (`vo2max` was recompiled to confirm: identical).
 
 The panels: `cardio` 297 genes, `cancer` 293, `pathogenic` 4,793 (402,218 pathogenic + 214,942
 likely-pathogenic). Every row carries a coordinate and a typed `clin_sig`.

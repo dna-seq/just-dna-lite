@@ -224,20 +224,20 @@ PubMedCentral ids and a few malformed "PubMed" ones (Variation 12606 cites `1683
 one. `v1_port/clinvar_panel.py` passes `max_citations=0` and drafts its own `studies.csv` with a PMID
 filter.
 
-**`enrich()` is quadratic in module size, and the cache is not why.** `clinvar.lookup_clin_sig` (and
-`_lookup_rsid_candidates`) build one OR'd four-column predicate per allele, which DuckDB evaluates
-per row per predicate instead of as a hash join. Measured on the local snapshot: **5,000 alleles as
-an OR-list = 127 s; the same 5,000 as a temp table + JOIN = 0.13 s**, against a view that builds in
-0.07 s and full-scans all 4.4M records in 0.03 s. That is why `cardio` unbatched sat at 12% CPU for
-two hours. Two mitigations in `clinvar_runner`, both documented at their constants:
+**`enrich()` was quadratic in module size — fixed in enricher 0.5.2, and the workarounds are gone.**
+Kept here because the symptom is so misleading: `cardio` sat at **12% CPU with no disk I/O for two
+hours**, which reads like a deadlock and was one enormous DuckDB expression tree. The ClinVar reader
+OR-chained one predicate per allele, which cannot be folded into a hash probe, so cost grew with
+`alleles × rows`. 0.5.2 joins a probe table instead. Measured here after the bump: **76,078 rows
+resolve in 13.3 s (0.17 ms/row), and the rate improves with size** — against 4.6 ms/row before.
 
-- `enrich_in_batches` slices `variants.csv` into 10k-row spec dirs (caps the quadratic term) and
-  **resumes** — it reuses any batch whose slice still matches, so a crash costs one batch, not an
-  hour. It compares parsed rows, not bytes, so a line-terminator change does not discard the work.
-- `PANEL_VERIFY_CLIN_SIG = False`: the `clin_sig` cross-check is ~90% of a panel's resolve time
-  (27.1 s → 2.6 s on 7,818 rows, byte-identical output) and is **tautological for a drafted panel** —
-  `draft_gene_panel` copied the value out of the snapshot the check reads. Hand-authored modules keep
-  it on. Measured live mid-run on `pathogenic`: 83 s/batch → 10 s/batch.
+Two mitigations existed and have been **removed** rather than left dormant: `enrich_in_batches`
+(10k-row slicing with resume) and `PANEL_VERIFY_CLIN_SIG=False`. If you are reading old code or an
+old branch that still has them, they are dead weight now. The `clin_sig` skip in particular is better
+in the library than it was here: 0.5.2 compares the module's `panel:` pin against the snapshot's
+`release.json` and skips **only on an established match**, so a hand-authored module or one pinned to
+a different release still gets checked — where the local flag was unconditional. The reason travels
+on `EnrichmentResult.clin_sig_not_checked`, so an empty conflict list is no longer ambiguous.
 
 All five are filed upstream in `/data/sources/just-dna-format/docs/ROADMAP.md`.
 
