@@ -21,7 +21,19 @@ from just_dna_pipelines.module_config import MODULES_CONFIG
 
 # weights/annotations/studies are what discovery needs; manifest.json + logo are additive.
 _REQUIRED = ("weights.parquet", "annotations.parquet", "studies.parquet")
-_ALLOW_PATTERNS = [*_REQUIRED, "manifest.json", "logo.png", "logo.jpg"]
+
+# The 0.4/0.5 side tables a compiled module may also carry. Additive: HuggingFace discovery ignores
+# what it does not know, and shipping them keeps the uploaded module a complete artifact.
+#
+# Ordered so the tables that can *lead* a module come first — the refusal below names the first one
+# present, and "led by sources.parquet" is not a useful thing to tell an author.
+_OPTIONAL_TABLES = (
+    "pharm_variants.parquet", "diplotypes.parquet", "haplotypes.parquet", "pgs.parquet",
+    "copynumbers.parquet", "heteroplasmy.parquet", "repeat_alleles.parquet",
+    "activity_phenotype.parquet", "allele_function.parquet",
+    "sources.parquet", "literature.parquet", "frequencies.parquet", "gene_metrics.parquet",
+)
+_ALLOW_PATTERNS = [*_REQUIRED, *_OPTIONAL_TABLES, "manifest.json", "logo.png", "logo.jpg"]
 
 
 class PublishPlan(BaseModel):
@@ -47,6 +59,18 @@ def plan_publish(module_dir: Path, name: str, repo_id: Optional[str] = None) -> 
     present = [f for f in _ALLOW_PATTERNS if (module_dir / f).exists()]
     missing = [f for f in _REQUIRED if f not in present]
     if missing:
+        # A module led by a 0.4 table (pharm_variants, diplotypes, pgs, …) compiles fine and has no
+        # weights.parquet — but `annotation.hf_modules` probes for exactly that file to decide a
+        # directory *is* a module, so uploading one here would put files where the app cannot see
+        # them. The registry has no such constraint, so say which route the module has.
+        led_by = [f for f in _OPTIONAL_TABLES if f in present]
+        if led_by and "weights.parquet" in missing:
+            raise FileNotFoundError(
+                f"{name}: no weights.parquet — this module is led by {led_by[0]}, and HuggingFace "
+                f"discovery (annotation.hf_modules) keys on weights.parquet, so the upload would be "
+                f"invisible to the app. Publish it to the registry instead: "
+                f"`pipelines marketplace publish just-dna-seq {name} <version> {module_dir}`."
+            )
         raise FileNotFoundError(
             f"{name}: missing compiled artifact(s) {missing} in {module_dir} — "
             f"run `pipelines v1-port port --module {name} --compile` first"
