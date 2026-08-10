@@ -8,123 +8,161 @@ Gen-I modules were OakVar *postaggregators*, one `just_*` repo per module in the
 file. Stage 1 (see `just_dna_pipelines.v1_port` and `data/interim/v1_port/`) reproducibly ports the
 variant-backed modules from that canonical source; this plan covers the rest.
 
+**As of 2026-08-09 every Gen-I module has a Gen-II counterpart.** The two that were on hold —
+`lnewco` (APOE diplotype) and `drugs` (PharmGKB) — are resolved differently: `drugs` is superseded by
+the new `pharmgkb` module on the ClinPGx surface, and `lnewco` is now *unblocked* rather than done
+(0.5 shipped the diplotype tables it needed; see item 5).
+
 ## Where they're published
 
-The **module marketplace** (`https://module-marketplace.just-dna.life`, namespace `just-dna-seq`) is
-now the primary store; publish via `pipelines marketplace publish just-dna-seq <name> <version>
-data/interim/v1_port/<name>`. The HuggingFace collection (`just-dna-seq/annotators`) is **legacy** and
-will be retired after the marketplace migration; it's kept in sync for now via `pipelines v1-port
-publish <name>`. All six variant-backed modules are live on both at **1.0.0**.
+The **module registry** (`https://module-registry.just-dna.life`, namespace `just-dna-seq`, server
+`just-dna-registry 0.11.0`) is the primary store; publish via `pipelines marketplace publish
+just-dna-seq <name> <version> data/interim/v1_port/<name>`. The HuggingFace collection
+(`just-dna-seq/annotators`) is **legacy** and kept in sync via `pipelines v1-port publish <name>`.
+
+**All nine were published on 2026-07-09 and the registry has since been wiped** — `marketplace list`
+now returns only `eric-mods/lactose_tolerance`. So every module below needs republishing, not just
+the rebuilt ones. The pre-wipe versions and changelogs are preserved in
+[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) so the history stays continuous.
+
+Build and release commands for all ten modules: **[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md)**.
 
 ## Status overview
 
-| Gen-I repo | Module | Data | Ported to `v1_port/`? | Published (marketplace + HF) | Parity |
-|---|---|---|---|---|---|
-| `just_coronary` | coronary | `coronary.sqlite` | ✅ compiled | ✅ 1.0.0 | **full** — 27/27 rsids match HF |
-| `just_vo2max` | vo2max | `vo2max.sqlite` | ✅ compiled | ✅ 1.0.0 | **full** — 13/13 match HF |
-| `just_lipidmetabolism` | lipidmetabolism | `lipid_metabolism.sqlite` | ✅ compiled | ✅ 1.0.0 | **full** — 15/15 match HF |
-| `just_longevitymap` | longevitymap | `longevitymap.sqlite` | ✅ compiled | ✅ 1.0.0 | **full** — 528/528 rsids, 1043/1043 rows (het gap closed 2026-07-07) |
-| `just_thrombophilia` | thrombophilia | `thrombophilia.sqlite` | ✅ compiled | ✅ 1.0.0 | **full** — newly published (2026-07) |
-| `just_superhuman` | superhuman | `superhuman.sqlite` | ✅ compiled (v2, narrowed) | ✅ 1.0.0 live; 2.0.0 ready to publish | **full** — v2 curated: 99/99 named protective alleles grounded on human-verified PMIDs (37 genes) + Mar-2026 refresh |
-| `just_cardio` | cardio | `genes.txt` | ✅ compiled (ClinVar gene-panel) | ⏸ built, not published (decision) | **reference impl** — 123,020 rows / 304 genes (10 aliases resolved) |
-| `just_cancer` | cancer | `genes.txt` | ✅ compiled (ClinVar gene-panel) | ⏸ built, not published (decision) | **reference impl** — 145,467 rows / 319 genes (10 aliases resolved) |
-| `just_pathogenic` | pathogenic | (derived from ClinVar) | ✅ compiled (genome-wide ClinVar) | ⏸ built, not published (decision) | **reference impl** — 674,426 rows / 5,540 genes |
-| `just_lnewco` | lnewco (APOE) | `metabolic_genotype.sqlite` | ❌ | ❌ | **on hold** — diplotype schema needed (ROADMAP #8) |
-| `just_drugs` | drugs | `annotation_tab.tsv` | ❌ | ❌ | **on hold** — PharmGKB domain (ROADMAP #9) |
+| Gen-I repo | Module | Data | Built by | Was (wiped) | Republish as | Parity |
+|---|---|---|---|---|---|---|
+| `just_coronary` | coronary | `coronary.sqlite` | `v1-port port` | 1.0.0 | 1.1.0 | **full** — 27 rsids |
+| `just_vo2max` | vo2max | `vo2max.sqlite` | `v1-port port` | 1.0.0 | 1.1.0 | **full** — 13 rsids |
+| `just_lipidmetabolism` | lipidmetabolism | `lipid_metabolism.sqlite` | `v1-port port` | 1.0.0 | 1.1.0 | **full** — 15 rsids |
+| `just_longevitymap` | longevitymap | `longevitymap.sqlite` | `v1-port port` | 1.1.0 | 1.2.0 | **full** — 528 rsids (4 unmatchable rows pruned, see below) |
+| `just_thrombophilia` | thrombophilia | `thrombophilia.sqlite` | `v1-port port` | 1.0.0 | 1.1.0 | **full** — 9 rsids |
+| `just_superhuman` | superhuman | `superhuman.sqlite` | `v1-port port` | 2.3.0 | 2.4.0 | **full** — v2 curated, 101 rsids / 37 genes, all PMID-grounded |
+| `just_cardio` | cardio | `genes.txt` | `v1-port clinvar` | 1.0.0 | **2.0.0** | **rebuilt on 0.5** — ClinVar snapshot route |
+| `just_cancer` | cancer | `genes.txt` | `v1-port clinvar` | 1.0.0 | **2.0.0** | **rebuilt on 0.5** |
+| `just_pathogenic` | pathogenic | (derived from ClinVar) | `v1-port clinvar` | 1.0.0 | **2.0.0** | **rebuilt on 0.5** — genome-wide flag |
+| `just_drugs` | **pharmgkb** | `annotation_tab.tsv` | `v1-port pharmgkb` | — | 1.0.0 | **superseded** — ClinPGx clinical annotations, 1,482 rows / 219 annotations / 55 drugs |
+| `just_lnewco` | lnewco (APOE) | `metabolic_genotype.sqlite` | — | — | ❌ | **unblocked, not built** — 0.5 has the diplotype tables (item 5) |
 
-The five modules previously on HuggingFace now have a **reproducible source-of-truth port**
-re-derived from their Gen-I repos, and the reproduction matches the published artifacts almost exactly
-— validating both the port and the legacy HF data. thrombophilia was newly added; superhuman v2
-(full PMID grounding + Mar-2026 refresh) is curated and ready to publish as 2.0.0.
+The panels take a **major** because the rebuild changed what they contain, not just how it is
+compiled — see [MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) § The republish.
 
-## Work items to reach parity
+## Work items
 
 ### 1. Publish `thrombophilia` — ✅ done (2026-07)
-Published to `just-dna-seq/annotators/data/thrombophilia/` via `pipelines v1-port publish
-thrombophilia`; `module_metadata.thrombophilia` added to `modules.yaml`. It is now auto-discovered and
-part of the default module set. Re-publish (or publish other readied modules) with the same command.
+Published via `pipelines v1-port publish thrombophilia`; `module_metadata.thrombophilia` added to
+`modules.yaml`. Auto-discovered and part of the default module set.
 
 ### 2. Close the longevitymap het-allele gap — ✅ done (2026-07-07)
-Root cause was **not** Ensembl coverage (all 528 rsids are present in the cache) but a genotype-
-reconstruction bug: heterozygous genotypes were built by concatenating the Ensembl `ref` + `alt`
-columns, and `alt` is a `|`-joined **multiallelic** list (e.g. `A|G`), yielding invalid genotypes for
-284 rows. The fix (`_longevitymap_genotype`) pairs the module's own curated **effect allele** with
-its single complement (the Ensembl reference when the effect is an alt), and reads `spec`-state rows
-whose `allele` field spells the het genotype out directly (e.g. `CT` → `C/T`). Result: **1043/1043
-rows, 528/528 rsids, zero skips** — full parity, no external API/dbSNP build needed. Covered by
-`test_longevitymap_genotype_reconstruction` + `test_longevitymap_reconstructs_every_source_rsid`.
+Root cause was **not** Ensembl coverage but a genotype-reconstruction bug: heterozygous genotypes were
+built by concatenating the Ensembl `ref` + `alt` columns, and `alt` is a `|`-joined **multiallelic**
+list (e.g. `A|G`), yielding invalid genotypes for 284 rows. The fix (`_longevitymap_genotype`) pairs
+the module's own curated **effect allele** with its single complement and reads `spec`-state rows whose
+`allele` field spells the het genotype out directly. Result: **1043 rows / 528 rsids, zero skips**.
+Covered by `test_longevitymap_genotype_reconstruction` and
+`test_longevitymap_reconstructs_every_source_rsid`.
 
-### 3. Ground `superhuman` with real PMIDs — ✅ v2 curation DONE (publish pending)
-Executed per `docs/SUPERHUMAN_REFRESH_PLAN.md` (supervised, verification-gated; every PMID fetched +
-title-verified via NCBI E-utilities, no fabrication). The reviewed result is frozen in a tracked CSV
+### 3. Ground `superhuman` with real PMIDs — ✅ v2 curation done (publish pending)
+Executed per `docs/SUPERHUMAN_REFRESH_PLAN.md`, verification-gated (every PMID fetched and
+title-verified via NCBI E-utilities). Frozen in a tracked CSV
 (`just-dna-pipelines/.../v1_port/data/superhuman_pmid_curation.csv`) and merged by `adapt_superhuman`:
+narrowed to **101 named protective alleles across 37 genes**, all grounded, plus the March-2026
+additions (TPH2, COMT, BDNF, CETP, APOE Christchurch). This curation shipped as **2.3.0** before the
+registry wipe; the 0.5 rebuild republishes it as **2.4.0** with the curation unchanged.
 
-- **Narrowed to named protective alleles**: 1,243 dbSNP variants → **136 genotype rows / 99 rsids /
-  37 genes**, with **all 99 rsids grounded** (102 study rows). Unnamed whole-gene SNP dumps dropped.
-- **LOF dump genes** (NTRK1 8696348, RIMS1 35022694, SCN9A 17167479): kept as deletion/indel-class
-  variants only, grounded gene-level.
-- **March-2026 refresh additions** (single-rsid, verified): TPH2 rs4570625 (28342337), COMT rs4680
-  (12595695), BDNF rs6265 (12553913), CETP rs5882 (14559957), APOE Christchurch rs121918393 (31686034).
-  Gene-therapy/transgenic, haplotype, private/rsid-less and VNTR AREP entries excluded (see GAPS.md).
-- **Flag fixes**: APOA2 rs5082 relabeled (BMI/diet, not coronary); FAAH rs324420 → FAAH-OUT; CCR5 →
-  founding Δ32 paper.
+### 4. The ClinVar modules — ✅ rebuilt on the 0.5 enricher route (2026-08-09)
+`cardio`, `cancer` and `pathogenic` carry no per-variant weights: they select ClinVar pathogenic
+variants. The Generation-I re-port scanned the raw ClinVar VCF and baked coordinates into
+`variants.csv`; that route (`v1_port/clinvar.py` + the `gene_panel` adapter) is **superseded** by
+`v1_port/clinvar_panel.py`, which drives `just_dna_enricher.clinvar_draft.draft_gene_panel` over the
+published ClinVar **parquet snapshot**. Five things change:
 
-`validate_spec` passes; studies non-empty; all PMIDs digit-only; all study rsids present in weights.
-**Publish as `2.0.0`** (`v1-port publish superhuman` + `marketplace publish just-dna-seq superhuman
-2.0.0 …`) — left to the maintainer (publishing is out of scope for the curation agent).
+1. **Authored by identity.** rsID, or the whole coordinate when an rsID names more than one allele at
+   its locus. `just-dna-enricher enrich` fills `resolution.csv` from the same snapshot, so the compile
+   is offline and reproducible and Ensembl is not involved at all.
+2. **Typed `clin_sig`** from the closed `VALID_CLIN_SIG` vocabulary, so the module is checkable
+   against the source it was built from (`enrich --verify-clinsig`).
+3. **A stated review-status floor.** `MIN_REVIEW_STARS = 1` drops the 0★ "no assertion criteria
+   provided" submissions Gen-I mixed in silently. (The enricher's own default is 2 — better for a
+   clinical panel, but it discards ~72% of ClinVar's pathogenic set, and these are flags.)
+4. **Per-variant grounding** from ClinVar's own literature links (up to 3 each), instead of one
+   blanket citation of the ClinVar resource paper for every row. Variants ClinVar links no paper to
+   still fall back to it.
+5. **`sources.csv`** records ClinVar's terms, and `module_spec.yaml` carries a `panel:` block
+   (`GenePanelSpec`) pinning `clinvar_file_date` and `source_sha256`.
 
-### 4. ClinVar gene-panel (`cardio`, `cancer`, `pathogenic`) — 🟡 reference implementation built (2026-07-07)
-These carry no per-variant weights — they select ClinVar pathogenic variants. An **app-level
-reference implementation** now ships (`just_dna_pipelines.v1_port.clinvar` + the `gene_panel`
-adapter, `pipelines v1-port port --module cardio|cancer|pathogenic`):
-- Reads the Gen-I `data/genes.txt` gene list (cardio/cancer), scans the local ClinVar VCF
-  (`/data/just-dna-cache/clinvar/clinvar_GRCh38.vcf.gz`, ~190 MB, GRCh38 — hauled once), and keeps
-  `Pathogenic`/`Likely_pathogenic` variants whose `GENEINFO` gene is in the panel. `pathogenic` has
-  no gene list — it keeps *every* pathogenic ClinVar variant (a genome-wide flag).
-- **Gene-symbol reconciliation** (`symbols.py`): panel symbols are resolved against NCBI
-  `Homo_sapiens.gene_info` (`/data/just-dna-cache/ncbi_gene/`) so legacy aliases map to the current
-  symbols ClinVar uses (cardio: `CCDC114→ODAD1`, `TAZ→TAFAZZIN`, …; cancer: `MRE11A→MRE11`,
-  `PARK2→PRKN`, `MYST3→KAT6A`, …). HGNC `MT-*` symbols pass through as-is. Genuine source typos
-  (cancer: `ATK1`, `SF381`, `RADS1`, `KDMSC`, … — 13 of them) are **reported, never guessed**.
-- Emits both het (`ref/alt`) and hom-alt (`alt/alt`) **risk**-state carrier rows, `weight=None`
-  (no invented effect size), `clinvar=pathogenic=True`, conclusion from ClinVar `CLNDN`.
-- Every variant is grounded to the **ClinVar resource paper** (PMID `29165669`, PubMed-verified) —
-  the honest citation for the data source; per-submission citations are a future enhancement.
-- SNVs and short ACGT indels (≤ `MAX_ALLELE_LEN=50`) are kept; multi-kb structural alleles and
-  symbolic alleles are skipped (unmatchable as a two-allele genotype) and counted in the log.
-- Compiles **cardio** (123,020 rows / 304 genes), **cancer** (145,467 rows / 319 genes), and
-  **pathogenic** (674,426 rows / 5,540 genes; ClinVar release pinned in the provenance log). All
-  skip Ensembl resolution (`needs_ensembl=False`) since ClinVar already supplies positions.
+**The one judgement the port makes.** `draft_gene_panel` deliberately leaves `genotype` as a
+`<<REPLACE>>` placeholder — ClinVar publishes alleles, and whether carrying one is a carrier state or
+an affected one follows from the condition's inheritance mode, which the source does not state. A
+genome-wide panel cannot be curated row by row, so `fill_genotypes` expands each stub into the **two
+genotypes a diploid caller can emit** (heterozygous `ref/alt`, homozygous `alt/alt`) and says which in
+the conclusion. That is a transcription of zygosity, not a claim about its consequence, and it is the
+same shape the Gen-I modules had.
 
-**Publishing is on hold** (the user's outward decision): the modules are built under
-`data/interim/v1_port/` but not pushed to the marketplace/HF. The clean long-term home is a native
-**`GenePanelSpec`** in `just-dna-format` (a gene set + pathogenicity predicate, materialized at
-compile time) — see `just-dna-format/docs/ROADMAP.md` **item 7**; this app-level adapter is the
-intended upstream reference.
+Two upstream defects were worked around and reported to the format repo (see
+`just-dna-format/docs/ROADMAP.md`): the provider's own study drafting raises on ClinVar's
+PubMedCentral/malformed citation ids, so the panel drafts its own `studies.csv` with a PMID filter;
+and `cache pull` writes where `resolve_*` does not look.
 
-### 5. APOE diplotype (`lnewco`) — ⏸ on hold (needs your decision)
-`lnewco` keys conclusions on an APOE diplotype spanning `rs7412`+`rs429358` (e.g. `e4/e4`). The DSL's
-single-rsid `VariantRow` can't express a multi-locus genotype. Parity requires a haplotype/diplotype
-extension to the schema, documented as **ROADMAP item 8** in `just-dna-format`. Blocked on the schema
-decision (and worth designing generally, since star-allele PGx loci reuse the same shape).
+**Publishing stays the maintainer's call.** Built under `data/interim/v1_port/`, not pushed. These
+three were live at 1.0.0 before the registry wipe; the rebuild makes them 2.0.0 rather than a
+re-publish of the same number, because the selection and the grounding both changed.
 
-### 6. PharmGKB pharmacogenomics (`drugs`) — ⏸ on hold (needs your decision)
-`just_drugs` is drug-response annotation (PharmGKB `annotation_tab.tsv`) — a different domain from the
-variant-weight modules and never migrated from Gen I. Needs a PharmGKB adapter plus new fields (drug,
-response, evidence level), documented as **ROADMAP item 9**. Largest effort; scope separately.
+### 5. APOE diplotype (`lnewco`) — 🟡 unblocked by 0.5, not yet built
+`lnewco` keys conclusions on an APOE diplotype spanning `rs7412`+`rs429358` (e.g. `e4/e4`), which the
+single-rsid `VariantRow` cannot express. **0.5 shipped the tables it needed** — `haplotypes.csv` +
+`diplotypes.csv`, with `reference_examples/apoe_epsilon/` as a worked example of exactly this locus.
+The remaining work is an adapter that reads `metabolic_genotype.sqlite` and emits those two tables;
+no schema decision is outstanding. This is the only Gen-I module with no Gen-II counterpart.
 
-### 7. `pathogenic` (all-ClinVar) — 🟡 reference implementation built (2026-07-07)
-`just_pathogenic` had no gene list — it flagged *every* ClinVar pathogenic variant. Resolved by
-running the same `gene_panel` adapter with no gene filter (`db=None`): it keeps all pathogenic /
-likely-pathogenic ClinVar variants → **674,426 rows across 5,540 genes**, grounded to the ClinVar
-resource paper, ClinVar release pinned in the provenance log (`source_sha256`). Built under
-`data/interim/v1_port/pathogenic/`; **publishing on hold** (it's a large genome-wide flag — confirm
-it's a shape you want before pushing). This resolved the "no gene list" blocker by deriving the set
-from ClinVar itself.
+### 6. PharmGKB pharmacogenomics (`drugs`) — ✅ superseded by `pharmgkb` (2026-08-09)
+Gen-I `just_drugs` shipped 1,063 PharmGKB **variant** annotations — one row per published study
+finding, no evidence grading, `Significance: no` rows mixed in. There was no schema for drug response,
+so it was never migrated.
+
+0.5 supplies both halves, and `v1_port/pharmgkb.py` uses them: `pharm_variants.csv`
+(`PharmVariantRow`) models a drug-response row keyed by
+`(variant, drug, genotype, phenotype_category, annotation_id)`, and the enricher builds a snapshot of
+the ClinPGx **clinical** annotations — PharmGKB's aggregated, evidence-levelled reading of all the
+studies behind a variant/drug pair.
+
+The module is every clinical annotation at **evidence level 1A/1B/2A/2B** that is keyed to an rsID:
+**1,482 rows / 219 annotations / 147 variants / 55 drugs / 33 genes**. Level 3 (single study,
+13,631 rows) and 4 (case reports) are excluded — Gen-I drew no such line, and drawing it is most of
+the upgrade. Conclusions are ClinPGx's own published sentences, transcribed rather than summarized.
+
+**It is not sellable, and says so.** ClinPGx is CC BY-SA 4.0 *plus* a contractual bar on sale, so
+`sources.csv` records `commercial_use=false` / `declared_use=non_commercial` and the compiler refuses
+to build without that declaration.
+
+**It cannot go to HuggingFace.** A module led by `pharm_variants.parquet` has no `weights.parquet`,
+and `annotation.hf_modules` probes for exactly that file to decide a directory is a module — so the
+upload would be invisible to the app. `v1-port publish pharmgkb` refuses with that message. Registry
+only until discovery learns the 0.4 table families.
+
+### 7. `pathogenic` (all-ClinVar) — ✅ folded into item 4
+`just_pathogenic` had no gene list. Its gene set is now derived from the snapshot itself
+(`panel_genes()` — every gene in the pathogenic selection), and `GenePanelSpec.genes` is left empty,
+which the model documents as "no gene filter". That is what the module is.
+
+## Findings from the 0.5 rebuild
+
+Things the new surfaces caught that the old route did not:
+
+- **Four longevitymap rows can never match a VCF.** The registry's strict pre-publish check
+  (`POST /api/v1/modules/{ns}/{name}/check`) reports `rs699 A/T` and `T/T` against a locus that is
+  `A/G`, `rs1207362 C/C` against `G/T`, and `rs2107538 A/A` against `C/T`. This is Gen-I curation
+  following a paper's strand rather than the reference's, and it is **not** a reverse-complement away
+  — `rs699`'s authored pair mixes one forward-strand allele with one reverse-strand one. The port
+  drops such rows (named in `v1_port.log`) and the repair is curation against the original papers.
+- **Malformed gene cells.** `ABCG8, ABCG5` and `BIRC7, YTHDF1` are two genes in one cell;
+  `CXCL12 (LINC02881)` parenthesises a second identifier. `normalize_genes` splits and resolves them
+  against NCBI `gene_info`. `GUCYA3` (rs7692387) and `SERPINE` (rs1799889) are one-character
+  truncations the variant settles unambiguously, so they are in a small curated map with the reason;
+  `FLJ44450` (rs4952535) resolves to nothing and is reported, never guessed.
+- **Orphan study rows** citing rsIDs the module does not weight, pruned and counted.
 
 ## Suggested sequencing
-1. ✅ `thrombophilia` published. 2. ✅ `longevitymap` full parity (528/528). 3. 🟡 `cardio`/`cancer`/
-`pathogenic` gene-panel reference implementation built with gene-symbol reconciliation (publishing on
-hold). 4. ✅ `superhuman` v2 PMID back-fill + Mar-2026 refresh curated (publish as 2.0.0 pending).
-5. ⏸ Decisions: publish gene panels + pathogenic? then `lnewco` diplotype (ROADMAP #8) and PharmGKB
-`drugs` (ROADMAP #9) remain the only unported modules.
+1. ✅ `thrombophilia` published. 2. ✅ `longevitymap` full parity. 3. ✅ `superhuman` v2 curated
+(publish as 2.0.0). 4. ✅ `cardio`/`cancer`/`pathogenic` rebuilt on the 0.5 ClinVar route.
+5. ✅ `pharmgkb` built. 6. ⏸ Decisions left to the maintainer: publish the four unpublished modules,
+republish the six under 0.5 (every digest moves), and build `lnewco` on the diplotype tables.

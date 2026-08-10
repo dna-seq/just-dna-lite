@@ -81,7 +81,7 @@ the non-deterministic research is now a frozen, auditable input, not a live sear
    reference rsids present in `variants.csv`. Report grounded-vs-total variant counts.
 3. Publish (both stores, matching the other five):
    - HF: `uv run pipelines v1-port publish superhuman`
-   - Marketplace: `export MARKETPLACE_URL=https://module-marketplace.just-dna.life; uv run pipelines
+   - Marketplace: `export MARKETPLACE_URL=https://module-registry.just-dna.life; uv run pipelines
      marketplace publish just-dna-seq superhuman <version> data/interim/v1_port/superhuman`
 4. Update the gap notes: mark superhuman resolved in `data/interim/v1_port/GAPS.md` and
    `docs/V1_PARITY.md`.

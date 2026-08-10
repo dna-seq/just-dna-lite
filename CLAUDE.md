@@ -159,12 +159,37 @@ old name, so check here first:
 new column, a requiredness or identity change — is a 1.0 in the format repo, so 0.5.x is a stable
 target. Note the three packages version independently (enricher can take a patch on its own).
 
-**Still outstanding from the 0.4.0 schema change:** compiled artifacts gained ~14 columns
-(`variant_key`, `effect_size`, `clin_sig`, `acmg_sf`, …), so freshly compiled modules no longer
-match the modules published on HuggingFace under 0.3.x. `VariantRow.variant_key` is also frozen at
-load, so the resolver no longer backfills `chrom`/`start` onto a keyed row, and `ModuleInfo` no
-longer accepts `version`. Migrating means republishing the HF modules and updating the AI module
-creator's spec template — the roundtrip/compiler tests fail until that happens.
+**From the 0.4.0 schema change:** compiled artifacts gained ~14 columns (`variant_key`,
+`effect_size`, `clin_sig`, `acmg_sf`, …), so freshly compiled modules no longer match the modules
+published on HuggingFace under 0.3.x. `VariantRow.variant_key` is frozen at load, so the resolver no
+longer backfills `chrom`/`start` onto a keyed row. **But `variant_key` is the *authored identity*, not
+always a VRS id** (`derive_variant_key`, format `base.py`): an rsid-authored row keeps its **rsid**
+(case 1 — which is why every Gen-I port shows `variant_key=rsid`, not `ga4gh:…`), a coordinate-authored
+single-base substitution mints a `ga4gh:VA.…` VRS id (case 2), and everything else is
+`chrom:start:ref[:alts]` (case 3). The per-ALT VRS ids for an rsid-authored module live in
+`resolution.csv`'s `vrs_id` column, not in `weights.parquet`. `ModuleInfo.version` is a SemVer
+**string** (an unquoted `1` in YAML loads as an int and is rejected) — the AI module creator's
+template already emits it correctly.
+
+**`direction`/`stat_significance` are authored-optional 0.3 axes and are empty on every Gen-I port**
+(those modules were authored against 0.2, when only `state` existed). `weights.parquet` carries the
+**authored** value verbatim — the compiler never fills a cell the author left blank (report-never-
+repair), so a legacy module's empty `direction` is *correct*, not missing. The mapping
+`direction ← state`(+`weight` sign) is a **Python read-time accessor only**
+(`VariantRow.effective_direction` / `derive.direction_from_state`), unreachable from a SQL/polars read
+of the parquet. **Format 1.0 removes `state` — consumers must key on `direction`.** `report_logic`
+is already ready: `_effective_direction(direction, state, weight)` returns the `direction` column when
+present, else `direction_from_state(state, weight)` (the format's pure leaf), and
+`_variant_sign`/`_variant_color` go through it — so benefit colouring behaves identically on 0.5
+(empty `direction` → derived from `state`) and survives the 1.0 `state` removal (populated `direction`
+→ used directly). **Any new parquet-side read of `direction`/`stat_significance` must do the same** —
+derive with `just_dna_format.derive.direction_from_state(state, weight)`; never treat the empty 0.5
+column as directionless. Whether the artifact itself should carry the derived axes is a format-0.6
+question tracked in just-dna-format's ROADMAP.
+
+**Status (2026-08-09):** the tests are re-baselined and green, and all ten modules are rebuilt under
+0.5 in `data/interim/v1_port/`. What is left is **republishing**, which is the maintainer's call —
+see [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md).
 
 ### Contract facts (0.1.0 libs)
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
@@ -172,6 +197,75 @@ creator's spec template — the roundtrip/compiler tests fail until that happens
   `unique_genes`/`study_rows`/`unique_variants`.
 - `VALID_PRIORITIES` and `PMID_PATTERN` are intentionally **not** in `just_dna_format.spec` (dead
   code in the old schema; the live study rule is only "pmid non-empty").
+
+### 0.5 traps that cost real time (MANDATORY reading before touching a module build)
+
+**`compile_module(resolve_with_ensembl=False)` is the master switch for resolution, not a choice of
+reference.** The name reads as "do not use Ensembl", which is what a migration to `resolution.csv`
+wants — but it also disables the injected-table path, so a module with a complete `resolution.csv`
+compiles **successfully** with `chrom=None` on every weight row. Those rows can never match a VCF.
+The 0.5 call is `compile_module(spec, out, resolve_with_ensembl=True, ensembl_cache=None)`.
+
+**Call `load_env()` before the first `resolve_*_reference()` in a process.** The enricher's resolvers
+call `load_env()` inside `_resolve_parquet_cache`, but pass `default_*_cache_dir()` as an *argument* —
+evaluated before that call. So the **first** resolve in a fresh process computes its default from
+platformdirs and returns `None` even when `$JUST_DNA_PIPELINES_CACHE_DIR` names a full cache; every
+later call is fine. `v1_port/runner.py` and `tests/test_modules_0_5.py` both `load_env()` at import
+for exactly this reason.
+
+**`just-dna-enricher cache pull` writes where `cache status` does not look.** Same root cause: `pull`
+lands in `~/.cache/just-dna-pipelines/` while every resolver reads the configured cache dir, so
+`status` reports "absent" straight after a successful pull. Move them:
+`mv ~/.cache/just-dna-pipelines/{clinvar,clinpgx,cpic,gnomad_constraint} "$JUST_DNA_PIPELINES_CACHE_DIR"/`.
+
+**`clinvar_draft` raises on ClinVar's own citation ids.** `var_citations.txt` carries 632k
+PubMedCentral ids and a few malformed "PubMed" ones (Variation 12606 cites `168335863`, nine digits);
+`StudyRow.pmid` takes at most eight digits, and `draft_gene_panel` aborts the whole panel on the first
+one. `v1_port/clinvar_panel.py` passes `max_citations=0` and drafts its own `studies.csv` with a PMID
+filter.
+
+**`enrich()` is quadratic in module size, and the cache is not why.** `clinvar.lookup_clin_sig` (and
+`_lookup_rsid_candidates`) build one OR'd four-column predicate per allele, which DuckDB evaluates
+per row per predicate instead of as a hash join. Measured on the local snapshot: **5,000 alleles as
+an OR-list = 127 s; the same 5,000 as a temp table + JOIN = 0.13 s**, against a view that builds in
+0.07 s and full-scans all 4.4M records in 0.03 s. That is why `cardio` unbatched sat at 12% CPU for
+two hours. Two mitigations in `clinvar_runner`, both documented at their constants:
+
+- `enrich_in_batches` slices `variants.csv` into 10k-row spec dirs (caps the quadratic term) and
+  **resumes** — it reuses any batch whose slice still matches, so a crash costs one batch, not an
+  hour. It compares parsed rows, not bytes, so a line-terminator change does not discard the work.
+- `PANEL_VERIFY_CLIN_SIG = False`: the `clin_sig` cross-check is ~90% of a panel's resolve time
+  (27.1 s → 2.6 s on 7,818 rows, byte-identical output) and is **tautological for a drafted panel** —
+  `draft_gene_panel` copied the value out of the snapshot the check reads. Hand-authored modules keep
+  it on. Measured live mid-run on `pathogenic`: 83 s/batch → 10 s/batch.
+
+All five are filed upstream in `/data/sources/just-dna-format/docs/ROADMAP.md`.
+
+### Building and releasing the modules
+
+See **[docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md)** for the full runbook and
+**[docs/V1_PARITY.md](docs/V1_PARITY.md)** for what each module is.
+
+```bash
+uv run pipelines v1-port port --all        # the six curated Gen-I ports (enrich → literature → compile)
+uv run pipelines v1-port clinvar --all     # cardio / cancer / pathogenic, from the ClinVar snapshot
+uv run pipelines v1-port pharmgkb          # drug response, from the ClinPGx clinical annotations
+uv run python scripts/registry_precheck.py --namespace sandbox   # live pre-publish check
+```
+
+The pre-check posts the authored spec to the registry's `POST /api/v1/modules/{ns}/{name}/check` —
+the full publish dry run, returning `would_publish`. **The token must own the namespace being
+checked**; `REGISTRY_TOKEN` in `.env` currently owns `test-namespace`/`test-namespace2` and
+`REGISTRY_TOKEN_SANDBOX` owns `sandbox`, not `just-dna-seq`, so rehearse under `--namespace sandbox`.
+
+### `modules.yaml`: the working copy is *merged* over the defaults, never substituted
+
+`_load_config()` layers `data/interim/modules.yaml` (or the `JUST_DNA_PIPELINES_OUTPUT_DIR`-derived
+runtime copy) on top of the repo-root file, dict-merging `module_metadata` and unioning `sources`.
+It used to be first-found-wins, which meant that once `register_custom_module` wrote a working copy
+naming one custom module, **every built-in module silently lost its display metadata** — in the app
+and in every spec a port wrote. Keep the merge; `save_config` patches only those two keys for the
+same reason.
 
 ### Working agreement: propose shared changes via the format repo's docs (don't manage that repo)
 
