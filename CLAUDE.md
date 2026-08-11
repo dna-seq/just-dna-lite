@@ -35,6 +35,69 @@ like `start`.
 
 ---
 
+## Dependency Pins — Where Every Version Constraint Lives
+
+Audited 2026-07-28 across all nested `pyproject.toml` files in the multi-repo workspace. Consult
+this before hunting for a version pin; **do not re-derive it by grepping every repo.**
+
+### Every `pyproject.toml` in the workspace (and whether it hard-pins)
+
+| File | Package | Hard `==` pins? |
+|------|---------|-----------------|
+| `pyproject.toml` (root) | `just-dna-lite` | no — but has deliberate ceilings, see below |
+| `just-dna-pipelines/pyproject.toml` | `just-dna-pipelines` | none |
+| `webui/pyproject.toml` | `webui` | **yes — `reflex==X` (the only `==` pin in the whole workspace)** |
+| `../just-prs/pyproject.toml` | `just-prs-workspace` | none |
+| `../just-prs/just-prs/pyproject.toml` | `just-prs` | none |
+| `../just-prs/prs-ui/pyproject.toml` | `prs-ui` | none (`reflex>=`, `reflex-components-*>=`, `reflex-mui-datagrid>=`) |
+| `../just-prs/prs-pipeline/pyproject.toml` | `prs-pipeline` | none |
+| `../just-dna-format/pyproject.toml` | (workspace root) | none |
+| `../just-dna-format/schema/pyproject.toml` | `just-dna-format` | none |
+| `../just-dna-format/compiler/pyproject.toml` | `just-dna-compiler` | none |
+| `../just-dna-format/enricher/pyproject.toml` | `just-dna-enricher` | none |
+| `../just-dna-marketplace/pyproject.toml` | `just-dna-registry` | none |
+| `../reflex-mui-datagrid/pyproject.toml` | `reflex-mui-datagrid` | none (`reflex>=0.9.4`) |
+| `../reflex-mui-datagrid/examples/datagrid_demo/pyproject.toml` | `datagrid-demo` | none |
+
+**Takeaway: the single hard `==` pin in the entire workspace is `reflex` in `webui/pyproject.toml`.**
+Everything else floats on `>=`.
+
+### Non-`==` constraints that still deliberately hold versions back
+
+All in the **root** `pyproject.toml`:
+
+- `grpcio-health-checking<1.82` and `grpcio<1.82` — 1.82.0 ships `_pb2` gencode built against
+  protobuf 7.35, but dagster caps `protobuf<7`; the resolved protobuf 6.x is then older than the
+  gencode and dagster fails to import. Keep both in lockstep. (Reason is already commented inline.)
+- `google-genai>=1.71.0,<2.0` (also repeated in `webui/pyproject.toml`)
+- `requires-python = ">=3.13, <3.14"`
+- `agno` is pinned **by git rev**, not version, in root `[tool.uv.sources]`.
+
+There are **no** `[tool.uv] constraint-dependencies` / `override-dependencies` anywhere.
+
+### Upgrading Reflex: the `reflex-components-*` family does NOT follow
+
+`reflex` requires its siblings with `>=` only (`reflex-components-core>=`, `-radix>=`, …), so
+bumping the `reflex==` pin and running `uv sync` upgrades **only** `reflex` + `reflex-base` and
+leaves every `reflex-components-*` at its already-locked version. Each reflex release is tested
+against specific companion versions (check its release notes), so upgrade them explicitly:
+
+```bash
+uv lock --upgrade-package reflex-components-core --upgrade-package reflex-components-radix
+uv sync
+```
+
+Then verify with `uv pip list | grep reflex` against the release notes. Note reflex also caps some
+transitive deps (0.9.7 added `wrapt<2.2`, which *downgrades* `wrapt` — expected, not a mistake).
+
+### Frontend (npm) pins
+
+`webui/reflex.lock/package.json` + `bun.lock` are **generated** by reflex — never hand-edit. Reflex
+0.9.7 added `rx.Config.frozen_lockfile` (default `True`): if those two drift out of sync, bun's
+install fails fast instead of silently updating. Regenerate both together.
+
+---
+
 ## Coding Standards
 
 - **Avoid nested try-catch**: try catch often just hide errors, put them only when errors is what we consider unavoidable in the use-case
