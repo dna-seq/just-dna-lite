@@ -53,6 +53,8 @@ from just_dna_format.identity import (
     is_valid_version,
     version_from_legacy,
 )
+from just_dna_compiler.compiler import _OUTPUT_FILES as _COMPILER_OUTPUT_FILES
+from just_dna_compiler.compiler import content_signature
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
@@ -5454,9 +5456,13 @@ def _registry_url() -> str:
     return os.getenv("REGISTRY_URL", "https://module-marketplace.just-dna.life").rstrip("/")
 
 
-# Compiled artifact files the digest is computed over — mirrors
-# just_dna_compiler.compiler._OUTPUT_FILES. `build_artifact` skips any that are absent.
-_ARTIFACT_FILES: tuple = ("weights.parquet", "annotations.parquet", "studies.parquet")
+# Compiled artifact files the digest is computed over. Taken from the compiler rather than
+# restated, because a hand-copied list silently stops mirroring it: this was frozen at the
+# original three while 0.5 grew the set to sixteen (the 0.4 table families plus the enrichment
+# sidecars `frequencies`/`gene_metrics`/`literature`/`sources`), so the digest computed here
+# ignored every one of them and could not equal the server's for any enriched module.
+# `build_artifact` skips absent files, so passing the full set is safe for a minimal module.
+_ARTIFACT_FILES: tuple = tuple(_COMPILER_OUTPUT_FILES)
 
 
 def _local_key(namespace: str, name: str) -> str:
@@ -5505,11 +5511,22 @@ def _spec_version(module_dir: Path) -> str:
 def _scan_local_modules() -> List[Dict[str, Any]]:
     """Scan the local custom-modules dir → one dict per registered module.
 
-    The artifact ``digest`` is **computed from the compiled files on disk** (not read from
-    ``manifest.json``), so a metadata-stripped import whose content matches a catalog module is
-    still classified as catalog-present by digest. ``manifest.json`` is used only for optional
-    display metadata (version/namespace/title). ``has_spec`` marks whether spec files are present
-    (needed for Edit-into-slot). Pure function — safe to run in an executor.
+    Two content identities are recorded, because they answer different questions:
+
+    ``signature`` is ``content_signature`` over the *authored* CSVs — name- and
+    Ensembl-independent, and **the value the registry gates 409 duplicate_content on**. It is
+    therefore the one that predicts whether a publish will be rejected. It is also stable across
+    a recompile, which the artifact digest is not: rebuilding a module always mints a new digest,
+    so a digest-only check reports "not published" for a module that merely got rebuilt and then
+    offers a Publish button the server rejects.
+
+    ``digest`` is the compiled-artifact digest, still computed from the files on disk (not read
+    from ``manifest.json``), and still the only identity available for a **compiled-only import**
+    that carries no spec CSVs — a metadata-stripped module shared peer-to-peer.
+
+    ``manifest.json`` is used only for optional display metadata (version/namespace/title).
+    ``has_spec`` marks whether spec files are present (needed for Edit-into-slot). Pure function
+    — no client and no HTTP (``content_signature`` parses CSVs locally) — safe in an executor.
     """
     out: List[Dict[str, Any]] = []
     if not CUSTOM_MODULES_DIR.exists():
@@ -5522,10 +5539,18 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
             digest = build_artifact(d, list(_ARTIFACT_FILES)).digest
         except Exception:  # noqa: BLE001 - unreadable artifact → no digest, treat as unclassified
             digest = ""
+        has_spec = (d / "module_spec.yaml").exists()
+        signature = ""
+        if has_spec:
+            try:
+                signature = content_signature(d)
+            except Exception:  # noqa: BLE001 - unauthored/invalid spec → fall back to digest
+                signature = ""
         entry: Dict[str, Any] = {
-            "name": name, "version": "", "digest": digest, "namespace": "",
+            "name": name, "version": "", "digest": digest, "signature": signature,
+            "namespace": "",
             "catalog_name": name, "title": name, "icon": "database", "color": "#6435c9",
-            "has_spec": (d / "module_spec.yaml").exists(), "in_catalog": False,
+            "has_spec": has_spec, "in_catalog": False,
         }
         manifest_path = d / "manifest.json"
         if manifest_path.exists():
@@ -5745,33 +5770,49 @@ class RegistryState(rx.State):
             upload_state._refresh_module_ui_state()
 
     async def _refresh_local(self) -> None:
-        """Rescan local registry and classify each module's digest against the catalog."""
+        """Rescan local registry and classify each module against the catalog.
+
+        Signature first, digest only as a fallback. The registry gates 409 duplicate_content on
+        the authored-content signature, so that is what predicts a rejected publish; the artifact
+        digest changes on every recompile and would report a merely-rebuilt module as unpublished.
+        Modules with no spec CSVs (compiled-only imports) have no signature and keep the digest
+        route. Both lookups are batched, so this stays at most two requests for the whole corpus.
+        """
         async with self:
             url, token = self._client_args()
         loop = asyncio.get_event_loop()
         local = await loop.run_in_executor(None, _scan_local_modules)
-        digests = [m["digest"] for m in local if m["digest"]]
+        signatures = [m["signature"] for m in local if m.get("signature")]
+        digests = [m["digest"] for m in local if m["digest"] and not m.get("signature")]
+        sig_matches: Dict[str, list] = {}
         matches: Dict[str, list] = {}
-        if digests:
+        if signatures or digests:
             def _lookup():
                 with RegistryClient(url, token) as c:
-                    return c.lookup_by_digests(digests)
+                    sigs = c.lookup_by_signatures(signatures) if signatures else {}
+                    digs = c.lookup_by_digests(digests) if digests else {}
+                    return sigs, digs
             try:
-                matches = await loop.run_in_executor(None, _lookup)
+                sig_matches, matches = await loop.run_in_executor(None, _lookup)
             except Exception:  # noqa: BLE001 - offline classification degrades to local-only
-                matches = {}
+                sig_matches, matches = {}, {}
         for m in local:
-            ms = matches.get(m["digest"]) or []
+            # lookup_by_signatures returns VersionRef models; lookup_by_digests returns dicts.
+            ms = list(sig_matches.get(m.get("signature", ""), []) or []) if m.get("signature") else []
+            by_signature = bool(ms)
+            if not ms:
+                ms = matches.get(m["digest"]) or []
             m["in_catalog"] = bool(ms)
             if ms:
-                # Content matched the catalog by digest — backfill identity the local copy is
-                # missing (covers metadata-stripped imports shared peer-to-peer).
+                # Content matched the catalog — backfill identity the local copy is missing
+                # (covers metadata-stripped imports shared peer-to-peer).
                 best = ms[0]
+                get = (lambda k, d="": getattr(best, k, d)) if by_signature else (lambda k, d="": best.get(k, d))
                 if not m["namespace"]:
-                    m["namespace"] = best.get("namespace", "")
+                    m["namespace"] = get("namespace")
                 if not m["version"]:
-                    m["version"] = best.get("version", "")
-                m["catalog_name"] = best.get("name", m["name"])
+                    m["version"] = get("version")
+                m["catalog_name"] = get("name", m["name"]) or m["name"]
         names = [m["name"] for m in local]
         async with self:
             self.local_modules = local
@@ -6257,11 +6298,12 @@ class RegistryState(rx.State):
 
     @rx.var
     def selected_in_catalog(self) -> bool:
-        """Whether the selected module's exact artifact already exists in the catalog.
+        """Whether the selected module's content already exists in the catalog.
 
-        Set by ``_refresh_local`` via a server digest lookup (``lookup_by_digests``). The registry
-        rejects duplicate content on publish (409 ``duplicate_content``); this lets us pre-empt it
-        so we don't offer a Publish button for content that's already published.
+        Set by ``_refresh_local``, which matches on ``content_signature`` (the authored-data
+        identity the registry actually gates 409 ``duplicate_content`` on) and falls back to the
+        artifact digest only for compiled-only imports that carry no spec. This lets us pre-empt
+        the rejection instead of offering a Publish button the server refuses.
         """
         return bool(self._selected_local.get("in_catalog", False))
 
