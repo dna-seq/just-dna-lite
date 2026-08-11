@@ -12,7 +12,7 @@ artifact digest are trusted.
 ## 0. Point the client at the public marketplace
 
 ```bash
-export MARKETPLACE_URL=https://module-marketplace.just-dna.life
+export MARKETPLACE_URL=https://module-registry.just-dna.life
 ```
 
 ## 1. Register an account

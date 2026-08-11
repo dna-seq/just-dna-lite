@@ -8,6 +8,7 @@ genotype/rsid are skipped and reported as warnings rather than emitted invalid.
 """
 
 import csv
+import re
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -736,7 +737,82 @@ ADAPTERS = {
 }
 
 
+#: Separators Gen-I curation used inside a single `gene` cell. `ABCG8, ABCG5` and `BIRC7, YTHDF1`
+#: are two genes in one cell; `CXCL12 (LINC02881)` is a symbol with its lncRNA in parentheses.
+_GENE_SPLIT = re.compile(r"[,;/]| \(")
+
+#: Curation decisions, not guesses: two Gen-I cells are one-character truncations of a symbol the
+#: variant unambiguously identifies, so the reading is settled by the variant rather than by string
+#: similarity. Recorded here, per row, with the reason — anything less certain stays reported.
+#:
+#: * ``GUCYA3`` on rs7692387 — the chromosome-4 coronary GWAS locus in *GUCY1A3*, which HGNC has
+#:   since renamed *GUCY1A1*. Both the truncation and the rename are resolved in one step.
+#: * ``SERPINE`` on rs1799889 — the PAI-1 4G/5G promoter indel, which is in *SERPINE1*.
+_CURATED_SYMBOL_FIXES: dict[str, str] = {
+    "GUCYA3": "GUCY1A1",
+    "SERPINE": "SERPINE1",
+}
+
+
+def normalize_genes(variants: list[VariantRow], warnings: list[str]) -> list[VariantRow]:
+    """Resolve each row's ``gene`` to a symbol HGNC still recognises.
+
+    The registry's pre-publish check runs a gene-symbol currency pass, and it is what surfaced this:
+    Gen-I curation put two genes in one cell (``ABCG8, ABCG5``), parenthesised a second identifier
+    (``CXCL12 (LINC02881)``), and carries plain truncations and retired aliases (``SERPINE`` for
+    SERPINE1, ``FLJ44450``, ``GUCYA3``). A cell like that is not a gene symbol at all, so nothing
+    downstream can join on it.
+
+    The rule: split the cell, resolve each token against NCBI ``gene_info`` (current symbol, else
+    known synonym), and keep the **first token that resolves**. A cell where nothing resolves is
+    left exactly as authored and reported — a symbol nobody recognises is a curation question, and
+    guessing at it would be inventing an assertion the source never made.
+    """
+    resolver = load_symbol_resolver()
+    if resolver is None:
+        warnings.append(
+            "gene-symbol resolver unavailable (no NCBI gene_info cache) — gene cells left as authored"
+        )
+        return variants
+
+    remapped: dict[str, str] = {}
+    unresolved: set[str] = set()
+    out: list[VariantRow] = []
+    for variant in variants:
+        raw = (variant.gene or "").strip()
+        if not raw:
+            out.append(variant)
+            continue
+        current = _CURATED_SYMBOL_FIXES.get(raw) or next(
+            (
+                resolved
+                for token in _GENE_SPLIT.split(raw)
+                if (resolved := resolver.current(token.strip().rstrip(")"))) is not None
+            ),
+            None,
+        )
+        if current is None:
+            unresolved.add(raw)
+            out.append(variant)
+            continue
+        if current != raw:
+            remapped[raw] = current
+            variant = variant.model_copy(update={"gene": current})
+        out.append(variant)
+
+    if remapped:
+        pairs = ", ".join(f"{old}→{new}" for old, new in sorted(remapped.items()))
+        warnings.append(f"normalized {len(remapped)} gene symbol(s): {pairs}")
+    if unresolved:
+        warnings.append(
+            f"{len(unresolved)} gene cell(s) match no current NCBI symbol or known synonym "
+            f"(kept as authored, never guessed): {', '.join(sorted(unresolved))}"
+        )
+    return out
+
+
 def run_adapter(
     module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
 ) -> AdapterResult:
-    return ADAPTERS[module.adapter](module, db, ensembl_cache)
+    spec, variants, studies, warnings = ADAPTERS[module.adapter](module, db, ensembl_cache)
+    return spec, normalize_genes(variants, warnings), studies, warnings

@@ -19,8 +19,28 @@ from just_dna_pipelines.module_compiler.models import (
     VariantRow,
 )
 
-_VARIANT_COLUMNS = list(VariantRow.model_fields.keys())
-_STUDY_COLUMNS = list(StudyRow.model_fields.keys())
+def _authored_columns(model: type) -> list[str]:
+    """The columns an author may write: every model field except the compiler-managed ones.
+
+    0.4 added ``variant_key`` and ``authored_ident`` to ``VariantRow`` as *derived* identity, tagged
+    ``compiler_managed`` in their schema extra. Emitting them from a port would author values the
+    compiler computes — and `variant_key` is frozen at load, so an authored one is not overwritten.
+    """
+    columns: list[str] = []
+    for name, field in model.model_fields.items():
+        extra = field.json_schema_extra or {}
+        if isinstance(extra, dict) and extra.get("compiler_managed"):
+            continue
+        columns.append(name)
+    return columns
+
+
+_VARIANT_COLUMNS = _authored_columns(VariantRow)
+_STUDY_COLUMNS = _authored_columns(StudyRow)
+
+#: How a multi-valued cell is spelled. The authored models split on ``[,;|]``; a semicolon is the
+#: separator that never collides with prose in a `conclusion`-adjacent column.
+_MULTI_JOIN = ";"
 
 
 def _sha256(path: Path) -> str:
@@ -31,8 +51,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _flatten(value: object) -> object:
+    """A list cell becomes its separator-joined CSV spelling; everything else passes through.
+
+    Polars refuses to write a nested column ("CSV format does not support nested data"), and the
+    authored models re-split the joined string on load, so this is the round-trip, not a lossy cast.
+    """
+    if isinstance(value, (list, tuple)):
+        return _MULTI_JOIN.join(str(v) for v in value) or None
+    return value
+
+
 def _write_csv(rows: list, columns: list[str], path: Path) -> None:
-    records = [r.model_dump() for r in rows]
+    records = [
+        {k: _flatten(v) for k, v in r.model_dump(include=set(columns)).items()} for r in rows
+    ]
     if not records:
         # Header-only file so the shape is explicit even when a module yields no rows.
         path.write_text(",".join(columns) + "\n", encoding="utf-8")

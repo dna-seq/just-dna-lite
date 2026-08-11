@@ -11,7 +11,19 @@ dependencies = [
   "pyyaml>=6.0.3",
   "dagster-dg-cli>=1.12.22",
   "just-prs>=0.7.5",
-  "just-dna-marketplace>=0.8.1",
+  # The catalog client, pinned to the server's own version. `just-dna-marketplace` is this package's
+  # old name and 0.8.1 its last release under it; the live server (just-dna-registry 0.11.0) renamed
+  # `marketplace` to `registry` in `GET /api/v1/version`, so 0.8.1's compatibility guard raises a
+  # pydantic ValidationError before any request is sent — every subcommand, publish included, is
+  # unusable against the current server. PyPI stops at 0.9.1, which connects but is behind the
+  # server's surface, so this takes 0.11.2 from the local checkout (see tool.uv.sources).
+  # 0.11.1 added the `archive=` part to /validate and /check — before it, a spec too large to send
+  # raw could be published but never rehearsed, which is exactly where the three ClinVar panels
+  # sat. 0.11.2 adopts compiler/enricher 0.5.2 and distinguishes the empty lists a check can
+  # return, so the client and the deployed server stay on one version. 0.11.3 adopts 0.5.3 and
+  # makes `trusted` three-valued: `false` when the compiler reports a positional table that joins
+  # by rsID only. `pharmgkb` is exactly that, so it now publishes labelled untrusted — accurately.
+  "just-dna-registry>=0.11.3",
   # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
   # but dagster caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
   # the gencode and dagster fails to import (VersionError in health_pb2). 1.81.1 is the
@@ -23,6 +35,11 @@ dependencies = [
 [tool.uv.sources]
 just-dna-pipelines = { workspace = true }
 webui = { workspace = true }
+# 0.11.0 is not on PyPI (0.9.1 is the newest published), and 0.11.0 is what the deployed registry
+# runs — so the client is taken from its checkout to keep client and server on one version. Swap
+# this for a plain version pin the moment 0.11.0 publishes; the directory is still named for the
+# package's old name, `just-dna-marketplace`.
+just-dna-registry = { path = "/data/sources/just-dna-marketplace", editable = true }
 
 [dependency-groups]
 dev = [

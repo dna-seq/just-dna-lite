@@ -8,20 +8,31 @@ what the compiler emits, and the published modules on HuggingFace predate that s
 This file exists so the next person does not re-derive the numbers. The raw measurements are
 reproducible with the script described in [Reproducing](#reproducing).
 
-## Test status
+## Test status — resolved 2026-08-09
 
-The suite reports **29 failures** on a stock checkout (222 passed, 1 skipped). They fall into three
-groups, and only the first two are actionable:
+**The suite is green: 276 passed, 9 skipped, 0 failed.** It reported 29 failures when this file was
+first written, then 23 after the environment fix; the rest were re-baselined rather than worked
+around, because the assertions encoded the *old* shape rather than any invariant:
 
-| group | count | cause | status |
-|---|---|---|---|
-| `TestResolver` | 4 | incomplete local Ensembl cache — not code | fixed by configuration, see below |
-| `test_agent_smoke` | 1 | module creator wrote a non-string `version` | fixed in code |
-| `test_module_roundtrip` | 15 | 0.5 emits more columns than the published modules carry | **documented here, not fixed** |
-| `test_module_compiler` (rest) | 9 | contract changes listed below | **documented here, not fixed** |
+| group | count | resolution |
+|---|---|---|
+| `TestResolver` | 4 | configuration — an incomplete Ensembl cache, see below |
+| `test_agent_smoke` | 1 | fixed in code (non-string `version`) |
+| `test_module_roundtrip` — column equality | 12 | now asserts **no column is dropped** (superset), which is what the round-trip guarantees and what survives the next additive release |
+| `test_module_roundtrip` — annotation row counts | 3 | now derived from the compiled weights: `annotations.height == weights.select("variant_key", "conclusion").unique().height` |
+| `test_module_compiler` — `variant_key` | 1 | asserts the VRS shape plus the property that motivated it (two alts at one locus get distinct keys) |
+| `test_module_compiler` — validation message | 1 | matches "no recognized table", the stable half of the 0.4 wording |
+| `TestCompileWithResolution` | 5 | moved onto the enricher path (`enrich` → `resolution.csv` → inject-only compile), so they survive the 1.0 removal of `ensembl_cache=` |
 
-The last two groups are a *republishing* task, not a bug hunt: they cannot pass until the modules on
-HuggingFace are rebuilt under 0.5 and the assertions are re-baselined against the new shape.
+A new file, `tests/test_modules_0_5.py` (36 tests), covers the surfaces this repo added on top: the
+ClinVar panel route, the ClinPGx route, the `modules.yaml` merge, and the spec writer's handling of
+list-typed and compiler-managed columns. Everything needing a reference snapshot skips cleanly
+without one.
+
+**The annotation identity, measured rather than assumed.** The first re-baseline asserted one
+annotation row per `variant_key` and was wrong — vo2max has 13 distinct keys and 28 rows. The real
+key is `(variant_key, conclusion)`: a variant whose genotypes carry different conclusions gets one
+row each. Verified against all six rebuilt modules before the assertion was written.
 
 ## The environment trap (fixed)
 
@@ -141,16 +152,29 @@ consumes — no reference, no network at compile time.
 
 ## What migration requires
 
-1. **Rebuild and republish the modules** on `just-dna-seq/annotators` under 0.5. All five round-trip
-   cleanly today, so this is a rebuild rather than a data-repair job. Note it moves every module's
-   `artifact.digest`.
-2. **Re-baseline the assertions** in `test_module_roundtrip.py` (column sets, annotation row counts)
-   and `test_module_compiler.py` (`variant_key` spelling, the dedup counts, the validation message).
-3. **Inject a cache in `TestCompileWithResolution`**, or move those tests onto the `resolution.csv`
-   path so they survive the 1.0 removal.
-4. **Migrate off `ensembl_cache=`** before 1.0.
+1. **Rebuild and republish the modules** on `just-dna-seq/annotators` under 0.5 — ✅ rebuilt
+   (`pipelines v1-port port --all`), **publishing left to the maintainer**. See
+   [MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md). It moves every module's `artifact.digest`.
+2. **Re-baseline the assertions** — ✅ done, see the table above.
+3. **Move `TestCompileWithResolution` onto the `resolution.csv` path** — ✅ done, via a
+   `_enrich_and_compile` helper, so they survive the 1.0 removal.
+4. **Migrate off `ensembl_cache=`** — ✅ done for the port and the ClinVar/PGx routes; the compile is
+   inject-only and the coordinates travel in `resolution.csv`. `module_compiler/resolver.py` and
+   `register_custom_module` still inject a cache and are the remaining callers.
 
-Order matters: (1) before (2), or the new baselines get written against artifacts nobody ships.
+### One more trap, found migrating (2026-08-09)
+
+`compile_module(resolve_with_ensembl=False)` reads as "do not use Ensembl", which is exactly what a
+migration to `resolution.csv` wants it to mean. It is the **master switch for resolution**, so it
+also disables the injected-table path: a module with a complete, correct `resolution.csv` compiles
+*successfully* with `chrom=None` on every weight row. The correct 0.5 call is
+
+```python
+compile_module(spec_dir, out_dir, resolve_with_ensembl=True, ensembl_cache=None)
+```
+
+Reported upstream; `tests/test_module_compiler.py::test_no_resolve_flag_skips_resolution` now pins
+the behaviour so nobody re-derives it.
 
 ## CLI surface (done)
 

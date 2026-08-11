@@ -336,35 +336,65 @@ def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
     return raw
 
 
-def _load_config() -> ModulesConfig:
-    """Load modules.yaml, checking three locations in order:
+def _merge_config(default: Dict[str, Any], working: Dict[str, Any]) -> Dict[str, Any]:
+    """Layer the mutable working copy over the shipped defaults.
 
-    1. Working copy at ``data/interim/modules.yaml`` (mutable, gitignored)
-    2. Project root ``modules.yaml`` (git-tracked, read-only defaults)
-    3. Package directory ``modules.yaml`` (bundled fallback)
+    ``module_metadata`` and ``sources`` are the two keys a runtime mutates (register/unregister), so
+    they are **merged** rather than replaced: a working copy that names one custom module must not
+    delete the display metadata of the ten shipped ones. Every other key is taken from the working
+    copy when it is present, since those are settings the deployment has deliberately overridden.
 
-    The first file found wins.  If none exist, returns defaults.
+    This replaces a first-found-wins load that silently dropped the defaults. The failure was quiet
+    and total: once ``register_custom_module`` wrote a working copy, every built-in module fell back
+    to the auto-generated title/description/``database`` icon, in the app *and* in every spec a port
+    wrote — which is how it was found (a rebuilt `coronary` came out as "Annotation module:
+    coronary"). See ``save_config``, which patches only these two keys for the same reason.
     """
-    search_paths: list[Path] = []
+    merged = dict(default)
+    for key, value in working.items():
+        if key == "module_metadata" and isinstance(value, dict):
+            base = dict(merged.get("module_metadata") or {})
+            base.update(value)
+            merged[key] = base
+        elif key == "sources" and isinstance(value, list):
+            by_url: Dict[str, Any] = {}
+            for entry in list(merged.get("sources") or []) + value:
+                url = entry.get("url") if isinstance(entry, dict) else entry
+                by_url[str(url)] = entry
+            merged[key] = list(by_url.values())
+        else:
+            merged[key] = value
+    return merged
+
+
+def _read_yaml(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.exists():
+        return None
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+    return raw if isinstance(raw, dict) else None
+
+
+def _load_config() -> ModulesConfig:
+    """Load modules.yaml from the shipped defaults, with the working copy layered on top.
+
+    1. Project root ``modules.yaml``, else package ``modules.yaml`` — the shipped defaults
+    2. Working copy at ``data/interim/modules.yaml`` (mutable, gitignored) — merged over them
+
+    Returns bare defaults if neither exists.
+    """
+    default_path = _default_config_path()
+    raw: Dict[str, Any] = (_read_yaml(default_path) if default_path else None) or {}
 
     working = _working_config_path()
     if working is not None:
-        search_paths.append(working)
+        working_raw = _read_yaml(working)
+        if working_raw is not None:
+            raw = _merge_config(raw, working_raw)
 
-    project_root = _find_project_root()
-    if project_root is not None:
-        search_paths.append(project_root / "modules.yaml")
-
-    search_paths.append(Path(__file__).parent / "modules.yaml")
-
-    for config_path in search_paths:
-        if config_path.exists():
-            with open(config_path) as f:
-                raw = yaml.safe_load(f)
-            if raw is not None:
-                return ModulesConfig.model_validate(_drop_project_runtime_sources(raw))
-
-    return ModulesConfig()
+    if not raw:
+        return ModulesConfig()
+    return ModulesConfig.model_validate(_drop_project_runtime_sources(raw))
 
 
 def get_config_path() -> Path:
@@ -449,6 +479,26 @@ def is_immutable_mode() -> bool:
 def get_immutable_config() -> ImmutableModeConfig:
     """Return the immutable mode configuration from modules.yaml."""
     return MODULES_CONFIG.immutable_mode
+
+# The table families that can *lead* a compiled module — carry its rows in place of
+# weights.parquet. A directory holding any of these is a module; discovery and the HuggingFace
+# publisher both key on this list, so a new 0.4 family becomes discoverable and publishable by being
+# added here once. Order is priority: a module shipping several is led by the first.
+#
+# Lives here rather than in `annotation.hf_modules` because importing that module runs discovery
+# (and therefore network I/O) at import time, and the publisher must not pay for that.
+LEAD_TABLES: tuple[str, ...] = (
+    "weights",
+    "pharm_variants",
+    "diplotypes",
+    "haplotypes",
+    "pgs",
+    "copynumbers",
+    "repeat_alleles",
+    "heteroplasmy",
+    "activity_phenotype",
+    "allele_function",
+)
 
 # Backward-compatible: list of HF repo IDs extracted from sources
 DEFAULT_REPOS: list[str] = [

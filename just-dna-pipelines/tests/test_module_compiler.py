@@ -14,6 +14,8 @@ import polars as pl
 import pytest
 import yaml
 
+from just_dna_enricher.enrich import enrich
+
 from just_dna_pipelines.module_compiler.compiler import compile_module, validate_spec
 from just_dna_pipelines.module_compiler.models import (
     CompilationResult,
@@ -143,7 +145,38 @@ class TestVariantRow:
             conclusion="Position-only",
         )
         assert row.rsid is None
+        # Since 0.4 a fully-specified allele keys on its GA4GH VRS identifier, not the positional
+        # string `chrom:start:ref` — which could not tell two alts at one locus apart. Asserted as a
+        # shape rather than a literal: the digest is the library's to compute, ours to key on.
+        assert row.variant_key.startswith("ga4gh:VA.")
+        assert row.variant_key != "10:94781859:G"
+
+    def test_position_only_without_alt_keys_on_coordinate(self) -> None:
+        """No alt means no allele to mint a VRS id from, so the key stays positional."""
+        row = VariantRow(
+            chrom="10",
+            start=94781859,
+            ref="G",
+            genotype="A/G",
+            weight=-0.5,
+            state="risk",
+            conclusion="Position-only, no alt",
+        )
         assert row.variant_key == "10:94781859:G"
+
+    def test_variant_key_distinguishes_alts_at_one_locus(self) -> None:
+        """The reason the key changed: `chrom:start:ref` collapsed distinct alleles onto one id."""
+        common = {
+            "chrom": "11",
+            "start": 5226762,
+            "ref": "C",
+            "state": "risk",
+            "weight": None,
+            "conclusion": "Two alleles, one locus",
+        }
+        insertion = VariantRow(alts="CA", genotype="C/CA", **common)
+        longer = VariantRow(alts="CAAAG", genotype="C/CAAAG", **common)
+        assert insertion.variant_key != longer.variant_key
 
     def test_neither_rsid_nor_position_rejected(self) -> None:
         with pytest.raises(Exception, match="At least one identifier"):
@@ -286,7 +319,11 @@ class TestValidation:
         )
         result = validate_spec(tmp_path)
         assert not result.valid
-        assert any("variants.csv not found" in e for e in result.errors)
+        # Since 0.4 a module may lead with a table other than variants.csv (pharm_variants.csv,
+        # diplotypes.csv, pgs.csv, …), so the error names the class of missing table rather than
+        # that one file. Matched on the stable half of the sentence.
+        assert any("no recognized table" in e for e in result.errors), result.errors
+        assert any("variants.csv" in e for e in result.errors), result.errors
 
     def test_malformed_csv_row(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "module_spec.yaml"
@@ -532,7 +569,11 @@ class TestCompilation:
         compile_module(MTHFR_DIR, output_dir)
         df = pl.read_parquet(output_dir / "annotations.parquet")
 
-        assert df.height == df["rsid"].n_unique()
+        # 0.5 keys an annotation by `(variant_key, conclusion)`, not by rsID: a variant whose
+        # genotypes carry different conclusions gets one row each, where 0.3 collapsed it to one
+        # row per rsID. Derived from weights rather than hardcoded, so it holds as the spec grows.
+        weights = pl.read_parquet(output_dir / "weights.parquet")
+        assert df.height == weights.select("variant_key", "conclusion").unique().height
         rsids = set(df["rsid"].to_list())
         assert "rs1801133" in rsids
         assert "rs4680" in rsids
@@ -567,8 +608,11 @@ class TestCompilation:
         compile_module(CYP_DIR, output_dir)
         df = pl.read_parquet(output_dir / "annotations.parquet")
 
-        rsid_count = df["rsid"].n_unique()
-        assert df.height == rsid_count
+        # One row per distinct (variant_key, conclusion) — the 0.5 annotation identity — and every
+        # rsID in weights still annotated. Both derived from the compiled weights, not hardcoded.
+        weights = pl.read_parquet(output_dir / "weights.parquet")
+        assert df.height == weights.select("variant_key", "conclusion").unique().height
+        assert set(weights["rsid"].to_list()) == set(df["rsid"].to_list())
         categories = set(df["category"].to_list())
         assert categories == {"cyp2c19", "cyp2d6", "cyp2c9", "cyp3a4"}
 
@@ -623,6 +667,20 @@ class TestCompilation:
 # ── Compilation with resolution tests ─────────────────────────────────────────
 
 
+def _enrich_and_compile(spec_dir: Path, output_dir: Path, ensembl_db_path: Path) -> "CompilationResult":
+    """Resolve with the enricher, then compile from the produced `resolution.csv`.
+
+    **This is the 0.5 route, and the tests below use it because the old one is going away.**
+    ``compile_module`` no longer provisions a reference: called bare it succeeds with
+    ``chrom=None``. Injecting ``ensembl_cache=`` still works but is deprecated and removed at 1.0
+    (`compile_module`'s own docstring says so). The replacement is exactly this — the enricher
+    writes ``resolution.csv`` beside the spec, and the compiler consumes it with no reference and
+    no network, which is also what makes these assertions reproducible off a fixed cache.
+    """
+    enrich(spec_dir, offline=True, ensembl_cache=ensembl_db_path, use_gnomad=False, download=False)
+    return compile_module(spec_dir, output_dir, resolve_with_ensembl=True, ensembl_cache=None)
+
+
 @pytest.mark.integration
 class TestCompileWithResolution:
     """Compilation using real Ensembl resolution — rsid-only and position-only specs."""
@@ -642,7 +700,7 @@ class TestCompileWithResolution:
             "rs3892097,C/C,0.0,neutral,CYP2D6 normal,CYP2D6,Drug metabolism,cyp2d6\n"
             "rs3892097,T/T,-1.5,risk,CYP2D6*4 hom,CYP2D6,Drug metabolism,cyp2d6\n",
         )
-        result = compile_module(spec_dir, output_dir, resolve_with_ensembl=True)
+        result = _enrich_and_compile(spec_dir, output_dir, ensembl_db_path)
         assert result.success, f"Errors: {result.errors}"
 
         df = pl.read_parquet(output_dir / "weights.parquet")
@@ -668,7 +726,7 @@ class TestCompileWithResolution:
             "22,42128945,C,T,C/T,-0.7,risk,CYP2D6*4 het,CYP2D6,Drug metabolism,cyp2d6\n"
             "22,42128945,C,T,C/C,0.0,neutral,CYP2D6 normal,CYP2D6,Drug metabolism,cyp2d6\n",
         )
-        result = compile_module(spec_dir, output_dir, resolve_with_ensembl=True)
+        result = _enrich_and_compile(spec_dir, output_dir, ensembl_db_path)
         assert result.success, f"Errors: {result.errors}"
 
         df = pl.read_parquet(output_dir / "weights.parquet")
@@ -690,7 +748,7 @@ class TestCompileWithResolution:
             ",10,94780653,G,A,A/G,-0.8,risk,position-only row,CYP2C19,Drug metabolism,cyp2c19\n"
             "rs3892097,22,42128945,C,T,C/T,-0.7,risk,complete row,CYP2D6,Drug metabolism,cyp2d6\n",
         )
-        result = compile_module(spec_dir, output_dir, resolve_with_ensembl=True)
+        result = _enrich_and_compile(spec_dir, output_dir, ensembl_db_path)
         assert result.success, f"Errors: {result.errors}"
 
         df = pl.read_parquet(output_dir / "weights.parquet")
@@ -714,7 +772,12 @@ class TestCompileWithResolution:
     def test_no_resolve_flag_skips_resolution(
         self, tmp_path: Path, output_dir: Path
     ) -> None:
-        """With resolve_with_ensembl=False, rsid-only rows keep no positions."""
+        """`resolve_with_ensembl=False` is the master off switch, resolution.csv or not.
+
+        Worth pinning: the name reads like "do not use Ensembl", but it turns off the injected-table
+        path too, so a spec with a perfectly good resolution.csv compiles every row with
+        `chrom=None` — silently, and successfully.
+        """
         spec_dir = _make_spec_dir(
             tmp_path,
             "no_resolve",
@@ -740,13 +803,16 @@ class TestCompileWithResolution:
             "rs4244285,G/G,0.0,neutral,Normal,CYP2C19,Drug metabolism,cyp2c19\n"
             "rs1057910,A/C,-0.6,risk,CYP2C9*3 het,CYP2C9,Warfarin,cyp2c9\n",
         )
-        result = compile_module(spec_dir, output_dir, resolve_with_ensembl=True)
+        result = _enrich_and_compile(spec_dir, output_dir, ensembl_db_path)
         assert result.success
 
         ann_df = pl.read_parquet(output_dir / "annotations.parquet")
-        assert ann_df.height == 2
+        # Three rows, not two: rs4244285's two genotypes carry different conclusions, and 0.5 keys
+        # an annotation by (variant_key, conclusion) rather than collapsing per rsID.
+        assert ann_df.height == 3
         rsids = set(ann_df["rsid"].to_list())
         assert rsids == {"rs4244285", "rs1057910"}
+        assert set(ann_df["conclusion"].to_list()) == {"CYP2C19*2 het", "Normal", "CYP2C9*3 het"}
 
     def test_position_only_annotations_get_resolved_rsid(
         self, tmp_path: Path, output_dir: Path, ensembl_db_path: Path
@@ -759,12 +825,14 @@ class TestCompileWithResolution:
             "10,94781859,G,A,A/G,-0.8,risk,CYP2C19*2 het,CYP2C19,Drug metabolism,cyp2c19\n"
             "10,94781859,G,A,G/G,0.0,neutral,Normal,CYP2C19,Drug metabolism,cyp2c19\n",
         )
-        result = compile_module(spec_dir, output_dir, resolve_with_ensembl=True)
+        result = _enrich_and_compile(spec_dir, output_dir, ensembl_db_path)
         assert result.success
 
         ann_df = pl.read_parquet(output_dir / "annotations.parquet")
-        assert ann_df.height == 1
-        assert ann_df["rsid"][0] == "rs4244285"
+        # One row per distinct conclusion at the locus; both carry the back-filled rsID.
+        assert ann_df.height == 2
+        assert set(ann_df["rsid"].to_list()) == {"rs4244285"}
+        assert set(ann_df["conclusion"].to_list()) == {"CYP2C19*2 het", "Normal"}
 
 
 # ── Round-trip consistency tests ───────────────────────────────────────────────

@@ -12,12 +12,12 @@ from typing import Optional
 
 import polars as pl
 from eliot import log_message
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from just_dna_pipelines.annotation.module_cache import (
     invalidate_module_cache_on_version_change,
 )
-from just_dna_pipelines.module_config import DEFAULT_REPOS, MODULES_CONFIG, Source
+from just_dna_pipelines.module_config import DEFAULT_REPOS, LEAD_TABLES, MODULES_CONFIG, Source
 
 
 # Backward-compatible aliases sourced from modules.yaml
@@ -29,16 +29,38 @@ MODULE_TABLES = ["annotations", "studies", "weights"]
 
 
 class ModuleInfo(BaseModel):
-    """Information about a discovered annotation module."""
+    """Information about a discovered annotation module.
+
+    Discovery used to probe for `weights.parquet` alone, which made a pharmacogenomics module
+    (pharm_variants-led) undiscoverable, and therefore unpublishable to HuggingFace at all. A
+    module's *lead table* is whichever family in `LEAD_TABLES` it actually carries; read `lead_url`
+    unless you specifically need weights.
+    """
     name: str
     repo_id: str  # HF repo ID or source URL
     source_url: str = ""  # Original source URL from config
     path: str  # Base path for the module data
-    weights_url: str
+    # Which 0.4 table family carries this module's rows, and where it lives. For the common
+    # weights-led module these are "weights" and the same URL as `weights_url`.
+    lead_table: str = "weights"
+    lead_url: str = ""
+    # None for a module led by a 0.4 table. Read `lead_url` unless you specifically need weights.
+    weights_url: Optional[str] = None
     annotations_url: Optional[str] = None
     studies_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _default_lead_to_weights(self) -> "ModuleInfo":
+        """A ModuleInfo built with only `weights_url` is weights-led.
+
+        Callers predating the lead-table concept construct ModuleInfo directly, and so does anything
+        deserializing a stored one. Without this they would get an empty `lead_url` and read nothing.
+        """
+        if not self.lead_url and self.weights_url:
+            self.lead_url = self.weights_url
+        return self
 
 
 def _get_hf_filesystem() -> "HfFileSystem":
@@ -72,6 +94,14 @@ def _build_url(protocol: str, path: str) -> str:
     return f"{protocol}://{path}"
 
 
+def _find_lead_table(fs: "AbstractFileSystem", base_path: str) -> Optional[str]:
+    """Return the name of the table family leading this directory, or None if it is not a module."""
+    for table in LEAD_TABLES:
+        if fs.exists(f"{base_path}/{table}.parquet"):
+            return table
+    return None
+
+
 def _probe_module_at_path(
     fs: "AbstractFileSystem",
     base_path: str,
@@ -81,13 +111,14 @@ def _probe_module_at_path(
     repo_id: str,
 ) -> Optional[ModuleInfo]:
     """
-    Probe a directory for module files (weights.parquet, etc.).
+    Probe a directory for module files (weights.parquet, a 0.4 lead table, etc.).
 
-    Returns ModuleInfo if weights.parquet exists, None otherwise.
+    Returns ModuleInfo if any table in LEAD_TABLES exists, None otherwise.
     """
-    weights_path = f"{base_path}/weights.parquet"
-    if not fs.exists(weights_path):
+    lead_table = _find_lead_table(fs, base_path)
+    if lead_table is None:
         return None
+    lead_path = f"{base_path}/{lead_table}.parquet"
 
     annotations_path = f"{base_path}/annotations.parquet"
     studies_path = f"{base_path}/studies.parquet"
@@ -109,12 +140,15 @@ def _probe_module_at_path(
     elif fs.exists(metadata_yaml_path):
         resolved_metadata_url = _build_url(protocol, metadata_yaml_path)
 
+    lead_url = _build_url(protocol, lead_path)
     return ModuleInfo(
         name=module_name,
         repo_id=repo_id,
         source_url=source_url,
         path=base_path,
-        weights_url=_build_url(protocol, weights_path),
+        lead_table=lead_table,
+        lead_url=lead_url,
+        weights_url=lead_url if lead_table == "weights" else None,
         annotations_url=_build_url(protocol, annotations_path) if fs.exists(annotations_path) else None,
         studies_url=_build_url(protocol, studies_path) if fs.exists(studies_path) else None,
         logo_url=logo_url,
@@ -136,9 +170,9 @@ def _discover_hf_source(source: Source) -> dict[str, ModuleInfo]:
     kind = source.kind
 
     if kind == "module" or (kind is None and not fs.exists(base_path)):
-        # Single module: check for weights.parquet at data root or repo root
+        # Single module: check for a lead table at data root or repo root
         for candidate_path in (base_path, f"datasets/{repo_id}"):
-            if fs.exists(f"{candidate_path}/weights.parquet"):
+            if _find_lead_table(fs, candidate_path) is not None:
                 name = source.name or repo_id.split("/")[-1]
                 info = _probe_module_at_path(fs, candidate_path, "hf", name, source.url, repo_id)
                 if info:
@@ -191,8 +225,8 @@ def _discover_fsspec_source(source: Source) -> dict[str, ModuleInfo]:
             module_infos[name] = info
         return module_infos
 
-    # Auto-detect: check if weights.parquet at root (single module)
-    if kind is None and fs.exists(f"{base_path}/weights.parquet"):
+    # Auto-detect: check for a lead table at root (single module)
+    if kind is None and _find_lead_table(fs, base_path) is not None:
         name = source.name or base_path.split("/")[-1] if base_path else "unknown"
         info = _probe_module_at_path(fs, base_path, protocol, name, source.url, source.url)
         if info:
@@ -368,6 +402,9 @@ class ModuleTable(str, Enum):
     ANNOTATIONS = "annotations"
     STUDIES = "studies"
     WEIGHTS = "weights"
+    # Whichever table family carries this module's rows — weights for most, pharm_variants for a
+    # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
+    LEAD = "lead"
 
 
 def get_module_info(module_name: str) -> ModuleInfo:
@@ -389,7 +426,16 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
     info = module_info or get_module_info(module_name)
     table_name = table.value if isinstance(table, ModuleTable) else table
 
-    if table_name == "weights":
+    # "lead" is the alias; the family's own name resolves the same way, so a caller iterating table
+    # names gets the real URL rather than the protocol-less fallback at the end of this function.
+    if table_name in ("lead", info.lead_table):
+        return info.lead_url
+    elif table_name == "weights":
+        if not info.weights_url:
+            raise ValueError(
+                f"Module {module_name} has no weights table — it is led by {info.lead_table}. "
+                f"Ask for ModuleTable.LEAD instead."
+            )
         return info.weights_url
     elif table_name == "annotations":
         if not info.annotations_url:

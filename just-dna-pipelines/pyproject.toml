@@ -23,8 +23,8 @@ dependencies = [
     "huggingface-hub>=1.10.0",
     # The 0.5 line closed the digest window: anything that moves a compiled module's
     # artifact.digest is 1.0 from here, so 0.5.x is a stable target to sit on.
-    "just-dna-compiler>=0.5.1",
-    "just-dna-enricher>=0.5.1",
+    "just-dna-compiler>=0.5.3",
+    "just-dna-enricher>=0.5.3",
     "just-dna-format>=0.5.0",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;

@@ -269,20 +269,47 @@ def _variant_color(
     return "transparent"
 
 
-def _genotype_str(genotype: list[str] | None) -> str:
-    """Format a genotype list as a human-readable string like 'A/G'."""
+# ClinPGx evidence tiers, strongest first. Anything unrecognised (including the empty string every
+# non-pharmacogenomics module carries) ranks last.
+_EVIDENCE_ORDER: tuple[str, ...] = ("1A", "1B", "2A", "2B", "3", "4")
+
+
+def _evidence_rank(level: str | None) -> int:
+    """Sort key for a ClinPGx evidence level: higher is stronger."""
+    if not level:
+        return 0
+    normalized = level.strip().upper()
+    if normalized not in _EVIDENCE_ORDER:
+        return 0
+    return len(_EVIDENCE_ORDER) - _EVIDENCE_ORDER.index(normalized)
+
+
+def _genotype_alleles(genotype: list[str] | str | None) -> list[str]:
+    """Alleles of a genotype, from either representation.
+
+    ``weights.parquet`` stores a genotype as a list of alleles; the 0.4 table families
+    (``pharm_variants`` and friends) store the authored string, e.g. ``"G/G"``. Both reach the
+    report, and treating the string as a sequence of characters silently produced ``G///G`` and a
+    zygosity read off the separator.
+    """
     if genotype is None:
-        return ""
-    return "/".join(genotype)
+        return []
+    if isinstance(genotype, str):
+        return [a for a in genotype.split("/") if a]
+    return list(genotype)
 
 
-def _zygosity(genotype: list[str] | None) -> str:
-    """Determine zygosity from a genotype list."""
-    if genotype is None or len(genotype) < 2:
+def _genotype_str(genotype: list[str] | str | None) -> str:
+    """Format a genotype as a human-readable string like 'A/G'."""
+    return "/".join(_genotype_alleles(genotype))
+
+
+def _zygosity(genotype: list[str] | str | None) -> str:
+    """Determine zygosity from a genotype."""
+    alleles = _genotype_alleles(genotype)
+    if len(alleles) < 2:
         return ""
-    if genotype[0] == genotype[1]:
-        return "hom"
-    return "het"
+    return "hom" if alleles[0] == alleles[1] else "het"
 
 
 def load_annotated_weights(
@@ -551,10 +578,21 @@ def build_module_report_data(
                 "population": row.get("population", ""),
                 "p_value": row.get("p_value", ""),
                 "studies": studies_by_rsid.get(rsid, []),
+                # Pharmacogenomics facts, present only on a pharm_variants-led module. Empty
+                # strings elsewhere, so the template can show them unconditionally.
+                "drug": row.get("drug", "") or "",
+                "evidence_level": row.get("evidence_level", "") or "",
+                "phenotype_category": row.get("phenotype_category", "") or "",
+                "response": row.get("response", "") or "",
             }
             variants.append(variant)
 
-        variants.sort(key=lambda v: abs(v["weight"]), reverse=True)
+        # A pharmacogenomics module carries no weights, so ordering by |weight| would leave it in
+        # scan order. Evidence level is its ranking axis: 1A is a prescribing guideline, 2B the
+        # weakest tier we admit.
+        variants.sort(
+            key=lambda v: (abs(v["weight"]), _evidence_rank(v["evidence_level"])), reverse=True
+        )
 
         # Direction counts are weight-aware with a state fallback so weight-less protective
         # modules (superhuman) still tally as beneficial rather than 0 positive / 0 negative.

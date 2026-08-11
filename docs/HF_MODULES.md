@@ -17,10 +17,19 @@ The modules are **self-contained**—they include all annotation data (gene symb
 
 ## Module Sources Configuration
 
-Module sources are configured in **`modules.yaml`**. The loader checks two locations (first found wins):
+Module sources are configured in **`modules.yaml`**. The loader reads the shipped defaults and then
+**layers the mutable working copy over them**:
 
-1. **Project root** (`./modules.yaml`) — preferred, easy for users to find and edit
-2. **Package directory** (`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) — bundled fallback
+1. **Project root** (`./modules.yaml`), else **package directory**
+   (`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) — the shipped defaults
+2. **Working copy** (`data/interim/modules.yaml`, or the `JUST_DNA_PIPELINES_OUTPUT_DIR`-derived
+   runtime path) — merged on top: `module_metadata` is dict-merged by key, `sources` is unioned by
+   URL, every other key is overridden when present
+
+The merge matters. It used to be first-found-wins, so a working copy written by
+`register_custom_module` — which only ever names the custom module — silently replaced the display
+metadata of all ten shipped ones, and every module fell back to its auto-generated title and the
+generic `database` icon.
 
 Sources can be any fsspec-compatible URL:
 

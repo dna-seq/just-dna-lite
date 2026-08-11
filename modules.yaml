@@ -90,9 +90,18 @@ module_metadata:
     report_title: ClinVar Pathogenic Variants
     icon: database
     color: '#b21e1e'
+  # `drugs` was the Generation-I module name; `pharmgkb` is its 0.5 rebuild on the ClinPGx
+  # clinical annotations. Both are listed so a report of either spells the same title.
   drugs:
     title: Pharmacogenomics
     description: Drug response and metabolism (PharmGKB)
     report_title: Pharmacogenomics
+    icon: pill
+    color: '#a333c8'
+  pharmgkb:
+    title: Pharmacogenomics
+    description: Drug response by genotype, from the ClinPGx (PharmGKB) clinical annotations
+      at evidence levels 1A/1B/2A/2B
+    report_title: Drug Response
     icon: pill
     color: '#a333c8'

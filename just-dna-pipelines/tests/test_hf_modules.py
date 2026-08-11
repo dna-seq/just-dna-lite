@@ -155,7 +155,10 @@ class TestModuleTableUrl:
         for table in ModuleTable:
             url = get_module_table_url(module_name, table, module_info=info)
             assert f"/{module_name}/" in url
-            assert f"/{table.value}.parquet" in url
+            # LEAD is an alias for whichever family carries the module's rows, not a file name of
+            # its own — for this weights-led module it resolves to weights.parquet.
+            expected = "weights" if table is ModuleTable.LEAD else table.value
+            assert f"/{expected}.parquet" in url
 
 
 @pytest.mark.integration
@@ -406,3 +409,116 @@ class TestModuleWeightsSchema:
         # Core annotation columns
         assert "weight" in schema.names(), f"{module_name} missing 'weight'"
         assert "state" in schema.names(), f"{module_name} missing 'state'"
+
+
+class TestLeadTableDiscovery:
+    """Discovery must recognise a module led by a 0.4 table family, not weights alone.
+
+    Ground truth is the real compiled modules under data/interim/v1_port when they are present:
+    `coronary` is weights-led, `pharmgkb` is pharm_variants-led with no weights.parquet at all.
+    """
+
+    PORT_ROOT = Path("data/interim/v1_port")
+
+    def _probe(self, module: str):
+        import fsspec
+        from just_dna_pipelines.annotation.hf_modules import _probe_module_at_path
+
+        base = (self.PORT_ROOT / module).resolve()
+        if not base.is_dir():
+            pytest.skip(f"{base} not built")
+        return _probe_module_at_path(
+            fsspec.filesystem("file"), str(base), "file", module, str(base), str(base)
+        )
+
+    def test_weights_led_module_is_unchanged(self):
+        info = self._probe("coronary")
+        assert info is not None
+        assert info.lead_table == "weights"
+        # a weights-led module still answers to weights_url, and lead_url agrees with it
+        assert info.weights_url is not None
+        assert info.lead_url == info.weights_url
+
+    def test_pharm_variants_led_module_is_discovered(self):
+        info = self._probe("pharmgkb")
+        assert info is not None, "a pharm_variants-led module must be discoverable"
+        assert info.lead_table == "pharm_variants"
+        assert info.lead_url.endswith("pharm_variants.parquet")
+        # it genuinely has no weights table — that is the point
+        assert info.weights_url is None
+
+    def test_a_directory_with_no_lead_table_is_not_a_module(self, tmp_path):
+        import fsspec
+        from just_dna_pipelines.annotation.hf_modules import _probe_module_at_path
+
+        (tmp_path / "sources.parquet").touch()   # a side table alone is not a module
+        info = _probe_module_at_path(
+            fsspec.filesystem("file"), str(tmp_path), "file", "x", str(tmp_path), str(tmp_path)
+        )
+        assert info is None
+
+    def test_lead_url_defaults_to_weights_for_a_hand_built_info(self):
+        """Callers predating the lead table build ModuleInfo directly and must keep working."""
+        info = ModuleInfo(
+            name="coronary", repo_id="org/repo", path="p", weights_url="hf://p/weights.parquet"
+        )
+        assert info.lead_url == "hf://p/weights.parquet"
+        assert get_module_table_url("coronary", ModuleTable.LEAD, module_info=info).endswith(
+            "weights.parquet"
+        )
+
+    def test_asking_for_weights_on_a_pharm_module_says_what_to_use(self):
+        info = ModuleInfo(
+            name="pharmgkb", repo_id="org/repo", path="p",
+            lead_table="pharm_variants", lead_url="hf://p/pharm_variants.parquet",
+        )
+        with pytest.raises(ValueError, match="pharm_variants"):
+            get_module_table_url("pharmgkb", ModuleTable.WEIGHTS, module_info=info)
+
+
+class TestPharmVariantsAnnotation:
+    """A pharm_variants-led module has no coordinates, so it must join on rsid and still annotate."""
+
+    PORT_ROOT = Path("data/interim/v1_port")
+
+    def test_join_downgrades_to_rsid_and_matches_real_rows(self, tmp_path):
+        import fsspec
+        from just_dna_pipelines.annotation.hf_modules import _probe_module_at_path
+        from just_dna_pipelines.annotation.hf_logic import (
+            _has_coordinates,
+            annotate_vcf_with_module_weights,
+        )
+
+        base = (self.PORT_ROOT / "pharmgkb").resolve()
+        if not base.is_dir():
+            pytest.skip(f"{base} not built")
+        info = _probe_module_at_path(
+            fsspec.filesystem("file"), str(base), "file", "pharmgkb", str(base), str(base)
+        )
+
+        table = pl.read_parquet(base / "pharm_variants.parquet")
+        # the compiler materialises 0.4 tables verbatim from CSV, so an rsid-authored one has no
+        # coordinates — a position join would match nothing
+        assert not _has_coordinates(pl.scan_parquet(base / "pharm_variants.parquet"))
+
+        picks = table.select("rsid", "genotype").unique().head(3)
+        vcf = pl.DataFrame({
+            "chrom": ["1"] * 3 + ["2"],
+            "start": [100, 200, 300, 400],
+            "rsid": picks["rsid"].to_list() + ["rs_absent_from_module"],
+            "genotype": picks["genotype"].to_list() + ["A/A"],
+        }).lazy()
+
+        out, n = annotate_vcf_with_module_weights(
+            vcf, "pharmgkb", tmp_path / "pgx.parquet", module_info=info
+        )
+        assert n > 0, "the default position join must downgrade to rsid rather than annotate nothing"
+
+        result = pl.read_parquet(out)
+        # every annotated row belongs to one of the three rsids we planted; the absent one is gone
+        assert set(result["rsid"].unique()) == set(picks["rsid"].unique())
+        # ground truth: the join fans out to exactly the module's rows for those (rsid, genotype)
+        expected = table.join(picks, on=["rsid", "genotype"], how="semi").height
+        assert n == expected
+        # and the pharmacogenomics facts survive the join
+        assert {"drug", "evidence_level", "phenotype_category"}.issubset(result.columns)

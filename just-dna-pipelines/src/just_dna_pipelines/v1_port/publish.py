@@ -17,11 +17,22 @@ from typing import Optional
 from huggingface_hub import HfApi, get_token
 from pydantic import BaseModel
 
-from just_dna_pipelines.module_config import MODULES_CONFIG
+from just_dna_pipelines.module_config import LEAD_TABLES, MODULES_CONFIG
 
-# weights/annotations/studies are what discovery needs; manifest.json + logo are additive.
-_REQUIRED = ("weights.parquet", "annotations.parquet", "studies.parquet")
-_ALLOW_PATTERNS = [*_REQUIRED, "manifest.json", "logo.png", "logo.jpg"]
+# A module must carry one of the LEAD_TABLES families — that is exactly what discovery probes for.
+# The rest are additive: discovery ignores what it does not know, and shipping them keeps the
+# uploaded module a complete artifact.
+_LEAD_PARQUETS = tuple(f"{t}.parquet" for t in LEAD_TABLES)
+_SIDE_TABLES = (
+    "annotations.parquet", "studies.parquet",
+    "sources.parquet", "literature.parquet", "frequencies.parquet", "gene_metrics.parquet",
+)
+_ALLOW_PATTERNS = [*_LEAD_PARQUETS, *_SIDE_TABLES, "manifest.json", "logo.png", "logo.jpg"]
+
+# What a weights-led module is expected to carry. A missing side table here is worth stopping for —
+# it means an interrupted or partial compile — but only for the weights-led shape, since a
+# pharm_variants-led module legitimately has neither annotations nor studies.
+_EXPECTED_WITH_WEIGHTS = ("annotations.parquet", "studies.parquet")
 
 
 class PublishPlan(BaseModel):
@@ -41,16 +52,53 @@ def default_collection_repo() -> str:
     return "just-dna-seq/annotators"
 
 
+def resolve_module_dir(module: str, out_root: Path) -> tuple[Path, str]:
+    """Accept either a compiled module **directory** or a bare name under ``out_root``.
+
+    Returns ``(module_dir, name)``, where the name is the directory's own basename — that is what
+    the module is called in the collection, so a path and the equivalent name publish identically.
+
+    Taking only a name meant a path was silently joined onto the output root, producing
+    ``data/interim/v1_port/data/interim/v1_port/coronary`` and then an error advising a rebuild
+    command that could not work. A publish route should accept the thing you are looking at.
+    """
+    candidate = Path(module)
+    if candidate.is_dir():
+        return candidate, candidate.name
+    # Anything path-shaped that does not exist is a mistyped path, not a module name — say so
+    # rather than searching for it under the output root and reporting a different absence.
+    if len(candidate.parts) > 1:
+        raise FileNotFoundError(f"no such module directory: {candidate}")
+    return out_root / module, module
+
+
 def plan_publish(module_dir: Path, name: str, repo_id: Optional[str] = None) -> PublishPlan:
     """Resolve the upload plan and validate the compiled artifacts are present."""
     repo_id = repo_id or default_collection_repo()
     present = [f for f in _ALLOW_PATTERNS if (module_dir / f).exists()]
-    missing = [f for f in _REQUIRED if f not in present]
-    if missing:
+
+    # The lead table is the whole requirement: it is exactly what discovery probes for, so a module
+    # led by a 0.4 family (pharm_variants, diplotypes, pgs, …) publishes here like any other.
+    lead = next((f for f in _LEAD_PARQUETS if f in present), None)
+    if lead is None:
+        if not module_dir.is_dir():
+            raise FileNotFoundError(f"{name}: no such module directory: {module_dir}")
         raise FileNotFoundError(
-            f"{name}: missing compiled artifact(s) {missing} in {module_dir} — "
-            f"run `pipelines v1-port port --module {name} --compile` first"
+            f"{name}: no compiled table in {module_dir} — expected one of {list(_LEAD_PARQUETS)}. "
+            f"This uploads the compiled parquet, so compile the spec first — in place, since that "
+            f"is where the upload reads from: "
+            f"`pipelines module compile {module_dir} --output {module_dir}`"
         )
+
+    if lead == "weights.parquet":
+        missing = [f for f in _EXPECTED_WITH_WEIGHTS if f not in present]
+        if missing:
+            raise FileNotFoundError(
+                f"{name}: missing compiled artifact(s) {missing} in {module_dir} — a weights-led "
+                f"module should carry these, so this looks like a partial compile. Rebuild with "
+                f"`pipelines module compile {module_dir} --output {module_dir}`"
+            )
+
     return PublishPlan(
         module=name, repo_id=repo_id, path_in_repo=f"data/{name}", files=present
     )

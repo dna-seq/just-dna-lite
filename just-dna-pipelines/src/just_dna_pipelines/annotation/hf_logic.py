@@ -95,6 +95,21 @@ def prepare_vcf_rsid_only(
     )
 
 
+def _has_coordinates(lead_lf: pl.LazyFrame) -> bool:
+    """Whether a module's lead table can be joined by position.
+
+    Both columns must exist *and* hold at least one value: a table typed with `chrom`/`start` but
+    null throughout (an rsid-authored 0.4 table) is not positionally joinable, and treating it as if
+    it were produces an empty annotation rather than an error.
+    """
+    schema = lead_lf.collect_schema().names()
+    if not {"chrom", "start"}.issubset(schema):
+        return False
+    return bool(
+        lead_lf.select(pl.col("chrom").is_not_null().any()).collect().item()
+    )
+
+
 def annotate_vcf_with_module_weights(
     vcf_lf: pl.LazyFrame,
     module_name: str,
@@ -124,9 +139,23 @@ def annotate_vcf_with_module_weights(
         Tuple of (output_path, num_annotated_variants)
     """
     with start_action(action_type="annotate_with_module_weights", module=module_name, join_on=join_on) as action:
-        # Load module weights table (lazy)
-        weights_lf = scan_module_table(module_name, ModuleTable.WEIGHTS, module_info=module_info)
-        
+        # Load the module's lead table (lazy) — weights for most modules, pharm_variants for a
+        # pharmacogenomics one.
+        weights_lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
+
+        # A position join needs coordinates, and the 0.4 table families are materialized verbatim
+        # from their authored CSV — the compiler applies resolution.csv to weights.parquet only. So a
+        # pharm_variants-led module reaches us with chrom/start null on every row and would join to
+        # nothing at all. Fall back to rsid rather than silently annotating zero variants.
+        if join_on == "position" and not _has_coordinates(weights_lf):
+            action.log(
+                message_type="info",
+                step="join_strategy_downgraded",
+                module=module_name,
+                reason="lead table carries no coordinates; joining on rsid + genotype instead",
+            )
+            join_on = "rsid"
+
         if join_on == "rsid":
             # Join on rsid + genotype (requires VCF to have rsids)
             module_rsids = weights_lf.select("rsid").unique()
