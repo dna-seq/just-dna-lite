@@ -865,6 +865,26 @@ def _publish_preview() -> rx.Component:
 
 def _publish_controls() -> rx.Component:
     return rx.el.div(
+        # Already in the catalog (exact content) → duplicate, can't republish
+        rx.cond(
+            RegistryState.selected_in_catalog & ~RegistryState.publish_is_published,
+            rx.el.div(
+                fomantic_icon("check circle", size=12, color="#21ba45"),
+                rx.el.span(" Already published", style={"marginLeft": "4px", "fontWeight": "600",
+                                                        "color": "#21ba45"}),
+                rx.el.div(
+                    "This exact content is already in the catalog as ",
+                    rx.el.code(RegistryState.selected_catalog_ref,
+                               style={"fontSize": "0.72rem", "color": "#6435c9"}),
+                    ". The registry rejects duplicate data, so there's nothing to publish. "
+                    "Edit the data and bump the version to publish a change.",
+                    style={"fontSize": "0.76rem", "color": "#777", "lineHeight": "1.4",
+                           "marginTop": "4px"},
+                ),
+                style={"fontSize": "0.8rem", "marginBottom": "8px"},
+            ),
+            rx.fragment(),
+        ),
         # New / new-version → publish enabled
         rx.cond(
             RegistryState.can_publish,

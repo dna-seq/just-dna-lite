@@ -48,7 +48,11 @@ from just_dna_pipelines.module_registry import (
 )
 from just_dna_registry import RegistryClient, RegistryError
 from just_dna_registry.client import VersionMismatchError
-from just_dna_format.identity import is_valid_namespace
+from just_dna_format.identity import (
+    is_valid_namespace,
+    is_valid_version,
+    version_from_legacy,
+)
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
@@ -5470,6 +5474,34 @@ def _local_key(namespace: str, name: str) -> str:
     return f"{safe_ns}__{name}"
 
 
+def _spec_version(module_dir: Path) -> str:
+    """Publish version from the authored spec (``module.version``), normalized to SemVer.
+
+    Identity beyond ``name`` (version/namespace/canonical_id) is a marketplace concern assigned at
+    publish time — the compiler emits ``Identity(name=...)`` only, so a locally-compiled
+    manifest.json carries a null identity.version. The authored version still lives in
+    ``module_spec.yaml`` (possibly a legacy int/``vN`` like ``2``), so read it there and coerce
+    (``2``/``v2`` → ``2.0.0``). Returns ``""`` when no usable version is found.
+    """
+    spec_path = module_dir / "module_spec.yaml"
+    if not spec_path.exists():
+        return ""
+    try:
+        raw = yaml.safe_load(spec_path.read_text()) or {}
+    except Exception:  # noqa: BLE001 - spec is best-effort metadata
+        return ""
+    version = (raw.get("module") or {}).get("version")
+    if version is None or str(version).strip() == "":
+        return ""
+    candidate = str(version).strip()
+    if is_valid_version(candidate):
+        return candidate
+    try:
+        return version_from_legacy(candidate)
+    except ValueError:
+        return ""
+
+
 def _scan_local_modules() -> List[Dict[str, Any]]:
     """Scan the local custom-modules dir → one dict per registered module.
 
@@ -5507,6 +5539,11 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
                 entry["color"] = mf.display.color or "#6435c9"
             except Exception:  # noqa: BLE001 - manifest is best-effort metadata
                 pass
+        # The compiler leaves manifest identity.version null (marketplace-assigned at publish
+        # time); fall back to the authored spec version so the publish pane shows a version and
+        # enables the Publish button.
+        if not entry["version"]:
+            entry["version"] = _spec_version(d)
         out.append(entry)
     return out
 
@@ -6219,8 +6256,33 @@ class RegistryState(rx.State):
         return bool(li) and li.get("has_spec", False)
 
     @rx.var
+    def selected_in_catalog(self) -> bool:
+        """Whether the selected module's exact artifact already exists in the catalog.
+
+        Set by ``_refresh_local`` via a server digest lookup (``lookup_by_digests``). The registry
+        rejects duplicate content on publish (409 ``duplicate_content``); this lets us pre-empt it
+        so we don't offer a Publish button for content that's already published.
+        """
+        return bool(self._selected_local.get("in_catalog", False))
+
+    @rx.var
+    def selected_catalog_ref(self) -> str:
+        """``namespace/name@version`` of the catalog match for the selected module (else "")."""
+        li = self._selected_local
+        if not li.get("in_catalog", False):
+            return ""
+        ns, name, ver = li.get("namespace", ""), li.get("catalog_name", ""), li.get("version", "")
+        return f"{ns}/{name}@{ver}" if ns and name else ""
+
+    @rx.var
     def can_publish(self) -> bool:
-        return self.publish_state in ("new", "new_version") and self.publish_has_spec
+        # Content already in the catalog can't be republished (the server rejects it as
+        # duplicate_content); don't offer the button for it.
+        return (
+            self.publish_state in ("new", "new_version")
+            and self.publish_has_spec
+            and not self.selected_in_catalog
+        )
 
     @rx.var
     def publish_is_published(self) -> bool:
@@ -6501,7 +6563,7 @@ class RegistryState(rx.State):
                 return c.publish(ns, catalog_name, version, CUSTOM_MODULES_DIR / key, changelog="")
 
         try:
-            await loop.run_in_executor(None, _pub)
+            manifest = await loop.run_in_executor(None, _pub)
         except VersionMismatchError as e:
             async with self:
                 self.publish_busy = False
@@ -6511,7 +6573,11 @@ class RegistryState(rx.State):
         except RegistryError as e:
             async with self:
                 self.publish_busy = False
-                if e.status_code == 409:
+                # The registry uses 409 for both "this version number is taken" and "this exact
+                # data is already published (possibly under another name)". Surface the difference.
+                if e.status_code == 409 and "duplicate_content" in str(e.detail):
+                    self.publish_message = f"Not published: {e.detail}"
+                elif e.status_code == 409:
                     self.publish_message = (
                         f"Version {version} already exists in {ns} — bump the version (Edit) to publish changes."
                     )
@@ -6523,12 +6589,29 @@ class RegistryState(rx.State):
                 self.publish_busy = False
                 self.publish_message = f"Publish failed: {e}"
             return
+        # The server recompiles the uploaded spec with its pinned Ensembl reference, so the
+        # published artifact digest can legitimately differ from our locally-compiled bytes (e.g.
+        # when the local Ensembl cache was incomplete). We just published this spec, so trust the
+        # server's returned manifest as authoritative rather than recomputing a local-vs-server
+        # "conflict" (which would falsely tell the user their fresh publish differs).
+        server_digest = manifest.artifact.digest if manifest and manifest.artifact else ""
+        local_digest = li.get("digest", "") if li else ""
+        recompiled = bool(server_digest) and bool(local_digest) and server_digest != local_digest
         await self._refresh_local()
         await self._refresh_account()
-        await self._load_publish_state()
         async with self:
+            self.publish_state = "published_identical"
+            self.published_digest = server_digest
+            self.publish_version = version
             self.publish_busy = False
-            self.publish_message = f"Published {ns}/{catalog_name}@{version}."
+            if recompiled:
+                self.publish_message = (
+                    f"Published {ns}/{catalog_name}@{version}. The registry recompiled from your "
+                    "spec with its reference Ensembl build, so the published artifact differs from "
+                    "your local copy — reinstall to sync it."
+                )
+            else:
+                self.publish_message = f"Published {ns}/{catalog_name}@{version}."
 
     async def _set_yank(self, yanked: bool) -> None:
         async with self:
