@@ -22,6 +22,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     scan_module_weights,
     HF_REPO_ID,
     DISCOVERED_MODULES,
+    MODULE_INFOS,
     get_all_modules,
     validate_module,
     validate_modules,
@@ -258,14 +259,21 @@ class TestHfModuleLoading:
         assert schema["genotype"] == pl.List(pl.String)
     
     @pytest.mark.integration
-    def test_scan_all_modules_have_weights(self):
-        """All modules should have a weights table with required columns."""
-        required_cols = {"rsid", "genotype", "module", "chrom", "start"}
-        
+    def test_scan_all_modules_have_a_joinable_lead_table(self):
+        """Every module's lead table must carry what a VCF join needs.
+
+        `rsid`, `genotype` and `module` are the universal floor: a weights-led module is joined by
+        position and a 0.4-led one by rsid, but both need an rsid and a genotype to match on. The
+        position columns are asserted separately, against the weights-led modules that must have
+        them — this used to demand them of every module, which only passed because no module led by
+        a 0.4 table had been published yet.
+        """
+        required_cols = {"rsid", "genotype", "module"}
+
         for module_name in DISCOVERED_MODULES:
-            lf = scan_module_table(module_name, ModuleTable.WEIGHTS)
+            lf = scan_module_table(module_name, ModuleTable.LEAD)
             schema = lf.collect_schema()
-            
+
             missing = required_cols - set(schema.names())
             assert not missing, f"Module {module_name} missing columns: {missing}"
     
@@ -381,34 +389,61 @@ class TestAnnotationWithRealData:
             print(f"{module_name}: {num_rows} variants")
 
 
+# The weights contract applies to the modules that actually have weights. Splitting the parameter
+# list rather than skipping inside the test keeps a 0.4-led module from reporting as "passed" for a
+# contract it was never asked to meet.
+WEIGHTS_LED_MODULES = [n for n, i in MODULE_INFOS.items() if i.lead_table == "weights"]
+TABLE_LED_MODULES = [n for n, i in MODULE_INFOS.items() if i.lead_table != "weights"]
+
+
 class TestModuleWeightsSchema:
     """Verify the schema of HF module weights tables."""
-    
+
     @pytest.mark.integration
-    @pytest.mark.parametrize("module_name", DISCOVERED_MODULES)
+    @pytest.mark.parametrize("module_name", WEIGHTS_LED_MODULES)
     def test_module_has_position_columns(self, module_name: str):
-        """Each module should have position columns for joining."""
+        """Each weights-led module should have position columns for joining."""
         lf = scan_module_weights(module_name)
         schema = lf.collect_schema()
-        
+
         # Position columns
         assert "chrom" in schema.names(), f"{module_name} missing 'chrom'"
         assert "start" in schema.names(), f"{module_name} missing 'start'"
-        
+
         # Genotype column
         assert "genotype" in schema.names(), f"{module_name} missing 'genotype'"
         assert schema["genotype"] == pl.List(pl.String), f"{module_name} genotype is not List[String]"
-    
+
     @pytest.mark.integration
-    @pytest.mark.parametrize("module_name", DISCOVERED_MODULES)
+    @pytest.mark.parametrize("module_name", WEIGHTS_LED_MODULES)
     def test_module_has_annotation_columns(self, module_name: str):
-        """Each module should have annotation columns."""
+        """Each weights-led module should have annotation columns."""
         lf = scan_module_weights(module_name)
         schema = lf.collect_schema()
-        
+
         # Core annotation columns
         assert "weight" in schema.names(), f"{module_name} missing 'weight'"
         assert "state" in schema.names(), f"{module_name} missing 'state'"
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("module_name", TABLE_LED_MODULES)
+    def test_table_led_module_is_rsid_joinable(self, module_name: str):
+        """A published 0.4-led module must be joinable the one way it can be: rsid + genotype.
+
+        It has no weights, and asking for that table is an error rather than an empty result. Its
+        genotype is the authored string, not the list a weights row carries — the report helpers
+        accept both for exactly this reason.
+        """
+        with pytest.raises(ValueError, match="no weights table"):
+            scan_module_weights(module_name)
+
+        lf = scan_module_table(module_name, ModuleTable.LEAD)
+        schema = lf.collect_schema()
+        assert "rsid" in schema.names(), f"{module_name} missing 'rsid'"
+        assert schema["genotype"] == pl.String, f"{module_name} genotype is not String"
+        # every row must actually carry an rsid, or the only available join matches nothing
+        unmatched = lf.select(pl.col("rsid").is_null().sum()).collect().item()
+        assert unmatched == 0, f"{module_name} has {unmatched} row(s) with no rsid to join on"
 
 
 class TestLeadTableDiscovery:
