@@ -5465,6 +5465,55 @@ def _registry_url() -> str:
 _ARTIFACT_FILES: tuple = tuple(_COMPILER_OUTPUT_FILES)
 
 
+#: Tables that can lead a module, newest-first — mirrors the order
+#: `scripts/registry_precheck.py` uses. The leading table's row count is what the server's
+#: enrichment limit counts.
+_LEAD_TABLES: tuple = ("variants.csv", "pharm_variants.csv", "diplotypes.csv", "pgs.csv")
+
+#: The server's ceiling on the enrichment half of `/check` (`REGISTRY_ENRICH_MAX_VARIANTS`).
+#: Past it the endpoint answers `422 too_many_variants`, so a bigger module goes to `/validate` —
+#: which has no network tier and is the half that decides publishability anyway.
+_ENRICH_MAX_VARIANTS: int = 500
+
+#: Raw spec bytes past which the spec is packed into one archive rather than sent as loose parts.
+#: The server bounds the wire at 25 MiB.
+_PACK_ABOVE_BYTES: int = 20 * 1024 * 1024
+
+
+def _trust_word(trusted: Optional[bool]) -> str:
+    """Flatten `ResolutionInfo.trusted` to a branchable word, keeping all three states.
+
+    `None` is not "untrusted": it means the server said nothing, which is what an older release
+    predating the field looks like. Collapsing it into `False` would label such a version as
+    positionally unjoinable when nothing established that.
+    """
+    if trusted is True:
+        return "yes"
+    if trusted is False:
+        return "no"
+    return "unknown"
+
+
+def _authored_row_count(module_dir: Path) -> int:
+    """Rows in whichever table leads the module — what the enrichment limit counts."""
+    for table in _LEAD_TABLES:
+        path = module_dir / table
+        if path.exists():
+            with path.open(encoding="utf-8") as handle:
+                return max(sum(1 for _ in handle) - 1, 0)
+    return 0
+
+
+def _spec_bytes(module_dir: Path) -> int:
+    """Raw size of the authored parts, which is what decides loose-parts vs packed archive."""
+    return sum(
+        f.stat().st_size
+        for pattern in ("module_spec.yaml", "*.csv", "*.log")
+        for f in module_dir.glob(pattern)
+        if f.is_file()
+    )
+
+
 def _local_key(namespace: str, name: str) -> str:
     """Local registry key for a registry module: ``{namespace}__{name}``.
 
@@ -5619,6 +5668,11 @@ class RegistryState(rx.State):
     selected_versions: List[str] = []
     _remote_versions: List[str] = []
     _remote_digests: Dict[str, str] = {}
+    # version -> "yes" | "no" | "unknown". `ResolutionInfo.trusted` is three-valued in registry
+    # 0.11.3 and the third state is not a detail: `false` means the compiler reported a positional
+    # table that joins by rsID only, and `null` means the server did not say. Carried as a string
+    # because an Optional[bool] cannot be branched on with rx.cond without collapsing None to False.
+    _remote_trust: Dict[str, str] = {}
     detail_loading: bool = False
     detail_error: str = ""
 
@@ -5648,6 +5702,13 @@ class RegistryState(rx.State):
     published_digest: str = ""
     publish_busy: bool = False
     publish_message: str = ""
+
+    # --- Pre-publish rehearsal (registry 0.11 `/check` and `/validate`) ---
+    precheck_busy: bool = False
+    precheck_endpoint: str = ""    # "" | check | validate — which half actually ran
+    precheck_verdict: str = ""     # "" | pass | fail | blocked | rate_limited | error
+    precheck_message: str = ""
+    precheck_findings: List[str] = []
 
     # ------------------------------------------------------------------ helpers
 
@@ -6002,6 +6063,12 @@ class RegistryState(rx.State):
         compatible = [v for v in versions if v.get("version") and not v.get("needs_upgrade", False)]
         remote_versions = [v.get("version") for v in compatible]
         remote_digests = {v.get("version"): (v.get("artifact_digest") or "") for v in compatible}
+        # Trust is per *version*, not per module: it describes how that build's variants were
+        # pinned to the genome, so a module can hold a trusted release and an untrusted one.
+        remote_trust = {
+            v.get("version"): _trust_word((v.get("resolution") or {}).get("trusted"))
+            for v in compatible
+        }
         stats = detail.get("stats") or {}
         union = list(remote_versions)
         if installed_version and installed_version not in union:
@@ -6027,6 +6094,7 @@ class RegistryState(rx.State):
             self.selected_logo_url = (url + logo) if logo.startswith("/") else logo
             self._remote_versions = remote_versions
             self._remote_digests = remote_digests
+            self._remote_trust = remote_trust
             self.selected_versions = union
             self.selected_version = default_v
             self.detail_loading = False
@@ -6317,6 +6385,29 @@ class RegistryState(rx.State):
         return f"{ns}/{name}@{ver}" if ns and name else ""
 
     @rx.var
+    def selected_trusted(self) -> str:
+        """Trust of the *selected version*: ``yes`` | ``no`` | ``unknown``.
+
+        ``unknown`` also covers a locally-installed version that the catalog does not list, which
+        is why this reads the map rather than defaulting to a bool.
+        """
+        return self._remote_trust.get(self.selected_version, "unknown")
+
+    @rx.var
+    def selected_trust_hint(self) -> str:
+        """Why the selected version carries that trust, in the terms the registry means it."""
+        word = self.selected_trusted
+        if word == "yes":
+            return "Variants are pinned to genome coordinates, so this joins to a VCF by position."
+        if word == "no":
+            return (
+                "This build's table has no coordinates — it joins on rsID and genotype only, so a "
+                "VCF without rsIDs in its ID column will match nothing. Published as untrusted "
+                "deliberately; it is not a defect."
+            )
+        return "The catalog did not report a trust level for this version."
+
+    @rx.var
     def can_publish(self) -> bool:
         # Content already in the catalog can't be republished (the server rejects it as
         # duplicate_content); don't offer the button for it.
@@ -6578,6 +6669,137 @@ class RegistryState(rx.State):
                     self.publish_state = "published_identical"
                 else:
                     self.publish_state = "conflict"
+
+    @rx.event(background=True)
+    async def precheck_selected(self):
+        """Rehearse the publish server-side before uploading anything.
+
+        Which endpoint runs is decided here rather than left to the user, because the choice is
+        mechanical: `/check` is the full dry run (validation plus the server's network tier) but its
+        enrichment half is capped at `_ENRICH_MAX_VARIANTS`, and a module over that answers
+        `422 too_many_variants`. `/validate` has no network tier and is the half that decides
+        publishability, so it is both the fallback and the right answer for a large module. A spec
+        too large to send as loose parts is packed — before client/server 0.11.1 there was no
+        archive form at all, so a big module could be published but never rehearsed.
+        """
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            key = li.get("name", "") if li else ""
+            catalog_name = li.get("catalog_name", "") if li else ""
+            has_spec = li.get("has_spec", False) if li else False
+            url, token = self._client_args()
+        if not (ns and catalog_name):
+            return
+        if not has_spec:
+            async with self:
+                self.precheck_verdict = "error"
+                self.precheck_message = "This module has no spec files to check."
+                self.precheck_findings = []
+            return
+
+        spec_dir = CUSTOM_MODULES_DIR / key
+        async with self:
+            self.precheck_busy = True
+            self.precheck_verdict = ""
+            self.precheck_findings = []
+            self.precheck_endpoint = ""
+            self.precheck_message = f"Checking {catalog_name} against {ns}…"
+
+        loop = asyncio.get_event_loop()
+
+        def _run() -> tuple[str, Any]:
+            rows = _authored_row_count(spec_dir)
+            pack = _spec_bytes(spec_dir) > _PACK_ABOVE_BYTES
+            with RegistryClient(url, token) as c:
+                if rows <= _ENRICH_MAX_VARIANTS:
+                    try:
+                        return "check", c.check(ns, catalog_name, spec_dir, pack=pack)
+                    except RegistryError as exc:
+                        # Only the size ceiling is worth downgrading for; anything else is a real
+                        # answer and belongs to the caller.
+                        if not (exc.status_code == 422 and "too_many_variants" in str(exc.detail)):
+                            raise
+                return "validate", c.validate(ns, catalog_name, spec_dir, pack=pack)
+
+        try:
+            endpoint, report = await loop.run_in_executor(None, _run)
+        except VersionMismatchError as e:
+            async with self:
+                self.precheck_busy = False
+                self.server_incompatible = True
+                self.precheck_verdict = "error"
+                self.precheck_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+            return
+        except RegistryError as e:
+            async with self:
+                self.precheck_busy = False
+                self.precheck_findings = []
+                if e.status_code == 429:
+                    # The rate limiter says "not yet" — emphatically not "would not publish".
+                    self.precheck_verdict = "rate_limited"
+                    self.precheck_message = (
+                        "The check endpoint is rate limited right now. This says nothing about "
+                        "whether the module would publish — try again in a minute."
+                    )
+                elif e.status_code == 403:
+                    self.precheck_verdict = "blocked"
+                    self.precheck_message = (
+                        f"Your token does not own the namespace {ns}, so the server refused the "
+                        f"check. This reads like a spec problem and is not one. ({e.detail})"
+                    )
+                elif e.status_code == 413:
+                    self.precheck_verdict = "blocked"
+                    self.precheck_message = f"Spec is too large for the server to accept: {e.detail}"
+                else:
+                    self.precheck_verdict = "error"
+                    self.precheck_message = f"Check failed: {e.detail}"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.precheck_busy = False
+                self.precheck_verdict = "error"
+                self.precheck_message = f"Check failed: {e}"
+            return
+
+        # A CheckReport wraps the ValidationReport; a ValidationReport is its own validation half.
+        validation = getattr(report, "validation", report)
+        passed = bool(report.would_publish) if endpoint == "check" else bool(validation.valid)
+        findings: List[str] = []
+        for level in ("errors", "warnings"):
+            entries = list(getattr(validation, level, []) or [])
+            for entry in entries[:5]:
+                findings.append(f"{level[:-1]}: {str(entry)[:220]}")
+            if len(entries) > 5:
+                findings.append(f"… and {len(entries) - 5} more {level}")
+
+        stats = getattr(validation, "stats", None)
+        counts = ""
+        if stats is not None:
+            counts = (
+                f" — {getattr(stats, 'variant_count', 0):,} variants, "
+                f"{getattr(stats, 'study_count', 0):,} studies, "
+                f"{getattr(stats, 'gene_count', 0):,} genes"
+            )
+        skipped = getattr(report, "skipped_reason", "") if endpoint == "check" else ""
+
+        async with self:
+            self.precheck_busy = False
+            self.precheck_endpoint = endpoint
+            self.precheck_verdict = "pass" if passed else "fail"
+            verb = "would publish" if endpoint == "check" else "validates"
+            if passed:
+                self.precheck_message = f"{catalog_name} {verb}{counts}."
+            else:
+                self.precheck_message = f"{catalog_name} would be rejected{counts}."
+            if endpoint == "validate":
+                self.precheck_message += (
+                    " Validation tier only — this module is over the server's enrichment limit, "
+                    "so the network passes did not run."
+                )
+            if skipped:
+                self.precheck_message += f" Enrichment skipped: {skipped}."
+            self.precheck_findings = findings
 
     @rx.event(background=True)
     async def publish_selected(self):

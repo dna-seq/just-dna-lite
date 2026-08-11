@@ -34,6 +34,45 @@ def _status_badge() -> rx.Component:
     )
 
 
+def _trust_badge() -> rx.Component:
+    """Positional-trust pill for the selected *version* (registry 0.11.3).
+
+    Three states, not two: `unknown` is shown as its own muted pill rather than folded into
+    "untrusted", because a release the server reported nothing for is not the same claim as one
+    the compiler flagged as joining by rsID only.
+    """
+    return rx.match(
+        RegistryState.selected_trusted,
+        (
+            "yes",
+            rx.el.span(
+                "positional",
+                title=RegistryState.selected_trust_hint,
+                style={"display": "inline-block", "fontSize": "0.68rem", "fontWeight": "700",
+                       "padding": "2px 8px", "borderRadius": "10px", "color": "#fff",
+                       "backgroundColor": "#21ba45", "cursor": "help"},
+            ),
+        ),
+        (
+            "no",
+            rx.el.span(
+                "rsID-only",
+                title=RegistryState.selected_trust_hint,
+                style={"display": "inline-block", "fontSize": "0.68rem", "fontWeight": "700",
+                       "padding": "2px 8px", "borderRadius": "10px", "color": "#fff",
+                       "backgroundColor": "#f2711c", "cursor": "help"},
+            ),
+        ),
+        rx.el.span(
+            "trust unknown",
+            title=RegistryState.selected_trust_hint,
+            style={"display": "inline-block", "fontSize": "0.68rem", "fontWeight": "600",
+                   "padding": "2px 8px", "borderRadius": "10px", "color": "#666",
+                   "backgroundColor": "#e8e8e8", "cursor": "help"},
+        ),
+    )
+
+
 def _gate_banner() -> rx.Component:
     """Confirm/cancel banner shown before a destructive/replacing action."""
     return rx.cond(
@@ -204,6 +243,7 @@ def _selected_card() -> rx.Component:
                         style={"fontSize": "1rem", "fontWeight": "700", "color": "#333", "flex": "1"},
                     ),
                     _status_badge(),
+                    _trust_badge(),
                     style={"display": "flex", "alignItems": "center", "gap": "8px"},
                 ),
                 rx.el.div(
@@ -863,6 +903,73 @@ def _publish_preview() -> rx.Component:
     )
 
 
+def _precheck_block() -> rx.Component:
+    """Server-side rehearsal before uploading anything (registry 0.11 `/check`, `/validate`).
+
+    Kept as a separate step rather than folded into Publish: `/check` is the service's most
+    expensive endpoint and is rate-limited per account, so it should be something the user asks
+    for, not something every publish pays for.
+    """
+    return rx.el.div(
+        rx.el.button(
+            rx.cond(RegistryState.precheck_busy,
+                    rx.el.i("", class_name="spinner loading icon"),
+                    fomantic_icon("clipboard check", size=13)),
+            " Check before publishing",
+            on_click=RegistryState.precheck_selected,
+            disabled=RegistryState.precheck_busy,
+            class_name="ui basic button",
+            style={"width": "100%", "marginBottom": "6px"},
+        ),
+        rx.cond(
+            RegistryState.precheck_verdict != "",
+            rx.el.div(
+                rx.el.div(
+                    rx.match(
+                        RegistryState.precheck_verdict,
+                        ("pass", fomantic_icon("check circle", size=13, color="#21ba45")),
+                        ("fail", fomantic_icon("times circle", size=13, color="#db2828")),
+                        ("rate_limited", fomantic_icon("clock", size=13, color="#fbbd08")),
+                        ("blocked", fomantic_icon("lock", size=13, color="#f2711c")),
+                        fomantic_icon("exclamation circle", size=13, color="#767676"),
+                    ),
+                    rx.el.span(
+                        " " + RegistryState.precheck_message,
+                        style={"marginLeft": "4px"},
+                    ),
+                    style={"fontSize": "0.78rem", "lineHeight": "1.4",
+                           "color": rx.match(
+                               RegistryState.precheck_verdict,
+                               ("pass", "#21ba45"),
+                               ("fail", "#db2828"),
+                               ("rate_limited", "#8a6d00"),
+                               ("blocked", "#b5500f"),
+                               "#666",
+                           )},
+                ),
+                rx.cond(
+                    RegistryState.precheck_findings.length() > 0,
+                    rx.el.ul(
+                        rx.foreach(
+                            RegistryState.precheck_findings,
+                            lambda f: rx.el.li(
+                                f,
+                                style={"fontSize": "0.72rem", "color": "#777",
+                                       "lineHeight": "1.35", "marginBottom": "2px"},
+                            ),
+                        ),
+                        style={"margin": "6px 0 0 0", "paddingLeft": "18px"},
+                    ),
+                    rx.fragment(),
+                ),
+                style={"padding": "8px", "borderRadius": "4px", "backgroundColor": "#fafafa",
+                       "border": "1px solid #eee", "marginBottom": "8px"},
+            ),
+            rx.fragment(),
+        ),
+    )
+
+
 def _publish_controls() -> rx.Component:
     return rx.el.div(
         # Already in the catalog (exact content) → duplicate, can't republish
@@ -898,6 +1005,7 @@ def _publish_controls() -> rx.Component:
                     ),
                     style={"fontSize": "0.76rem", "color": "#777", "marginBottom": "6px"},
                 ),
+                _precheck_block(),
                 rx.el.button(
                     rx.cond(RegistryState.publish_busy,
                             rx.el.i("", class_name="spinner loading icon"),
