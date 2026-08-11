@@ -247,6 +247,21 @@ on `EnrichmentResult.clin_sig_not_checked`, so an empty conflict list is no long
 
 All five are filed upstream in `/data/sources/just-dna-format/docs/ROADMAP.md`.
 
+**Resolution is scoped to `variants.csv`, so a 0.4-family table joins by rsID only.** The compiler
+materializes `pharm_variants` / `haplotypes` / `heteroplasmy` verbatim from their authored CSV and
+applies `resolution.csv` to `weights.parquet` alone — so an rsid-authored PGx module compiles clean,
+validates, publishes, and carries a null `chrom`/`start` on every row. Compiler **0.5.3** makes this
+visible rather than silent (`_check_positional_joinability`, a warning in both plain and `--strict`,
+naming how many rows are unplaced *and* how many `resolution.csv` could place); it does **not** fill
+them. Materializing the coordinate breaks Principle 7 — `reverse_module` would read it back as
+authored — so the fix waits on RM43 and a `0.4`-family equivalent of `VariantRow.authored_ident`.
+
+Two consequences live here. `hf_logic.annotate_vcf_with_module_weights` detects the null-coordinate
+case and downgrades a position join to **rsid + genotype**, because the alternative is annotating
+nothing at all; a VCF with no rsIDs in `ID` (DeepVariant output among them) therefore matches such a
+module on nothing. And registry **0.11.3** reads the same warning to make `trusted` three-valued, so
+`pharmgkb` publishes as `trusted: false` — correct, not a defect to work around.
+
 ### Building and releasing the modules
 
 See **[docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md)** for the full runbook and

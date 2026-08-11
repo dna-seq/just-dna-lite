@@ -20,8 +20,10 @@ dependencies = [
   # 0.11.1 added the `archive=` part to /validate and /check — before it, a spec too large to send
   # raw could be published but never rehearsed, which is exactly where the three ClinVar panels
   # sat. 0.11.2 adopts compiler/enricher 0.5.2 and distinguishes the empty lists a check can
-  # return, so the client and the deployed server stay on one version.
-  "just-dna-registry>=0.11.2",
+  # return, so the client and the deployed server stay on one version. 0.11.3 adopts 0.5.3 and
+  # makes `trusted` three-valued: `false` when the compiler reports a positional table that joins
+  # by rsID only. `pharmgkb` is exactly that, so it now publishes labelled untrusted — accurately.
+  "just-dna-registry>=0.11.3",
   # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
   # but dagster caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
   # the gencode and dagster fails to import (VersionError in health_pb2). 1.81.1 is the

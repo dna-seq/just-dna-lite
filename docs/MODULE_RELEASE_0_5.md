@@ -395,6 +395,13 @@ into `--changelog`.
 Arguments are `<namespace> <name> <version> <spec_dir>`. The server recompiles, so what is uploaded
 is the authored spec, not the parquet.
 
+**`pharmgkb` will publish as `trusted: false`, and that is the honest label.** Registry 0.11.3 made
+the facet three-valued and sets it `false` for any module whose compiled output has a positional
+table joining by rsID only — which `pharm_variants.csv` does, on all 1,482 rows. It publishes
+normally (`would_publish` is true, checked live); the facet says a consumer joining by position gets
+nothing from it, which is true until the compiler applies `resolution.csv` to the 0.4 families
+(upstream RM43). Do not treat it as a defect to clear before publishing.
+
 The six small modules go through `publish` (multipart); the three panels are over the 25 MiB limit
 and go through `import-module` with a tar.gz. Changelog text is in the section above — it is long,
 so keep it in a variable rather than inline.
