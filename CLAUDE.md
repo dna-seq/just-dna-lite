@@ -50,6 +50,17 @@ like `start`.
 - **No placeholders**: Never use `/my/custom/path/` in code.
 - **No legacy support**: Refactor aggressively; do not keep old API functions.
 - **Dependency Management**: Use `uv sync` and `uv add`. NEVER use `uv pip install`.
+- **No dependency paths outside this repo**: `[tool.uv.sources]` may only contain workspace members
+  (`{ workspace = true }`). Never add a `path =` / `editable =` entry pointing at a sibling checkout
+  (`just-dna-marketplace`, `just-prs`, `just-dna-format`, …) — the absolute path does not exist on
+  other machines, in CI, or in containers, and `uv sync` then hard-fails with
+  `Distribution not found at: file:///…` before a venv can even be created. Every shared lib we
+  consume is published. Test unpublished libs with a temporary uncommitted override only.
+- **A pin that will not resolve is something you wait for, not something you reroute**: when a needed
+  version is not on PyPI yet, poll for it with exponential backoff for up to ~30 minutes total
+  (30s, 1m, 2m, 4m, 8m, 15m) and then stop and report that it is still unpublished. Never work around
+  it with a local path source, a vendored copy, or a quiet downgrade of the pin. Poll the index
+  directly (`curl -s https://pypi.org/pypi/<pkg>/json`), not by re-running `uv sync` in a loop.
 - **Versions**: Do not hardcode versions in `__init__.py`; use `project.toml`.
 - **Avoid __all__**: Avoid `__init__.py` with `__all__` as it confuses where things are located.
 - **Cross-Project Knowledge**: We sometimes add `prepare-annotations` to the workspace. This folder is **READ-ONLY**. You MUST check `@prepare-annotations/AGENTS.md` for shared Dagster patterns, resource tracking, and best practices. If you find a superior pattern there that is applicable to `just-dna-lite`, you should adopt it and update this file.
