@@ -12,6 +12,11 @@ from pathlib import Path
 
 _IS_WINDOWS = sys.platform == "win32"
 
+from just_dna_lite.process import (
+    detached_popen_kwargs,
+    reap_dagster_instance,
+    shutdown_managed_processes,
+)
 from just_dna_pipelines.runtime import load_env
 from webui import serve_watchdog
 from webui.forksafety import apply_process_model_guards
@@ -97,6 +102,12 @@ def _start_dagster_for_serve() -> subprocess.Popen[bytes] | None:
     dagster_host = os.getenv("DAGSTER_HOST", "127.0.0.1")
     dagster_port = _resolve_dagster_port()
     dagster_home = _ensure_dagster_home(workspace_root)
+    killed = reap_dagster_instance(dagster_home)
+    if killed:
+        print(
+            f"Killed {len(killed)} leftover Dagster process(es) from a previous session.",
+            flush=True,
+        )
 
     if _port_is_listening(dagster_host, dagster_port):
         print(
@@ -107,41 +118,24 @@ def _start_dagster_for_serve() -> subprocess.Popen[bytes] | None:
 
     dg_name = "dg.exe" if _IS_WINDOWS else "dg"
     dg_path = Path(sys.executable).parent / dg_name
-    popen_kwargs: dict[str, object] = {}
-    if _IS_WINDOWS:
-        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(
         ["dg", "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
         cwd=workspace_root,
         executable=str(dg_path) if dg_path.exists() else None,
-        **popen_kwargs,
+        **detached_popen_kwargs(),
     )
     print(f"Started Dagster UI at http://{dagster_host}:{dagster_port}", flush=True)
     print(f"Dagster home: {dagster_home}", flush=True)
     return process
 
 
-def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
-    """Stop a background process group created by this launcher."""
-    if process is None or process.poll() is not None:
-        return
-
-    try:
-        if _IS_WINDOWS:
-            process.terminate()
-        else:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-    except (ProcessLookupError, OSError):
-        return
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        if _IS_WINDOWS:
-            process.kill()
-        else:
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+def _stop_process(
+    process: subprocess.Popen[bytes] | None,
+    dagster_home: Path | None = None,
+) -> None:
+    """Stop a background process and any Dagster leftovers it left behind."""
+    processes = [process] if process is not None else []
+    shutdown_managed_processes(processes, dagster_home=dagster_home, force=True)
 
 
 def _start_serve_watchdog(port: int) -> subprocess.Popen[bytes] | None:
@@ -161,18 +155,10 @@ def _start_serve_watchdog(port: int) -> subprocess.Popen[bytes] | None:
         "SERVE_WATCHDOG_PID": str(os.getpid()),
         "SERVE_WATCHDOG_URL": f"http://{host}:{port}{serve_watchdog.PROBE_PATH}",
     }
-    popen_kwargs: dict[str, object] = {}
-    if _IS_WINDOWS:
-        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        # Its own session, so the watchdog survives anything that takes down the
-        # server's own group — it is the thing that has to outlive the wedge.
-        popen_kwargs["start_new_session"] = True
-
     process = subprocess.Popen(
         [sys.executable, "-m", "webui.serve_watchdog"],
         env=env,
-        **popen_kwargs,
+        **detached_popen_kwargs(),
     )
     print(f"Started serve watchdog (pid {process.pid}) probing {env['SERVE_WATCHDOG_URL']}", flush=True)
     return process
@@ -187,10 +173,23 @@ def main() -> None:
     _setup()
 
     from reflex import constants
+    from reflex.utils import processes
     from reflex_base.config import environment
+    from webui.deployment_urls import persist_local_backend_api_url
 
     environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
-    _run_reflex("Reflex app", {"env": constants.Env.DEV})
+    # Pick the port here so API_URL matches what Reflex binds.  If we let
+    # Reflex auto-increment later, custom /api/... links still point at 8000.
+    backend_port = processes.handle_port(
+        "backend",
+        constants.DefaultPorts.BACKEND_PORT,
+        auto_increment=True,
+    )
+    persist_local_backend_api_url(backend_port)
+    _run_reflex(
+        "Reflex app",
+        {"env": constants.Env.DEV, "backend_port": backend_port},
+    )
 
 
 def serve() -> None:
@@ -224,14 +223,20 @@ def serve() -> None:
         print("Removed stale .web build directory before production serve.", flush=True)
 
     from webui.crawler_assets import generate_crawler_assets
-    from webui.deployment_urls import resolve_configured_public_app_url
+    from webui.deployment_urls import persist_local_backend_api_url, resolve_configured_public_app_url
 
     app_url = resolve_configured_public_app_url()
     if app_url:
         os.environ["API_URL"] = app_url
         print(f"Using fullstack public app URL for Reflex API: {app_url}", flush=True)
     dagster_process = _start_dagster_for_serve()
-    atexit.register(_stop_process, dagster_process)
+    dagster_home = Path(os.environ["DAGSTER_HOME"]) if os.getenv("DAGSTER_HOME") else None
+    atexit.register(
+        shutdown_managed_processes,
+        [dagster_process] if dagster_process is not None else [],
+        dagster_home=dagster_home,
+        force=True,
+    )
     generate_crawler_assets()
 
     from reflex import constants
@@ -254,6 +259,7 @@ def serve() -> None:
 
     watchdog_process = _start_serve_watchdog(port)
     atexit.register(_stop_process, watchdog_process)
+    persist_local_backend_api_url(port)
 
     environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
     _run_reflex(

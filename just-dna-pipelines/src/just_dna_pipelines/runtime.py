@@ -98,7 +98,7 @@ def resource_tracker(name: str = "resource_usage", context: Optional[Any] = None
             if not clean_key:
                 clean_key = "resource_usage"
             
-            # Dagster 1.12.x compatible metadata logging
+            # Dagster 1.13.x: context.log.info() has no metadata kwarg; use add_output_metadata
             # Note: context.log.info does not take metadata, use add_output_metadata or log separately
             # For assets, the standard way is to return Output with metadata, 
             # but inside the asset we can use context.add_output_metadata

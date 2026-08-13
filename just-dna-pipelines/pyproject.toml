@@ -11,40 +11,41 @@ dependencies = [
     # >=2.7.0 is the first PyPI release containing agno-agi/agno#7674
     # (AccuracyResult stat-field fix); previously pinned to a git rev because
     # the fix was unreleased. See docs/reviews/pr-28-windows-installer.md.
-    "agno>=2.7.2",
-    "aiohttp>=3.13.5",
-    "anthropic>=0.92.0",
-    "dagster>=1.12.22",
-    "dagster-duckdb>=0.28.22",
-    "dagster-webserver>=1.12.22",
-    "eliot>=1.17.5",
-    "fsspec>=2026.2.0",
-    "google-genai>=1.71.0,<2.0",
-    "huggingface-hub>=1.10.0",
+    # Do not float to 3.x alphas.
+    "agno>=2.9.0",
+    "aiohttp>=3.14.3",
+    "anthropic>=0.121.0",
+    "dagster>=1.13.17",
+    "dagster-duckdb>=0.29.17",
+    "dagster-webserver>=1.13.17",
+    "eliot>=1.18.0",
+    "fsspec>=2026.7.0",
+    "google-genai>=1.75.0,<2.0",
+    "huggingface-hub>=1.27.0",
     # The 0.5 line closed the digest window: anything that moves a compiled module's
     # artifact.digest is 1.0 from here, so 0.5.x is a stable target to sit on.
-    "just-dna-compiler>=0.5.3",
-    "just-dna-enricher>=0.5.3",
-    "just-dna-format>=0.5.0",
+    "just-dna-compiler>=0.5.4",
+    "just-dna-enricher>=0.5.4",
+    "just-dna-format>=0.5.4",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
     # mcp 2.0.0 removed both, so `from agno.tools.mcp import MCPTools` raises ImportError.
-    # Verified still broken on agno 2.8.5. Drop the cap once agno supports mcp 2.x.
-    "mcp>=1.27.0,<2.0",
-    "numpy>=2.4.3",
-    "openai>=2.31.0",
-    "pillow>=12.2.0",
-    "polars-bio>=0.27.1",
+    # Still broken as of agno 2.9.0. Drop the cap once agno supports mcp 2.x.
+    "mcp>=1.29.0,<2.0",
+    "numpy>=2.5.2",
+    "openai>=3.0.0",
+    "pillow>=12.3.0",
+    "polars-bio>=0.33.1",
     "pooch>=1.9.0",
     "psutil>=7.2.2",
     "pycomfort>=0.0.18",
-    "pydantic>=2.12.5",
+    "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
-    "requests>=2.32.5",
-    "rich>=14.3.3",
+    "requests>=2.34.2",
+    "rich>=15.0.0",
     "tenacity>=9.1.4",
-    "typer>=0.24.1",
+    "typer>=0.27.1",
 ]
 
 [project.scripts]
@@ -56,12 +57,12 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "jupyterlab>=4.5.6",
-    "marimo>=0.23.0",
-    "pytest>=9.0.3",
-    "python-lsp-server[all]>=1.14.0",
-    "ruff>=0.15.9",
-    "sqlglot>=30.4.2",
+    "jupyterlab>=4.6.3",
+    "marimo>=0.23.16",
+    "pytest>=9.1.1",
+    "python-lsp-server[all]>=1.15.0",
+    "ruff>=0.16.3",
+    "sqlglot>=30.17.0",
     "vegafusion>=2.0.3",
     "vl-convert-python>=1.9.0",
 ]

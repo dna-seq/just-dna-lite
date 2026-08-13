@@ -21,6 +21,8 @@ The recommended way to start the application is from the repo root:
 
 - `uv run start` - Starts the Reflex Web UI development server.
 
+**Ctrl+C must kill the Dagster daemon tree, not just `dg`.** Launchers detach `dg` (`start_new_session` on POSIX, `CREATE_NEW_PROCESS_GROUP` on Windows). Shutdown is in `just_dna_lite.process`: POSIX uses SIGINT then SIGKILL; Windows uses `CTRL_BREAK_EVENT` then `TerminateProcess`. Startup also reaps leftover Reflex UI processes for this workspace so a stale frontend cannot keep port 3000. A second `uv run start` is last-writer-wins (no pidfile); the dying instance only reaps PIDs that already existed when shutdown began. Ctrl+Z/`SIGTSTP` is POSIX-only. See `tests/test_process_shutdown.py`.
+
 ### uv Script Entry Point Collisions
 
 If `uv run start` or another project script unexpectedly resolves to a dependency's script
@@ -447,7 +449,7 @@ my_job = define_asset_job(
 
 This hook logs a summary at the end of each successful run: Total Duration, Max Peak Memory, and Top memory consumers.
 
-### Dagster Version Notes (1.12.x)
+### Dagster Version Notes (1.13.x)
 
 **API differences from newer versions (MANDATORY reference):**
 - `get_dagster_context()` does NOT exist - you must pass `context` explicitly.
@@ -1386,7 +1388,7 @@ Key principles:
 - Images for README live in `images/` at the project root. Use `<img>` tags (not markdown syntax) for images inside HTML `<div>` blocks.
 - Only GRCh38 VCF files are fully supported (GRCh37, T2T, and microarray are planned). VCF normalization renames `start` to `pos`; PRS computation must account for this, runs in Reflex rather than Dagster, and must clear/rebuild `prs_results_rows`, `prs_results_columns`, and `prs_results_column_groups` after updating `prs_results`.
 - `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g., `arrow up`), not hyphenated Lucide-style.
-- Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `webui/deployment_urls.py` builds the browser-reachable base URL: `PUBLIC_BACKEND_URL` overrides `API_URL` (needed when the image sets `API_URL=http://localhost:8000`). `rxconfig.py` persists the resolved URL in `os.environ["API_URL"]`, and `backend_api_url` reads it so the browser constructs direct URLs (e.g. `/api/report/...`). Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
+- Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `webui/deployment_urls.py` builds the browser-reachable base URL: `PUBLIC_BACKEND_URL` overrides `API_URL` (needed when the image sets `API_URL=http://localhost:8000`). `webui.run` selects a free backend port and persists it in `API_URL` / `REFLEX_BACKEND_PORT`; `backend_api_url` reads those so the browser constructs direct URLs (e.g. `/api/report/...`). A leftover `API_URL=http://localhost:8000` must not win when Reflex actually bound 8002. Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
 - Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
 - Public genomes for demos: Anton Kulaga (Zenodo 18370498, CC-Zero, 482 MB) and Livia Zaharia (Zenodo 19487816, CC-BY-4.0, 349 MB). Both are configured as `default_samples` in `modules.yaml` `immutable_mode:` section. The app can also import arbitrary Zenodo records with open-access + permissive license + VCF via the "Import from Zenodo" UI.
 - 6 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`, and `thrombophilia` (ported from Generation-I `dna-seq/just_thrombophilia` and published 2026-07, via `pipelines v1-port`). PharmGKB (drugs) has NOT been migrated from Generation I. HuggingFace `just-dna-seq` org hosts 6 datasets and 1 model (`GenNet`).

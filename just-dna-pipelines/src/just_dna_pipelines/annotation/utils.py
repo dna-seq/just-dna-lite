@@ -3,7 +3,7 @@ Utility functions for managing Dagster partitions and VCF discovery.
 """
 
 from pathlib import Path
-from dagster import DagsterInstance, success_hook, HookContext
+from dagster import DagsterEventType, DagsterInstance, success_hook, HookContext
 
 
 @success_hook
@@ -22,10 +22,7 @@ def resource_summary_hook(context: HookContext) -> None:
     run_id = context.run_id
     instance = context.instance
     
-    # Query materialization events for this run (Dagster 1.12.x compatible)
-    from dagster import DagsterEventType
-    
-    # Use all_logs instead of get_event_records (EventRecordsFilter doesn't have run_ids in 1.12.x)
+    # EventRecordsFilter has no run_ids; all_logs(run_id, of_type=...) is the 1.13 API.
     log_entries = instance.all_logs(run_id, of_type=DagsterEventType.ASSET_MATERIALIZATION)
     
     # Extract resource metrics from asset materializations

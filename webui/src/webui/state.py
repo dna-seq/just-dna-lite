@@ -57,9 +57,10 @@ def _backend_api_url() -> str:
 
     In production FULLSTACK mode, ``DEPLOY_URL``/``PUBLIC_APP_URL`` is enough
     because frontend and backend share one origin.  ``PUBLIC_BACKEND_URL`` is
-    still available for explicit split-backend deployments.
+    still available for explicit split-backend deployments.  Locally the port
+    comes from ``API_URL`` / ``REFLEX_BACKEND_PORT``, never a hardcoded 8000.
     """
-    return resolve_public_backend_base_url(8000)
+    return resolve_public_backend_base_url()
 
 
 # Module metadata with titles, descriptions, and icons
@@ -1868,10 +1869,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         (``/_event``, ``/_upload``, etc.).  Relative URLs therefore 404
         on the frontend.
 
-        ``rxconfig.py`` auto-discovers a free backend port and persists
-        the full URL in ``os.environ["API_URL"]``.  We read it here so
+        ``webui.run`` selects a free backend port and persists it in
+        ``API_URL`` / ``REFLEX_BACKEND_PORT``.  We read those here so
         the browser constructs direct URLs to the backend
-        (e.g. ``http://localhost:8042/api/report/...``).
+        (e.g. ``http://localhost:8002/api/report/...``).
         """
         return _backend_api_url()
 

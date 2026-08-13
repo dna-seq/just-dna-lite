@@ -14,6 +14,13 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env from cwd or parent dirs before any command runs
 
+from just_dna_lite.process import (
+    detached_popen_kwargs,
+    install_launcher_signal_handlers,
+    reap_dagster_instance,
+    reap_webui_leftovers,
+    shutdown_managed_processes,
+)
 from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
@@ -148,75 +155,28 @@ def _find_workspace_root(start: Path) -> Optional[Path]:
     return None
 
 
-def _kill_process_group(proc: Optional[subprocess.Popen]) -> None:
-    """Kill a process and its entire process group."""
-    if proc is None or proc.poll() is not None:
-        return
-    
-    try:
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGTERM)
-        proc.wait(timeout=5)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
-        try:
-            os.killpg(pgid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    except Exception as e:
-        typer.secho(f"Error killing process group: {e}", fg=typer.colors.RED, err=True)
+def _run_managed_foreground(command: list[str], dagster_home: Path) -> int:
+    """Run a foreground child and tear down its whole tree on Ctrl+C."""
 
+    proc = subprocess.Popen(command, **detached_popen_kwargs())
+    processes = [proc]
 
-def _signal_process_group(proc: subprocess.Popen, sig: signal.Signals) -> None:
-    """Send a signal to a child process group."""
+    def _force(_signum: int, _frame: object) -> None:
+        shutdown_managed_processes(processes, dagster_home=dagster_home, force=True)
+        raise SystemExit(1)
 
-    if proc.poll() is not None:
-        return
-    try:
-        os.killpg(os.getpgid(proc.pid), sig)
-    except ProcessLookupError:
-        return
+    def _first(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
 
-
-def _wait_for_processes(processes: list[subprocess.Popen], timeout: float) -> list[subprocess.Popen]:
-    """Wait for child processes, returning those still running after timeout."""
-
-    deadline = time.monotonic() + timeout
-    remaining = [proc for proc in processes if proc.poll() is None]
-    for proc in remaining:
-        wait_timeout = max(0.0, deadline - time.monotonic())
-        try:
-            proc.wait(timeout=wait_timeout)
-        except subprocess.TimeoutExpired:
-            pass
-    return [proc for proc in processes if proc.poll() is None]
-
-
-def _shutdown_processes(processes: list[subprocess.Popen]) -> None:
-    """Gracefully stop all managed child process groups before exiting."""
-
-    live = [proc for proc in processes if proc.poll() is None]
-    if not live:
-        return
-
-    for proc in live:
-        _signal_process_group(proc, signal.SIGTERM)
-
-    live = _wait_for_processes(live, timeout=30)
-    for proc in live:
-        _signal_process_group(proc, signal.SIGKILL)
-
-    _wait_for_processes(live, timeout=5)
-
-
-def _run_managed_foreground(command: list[str]) -> int:
-    """Run a foreground child and let it finish cleanly on Ctrl+C."""
-
-    proc = subprocess.Popen(command, start_new_session=True)
+    install_launcher_signal_handlers(_first, _force)
     try:
         return proc.wait()
     except KeyboardInterrupt:
-        _shutdown_processes([proc])
+        typer.secho("\nShutting down Dagster...", fg=typer.colors.YELLOW)
+        shutdown_managed_processes(processes, dagster_home=dagster_home)
         return 0
+    finally:
+        shutdown_managed_processes(processes, dagster_home=dagster_home, force=True)
 
 
 def _kill_port_owner(port: int) -> None:
@@ -345,10 +305,18 @@ def start_dagster(
     _kill_port_owner(dagster_port)
     
     typer.secho(f"\n💡 Dagster UI will be available at: http://{dagster_host}:{dagster_port}\n", fg=typer.colors.GREEN, bold=True)
+
+    leftover = reap_dagster_instance(dagster_home_path)
+    if leftover:
+        typer.secho(
+            f"🧹 Killed {len(leftover)} leftover Dagster process(es) from a previous session.",
+            fg=typer.colors.YELLOW,
+        )
     
     dg_path = Path(sys.executable).parent / "dg"
     exit_code = _run_managed_foreground(
-        [str(dg_path), "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host]
+        [str(dg_path), "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
+        dagster_home=dagster_home_path,
     )
     if exit_code != 0:
         raise typer.Exit(exit_code)
@@ -407,7 +375,21 @@ def start_all(
     os.environ["DAGSTER_HOME"] = dagster_home
 
     typer.secho("🏗️  Starting full Just DNA Pipelines stack...", fg=typer.colors.BRIGHT_MAGENTA, bold=True)
-    
+
+    leftover = reap_dagster_instance(dagster_home_path)
+    if leftover:
+        typer.secho(
+            f"🧹 Killed {len(leftover)} leftover Dagster process(es) from a previous session.",
+            fg=typer.colors.YELLOW,
+        )
+
+    leftover_ui = reap_webui_leftovers(root)
+    if leftover_ui:
+        typer.secho(
+            f"🧹 Killed {len(leftover_ui)} leftover Web UI process(es) from a previous session.",
+            fg=typer.colors.YELLOW,
+        )
+
     # 0. Optionally clean up orphan processes
     ports_to_clean = [3000, 3001, 8000, resolved_dagster_port]
     if _env_flag_enabled("JUST_DNA_START_KILL_PORTS"):
@@ -427,64 +409,89 @@ def start_all(
     # 1. Start the UI in the background via the workspace script
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
     child_processes: list[subprocess.Popen] = []
-    ui_proc = subprocess.Popen(
-        ["uv", "run", "--package", "webui", "run"],
-        cwd=root,
-        start_new_session=True,
-    )
-    child_processes.append(ui_proc)
+    exit_code = 0
 
-    # Give it a moment to initialize
-    time.sleep(2)
-
-    # 2. Start Dagster as the foreground child. The root launcher owns shutdown
-    # ordering so child processes can flush and exit before the root exits.
-    typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
-    typer.echo(f"📁 Dagster home: {dagster_home}")
-    dagster_file_path = root / dagster_file
-
-    typer.echo("\n" + "═" * 65)
-    typer.secho("🚀 Just DNA Pipelines Stack is starting!", fg=typer.colors.GREEN, bold=True)
-    if os.getenv("JUST_DNA_IMMUTABLE_MODE", "").lower() in ("true", "1", "yes"):
-        typer.secho("🔒 IMMUTABLE MODE — file uploads disabled, public genomes only", fg=typer.colors.YELLOW, bold=True)
-    typer.secho("⏳ Note: Reflex UI takes ~20s to initialize.", fg=typer.colors.YELLOW)
-    typer.echo(f"  • Web UI:       http://localhost:3000 (Main Interface)")
-    typer.echo(f"  • Pipelines UI: http://localhost:{resolved_dagster_port} (Dagster Dashboard)")
-    typer.echo(f"  • Backend API:  http://localhost:8000+ (Reflex Internal, auto-selected)")
-    typer.echo("═" * 65 + "\n")
-
-    # Clean up orphaned STARTED runs from previous session
-    try:
-        from dagster import DagsterInstance, DagsterRunStatus, RunsFilter
-        instance = DagsterInstance.get()
-        started_records = instance.get_run_records(
-            filters=RunsFilter(statuses=[DagsterRunStatus.STARTED]),
-            limit=100,
+    def _force(_signum: int, _frame: object) -> None:
+        shutdown_managed_processes(
+            child_processes,
+            dagster_home=dagster_home_path,
+            workspace_root=root,
+            force=True,
         )
-        webui_started = [r for r in started_records if r.dagster_run.tags.get("source") == "webui"]
-        if webui_started:
-            typer.echo(f"🧹 Cleaning up {len(webui_started)} orphaned webui run(s) from previous session...")
-            for record in webui_started:
-                run = record.dagster_run
-                instance.report_run_canceled(run, message="Orphaned run from previous session")
-                typer.echo(f"  ✓ Canceled {run.run_id[:8]}...")
-    except Exception:
-        pass
-    
-    dg_path = Path(sys.executable).parent / "dg"
-    dagster_proc = subprocess.Popen(
-        [str(dg_path), "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host],
-        cwd=root,
-        start_new_session=True,
-    )
-    child_processes.append(dagster_proc)
+        raise SystemExit(1)
+
+    def _first(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    install_launcher_signal_handlers(_first, _force)
     try:
+        ui_proc = subprocess.Popen(
+            ["uv", "run", "--package", "webui", "run"],
+            cwd=root,
+            **detached_popen_kwargs(),
+        )
+        child_processes.append(ui_proc)
+
+        # Give it a moment to initialize
+        time.sleep(2)
+
+        # 2. Start Dagster as the foreground child. The root launcher owns shutdown
+        # ordering so child processes can flush and exit before the root exits.
+        typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
+        typer.echo(f"📁 Dagster home: {dagster_home}")
+        dagster_file_path = root / dagster_file
+
+        typer.echo("\n" + "═" * 65)
+        typer.secho("🚀 Just DNA Pipelines Stack is starting!", fg=typer.colors.GREEN, bold=True)
+        if os.getenv("JUST_DNA_IMMUTABLE_MODE", "").lower() in ("true", "1", "yes"):
+            typer.secho("🔒 IMMUTABLE MODE — file uploads disabled, public genomes only", fg=typer.colors.YELLOW, bold=True)
+        typer.secho("⏳ Note: Reflex UI takes ~20s to initialize.", fg=typer.colors.YELLOW)
+        typer.echo("  • Web UI:       http://localhost:3000 (use the URL Reflex prints if 3000 is taken)")
+        typer.echo(f"  • Pipelines UI: http://localhost:{resolved_dagster_port} (Dagster Dashboard)")
+        typer.echo("  • Backend API:  http://localhost:8000+ (Reflex Internal, auto-selected)")
+        typer.echo("═" * 65 + "\n")
+
+        # Clean up orphaned STARTED runs from previous session
+        try:
+            from dagster import DagsterInstance, DagsterRunStatus, RunsFilter
+            instance = DagsterInstance.get()
+            started_records = instance.get_run_records(
+                filters=RunsFilter(statuses=[DagsterRunStatus.STARTED]),
+                limit=100,
+            )
+            webui_started = [r for r in started_records if r.dagster_run.tags.get("source") == "webui"]
+            if webui_started:
+                typer.echo(f"🧹 Cleaning up {len(webui_started)} orphaned webui run(s) from previous session...")
+                for record in webui_started:
+                    run = record.dagster_run
+                    instance.report_run_canceled(run, message="Orphaned run from previous session")
+                    typer.echo(f"  ✓ Canceled {run.run_id[:8]}...")
+        except Exception:
+            pass
+
+        dg_path = Path(sys.executable).parent / "dg"
+        dagster_proc = subprocess.Popen(
+            [str(dg_path), "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host],
+            cwd=root,
+            **detached_popen_kwargs(),
+        )
+        child_processes.append(dagster_proc)
         exit_code = dagster_proc.wait()
     except KeyboardInterrupt:
-        _shutdown_processes(child_processes)
+        typer.secho("\nShutting down...", fg=typer.colors.YELLOW)
+        shutdown_managed_processes(
+            child_processes,
+            dagster_home=dagster_home_path,
+            workspace_root=root,
+        )
         return
     finally:
-        _shutdown_processes([proc for proc in child_processes if proc is not dagster_proc])
+        shutdown_managed_processes(
+            child_processes,
+            dagster_home=dagster_home_path,
+            workspace_root=root,
+            force=True,
+        )
 
     if exit_code != 0:
         raise typer.Exit(exit_code)
