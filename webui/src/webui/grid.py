@@ -60,10 +60,25 @@ def artifact_root() -> Path:
     return get_cache_dir() / "grid_sort_artifacts"
 
 
-def _artifact_key(cache_id: str, filter_model: dict[str, Any], sort_model: list[dict[str, Any]]) -> str:
-    """Stable key for one (grid, filter, sort) view."""
+def _artifact_key(
+    cache_id: str,
+    source_path: str,
+    filter_model: dict[str, Any],
+    sort_model: list[dict[str, Any]],
+) -> str:
+    """Stable key for one (grid, file, filter, sort) view.
+
+    ``cache_id`` is the state class name (``UploadState``), which is shared
+    across every genome.  The source path must be part of the key or a sort
+    on Oksana is reused when the user switches to Livia.
+    """
     return json.dumps(
-        {"cache": cache_id, "filter": filter_model or {}, "sort": sort_model or []},
+        {
+            "cache": cache_id,
+            "path": source_path,
+            "filter": filter_model or {},
+            "sort": sort_model or [],
+        },
         sort_keys=True,
         default=str,
     )
@@ -74,6 +89,24 @@ def _artifact_dir(cache_id: str, key: str) -> Path:
     digest = hashlib.sha1(key.encode()).hexdigest()[:12]  # noqa: S324 - cache key, not security
     safe_cache_id = re.sub(r"[^A-Za-z0-9_.-]", "_", cache_id)[:40]
     return artifact_root() / f"{safe_cache_id}-{digest}"
+
+
+def filter_model_fingerprint(model: dict[str, Any] | list[dict[str, Any]] | None) -> str:
+    """Stable JSON for a MUI filter or sort model, used to detect remount replays."""
+    return json.dumps(model or {}, sort_keys=True, default=str)
+
+
+def is_stale_grid_view_replay(previous_fingerprint: str, incoming: Any) -> bool:
+    """True when a remounted grid is replaying the model we just cleared.
+
+    MUI keeps a local ``useState`` filter/sort model. Unmounting the previous
+    sample's grid can fire ``onFilterModelChange`` / ``onSortModelChange`` with
+    that old model after Python has already reset. One matching replay is
+    dropped; a later identical user action is applied.
+    """
+    if not previous_fingerprint:
+        return False
+    return filter_model_fingerprint(incoming) == previous_fingerprint
 
 
 def _evict_artifacts_over_limit() -> None:
@@ -116,7 +149,7 @@ async def resolve_view_source(
     if not sort_model:
         return source, filter_model, None
 
-    key = _artifact_key(cache_id, filter_model, sort_model)
+    key = _artifact_key(cache_id, source.path, filter_model, sort_model)
     cached = _artifacts.get(key)
     if cached is not None:
         _artifacts.move_to_end(key)
@@ -150,6 +183,39 @@ class SafeGridMixin(rx.State, mixin=True):
     # available; fall back to the library's in-process handlers.
     _grid_reader: str = ""
     _grid_path: str = ""
+
+    # Bumped on sample switch so a remounted MUI grid cannot keep the previous
+    # filter/sort UI.  Also used as a React ``key`` on the grid wrapper.
+    lf_grid_view_token: int = 0
+    _lf_grid_replay_filter: str = ""
+    _lf_grid_replay_sort: str = ""
+    _lf_grid_replay_selection: str = ""
+
+    def reset_grid_view_state(self) -> None:
+        """Clear filter, sort, and selection so another sample cannot inherit them."""
+        self._reset_grid_view_state(keep_selection=False)
+
+    def _reset_grid_view_state(self, *, keep_selection: bool) -> None:
+        """Reset the visible grid view.  Optionally keep the current row selection."""
+        self._lf_grid_replay_filter = filter_model_fingerprint(self.lf_grid_filter_model)
+        self._lf_grid_replay_sort = filter_model_fingerprint(self._lf_grid_sort)
+        if keep_selection:
+            self._lf_grid_replay_selection = ""
+        else:
+            self._lf_grid_replay_selection = filter_model_fingerprint(
+                self.lf_grid_row_selection_model
+            )
+        self.lf_grid_view_token += 1
+        self._lf_grid_filter = {}
+        self._lf_grid_sort = []
+        self.lf_grid_filter_model = {"items": []}
+        self.lf_grid_active_filter_fields = []
+        self.lf_grid_filter_preset_json = ""
+        self.lf_grid_filter_debug = "No active filters or sorts."
+        if not keep_selection:
+            self.lf_grid_row_selection_model = {"type": "include", "ids": []}
+        page_size = int((self.lf_grid_pagination_model or {}).get("pageSize") or _DEFAULT_CHUNK_SIZE)
+        self.lf_grid_pagination_model = {"page": 0, "pageSize": page_size}
 
     # ------------------------------------------------------------------
     # Registration
@@ -193,6 +259,7 @@ class SafeGridMixin(rx.State, mixin=True):
         Holds the state lock only to read inputs and to write results.
         """
         async with self:
+            view_token = self.lf_grid_view_token
             source = self._grid_source
             cache_id = self._lf_grid_cache_id
             filter_model = dict(self._lf_grid_filter or {})
@@ -234,6 +301,8 @@ class SafeGridMixin(rx.State, mixin=True):
         row_count = known_rows if known_rows is not None else page.row_count
 
         async with self:
+            if self.lf_grid_view_token != view_token:
+                return
             self.lf_grid_rows = existing_rows + page.rows if append else page.rows
             if row_count is not None:
                 self.lf_grid_row_count = row_count
@@ -261,6 +330,11 @@ class SafeGridMixin(rx.State, mixin=True):
     async def handle_lf_grid_sort(self, sort_model: list[dict[str, Any]]) -> None:
         """Apply a new sort model, resetting the scroll stream to the top."""
         async with self:
+            if is_stale_grid_view_replay(self._lf_grid_replay_sort, sort_model):
+                self._lf_grid_replay_sort = ""
+                self._lf_grid_sort = []
+                return
+            self._lf_grid_replay_sort = ""
             self.lf_grid_loading = True
             self.lf_grid_stats = "Sorting..."
             self._lf_grid_sort = sort_model
@@ -280,6 +354,13 @@ class SafeGridMixin(rx.State, mixin=True):
         from reflex_mui_datagrid.lazyframe_grid import _filter_model_for_filterable_columns
 
         async with self:
+            if is_stale_grid_view_replay(self._lf_grid_replay_filter, filter_model):
+                self._lf_grid_replay_filter = ""
+                self._lf_grid_filter = {}
+                self.lf_grid_filter_model = {"items": []}
+                self.lf_grid_active_filter_fields = []
+                return
+            self._lf_grid_replay_filter = ""
             self.lf_grid_loading = True
             self.lf_grid_stats = "Filtering..."
 
@@ -322,18 +403,34 @@ class SafeGridMixin(rx.State, mixin=True):
 
         await self._publish_page(append=True, with_count=False)
 
+    def _clear_grid_filter_fields(self) -> None:
+        """Reset filter UI/state and remember the old model so MUI cannot replay it."""
+        self._lf_grid_replay_filter = filter_model_fingerprint(
+            self.lf_grid_filter_model or self._lf_grid_filter
+        )
+        self.lf_grid_view_token += 1
+        self.lf_grid_loading = True
+        self.lf_grid_stats = "Clearing filters..."
+        self._lf_grid_filter = {}
+        self.lf_grid_filter_model = {"items": []}
+        self.lf_grid_active_filter_fields = []
+        self.lf_grid_filter_preset_json = ""
+        self.lf_grid_filter_debug = "No active filters or sorts."
+        page_size = int((self.lf_grid_pagination_model or {}).get("pageSize") or _DEFAULT_CHUNK_SIZE)
+        self.lf_grid_pagination_model = {"page": 0, "pageSize": page_size}
+
     @rx.event(background=True)
-    async def clear_lf_grid_filters(self) -> None:
+    async def clear_lf_grid_filters(self) -> Any:
         """Clear accumulated server-side filters and the MUI filter UI."""
         async with self:
-            self.lf_grid_loading = True
-            self.lf_grid_stats = "Clearing filters..."
-            self._lf_grid_filter = {}
-            self.lf_grid_filter_model = {"items": []}
-            page_size = self.lf_grid_pagination_model.get("pageSize", _DEFAULT_CHUNK_SIZE)
-            self.lf_grid_pagination_model = {"page": 0, "pageSize": page_size}
-
+            self._clear_grid_filter_fields()
         await self._publish_page(append=False, with_count=True)
+        async with self:
+            return self._events_after_filters_cleared()
+
+    def _events_after_filters_cleared(self) -> list[Any]:
+        """Hook for subclasses that must sync other state after Clear All."""
+        return []
 
     @rx.event(background=True)
     async def handle_lf_grid_request_value_options(self, field: str) -> None:

@@ -44,7 +44,7 @@ from just_dna_pipelines.module_registry import (
 )
 from webui.compute.jobs import await_job, forget_job, submit_job
 from webui.dagster_env import get_dagster_instance
-from webui.grid import SafeGridMixin
+from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
 
@@ -346,10 +346,12 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     new_sample_study_name: str = ""
     new_sample_notes: str = ""
 
-    # Key counter to force React re-mount of uncontrolled inputs on form reset.
-    # Uncontrolled inputs (default_value) don't update when state resets;
-    # changing the key forces React to destroy and recreate the DOM element.
-    _form_key: int = 0
+    # Public remount token for the Add Sample form. Uncontrolled inputs
+    # (default_value) keep their DOM value when state resets; bumping this
+    # key destroys and recreates those nodes. Must be a frontend var — a
+    # leading underscore would make it backend-only and the client would
+    # never remount.
+    form_key: int = 0
 
     @rx.var
     def is_immutable_mode(self) -> bool:
@@ -486,7 +488,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.zenodo_url_input = value
 
     def _reset_new_sample_form(self):
-        """Reset new sample form to defaults."""
+        """Reset new sample form to defaults and remount uncontrolled inputs."""
         self.new_sample_subject_id = ""
         self.new_sample_sex = "N/A"
         self.new_sample_tissue = "Sample tissue"
@@ -494,7 +496,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.new_sample_reference_genome = "GRCh38"
         self.new_sample_study_name = ""
         self.new_sample_notes = ""
-        self._form_key = self._form_key + 1
+        self.form_key = self.form_key + 1
 
     def _get_safe_user_id(self, auth_email: str) -> str:
         """Sanitize user_id for path and partition key."""
@@ -735,6 +737,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         events: list[EventSpec] = [rx.toast.warning(warning) for warning in build_warnings]
         if new_files:
             self._reset_new_sample_form()
+            events.append(rx.clear_selected_files("vcf_upload"))
             events.extend(self.select_file(new_files[-1]))
             events.append(rx.toast.success(f"Added {len(new_files)} sample(s) with metadata"))
         else:
@@ -1270,6 +1273,8 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     # Currently selected file for annotation
     selected_file: str = ""
+    # Staged by select_file so sibling grids reset before this remounts the workspace.
+    _pending_selected_file: str = ""
     
     # File metadata cache: filename -> {size_mb, upload_date, reference_genome, sample_name}
     file_metadata: Dict[str, Dict[str, Any]] = {}
@@ -1293,6 +1298,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     # Output files for the selected sample
     output_files: List[Dict[str, Any]] = []
     report_files: List[Dict[str, Any]] = []  # HTML report files
+    outputs_loaded_for_file: str = ""
 
     # Data preview state (server-side grid state is managed by LazyFrameGridMixin)
     vcf_preview_loading: bool = False
@@ -1470,6 +1476,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     def _clear_vcf_preview(self):
         """Clear data preview and reset server-side grid state."""
+        self.reset_grid_view_state()
         self.lf_grid_rows = []
         self.lf_grid_columns = []
         self.lf_grid_row_count = 0
@@ -1477,13 +1484,17 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.lf_grid_loaded = False
         self.lf_grid_stats = ""
         self.lf_grid_selected_info = "Click a row to see details."
-        self._lf_grid_filter = {}
-        self._lf_grid_sort = []
         self.clear_grid_source()
         self.vcf_preview_error = ""
         self.vcf_preview_loading = False
         self.preview_source_label = ""
         self._clear_norm_stats()
+
+    def _clear_sample_outputs(self) -> None:
+        """Drop annotation and report lists so another genome cannot inherit them."""
+        self.output_files = []
+        self.report_files = []
+        self.outputs_loaded_for_file = ""
 
     def _clear_norm_stats(self):
         """Reset normalization filter statistics."""
@@ -1553,13 +1564,16 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         return None
 
     def _yield_prs_init_events(self) -> List[EventSpec]:
-        """Build the cross-state events that initialize PRSState for the selected file."""
+        """Initialize PRS after select_file has already reset sample/grid state."""
         normalized_parquet = self._get_normalized_parquet_path()
-        if normalized_parquet is None:
-            return []
-        parquet_str = str(normalized_parquet)
+        parquet_str = str(normalized_parquet) if normalized_parquet is not None else ""
         ref_genome = self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
-        return [PRSState.initialize_prs_for_file(parquet_str, ref_genome)]
+        # Grid/sample reset already ran in select_file before remount.
+        # Resetting again here would replace the remount-replay fingerprint
+        # with an empty model and let the previous filter write itself back.
+        if parquet_str:
+            return [PRSState.initialize_prs_for_file(parquet_str, ref_genome)]
+        return []
 
     def update_file_species(self, species: str):
         """Update species for the selected file and reset reference genome to default."""
@@ -2024,7 +2038,26 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         return REFERENCE_GENOMES.get(species, ["custom"])
 
     def select_file(self, filename: str):
-        """Select a file — quick state updates only, heavy loading is background."""
+        """Select a file — reset sibling grids first, then remount the workspace.
+
+        Changing ``selected_file`` remounts the right panel.  If that happens
+        before Output/PRS filters are cleared, the new MUI grids hydrate from
+        the previous sample's filter model.  Stage the filename and clear
+        those grids in events that run first.
+        """
+        self._pending_selected_file = filename
+        return [
+            OutputPreviewState.clear_output_preview,
+            PRSState.reset_for_genome_switch(""),
+            PRSTraitState.reset_for_genome_switch,
+            UploadState.commit_selected_file,
+        ]
+
+    def commit_selected_file(self):
+        """Apply the staged file selection and start loading that sample."""
+        filename = self._pending_selected_file
+        if not filename:
+            return
         self.selected_file = filename
         self.last_run_success = False
         self.expanded_run_id = ""
@@ -2049,11 +2082,14 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.new_analysis_expanded = True
         self.right_panel_active_tab = "input"
 
+        # Drop the previous genome's rows and output lists immediately.
+        # Annotations and reports live under {user}/{sample}/; leaving the
+        # old lists in place shows Oksana's files on Livia's remounted tabs.
+        self._clear_vcf_preview()
+        self._clear_sample_outputs()
         self.vcf_preview_loading = True
-        self.vcf_preview_error = ""
 
         return [
-            OutputPreviewState.clear_output_preview,
             *self._yield_prs_init_events(),
             UploadState.load_file_data_background,
         ]
@@ -2098,6 +2134,8 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 forget_job(token)
             if not result.success:
                 async with self:
+                    if self.selected_file != selected_file:
+                        return
                     self.progress_status = ""
                     self.vcf_preview_error = (
                         f"VCF normalization failed: {result.error or 'see Dagster UI'}"
@@ -2105,6 +2143,8 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 return
 
         async with self:
+            if self.selected_file != selected_file:
+                return
             self.progress_status = "Loading VCF preview..."
             self._load_norm_stats_from_dagster()
             self._load_vcf_into_grid()
@@ -2178,8 +2218,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         ``needs_materialization`` (bool — True when upstream is newer or asset never materialized).
         """
         if not self.selected_file or not self.safe_user_id:
-            self.output_files = []
-            self.report_files = []
+            self._clear_sample_outputs()
             return
         
         sample_name = self.selected_file.replace(".vcf.gz", "").replace(".vcf", "")
@@ -2289,6 +2328,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         
         reports.sort(key=lambda x: x["name"], reverse=True)
         self.report_files = reports
+        self.outputs_loaded_for_file = self.selected_file
 
     def _fetch_output_materialization_info(self, partition_key: str) -> Dict[str, Dict[str, Any]]:
         """Fetch materialization timestamps and staleness for output assets.
@@ -2341,24 +2381,35 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             }
         return info
 
+    def _outputs_belong_to_selected_file(self) -> bool:
+        return bool(self.selected_file) and self.outputs_loaded_for_file == self.selected_file
+
     @rx.var
     def has_output_files(self) -> bool:
-        """Check if there are any output files (data or reports) for the selected sample."""
+        """True when the selected sample has annotation or report files loaded."""
+        if not self._outputs_belong_to_selected_file():
+            return False
         return len(self.output_files) > 0 or len(self.report_files) > 0
 
     @rx.var
     def output_file_count(self) -> int:
-        """Get the number of data output files."""
+        """Number of annotation/data files for the selected sample only."""
+        if not self._outputs_belong_to_selected_file():
+            return 0
         return len(self.output_files)
 
     @rx.var
     def report_file_count(self) -> int:
-        """Get the number of report files."""
+        """Number of HTML reports for the selected sample only."""
+        if not self._outputs_belong_to_selected_file():
+            return 0
         return len(self.report_files)
 
     @rx.var
     def has_report_files(self) -> bool:
-        """Check if there are any report files."""
+        """True when the selected sample has HTML reports loaded."""
+        if not self._outputs_belong_to_selected_file():
+            return False
         return len(self.report_files) > 0
 
     async def delete_file(self, filename: str):
@@ -3430,6 +3481,7 @@ class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     def clear_output_preview(self):
         """Reset the output preview grid to empty state."""
+        self.reset_grid_view_state()
         self.output_preview_label = ""
         self.output_preview_error = ""
         self.output_preview_expanded = False
@@ -3437,6 +3489,7 @@ class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.lf_grid_rows = []
         self.lf_grid_columns = []
         self.lf_grid_row_count = 0
+        self.clear_grid_source()
 
 
 # ============================================================================
@@ -3537,6 +3590,93 @@ def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
 def _prs_results_version() -> str:
     """Version tag for stored PRS results.  Changes when enrichment format changes."""
     return f"prs-ui={prs_ui.__version__}"
+
+
+def _prs_ready_parquet_path(parquet_path: str) -> str:
+    """Return ``parquet_path`` only when the file is readable and non-empty."""
+    if parquet_path and _parquet_is_ready(Path(parquet_path)):
+        return parquet_path
+    return ""
+
+
+def _prs_compute_belongs_to_current_genome(
+    compute_token: int,
+    compute_file: str,
+    current_token: int,
+    current_file: str,
+) -> bool:
+    """True only when an in-flight PRS compute still matches the selected genome.
+
+    Background compute snapshots the file + a generation token. Switching
+    genomes increments the token and clears the file, so a late write from
+    the previous sample must not land on the newly selected one.
+    """
+    if not compute_file or not current_file:
+        return False
+    return compute_token == current_token and compute_file == current_file
+
+
+def _prs_reusable_results_for_file(
+    results: list[dict],
+    source_file: str,
+    current_file: str,
+    force_recompute: bool,
+) -> dict[str, dict]:
+    """Index cached PRS rows that belong to ``current_file``.
+
+    Rows from another genome, or any cache when force-recompute is on, are
+    ignored so Compute cannot skip work by PGS ID after a file switch.
+    """
+    if force_recompute or not current_file or source_file != current_file:
+        return {}
+    existing_by_id: dict[str, dict] = {}
+    for row in results:
+        pgs_id = str(row.get("pgs_id") or "")
+        row_file = str(row.get("_source_file") or source_file)
+        if pgs_id and row_file == current_file:
+            existing_by_id[pgs_id] = row
+    return existing_by_id
+
+
+def _preferred_prs_chart_id(
+    *,
+    grouped: bool,
+    trait_rows: list[dict],
+    result_rows: list[dict],
+    selected_pgs_ids: list[str],
+) -> str:
+    """Pick the trait or PGS id the results chart should open on.
+
+    Prefers a cached/computed row that belongs to the current selection so
+    Compute on an already-scored trait still opens that trait's chart.
+    """
+    selected = {str(pid) for pid in selected_pgs_ids if pid}
+    if grouped:
+        for row in trait_rows:
+            trait = str(row.get("trait") or "")
+            if not trait:
+                continue
+            pgs_ids = {
+                part.strip()
+                for part in str(row.get("pgs_ids") or "").split(",")
+                if part.strip()
+            }
+            if selected and pgs_ids and not (pgs_ids & selected):
+                continue
+            if selected and not pgs_ids:
+                continue
+            return _prs_ui_mixin._concise_trait_label(trait) or trait
+        if trait_rows:
+            first = str(trait_rows[0].get("trait") or "")
+            return _prs_ui_mixin._concise_trait_label(first) or first
+        return ""
+    for pid in selected_pgs_ids:
+        for row in result_rows:
+            if str(row.get("pgs_id") or "") == pid:
+                return pid
+    if result_rows:
+        return str(result_rows[0].get("pgs_id") or "")
+    return ""
 
 
 def _compute_single_prs(
@@ -3680,8 +3820,11 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
     status_message: str = ""
     prs_expanded: bool = False
     prs_initialized_for_file: str = ""
+    prs_results_source_file: str = ""
+    prs_compute_token: int = 0
     prs_selection_mode: str = "traits"
     prs_force_recompute: bool = False
+    _ignore_empty_selection_replay: bool = False
 
     # --- Auto-detected sample ancestry (just-prs 0.5.1 ancestry epic) ---
     # Inferred on file load; preselects the reference population so percentiles
@@ -3703,6 +3846,129 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
     def set_prs_force_recompute(self, value: bool) -> None:
         self.prs_force_recompute = bool(value)
+
+    def _prs_compute_still_current(self, token: int, source_file: str) -> bool:
+        """Return True if a background PRS task still belongs to this genome."""
+        return _prs_compute_belongs_to_current_genome(
+            token,
+            source_file,
+            self.prs_compute_token,
+            self.prs_initialized_for_file or self.prs_genotypes_path,
+        )
+
+    def _clear_prs_sample_state(self) -> None:
+        """Drop every sample-tied PRS value so another genome cannot inherit it.
+
+        Trait/PGS selection is kept so the user can recompute the same scores
+        on the newly selected genome without re-picking them.
+        """
+        self.prs_results = []
+        self.prs_results_rows = []
+        self.prs_results_columns = []
+        self.prs_results_column_groups = []
+        self.trait_summary_rows = []
+        self.trait_summary_columns = []
+        self.trait_summary_visible = False
+        self.low_match_warning = False
+        self.prs_results_source_file = ""
+        self.prs_initialized_for_file = ""
+        self.prs_genotypes_path = ""
+        self._prs_genotypes_lf = None
+        self.detected_ancestry = ""
+        self.detected_ancestry_confidence = 0.0
+        self.detected_fine_population = ""
+        self.ancestry_detection_status = ""
+        self.detected_sample_type = ""
+        self.sample_type_confidence = 0.0
+        self.sample_type_source = ""
+        self.sample_variant_count = 0
+        self.prs_computing = False
+        self.prs_progress = 0
+        self.status_message = ""
+        self._reset_selected_result()
+        self._reset_grid_view_state(keep_selection=True)
+        self._ignore_empty_selection_replay = True
+
+    def reset_for_genome_switch(self, next_parquet_path: str = "") -> None:
+        """Clear PRS results/charts when the selected genome changes.
+
+        Always invoked from ``select_file``, including when the new parquet
+        is not ready yet.  A no-op when the caller is re-selecting the same
+        ready file.
+        """
+        ready = _prs_ready_parquet_path(next_parquet_path)
+        if ready and ready == self.prs_initialized_for_file:
+            return
+        self.prs_compute_token += 1
+        self._clear_prs_sample_state()
+
+    @rx.var
+    def prs_results_genome_label(self) -> str:
+        """Sample folder name for the genome that owns the visible PRS results."""
+        path = self.prs_results_source_file or self.prs_initialized_for_file
+        if not path:
+            return ""
+        return Path(path).parent.name
+
+    def _ensure_result_chart_selected(self) -> None:
+        """Open the results chart for the selected trait/score, or the first cached one."""
+        if not self.prs_results:
+            self._reset_selected_result()
+            return
+        grouped = self.prs_view_mode == "grouped" or self.prs_selection_mode == "traits"
+        if grouped and not self.trait_summary_rows:
+            self.build_trait_summary()
+        chart_id = _preferred_prs_chart_id(
+            grouped=grouped,
+            trait_rows=list(self.trait_summary_rows),
+            result_rows=list(self.prs_results),
+            selected_pgs_ids=list(self.selected_pgs_ids),
+        )
+        if not chart_id:
+            self._reset_selected_result()
+            return
+        self.selected_result_id = chart_id
+        self._refresh_selected_chart()
+
+    def handle_lf_grid_row_selection(self, model: dict) -> None:
+        """Keep PGS selection across a sample remount; ignore the empty replay."""
+        if is_stale_grid_view_replay(self._lf_grid_replay_selection, model):
+            self._lf_grid_replay_selection = ""
+            return
+        self._lf_grid_replay_selection = ""
+        if (
+            self._ignore_empty_selection_replay
+            and model.get("type", "include") == "include"
+            and not model.get("ids", [])
+            and self.selected_pgs_ids
+        ):
+            self._ignore_empty_selection_replay = False
+            return
+        self._ignore_empty_selection_replay = False
+        PRSComputeStateMixin.handle_lf_grid_row_selection(self, model)
+
+    def _refresh_selected_chart(self) -> None:
+        """Rebuild the open chart from current results, or close it if stale."""
+        selected_id = self.selected_result_id
+        if not selected_id or not self.prs_results:
+            self._reset_selected_result()
+            return
+        if self.prs_view_mode == "grouped" or self.prs_selection_mode == "traits":
+            for trait_row in self.trait_summary_rows:
+                row_trait = str(trait_row.get("trait") or "")
+                if row_trait == selected_id or _prs_ui_mixin._concise_trait_label(row_trait) == selected_id:
+                    self.selected_result_html = ""
+                    self.selected_result_spec = self._generate_trait_chart_spec(selected_id)
+                    return
+        result = self._result_by_pgs_id(selected_id)
+        if result is None:
+            self._reset_selected_result()
+            return
+        self.selected_result_info = self._build_result_info(result)
+        self.selected_result_html = ""
+        self.selected_result_spec = self._generate_chart_spec(
+            selected_id, result, mode=self.chart_mode,
+        )
 
     def set_sample_type(self, value: str) -> None:
         """User override of the sequencing type used for restoration."""
@@ -3788,6 +4054,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 return
             build = self.genome_build
             cache_dir_str = self.cache_dir
+            token = self.prs_compute_token
+            source_file = self.prs_initialized_for_file
             self.ancestry_detection_status = "detecting"
             self.detected_ancestry = ""
             self.detected_ancestry_confidence = 0.0
@@ -3803,6 +4071,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 ),
             )
             async with self:
+                if not self._prs_compute_still_current(token, source_file):
+                    return
                 superpop = getattr(sample_ancestry, "superpopulation", None)
                 if not sample_ancestry or not superpop or superpop == "UNKNOWN":
                     self.ancestry_detection_status = "unknown"
@@ -3817,7 +4087,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         except Exception as exc:
             logger.warning("Sample ancestry inference failed: %s", exc)
             async with self:
-                self.ancestry_detection_status = "failed"
+                if self._prs_compute_still_current(token, source_file):
+                    self.ancestry_detection_status = "failed"
 
     def set_prs_selection_mode(self, mode: str) -> None:
         self.prs_selection_mode = mode
@@ -3875,32 +4146,30 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         """Initialize PRS for a newly selected VCF file.
 
         Sets genotypes LazyFrame and loads PGS Catalog scores.  On file
-        switch, clears stale results and tries to restore from Dagster.
+        switch, clears stale results/charts and tries to restore this
+        file's previous results from Dagster — never another genome's.
         """
         self.genome_build = "GRCh38"
-        ready_parquet_path = (
-            parquet_path
-            if parquet_path and _parquet_is_ready(Path(parquet_path))
-            else ""
-        )
+        ready_parquet_path = _prs_ready_parquet_path(parquet_path)
 
-        same_file = (ready_parquet_path == self.prs_initialized_for_file)
-        self.prs_initialized_for_file = ready_parquet_path
+        same_file = bool(ready_parquet_path) and ready_parquet_path == self.prs_initialized_for_file
         if not same_file:
+            leftover = bool(
+                self.prs_results
+                or self.selected_result_id
+                or self.prs_initialized_for_file
+                or self.prs_results_source_file
+            )
+            if leftover:
+                self.prs_compute_token += 1
+                self._clear_prs_sample_state()
+            self.prs_initialized_for_file = ready_parquet_path
             self.load_genotypes(ready_parquet_path)
-            self.prs_results_rows = []
-            self.prs_results_columns = []
-            self.prs_results_column_groups = []
-            self.trait_summary_rows = []
-            self.trait_summary_columns = []
-            self.trait_summary_visible = False
-            self.selected_pgs_ids = []
-            self.low_match_warning = False
         elif ready_parquet_path:
             self.prs_genotypes_path = ready_parquet_path
             self.set_prs_genotypes_lf(pl.scan_parquet(ready_parquet_path))
         else:
-            self.prs_genotypes_path = ready_parquet_path
+            self.prs_genotypes_path = ""
             self._prs_genotypes_lf = None
 
         yield from self.initialize_prs()
@@ -3958,6 +4227,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         thread-pool executor; state is updated via brief ``async with self:``
         blocks between iterations.
         """
+        token = 0
+        source_file = ""
         async with self:
             if self._get_genotypes_lf() is None:
                 path = self.prs_genotypes_path
@@ -3970,6 +4241,13 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
             selected_ids = list(self.selected_pgs_ids)
             if not selected_ids:
+                if self.prs_results:
+                    self.build_trait_summary()
+                    self._ensure_result_chart_selected()
+                    self.status_message = (
+                        "Showing cached PRS results. Select a trait above to compute more scores."
+                    )
+                    return
                 self.status_message = "No PGS scores selected. Load and select scores above."
                 return
 
@@ -3980,13 +4258,19 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             ancestry = self.selected_ancestry
             all_pops = self.compute_all_populations
             sample_type = self.sample_type
+            self.prs_compute_token += 1
+            token = self.prs_compute_token
+            source_file = self.prs_initialized_for_file or vcf_path
+            if not source_file:
+                self.status_message = "Normalized VCF not found — run normalization first."
+                return
 
-            existing_by_id: dict[str, dict] = {}
-            if not self.prs_force_recompute:
-                for r in self.prs_results:
-                    pid = r.get("pgs_id", "")
-                    if pid:
-                        existing_by_id[pid] = r
+            existing_by_id = _prs_reusable_results_for_file(
+                list(self.prs_results),
+                self.prs_results_source_file,
+                source_file,
+                self.prs_force_recompute,
+            )
 
             ids_to_compute = [pid for pid in selected_ids if pid not in existing_by_id]
             total = len(ids_to_compute)
@@ -3994,11 +4278,12 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             self.prs_computing = True
             self.prs_progress = 0
             self.low_match_warning = False
-            if self.prs_force_recompute:
+            if self.prs_force_recompute or self.prs_results_source_file != source_file:
                 self.prs_results = []
                 self.prs_results_rows = []
                 self.prs_results_columns = []
                 self.prs_results_column_groups = []
+                self._reset_selected_result()
 
             if not ids_to_compute:
                 self._build_prs_results_grid()
@@ -4007,6 +4292,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 self.status_message = f"All {len(selected_ids)} selected score(s) already computed"
                 if self.prs_results:
                     self.build_trait_summary()
+                    self._ensure_result_chart_selected()
                 return
 
             self.status_message = f"Computing PRS for {total} score(s)..." + (
@@ -4055,6 +4341,9 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
             for i, pgs_id in enumerate(ids_to_compute, start=1):
                 async with self:
+                    if not self._prs_compute_still_current(token, source_file):
+                        logger.info("Aborting PRS compute; genome switched")
+                        return
                     self.prs_progress = round(i / total * 100)
                     self.status_message = f"Computing {i}/{total}: {pgs_id}..."
 
@@ -4086,6 +4375,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
                 if row.pop("_low_match", False):
                     any_low_match = True
+                row["_source_file"] = source_file
                 new_results.append(row)
 
                 # Persist per-score (by-readiness), not once at the end. By-trait
@@ -4094,8 +4384,15 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 # trait-summary build — crashes. Update + checkpoint after each
                 # score so completed work always survives.
                 async with self:
+                    if not self._prs_compute_still_current(token, source_file):
+                        logger.info(
+                            "Discarding in-flight PRS write for %s; genome switched",
+                            pgs_id,
+                        )
+                        return
                     existing_by_id[pgs_id] = row
                     self.prs_results = list(existing_by_id.values())
+                    self.prs_results_source_file = source_file
                     self._build_prs_results_grid()
                     self.low_match_warning = any_low_match
                     self._checkpoint_prs_to_dagster()
@@ -4108,11 +4405,16 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                             self.build_trait_summary()
                         except Exception as summary_exc:
                             logger.warning("Incremental trait summary rebuild failed: %s", summary_exc)
+                    self._ensure_result_chart_selected()
                 gc.collect()
 
             async with self:
+                if not self._prs_compute_still_current(token, source_file):
+                    logger.info("Discarding finished PRS run; genome switched")
+                    return
                 merged = list(existing_by_id.values())
                 self.prs_results = merged
+                self.prs_results_source_file = source_file
                 self._build_prs_results_grid()
                 self.low_match_warning = any_low_match
                 self.prs_computing = False
@@ -4136,11 +4438,13 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                             exc_info=True,
                         )
                         self.status_message += " — trait summary unavailable (results saved)"
+                    self._ensure_result_chart_selected()
         except Exception as exc:
             logger.error("PRS computation failed: %s", exc, exc_info=True)
             async with self:
-                self.prs_computing = False
-                self.status_message = f"PRS computation failed: {exc}"
+                if self._prs_compute_still_current(token, source_file):
+                    self.prs_computing = False
+                    self.status_message = f"PRS computation failed: {exc}"
 
     def _checkpoint_prs_to_dagster(self) -> None:
         """Persist current PRS results to Dagster for cross-session restore."""
@@ -4200,7 +4504,14 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             data = results_meta.data
             rows = data.get("rows", []) if isinstance(data, dict) else []
             if rows:
-                self.prs_results = rows
+                source_file = self.prs_initialized_for_file
+                stamped = []
+                for row in rows:
+                    item = dict(row)
+                    item["_source_file"] = source_file
+                    stamped.append(item)
+                self.prs_results = stamped
+                self.prs_results_source_file = source_file
                 self._build_prs_results_grid()
                 stype_meta = mat.metadata.get("sample_type")
                 stored_stype = str(stype_meta.value) if stype_meta and hasattr(stype_meta, "value") else ""
@@ -4209,6 +4520,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                     self.sample_type_source = "metadata"
                 if self.prs_results:
                     self.build_trait_summary()
+                    self._ensure_result_chart_selected()
                 count_meta = mat.metadata.get("row_count")
                 n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
                 self.status_message = f"Restored {n} PRS result(s) from previous session"
@@ -4252,6 +4564,7 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     trait_selected_pgs_ids: list[str] = []
     prs_genotypes_path: str = ""
     traits_loaded: bool = False
+    _ignore_empty_selection_replay: bool = False
 
     _trait_to_pgs: dict[str, list[str]] = {}
     _traits_genome_build: str = ""
@@ -4317,6 +4630,14 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             column_overrides=_build_trait_column_overrides(),
         )
 
+    def reset_for_genome_switch(self) -> None:
+        """Clear trait-grid filters/sorts when the selected genome changes.
+
+        Trait selection is kept so the user can recompute the same scores.
+        """
+        self._reset_grid_view_state(keep_selection=True)
+        self._ignore_empty_selection_replay = True
+
     def initialize_traits(
         self,
         genome_build: str,
@@ -4335,10 +4656,22 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     def handle_lf_grid_row_selection(self, model: dict) -> None:
         """Track selected traits and resolve to PGS IDs."""
-        self.lf_grid_row_selection_model = model
-
+        if is_stale_grid_view_replay(self._lf_grid_replay_selection, model):
+            self._lf_grid_replay_selection = ""
+            return
+        self._lf_grid_replay_selection = ""
         selection_type: str = model.get("type", "include")
         raw_ids: list = model.get("ids", [])
+        if (
+            self._ignore_empty_selection_replay
+            and selection_type == "include"
+            and not raw_ids
+            and (self.selected_traits or self.selected_pgs_ids)
+        ):
+            self._ignore_empty_selection_replay = False
+            return
+        self._ignore_empty_selection_replay = False
+        self.lf_grid_row_selection_model = model
         selected_row_ids: set[int] = {int(i) for i in raw_ids}
 
         if selection_type == "exclude" and not selected_row_ids:
@@ -4382,13 +4715,30 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         resolved = self._resolve_pgs_ids_from_traits()
         return PRSState.sync_trait_pgs_ids(resolved)  # type: ignore[return-value]
 
-    def deselect_all_traits(self) -> Any:
-        """Clear all selected traits."""
+    def _clear_trait_selection(self) -> None:
+        """Drop trait checkboxes and the durable PGS id list."""
+        self._ignore_empty_selection_replay = False
+        self._lf_grid_replay_selection = filter_model_fingerprint(
+            self.lf_grid_row_selection_model
+        )
         self.selected_traits = []
         self.selected_pgs_ids = []
         self.trait_selected_pgs_ids = []
         self.lf_grid_row_selection_model = {"type": "include", "ids": []}
+
+    def deselect_all_traits(self) -> Any:
+        """Clear all selected traits."""
+        self._clear_trait_selection()
         return PRSState.sync_trait_pgs_ids([])  # type: ignore[return-value]
+
+    @rx.event(background=True)
+    async def clear_lf_grid_filters(self) -> Any:
+        """Clear trait filters and the Intelligence (or any) checkbox selection."""
+        async with self:
+            self._clear_trait_selection()
+            self._clear_grid_filter_fields()
+        await self._publish_page(append=False, with_count=True)
+        return [PRSState.sync_trait_pgs_ids([])]
 
     def _resolve_pgs_ids_from_traits(self) -> list[str]:
         """Resolve selected traits to PGS IDs."""

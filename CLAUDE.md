@@ -1181,6 +1181,7 @@ rx.box(class="ui segment")
 - **Forking after Polars/polars-bio/DuckDB has been used** - Silent, unkillable deadlock on the next parallel op. See Process Model & Fork Safety
 - **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
 - **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
+- **Underscore-prefixed state vars are backend-only** - Reflex does not send `_foo` to the client. A remount token used as `key=` on uncontrolled inputs (`default_value`) must be a public var (`form_key`, not `_form_key`), or the Add Sample fields keep the typed values after upload. Also return `rx.clear_selected_files(...)` and do not debounce those setters — a late debounce can write the old value back after reset.
 - **Using `@rx.background`** - Does NOT exist in Reflex 0.8.x. Use `@rx.event(background=True)` instead.
 
 ### Fomantic UI + Reflex Gotchas
@@ -1318,10 +1319,10 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 ### Data flow
 
 1. User selects a VCF file in the left panel
-2. `UploadState.select_file()` returns `PRSState.initialize_prs_for_file(parquet_path, genome_build)`
+2. `UploadState.select_file()` resets Output/PRS/trait grid views first, then remounts the workspace and calls `PRSState.reset_for_genome_switch` (even if the new parquet is not ready yet), then `PRSState.initialize_prs_for_file(parquet_path, genome_build)` when it is
 3. `PRSState` creates a `pl.scan_parquet()` LazyFrame from the normalized parquet and calls `set_prs_genotypes_lf(lf)` (preferred input method — lazy, memory-efficient)
 4. PGS Catalog scores are loaded into the MUI DataGrid for selection
-5. User selects scores and clicks Compute — `PRSComputeStateMixin.compute_selected_prs()` runs
+5. User selects scores and clicks Compute — `PRSState.compute_selected_prs()` runs
 6. Results with quality assessment, percentiles, and effect sizes are displayed
 
 ### Genome build mapping
@@ -1343,11 +1344,15 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 - **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
 - **`prs_section()` uses Radix components** (`rx.hstack`, `rx.badge`, `rx.table`) which render without Radix theming in our `theme=None` app. Functional but unstyled. Future work: Fomantic-styled wrappers.
 - **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
+- **PRS results are per-genome** — `select_file` must reset PRS sample state even when the new parquet is still normalizing. `prs_results`, the Altair/iframe chart (`selected_result_*`), and `prs_results_source_file` belong to one sample. Compute snapshots `prs_compute_token` + the parquet path and must discard writes if the user switched genomes. Never treat a leftover PGS ID as "already computed" for a different file.
+- **Remount the sample workspace, not individual widgets** — the right-panel tabs/content wrap with `key=UploadState.selected_file`. One sample = one React tree (grids, Vega charts, reports, analysis). Destroying that subtree is cheap; the cost is the parquet page. Do not keep a widget per genome, and do not reuse one MUI/Vega instance across partitions. The left file list and top nav stay mounted. Sort artifacts must include the source path, not just the state class name.
+- **Grid filters/sorts are per-sample** — `select_file` must reset Output/PRS/trait grid views *before* changing `selected_file`, then remount. MUI keeps a local `useState` filter model and can replay the previous sample's filters on unmount; `SafeGridMixin.reset_grid_view_state` clears every `lf_grid_*` filter/sort/selection field, bumps `lf_grid_view_token` (used as the grid `key`), and drops one matching remount replay. Quality-filter settings from `modules.yaml` are global and should stay the same.
 
 ### Anti-patterns
 
 - **Never make PRSState a substate of UploadState** — it needs its own `LazyFrameGridMixin` instance; mixing into UploadState would create MRO conflicts.
 - **Never pass UploadState's internal LazyFrame across states** — Reflex states are isolated; create a new `pl.scan_parquet()` LazyFrame from the shared parquet path instead.
+- **Never keep the previous genome's `prs_results` or chart spec across a file switch** — the chart panel is gated on `selected_result_spec != {}`, so an uncleared Vega spec keeps showing the old sample. Compute also skips PGS IDs already present in `prs_results`, which turns a leftover Oksana score into a no-op on Livia.
 
 ---
 

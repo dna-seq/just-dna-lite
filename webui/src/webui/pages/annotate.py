@@ -641,14 +641,14 @@ def add_sample_form() -> rx.Component:
             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
         ),
         
-        # Compact form - 2 columns
+        # Compact form - 2 columns. key=form_key remounts every field after
+        # upload so uncontrolled inputs and native <select>s return to defaults.
         rx.el.div(
             # Row 1: Subject ID + Sex
             rx.el.div(
                 rx.el.input(
-                    key=UploadState._form_key,
                     default_value=UploadState.new_sample_subject_id,
-                    on_change=UploadState.set_new_sample_subject_id.debounce(300),
+                    on_change=UploadState.set_new_sample_subject_id,
                     placeholder="Subject ID",
                     style={"flex": "1", "padding": "6px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem"},
                 ),
@@ -686,9 +686,8 @@ def add_sample_form() -> rx.Component:
                     style={"flex": "1", "padding": "6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem", "backgroundColor": "#fff"},
                 ),
                 rx.el.input(
-                    key=UploadState._form_key,
                     default_value=UploadState.new_sample_study_name,
-                    on_change=UploadState.set_new_sample_study_name.debounce(300),
+                    on_change=UploadState.set_new_sample_study_name,
                     placeholder="Study name",
                     style={"flex": "1", "padding": "6px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem"},
                 ),
@@ -741,6 +740,7 @@ def add_sample_form() -> rx.Component:
                 ),
                 style={"display": "flex", "alignItems": "center"},
             ),
+            key=UploadState.form_key,
         ),
 
         class_name="ui blue segment",
@@ -2091,6 +2091,15 @@ def _prs_results_header() -> rx.Component:
         rx.el.div(
             fomantic_icon("chart-bar", size=18, color="#2185d0"),
             rx.el.span("PRS Results", style={"color": "#1f2933"}),
+            rx.cond(
+                PRSState.prs_results_genome_label != "",
+                rx.el.span(
+                    PRSState.prs_results_genome_label,
+                    class_name="ui mini grey label",
+                    style={"marginLeft": "8px"},
+                ),
+                rx.fragment(),
+            ),
             style=PRS_RESULTS_TITLE_STYLE,
         ),
         rx.button(
@@ -2354,7 +2363,6 @@ def _output_preview_grid() -> rx.Component:
                 ),
                 rx.fragment(),
             ),
-            # Grid – hidden via CSS when no data loaded yet
             rx.el.div(
                 lazyframe_grid(
                     OutputPreviewState,
@@ -2366,6 +2374,7 @@ def _output_preview_grid() -> rx.Component:
                     width="100%",
                     debug_log=False,
                 ),
+                key=OutputPreviewState.lf_grid_view_token.to(str),
                 style={
                     "display": rx.cond(OutputPreviewState.has_output_preview, "block", "none"),
                 },
@@ -2445,9 +2454,9 @@ def quality_filter_stats_banner() -> rx.Component:
 def input_vcf_preview_section() -> rx.Component:
     """Show the selected input VCF file without an inner accordion.
 
-    The grid is rendered once and kept mounted to avoid DOM destruction on
-    state changes (which causes blinking).  Only the initial loading spinner
-    and error overlay are conditionally shown on top.
+    The grid stays mounted across preview refreshes to avoid blinking.
+    A sample switch remounts the parent workspace and bumps
+    ``lf_grid_view_token`` so MUI cannot keep the previous filter/sort.
     """
     return rx.el.div(
         rx.el.div(
@@ -2510,8 +2519,6 @@ def input_vcf_preview_section() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        # Grid – always mounted once UploadState inherits from the mixin.
-        # Hidden via CSS when no data loaded yet (avoids DOM destroy/recreate).
         rx.el.div(
             lazyframe_grid(
                 UploadState,
@@ -2523,6 +2530,7 @@ def input_vcf_preview_section() -> rx.Component:
                 width="100%",
                 debug_log=False,
             ),
+            key=UploadState.lf_grid_view_token.to(str),
             style={
                 "display": rx.cond(UploadState.has_vcf_preview, "block", "none"),
             },
@@ -3470,6 +3478,7 @@ def _local_trait_selector(
                         checkbox_selection=selection_ready,
                     ),
                 ),
+                key=state.lf_grid_view_token.to(str),
                 opacity=rx.cond(selection_ready, 1.0, 0.55),
                 pointer_events=rx.cond(selection_ready, "auto", "none"),
                 position="relative",
@@ -3593,6 +3602,7 @@ def _local_prs_scores_selector(
                         checkbox_selection=selection_ready,
                     ),
                 ),
+                key=state.lf_grid_view_token.to(str),
                 opacity=rx.cond(selection_ready, 1.0, 0.55),
                 pointer_events=rx.cond(selection_ready, "auto", "none"),
                 position="relative",
@@ -4104,10 +4114,11 @@ def right_panel_run_view() -> rx.Component:
             },
             id="right-column-header",
         ),
-        # Tabbed content (only when a file is selected)
+        # One React tree per sample.  Partitioned work (VCF, PRS, reports)
+        # must not inherit MUI/Vega instance state from the previous genome.
         rx.cond(
             UploadState.has_selected_file,
-            rx.fragment(
+            rx.el.div(
                 _right_panel_tab_menu(),
                 rx.el.div(
                     rx.match(
@@ -4117,12 +4128,14 @@ def right_panel_run_view() -> rx.Component:
                         ("annotated_files", _annotated_files_tab_content()),
                         ("reports", _reports_tab_content()),
                         ("analysis", _analysis_tab_content()),
-                        _input_tab_content(),  # default
+                        _input_tab_content(),
                     ),
                     class_name="ui bottom attached segment",
                     style={"padding": "16px"},
                     id="right-panel-tab-content",
                 ),
+                key=UploadState.selected_file,
+                id="right-panel-sample-workspace",
             ),
             no_file_selected_message(),
         ),
