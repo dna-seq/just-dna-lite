@@ -322,6 +322,274 @@ OUTPUT_CARD_META_ROW_STYLE = {
 }
 
 
+# Schematic of the whole-genome sequencing journey shown on the welcome panel.
+# Static inline SVG (no state), so novices can see where the VCF they must
+# download from their sequencing provider fits into the pipeline. The dashed
+# "zoom rays" at the bottom visually connect the Just-DNA-Lite box to the
+# how-to-use panel rendered directly below the SVG.
+SEQUENCING_JOURNEY_SVG = """
+<svg viewBox="0 0 1010 262" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Full-genome sequencing pipeline: DNA sample, sequencing (FASTQ), alignment (BAM/CRAM), variant calling (VCF - the file you download from your provider), then annotation and PRS in this app."
+     style="width: 100%; height: auto; font-family: Lato, 'Helvetica Neue', Arial, sans-serif;">
+  <defs>
+    <marker id="jd-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#b5b5b5"/>
+    </marker>
+    <marker id="jd-arrow-red" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#db2828"/>
+    </marker>
+  </defs>
+
+  <!-- "You are here" callout above the VCF stage -->
+  <text x="716" y="26" text-anchor="middle" font-size="22" font-weight="800" fill="#db2828">You are here</text>
+  <text x="716" y="46" text-anchor="middle" font-size="13" font-weight="600" fill="#db2828">download this file from your sequencing provider</text>
+  <line x1="716" y1="52" x2="716" y2="92" stroke="#db2828" stroke-width="2.5" marker-end="url(#jd-arrow-red)"/>
+
+  <!-- Bounding box: full-genome sequencing (done by the provider) -->
+  <rect x="8" y="64" width="804" height="142" rx="12" fill="#fdfdfd" stroke="#c9c9c9" stroke-width="1.5"/>
+  <text x="26" y="90" font-size="15" font-weight="700" fill="#555">Full-genome sequencing</text>
+  <text x="212" y="90" font-size="12" fill="#999">&#8212; already done by your sequencing provider</text>
+
+  <!-- Stage 1: DNA sample -->
+  <rect x="24" y="100" width="160" height="100" rx="10" fill="#fafafa" stroke="#d4d4d5" stroke-width="1.5"/>
+  <text x="104" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#333">DNA sample</text>
+  <text x="104" y="141" text-anchor="middle" font-size="11" fill="#777">what you sent in</text>
+  <rect x="54" y="154" width="100" height="24" rx="12" fill="#fff" stroke="#bbb"/>
+  <text x="104" y="170" text-anchor="middle" font-size="11" font-weight="600" fill="#666">saliva / blood</text>
+
+  <line x1="188" y1="150" x2="224" y2="150" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-arrow)"/>
+
+  <!-- Stage 2: Sequencing -->
+  <rect x="228" y="100" width="160" height="100" rx="10" fill="#fafafa" stroke="#d4d4d5" stroke-width="1.5"/>
+  <text x="308" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#333">Sequencing</text>
+  <text x="308" y="141" text-anchor="middle" font-size="11" fill="#777">machine reads your DNA</text>
+  <rect x="274" y="154" width="68" height="24" rx="12" fill="#fff" stroke="#bbb"/>
+  <text x="308" y="170" text-anchor="middle" font-size="11" font-weight="600" fill="#666">FASTQ</text>
+
+  <line x1="392" y1="150" x2="428" y2="150" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-arrow)"/>
+
+  <!-- Stage 3: Alignment -->
+  <rect x="432" y="100" width="160" height="100" rx="10" fill="#fafafa" stroke="#d4d4d5" stroke-width="1.5"/>
+  <text x="512" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#333">Alignment</text>
+  <text x="512" y="141" text-anchor="middle" font-size="11" fill="#777">reads mapped to genome</text>
+  <rect x="463" y="154" width="98" height="24" rx="12" fill="#fff" stroke="#bbb"/>
+  <text x="512" y="170" text-anchor="middle" font-size="11" font-weight="600" fill="#666">BAM / CRAM</text>
+
+  <line x1="596" y1="150" x2="632" y2="150" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-arrow)"/>
+
+  <!-- Stage 4: Variant calling (the VCF the user needs) -->
+  <rect x="636" y="100" width="160" height="100" rx="10" fill="#fff6f6" stroke="#db2828" stroke-width="2"/>
+  <text x="716" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#333">Variant calling</text>
+  <text x="716" y="141" text-anchor="middle" font-size="11" fill="#777">your genetic variants</text>
+  <rect x="651" y="154" width="130" height="24" rx="12" fill="#fff" stroke="#db2828" stroke-width="1.5"/>
+  <text x="716" y="170" text-anchor="middle" font-size="11" font-weight="700" fill="#db2828">VCF (.vcf / .vcf.gz)</text>
+  <ellipse cx="716" cy="167" rx="74" ry="19" fill="none" stroke="#db2828" stroke-width="2" stroke-dasharray="6 4"/>
+
+  <line x1="800" y1="150" x2="838" y2="150" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-arrow)"/>
+
+  <!-- Stage 5: Annotation and PRS (this app) -->
+  <rect x="842" y="100" width="160" height="100" rx="10" fill="#eafaf8" stroke="#00b5ad" stroke-width="2"/>
+  <text x="922" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#00756f">Annotation &amp; PRS</text>
+  <text x="922" y="141" text-anchor="middle" font-size="11" fill="#00877f">Just-DNA-Lite &#8212; this app</text>
+  <rect x="865" y="154" width="114" height="24" rx="12" fill="#fff" stroke="#00b5ad"/>
+  <text x="922" y="170" text-anchor="middle" font-size="11" font-weight="600" fill="#00877f">reports &amp; scores</text>
+
+  <!-- Zoom rays: magnify the app box into the how-to panel below -->
+  <line x1="842" y1="208" x2="12" y2="258" stroke="#00b5ad" stroke-width="2" stroke-dasharray="7 5" opacity="0.75"/>
+  <line x1="1002" y1="208" x2="1002" y2="258" stroke="#00b5ad" stroke-width="2" stroke-dasharray="7 5" opacity="0.75"/>
+</svg>
+"""
+
+
+# DAG of the in-app workflow, drawn in the same style as the pipeline schematic
+# so it reads as a map rather than as UI controls. Only the two pill "buttons"
+# in the "Add a sample" node are clickable (inline onclick guides that scroll
+# to and flash the real left-panel control); every downstream node is muted
+# grey/purple to signal it is not interactive.
+#
+# Topology: add sample -> {annotation modules and/or PRS} -> explore results
+# -> ask AI about results. Annotation modules <-> Module Manager (new modules
+# extend the list), and Module Manager takes research papers + the AI agent
+# as inputs.
+JOURNEY_DAG_SVG = """
+<svg viewBox="0 0 1010 330" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Just-DNA-Lite workflow: add a sample (upload your VCF or try a public genome), then annotation modules and/or PRS risk scores, both leading to explore results, then ask AI about your results. Annotation modules exchange with the Module Manager, which takes research papers and the AI agent as inputs."
+     style="width: 100%; height: auto; font-family: Lato, 'Helvetica Neue', Arial, sans-serif;">
+  <defs>
+    <marker id="jd-dag-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#b5b5b5"/>
+    </marker>
+    <marker id="jd-dag-arrow-rev" markerWidth="9" markerHeight="9" refX="2" refY="4.5" orient="auto">
+      <path d="M9,0 L1,4.5 L9,9 z" fill="#b5b5b5"/>
+    </marker>
+    <marker id="jd-dag-arrow-purple" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#c9a8dd"/>
+    </marker>
+  </defs>
+
+  <!-- Edges (drawn first, nodes on top) -->
+  <!-- fork: add sample -> modules / PRS -->
+  <path d="M216,155 C256,140 256,95 281,95" fill="none" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-dag-arrow)"/>
+  <path d="M216,195 C256,215 256,285 281,285" fill="none" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-dag-arrow)"/>
+  <text x="395" y="193" text-anchor="middle" font-size="11" font-weight="700" fill="#999">and / or</text>
+  <!-- merge: modules / PRS -> explore results -->
+  <path d="M505,112 C540,112 540,165 556,165" fill="none" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-dag-arrow)"/>
+  <path d="M505,285 C540,285 540,185 556,185" fill="none" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-dag-arrow)"/>
+  <!-- modules <-> module manager (two-sided: new modules extend the list) -->
+  <path d="M509,80 L786,80" fill="none" stroke="#b5b5b5" stroke-width="2" marker-start="url(#jd-dag-arrow-rev)" marker-end="url(#jd-dag-arrow)"/>
+  <text x="647" y="70" text-anchor="middle" font-size="10.5" font-style="italic" fill="#999">new modules extend the list</text>
+  <!-- explore results -> ask AI -->
+  <path d="M740,185 C768,195 762,285 786,285" fill="none" stroke="#b5b5b5" stroke-width="2" marker-end="url(#jd-dag-arrow)"/>
+  <!-- inputs into module manager: papers + AI agent -->
+  <path d="M821,30 L821,56" fill="none" stroke="#c9a8dd" stroke-width="2" marker-end="url(#jd-dag-arrow-purple)"/>
+  <path d="M930,30 L930,56" fill="none" stroke="#c9a8dd" stroke-width="2" marker-end="url(#jd-dag-arrow-purple)"/>
+
+  <!-- Inputs of the Module Manager: research papers + AI agent -->
+  <rect x="766" y="6" width="110" height="22" rx="11" fill="#faf7fc" stroke="#c9a8dd" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="821" y="21" text-anchor="middle" font-size="10" font-weight="600" fill="#75589c">research papers</text>
+  <rect x="892" y="6" width="76" height="22" rx="11" fill="#faf7fc" stroke="#c9a8dd" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="930" y="21" text-anchor="middle" font-size="10" font-weight="600" fill="#75589c">AI agent</text>
+
+  <!-- Node 1: Add a sample (the only interactive node) -->
+  <rect x="16" y="110" width="200" height="130" rx="12" fill="#ffffff" stroke="#21ba45" stroke-width="2"/>
+  <circle cx="28" cy="110" r="13" fill="#21ba45"/>
+  <text x="28" y="115" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">1</text>
+  <text x="116" y="137" text-anchor="middle" font-size="15" font-weight="700" fill="#333">Add a sample</text>
+  <text x="116" y="154" text-anchor="middle" font-size="11" font-weight="700" fill="#f2711c">&#8592; in the left panel</text>
+  <g class="jd-svg-click" onclick="event.stopPropagation();var ids=['add-sample-form','file-column-content'];var el=null;for(var i=0;i!==ids.length;i++){el=document.getElementById(ids[i]);if(el){break;}}if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jd-flash-target');void el.offsetWidth;el.classList.add('jd-flash-target');setTimeout(function(){el.classList.remove('jd-flash-target');},2300);}">
+    <rect x="33" y="163" width="166" height="24" rx="12" fill="#fff" stroke="#21ba45" stroke-width="1.5"/>
+    <text x="116" y="179" text-anchor="middle" font-size="11" font-weight="700" fill="#1e9e3e">Upload your VCF</text>
+  </g>
+  <text x="116" y="197" text-anchor="middle" font-size="9.5" font-weight="700" fill="#999">or</text>
+  <g class="jd-svg-click" onclick="event.stopPropagation();var ids=['public-genome-hint','file-column-content'];var el=null;for(var i=0;i!==ids.length;i++){el=document.getElementById(ids[i]);if(el){break;}}if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jd-flash-target');void el.offsetWidth;el.classList.add('jd-flash-target');setTimeout(function(){el.classList.remove('jd-flash-target');},2300);}">
+    <rect x="33" y="202" width="166" height="24" rx="12" fill="#fff" stroke="#00b5ad" stroke-width="1.5"/>
+    <text x="116" y="218" text-anchor="middle" font-size="11" font-weight="700" fill="#00877f">Try a public genome</text>
+  </g>
+
+  <!-- Node 2a: Annotation modules (muted, not clickable) -->
+  <rect x="285" y="60" width="220" height="70" rx="10" fill="#f7f8f8" stroke="#9fcfcc" stroke-width="1.5"/>
+  <circle cx="297" cy="60" r="12" fill="#7fbcb8"/>
+  <text x="297" y="65" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">2</text>
+  <text x="395" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#556">Annotation modules</text>
+  <text x="395" y="103" text-anchor="middle" font-size="10.5" fill="#889">pick modules (longevity, cardio &#8230;)</text>
+  <text x="395" y="117" text-anchor="middle" font-size="10.5" fill="#889">and run the annotation pipeline</text>
+
+  <!-- Node 2b: PRS (muted, not clickable) -->
+  <rect x="285" y="250" width="220" height="70" rx="10" fill="#f7f8f8" stroke="#a8c6e2" stroke-width="1.5"/>
+  <circle cx="297" cy="250" r="12" fill="#8fb3d9"/>
+  <text x="297" y="255" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">2</text>
+  <text x="395" y="276" text-anchor="middle" font-size="14" font-weight="700" fill="#556">PRS &#8212; risk scores</text>
+  <text x="395" y="293" text-anchor="middle" font-size="10.5" fill="#889">compute polygenic risk scores</text>
+  <text x="395" y="307" text-anchor="middle" font-size="10.5" fill="#889">directly, no modules needed</text>
+
+  <!-- Node 3: Explore results (vertically centered between the branches) -->
+  <rect x="560" y="140" width="180" height="70" rx="10" fill="#f7f8f8" stroke="#9bb5cc" stroke-width="1.5"/>
+  <circle cx="572" cy="140" r="12" fill="#7f9cb8"/>
+  <text x="572" y="145" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">3</text>
+  <text x="650" y="166" text-anchor="middle" font-size="14" font-weight="700" fill="#556">Explore results</text>
+  <text x="650" y="183" text-anchor="middle" font-size="10.5" fill="#889">reports, tables, and scores</text>
+  <text x="650" y="197" text-anchor="middle" font-size="10.5" fill="#889">appear in this panel</text>
+
+  <!-- Node 4: Module Manager (muted purple, exchanges with annotation modules) -->
+  <rect x="790" y="60" width="200" height="70" rx="10" fill="#faf7fc" stroke="#c9a8dd" stroke-width="1.5"/>
+  <circle cx="802" cy="60" r="12" fill="#b57edb"/>
+  <text x="802" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">+</text>
+  <text x="890" y="88" text-anchor="middle" font-size="13.5" font-weight="700" fill="#75589c">Module Manager</text>
+  <text x="890" y="105" text-anchor="middle" font-size="10.5" fill="#a08cb8">create &amp; install new modules,</text>
+  <text x="890" y="119" text-anchor="middle" font-size="10.5" fill="#a08cb8">its own tab in the top menu</text>
+
+  <!-- Node 5: Ask AI about results (muted purple) -->
+  <rect x="790" y="250" width="200" height="70" rx="10" fill="#faf7fc" stroke="#c9a8dd" stroke-width="1.5"/>
+  <circle cx="802" cy="250" r="12" fill="#b57edb"/>
+  <text x="802" y="254" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">AI</text>
+  <text x="890" y="276" text-anchor="middle" font-size="13.5" font-weight="700" fill="#75589c">Ask AI about results</text>
+  <text x="890" y="293" text-anchor="middle" font-size="10.5" fill="#a08cb8">take your reports to any</text>
+  <text x="890" y="307" text-anchor="middle" font-size="10.5" fill="#a08cb8">AI assistant you trust</text>
+</svg>
+"""
+
+
+# Onboarding CSS: nudge animation for "use the left panel" arrows, a flash
+# highlight for guide targets, and hover affordance for clickable guides.
+LEFT_NUDGE_CSS = """
+@keyframes jd-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-8px); }
+}
+.jd-left-nudge {
+  display: inline-flex;
+  align-items: center;
+  animation: jd-nudge 1.6s ease-in-out infinite;
+}
+@keyframes jd-flash {
+  0% { box-shadow: 0 0 0 0 rgba(242, 113, 28, 0.85); }
+  100% { box-shadow: 0 0 0 16px rgba(242, 113, 28, 0); }
+}
+.jd-flash-target {
+  animation: jd-flash 0.75s ease-out 3;
+}
+.jd-svg-click {
+  cursor: pointer;
+}
+.jd-svg-click:hover rect {
+  stroke-width: 2.5;
+  fill: #f2faf7;
+}
+"""
+
+
+def sequencing_journey_diagram() -> rx.Component:
+    """Sequencing-journey schematic plus the zoomed-in "how to use" panel.
+
+    The first SVG shows the full-genome sequencing pipeline with the VCF
+    circled; dashed rays "magnify" the Just-DNA-Lite box into a second SVG
+    below: a DAG of the in-app workflow (add sample, then annotation modules
+    and/or PRS, both merging into explore results, with the AI module creator
+    as a follow-up node). Only the two pills in the "Add a sample" DAG node
+    are clickable; they flash the matching left-panel control.
+    """
+    return rx.el.div(
+        rx.el.style(LEFT_NUDGE_CSS),
+        rx.html(SEQUENCING_JOURNEY_SVG),
+
+        # Zoomed-in view of the Just-DNA-Lite box: what you do inside the app
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("search plus", size=20, color="#00b5ad", style={"marginRight": "8px"}),
+                rx.el.span(
+                    "Inside Just-DNA-Lite \u2014 your steps",
+                    style={"fontSize": "1.3rem", "fontWeight": "800", "color": "#00756f"},
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "marginBottom": "6px",
+                },
+            ),
+            rx.el.div(
+                "The green buttons are clickable and point to the matching controls; "
+                "grey boxes are a map of what happens where.",
+                style={"fontSize": "0.9rem", "color": "#7aa8a4", "marginBottom": "14px"},
+            ),
+            rx.html(JOURNEY_DAG_SVG),
+            style={
+                "border": "2px dashed #00b5ad",
+                "borderRadius": "12px",
+                "backgroundColor": "#f6fffd",
+                "padding": "22px 24px 24px 24px",
+                "marginTop": "-3px",
+            },
+        ),
+        style={
+            "maxWidth": "1180px",
+            "width": "100%",
+            "margin": "0 auto 40px auto",
+            "textAlign": "center",
+        },
+    )
+
+
 # ============================================================================
 # COLUMN 1: FILE MANAGEMENT
 # ============================================================================
@@ -335,30 +603,34 @@ def add_sample_form() -> rx.Component:
         # Form header with inline file picker
         rx.el.div(
             fomantic_icon("plus-circle", size=16, color="#2185d0"),  # primary blue
-            rx.el.span(" Add Sample", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px"}),
-            # Inline file picker - compact button style
-            rx.upload(
-                rx.el.div(
-                    fomantic_icon("file-text", size=12, color="#666"),
+            rx.el.span(" Add Sample", style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "4px"}),
+            # Unstyled root: StyledUpload defaults to padding: 5em (dropzone).
+            rx.upload.root(
+                rx.el.button(
+                    fomantic_icon("file-text", size=16, color="#666"),
                     rx.cond(
                         rx.selected_files("vcf_upload").length() > 0,
                         rx.foreach(
                             rx.selected_files("vcf_upload"),
-                            lambda f: rx.el.span(f, style={"marginLeft": "4px", "color": "#00b5ad", "fontSize": "0.8rem", "maxWidth": "120px", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}),
+                            lambda f: rx.el.span(
+                                f,
+                                style={
+                                    "marginLeft": "4px",
+                                    "color": "#00b5ad",
+                                    "maxWidth": "120px",
+                                    "overflow": "hidden",
+                                    "textOverflow": "ellipsis",
+                                    "whiteSpace": "nowrap",
+                                },
+                            ),
                         ),
-                        rx.el.span("Select VCF...", style={"marginLeft": "4px", "color": "#888", "fontSize": "0.8rem"}),
+                        rx.el.span("Select VCF..."),
                     ),
-                    style={"display": "flex", "alignItems": "center"},
+                    type="button",
+                    class_name="ui large button",
                 ),
                 id="vcf_upload",
-                style={
-                    "padding": "4px 8px",
-                    "border": "1px solid #ccc",
-                    "borderRadius": "4px",
-                    "backgroundColor": "#fff",
-                    "cursor": "pointer",
-                    "marginLeft": "auto",
-                },
+                style={"marginLeft": "auto"},
                 multiple=False,
                 accept={
                     "application/vcf": [".vcf", ".vcf.gz"],
@@ -378,13 +650,13 @@ def add_sample_form() -> rx.Component:
                     default_value=UploadState.new_sample_subject_id,
                     on_change=UploadState.set_new_sample_subject_id.debounce(300),
                     placeholder="Subject ID",
-                    style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
+                    style={"flex": "1", "padding": "6px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem"},
                 ),
                 rx.el.select(
                     rx.foreach(UploadState.sex_options, lambda opt: rx.el.option(opt, value=opt)),
                     value=UploadState.new_sample_sex,
                     on_change=UploadState.set_new_sample_sex,
-                    style={"width": "80px", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                    style={"width": "80px", "padding": "6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem", "backgroundColor": "#fff"},
                 ),
                 style={"display": "flex", "gap": "6px", "marginBottom": "6px"},
             ),
@@ -394,13 +666,14 @@ def add_sample_form() -> rx.Component:
                     rx.foreach(UploadState.species_options, lambda opt: rx.el.option(opt, value=opt)),
                     value=UploadState.new_sample_species,
                     on_change=UploadState.set_new_sample_species,
-                    style={"flex": "1", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                    style={"flex": "1", "padding": "6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem", "backgroundColor": "#fff"},
                 ),
                 rx.el.select(
                     rx.foreach(UploadState.new_sample_available_genomes, lambda opt: rx.el.option(opt, value=opt)),
                     value=UploadState.new_sample_reference_genome,
                     on_change=UploadState.set_new_sample_reference_genome,
-                    style={"width": "100px", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                    title="The map of human DNA your VCF was written against. Most current files use GRCh38.",
+                    style={"width": "100px", "padding": "6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem", "backgroundColor": "#fff"},
                 ),
                 style={"display": "flex", "gap": "6px", "marginBottom": "6px"},
             ),
@@ -410,14 +683,14 @@ def add_sample_form() -> rx.Component:
                     rx.foreach(UploadState.tissue_options, lambda opt: rx.el.option(opt, value=opt)),
                     value=UploadState.new_sample_tissue,
                     on_change=UploadState.set_new_sample_tissue,
-                    style={"flex": "1", "padding": "5px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem", "backgroundColor": "#fff"},
+                    style={"flex": "1", "padding": "6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem", "backgroundColor": "#fff"},
                 ),
                 rx.el.input(
                     key=UploadState._form_key,
                     default_value=UploadState.new_sample_study_name,
                     on_change=UploadState.set_new_sample_study_name.debounce(300),
                     placeholder="Study name",
-                    style={"flex": "1", "padding": "5px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.8rem"},
+                    style={"flex": "1", "padding": "6px 8px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.95rem"},
                 ),
                 style={"display": "flex", "gap": "6px", "marginBottom": "8px"},
             ),
@@ -439,7 +712,7 @@ def add_sample_form() -> rx.Component:
             rx.el.div(
                 rx.text("or import from Zenodo"),
                 class_name="ui horizontal divider",
-                style={"margin": "10px 0 8px 0", "fontSize": "0.75rem", "color": "#aaa"},
+                style={"margin": "10px 0 8px 0", "fontSize": "0.85rem", "color": "#aaa"},
             ),
             rx.el.div(
                 rx.el.input(
@@ -448,10 +721,10 @@ def add_sample_form() -> rx.Component:
                     placeholder="https://zenodo.org/records/...",
                     style={
                         "flex": "1",
-                        "padding": "5px 8px",
+                        "padding": "6px 8px",
                         "borderRadius": "4px",
                         "border": "1px solid #ddd",
-                        "fontSize": "0.8rem",
+                        "fontSize": "0.95rem",
                     },
                 ),
                 rx.el.button(
@@ -472,6 +745,7 @@ def add_sample_form() -> rx.Component:
 
         class_name="ui blue segment",
         style={"padding": "10px 12px", "marginBottom": "12px"},
+        id="add-sample-form",
     )
 
 
@@ -518,13 +792,13 @@ def file_metadata_section() -> rx.Component:
                 rx.el.span(
                     " Sample: ",
                     rx.el.strong(info["sample_name"].to(str)),
-                    style={"fontSize": "1rem", "marginLeft": "6px"},
+                    style={"fontSize": "1.1rem", "marginLeft": "6px"},
                 ),
                 rx.el.span(
                     " (",
                     info["size_mb"].to(str),
                     " MB)",
-                    style={"fontSize": "0.85rem", "color": "#888", "marginLeft": "4px"},
+                    style={"fontSize": "0.95rem", "color": "#888", "marginLeft": "4px"},
                 ),
                 style={"display": "flex", "alignItems": "center", "marginBottom": "12px"},
             ),
@@ -714,7 +988,7 @@ def file_metadata_section() -> rx.Component:
                 ),
                 rx.el.span(
                     " Persists to Dagster asset catalog",
-                    style={"fontSize": "0.8rem", "color": "#888", "marginLeft": "10px"},
+                    style={"fontSize": "0.9rem", "color": "#888", "marginLeft": "10px"},
                 ),
                 
                 class_name="ui form",
@@ -738,10 +1012,10 @@ def file_item_expanded_content() -> rx.Component:
     def metadata_preview_row(label: str, value: rx.Var[str], fallback: str = "—") -> rx.Component:
         """Compact metadata row for accordion content."""
         return rx.el.div(
-            rx.el.span(label + ": ", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.75rem", "minWidth": "60px"}),
+            rx.el.span(label + ": ", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.9rem", "minWidth": "60px"}),
             rx.el.span(
                 rx.cond(value != "", value, fallback),
-                style={"fontSize": "0.75rem", "fontWeight": "500"},
+                style={"fontSize": "0.9rem", "fontWeight": "500"},
             ),
             style={"display": "flex", "alignItems": "center", "padding": "1px 0"},
         )
@@ -769,7 +1043,7 @@ def file_item_expanded_content() -> rx.Component:
             fomantic_icon("edit", size=10, color="rgba(255,255,255,0.5)", style={"marginRight": "4px"}),
             rx.el.span(
                 "Edit in form above",
-                style={"fontSize": "0.7rem", "color": "rgba(255,255,255,0.6)"},
+                style={"fontSize": "0.85rem", "color": "rgba(255,255,255,0.6)"},
             ),
             style={"display": "flex", "alignItems": "center", "padding": "4px 12px 8px 28px"},
         ),
@@ -803,7 +1077,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                 rx.el.div(
                     display_name,
                     style={
-                        "fontSize": "1rem",
+                        "fontSize": "1.1rem",
                         "overflow": "hidden", 
                         "textOverflow": "ellipsis", 
                         "whiteSpace": "nowrap",
@@ -816,7 +1090,7 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
                     rx.el.div(
                         upload_date,
                         style={
-                            "fontSize": "0.78rem",
+                            "fontSize": "0.9rem",
                             "color": rx.cond(is_selected, "rgba(255,255,255,0.7)", "#999"),
                             "lineHeight": "1.2",
                         },
@@ -876,8 +1150,8 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
     def meta_row(label: str, value: rx.Var[str]) -> rx.Component:
         """Compact read-only metadata row."""
         return rx.el.div(
-            rx.el.span(label + ":", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.75rem", "minWidth": "60px"}),
-            rx.el.span(value, style={"fontSize": "0.75rem", "fontWeight": "500"}),
+            rx.el.span(label + ":", style={"color": "rgba(255,255,255,0.7)", "fontSize": "0.9rem", "minWidth": "68px"}),
+            rx.el.span(value, style={"fontSize": "0.9rem", "fontWeight": "500"}),
             style={"display": "flex", "gap": "4px", "alignItems": "center"},
         )
     
@@ -885,7 +1159,7 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
         # VCF filename (always show since header may show Subject ID)
         rx.el.div(
             fomantic_icon("file-text", size=10, color="rgba(255,255,255,0.6)", style={"marginRight": "4px"}),
-            rx.el.span(filename, style={"fontSize": "0.7rem", "color": "rgba(255,255,255,0.8)"}),
+            rx.el.span(filename, style={"fontSize": "0.85rem", "color": "rgba(255,255,255,0.8)"}),
             style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
         ),
         # Metadata in compact grid
@@ -911,7 +1185,7 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
                     href=UploadState.current_zenodo_url,
                     target="_blank",
                     style={
-                        "fontSize": "0.7rem",
+                        "fontSize": "0.85rem",
                         "color": "rgba(255,255,255,0.9)",
                         "textDecoration": "underline",
                         "overflow": "hidden",
@@ -924,7 +1198,7 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
                     rx.el.span(
                         UploadState.current_zenodo_license,
                         class_name="ui mini label",
-                        style={"marginLeft": "6px", "padding": "2px 4px", "fontSize": "0.6rem", "flexShrink": "0"},
+                        style={"marginLeft": "6px", "padding": "2px 6px", "fontSize": "0.75rem", "flexShrink": "0"},
                     ),
                     rx.fragment(),
                 ),
@@ -939,7 +1213,7 @@ def file_item_readonly_content(filename: rx.Var[str]) -> rx.Component:
                 " Edit",
                 on_click=UploadState.enable_metadata_edit_mode,
                 class_name="ui mini inverted button",
-                style={"padding": "3px 8px", "fontSize": "0.7rem"},
+                style={"padding": "4px 10px", "fontSize": "0.85rem"},
             ),
             style={"display": "flex", "justifyContent": "flex-end"},
         ),
@@ -957,7 +1231,7 @@ def _immutable_disclaimer_box() -> rx.Component:
         ),
         rx.el.p(
             UploadState.immutable_disclaimer,
-            style={"fontSize": "0.85rem", "color": "#666", "marginBottom": "8px", "lineHeight": "1.4"},
+            style={"fontSize": "0.95rem", "color": "#666", "marginBottom": "8px", "lineHeight": "1.4"},
         ),
         rx.el.a(
             fomantic_icon("download", size=12),
@@ -972,7 +1246,7 @@ def _immutable_disclaimer_box() -> rx.Component:
                 rx.el.div(
                     rx.text("or import from Zenodo"),
                     class_name="ui horizontal divider",
-                    style={"margin": "10px 0 8px 0", "fontSize": "0.75rem", "color": "#aaa"},
+                    style={"margin": "10px 0 8px 0", "fontSize": "0.85rem", "color": "#aaa"},
                 ),
                 rx.el.div(
                     rx.el.input(
@@ -981,10 +1255,10 @@ def _immutable_disclaimer_box() -> rx.Component:
                         placeholder="https://zenodo.org/records/...",
                         style={
                             "flex": "1",
-                            "padding": "5px 8px",
+                            "padding": "6px 8px",
                             "borderRadius": "4px",
                             "border": "1px solid #ddd",
-                            "fontSize": "0.8rem",
+                            "fontSize": "0.95rem",
                         },
                     ),
                     rx.el.button(
@@ -1009,59 +1283,62 @@ def _immutable_disclaimer_box() -> rx.Component:
     )
 
 
+def _public_genome_row(sample: rx.Var) -> rx.Component:
+    """One public genome entry: label, license, and Import button / Imported badge."""
+    return rx.el.div(
+        rx.el.span(sample["label"].to(str), style={"fontWeight": "500", "fontSize": "1rem"}),
+        rx.el.span(sample["license"].to(str), class_name="ui mini teal label", style={"marginLeft": "4px"}),
+        rx.cond(
+            sample["imported"].to(bool),
+            rx.el.span(
+                rx.el.i("", class_name="check icon"),
+                "Imported",
+                class_name="ui mini green basic label",
+                style={"marginLeft": "auto"},
+            ),
+            rx.el.button(
+                rx.cond(
+                    UploadState.zenodo_importing,
+                    rx.el.i("", class_name="spinner loading icon"),
+                    rx.el.i("", class_name="download icon"),
+                ),
+                " Import",
+                on_click=lambda: UploadState.import_default_sample(sample["zenodo_url"].to(str)),
+                disabled=UploadState.zenodo_importing,
+                class_name="ui mini button",
+                style={"marginLeft": "auto", "padding": "4px 8px"},
+            ),
+        ),
+        style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
+    )
+
+
 def _public_genome_hint() -> rx.Component:
-    """Non-blocking info message suggesting public genomes for quick import."""
+    """Non-blocking info message suggesting public genomes for quick import.
+
+    The genome list comes from ``modules.yaml`` (``immutable_mode.default_samples``)
+    via ``UploadState.default_public_samples`` — never hardcode Zenodo URLs here.
+    Already-imported genomes show an "Imported" badge instead of the button.
+    """
     return rx.el.div(
         rx.el.div(
             fomantic_icon("dna", size=14, color="#2185d0"),
             rx.el.span(
                 " Try a public genome",
-                style={"fontSize": "0.9rem", "fontWeight": "600", "marginLeft": "4px"},
+                style={"fontSize": "1.05rem", "fontWeight": "600", "marginLeft": "4px"},
             ),
             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
         ),
         rx.el.div(
-            rx.el.div(
-                rx.el.span("Anton Kulaga ", style={"fontWeight": "500", "fontSize": "0.85rem"}),
-                rx.el.span("CC-Zero", class_name="ui mini teal label", style={"marginLeft": "4px"}),
-                rx.el.button(
-                    rx.cond(
-                        UploadState.zenodo_importing,
-                        rx.el.i("", class_name="spinner loading icon"),
-                        rx.el.i("", class_name="download icon"),
-                    ),
-                    " Import",
-                    on_click=UploadState.import_default_sample("https://zenodo.org/records/18370498"),
-                    disabled=UploadState.zenodo_importing,
-                    class_name="ui mini button",
-                    style={"marginLeft": "auto", "padding": "4px 8px"},
-                ),
-                style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
-            ),
-            rx.el.div(
-                rx.el.span("Livia Zaharia ", style={"fontWeight": "500", "fontSize": "0.85rem"}),
-                rx.el.span("CC-BY-4.0", class_name="ui mini teal label", style={"marginLeft": "4px"}),
-                rx.el.button(
-                    rx.cond(
-                        UploadState.zenodo_importing,
-                        rx.el.i("", class_name="spinner loading icon"),
-                        rx.el.i("", class_name="download icon"),
-                    ),
-                    " Import",
-                    on_click=UploadState.import_default_sample("https://zenodo.org/records/19487816"),
-                    disabled=UploadState.zenodo_importing,
-                    class_name="ui mini button",
-                    style={"marginLeft": "auto", "padding": "4px 8px"},
-                ),
-                style={"display": "flex", "alignItems": "center"},
-            ),
+            rx.foreach(UploadState.default_public_samples, _public_genome_row),
         ),
         rx.el.div(
             "Voluntarily shared under open licenses for research use.",
-            style={"fontSize": "0.75rem", "color": "#999", "marginTop": "8px"},
+            style={"fontSize": "0.85rem", "color": "#999", "marginTop": "8px"},
         ),
         class_name="ui info message",
         style={"padding": "10px 12px", "marginBottom": "12px"},
+        id="public-genome-hint",
     )
 
 
@@ -1073,7 +1350,7 @@ def _progress_indicator() -> rx.Component:
             rx.el.i("", class_name="spinner loading icon"),
             rx.el.span(
                 UploadState.progress_status,
-                style={"marginLeft": "8px", "fontSize": "0.85rem"},
+                style={"marginLeft": "8px", "fontSize": "0.95rem"},
             ),
             class_name="ui icon message",
             style={"padding": "10px 12px", "marginBottom": "12px"},
@@ -1082,9 +1359,41 @@ def _progress_indicator() -> rx.Component:
     )
 
 
+LEFT_PANEL_TYPE_CSS = """
+#file-column-content {
+    font-size: 1rem;
+    line-height: 1.4;
+}
+#file-column-content .ui.form .field > label {
+    font-size: 0.95rem !important;
+}
+#file-column-content .ui.form input,
+#file-column-content .ui.form select,
+#file-column-content .ui.form textarea {
+    font-size: 0.95rem !important;
+}
+#file-column-content .ui.dividing.header {
+    font-size: 1.05rem !important;
+}
+#file-column-content .ui.label {
+    font-size: 0.85rem;
+}
+#file-column-content .ui.mini.label,
+#file-column-content .ui.mini.button,
+#file-column-content .ui.mini.circular.label {
+    font-size: 0.8rem;
+}
+#file-column-content .ui.message,
+#file-column-content .ui.message p {
+    font-size: 0.95rem;
+}
+"""
+
+
 def file_column_content() -> rx.Component:
     """Column 1 content: Unified add sample form and library."""
     return rx.el.div(
+        rx.el.style(LEFT_PANEL_TYPE_CSS),
         # ============================================================
         # ADD SAMPLE FORM or IMMUTABLE DISCLAIMER
         # ============================================================
@@ -1096,13 +1405,12 @@ def file_column_content() -> rx.Component:
 
         # ============================================================
         # PUBLIC GENOME SUGGESTION
-        # Always visible in immutable mode; in normal mode only when no files yet
+        # Always visible: imported genomes show an "Imported" badge, the
+        # rest keep their one-click Import button. Hiding it after the
+        # first import made the second public genome unreachable and broke
+        # the welcome-diagram "Try a public genome" guide target.
         # ============================================================
-        rx.cond(
-            UploadState.is_immutable_mode | (UploadState.files.length() == 0),
-            _public_genome_hint(),
-            rx.fragment(),
-        ),
+        _public_genome_hint(),
 
         # ============================================================
         # PROGRESS INDICATOR for long operations
@@ -1117,7 +1425,7 @@ def file_column_content() -> rx.Component:
             rx.el.div(
                 rx.el.div(
                     fomantic_icon("edit", size=16, color="#21ba45"),
-                    rx.el.span(" Edit Metadata", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "6px", "flex": "1"}),
+                    rx.el.span(" Edit Metadata", style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "6px", "flex": "1"}),
                     rx.el.button(
                         fomantic_icon("x", size=12),
                         " Done",
@@ -1141,7 +1449,7 @@ def file_column_content() -> rx.Component:
             rx.el.div(
                 rx.el.div(
                     fomantic_icon("database", size=16, color="#767676"),
-                    rx.el.span(" Samples", style={"fontSize": "0.95rem", "fontWeight": "600", "marginLeft": "4px"}),
+                    rx.el.span(" Samples", style={"fontSize": "1.1rem", "fontWeight": "600", "marginLeft": "4px"}),
                     rx.el.span(
                         UploadState.files.length(),
                         class_name="ui mini circular label",
@@ -1164,18 +1472,14 @@ def file_column_content() -> rx.Component:
                 rx.el.div(
                     rx.foreach(UploadState.files, file_item),
                     id="file-list",
-                    style={
-                        "maxHeight": "400px",
-                        "overflowY": "auto",
-                        "paddingRight": "4px",
-                    },
+                    style={"paddingRight": "4px"},
                 ),
                 rx.el.div(
                     fomantic_icon("inbox", size=40, color="#ccc"),
                     rx.el.div("No samples yet", style={"color": "#888", "marginTop": "8px"}),
                     rx.el.div(
                         "Upload a VCF file or import from Zenodo to get started",
-                        style={"color": "#aaa", "fontSize": "0.85rem", "marginTop": "4px"},
+                        style={"color": "#aaa", "fontSize": "0.95rem", "marginTop": "4px"},
                     ),
                     style={"textAlign": "center", "padding": "30px 10px"},
                     id="empty-file-list",
@@ -2523,175 +2827,189 @@ def no_file_selected_message() -> rx.Component:
     Welcome/onboarding message when no sample is selected.
     Explains the workflow instead of duplicating the left panel.
     """
-    step_style = {
-        "display": "flex",
-        "alignItems": "flex-start",
-        "gap": "14px",
-        "marginBottom": "20px",
-    }
-    number_style = {
-        "width": "32px",
-        "height": "32px",
-        "borderRadius": "50%",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        "fontWeight": "700",
-        "fontSize": "0.9rem",
-        "color": "#fff",
-        "flexShrink": "0",
-    }
-
-    def workflow_step(
-        number: str, bg_color: str, icon: str, title: str, desc: str,
-    ) -> rx.Component:
+    def philosophy_item(icon: str, color: str, title: str, desc: str) -> rx.Component:
         return rx.el.div(
-            rx.el.div(number, style={**number_style, "backgroundColor": bg_color}),
+            fomantic_icon(icon, size=20, color=color, style={"marginRight": "12px"}),
             rx.el.div(
-                rx.el.div(
-                    fomantic_icon(icon, size=16, color=bg_color, style={"marginRight": "6px"}),
-                    rx.el.strong(title, style={"fontSize": "0.95rem"}),
-                    style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
-                ),
-                rx.el.div(desc, style={"fontSize": "0.85rem", "color": "#666", "lineHeight": "1.4"}),
-            ),
-            style=step_style,
-        )
-
-    return rx.el.div(
-        # DNA icon + project title
-        fomantic_icon("dna", size=80, color="#00b5ad"),
-        rx.el.h1(
-            "Just-DNA-Lite",
-            class_name="ui huge header",
-            style={"marginTop": "10px", "marginBottom": "0"},
-        ),
-        rx.el.p(
-            "Next-generation personal genomics platform — lite, fast, and OakVar-free.",
-            style={"fontSize": "1.2rem", "color": "#555", "fontStyle": "italic", "marginBottom": "20px"},
-        ),
-        
-        # RUO Warning Banner
-        rx.el.div(
-            rx.el.div(
-                fomantic_icon("exclamation-triangle", size=24, color="#db2828", style={"marginBottom": "8px"}),
-                rx.el.div(
-                    rx.el.strong("Medical Disclaimer & Research Use Only (RUO)"),
-                    style={"fontSize": "1.1rem", "color": "#db2828", "marginBottom": "6px"},
-                ),
-                rx.el.div(
-                    "This tool is for research, educational, and self-exploration purposes only. "
-                    "It is ",
-                    rx.el.strong("not a medical device"),
-                    " and provides no medical advice. "
-                    "The genetic modules and Polygenic Risk Scores (PRS) here are ",
-                    rx.el.strong("not clinically validated"),
-                    ". You must never use this tool for diagnostic or medical decisions. "
-                    "Interesting findings should be re-tested with clinically validated methods "
-                    "such as PCR or other orthogonal confirmation in a certified lab.",
-                    style={"fontSize": "0.95rem", "color": "#444", "lineHeight": "1.45"},
-                ),
-                class_name="ui red message",
-                style={
-                    "maxWidth": "840px",
-                    "width": "100%",
-                    "textAlign": "center",
-                    "margin": "0",
-                },
+                rx.el.strong(title),
+                rx.el.div(desc, style={"fontSize": "0.9rem", "color": "#666"}),
+                style={"flex": "1"},
             ),
             style={
                 "display": "flex",
+                "alignItems": "start",
+                "flex": "1 1 360px",
+                "maxWidth": "420px",
+                "textAlign": "left",
+            },
+        )
+
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("dna", size=36, color="#00b5ad", style={"marginRight": "10px"}),
+            rx.el.h1(
+                "Just-DNA-Lite",
+                class_name="ui huge header",
+                style={"margin": "0"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
                 "justifyContent": "center",
-                "width": "100%",
-                "marginBottom": "40px",
+                "marginBottom": "8px",
             },
         ),
-        
-        # Two-column layout for Info vs Workflow
-        rx.el.div(
-            # Left: Core Philosophy
+        rx.el.p(
+            "Explore your genome on your own computer. Nothing is sent to a server.",
+            style={
+                "fontSize": "1.25rem",
+                "color": "#444",
+                "margin": "0 0 12px 0",
+                "lineHeight": "1.35",
+            },
+        ),
+        rx.cond(
+            UploadState.show_welcome_disclaimer,
             rx.el.div(
-                rx.el.h3("Core Philosophy", class_name="ui large header", style={"textAlign": "left", "marginBottom": "20px"}),
                 rx.el.div(
-                    rx.el.div(
-                        fomantic_icon("lock", size=20, color="#2185d0", style={"marginRight": "12px"}),
-                        rx.el.div(
-                            rx.el.strong("Your data, your call"),
-                            rx.el.div("Runs entirely on your machine. Nothing leaves your computer.", style={"fontSize": "0.9rem", "color": "#666"}),
-                            style={"flex": "1"}
-                        ),
-                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
+                    rx.el.i(
+                        "",
+                        class_name="close icon",
+                        on_click=UploadState.close_welcome_disclaimer,
+                        role="button",
+                        aria_label="Close medical disclaimer",
+                        tab_index=0,
+                        style={"cursor": "pointer"},
+                    ),
+                    fomantic_icon(
+                        "exclamation-triangle",
+                        size=16,
+                        color="#db2828",
+                        style={"marginRight": "8px"},
                     ),
                     rx.el.div(
-                        fomantic_icon("eye", size=20, color="#fbbd08", style={"marginRight": "12px"}),
                         rx.el.div(
-                            rx.el.strong("Unfiltered access"),
-                            rx.el.div("We show the full research view, not a pre-filtered clinical summary.", style={"fontSize": "0.9rem", "color": "#666"}),
-                            style={"flex": "1"}
+                            rx.el.strong("Medical disclaimer"),
+                            " (research use only)",
+                            class_name="header",
+                            style={"color": "#db2828", "fontSize": "0.9rem"},
                         ),
-                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
-                    ),
-                    rx.el.div(
-                        fomantic_icon("rocket", size=20, color="#21ba45", style={"marginRight": "12px"}),
-                        rx.el.div(
-                            rx.el.strong("Speed & Iteration"),
-                            rx.el.div("We optimize for rapid exploration and fast module creation, not clinical-style validation cycles.", style={"fontSize": "0.9rem", "color": "#666"}),
-                            style={"flex": "1"}
+                        rx.el.p(
+                            "This tool is for research, educational, and self-exploration "
+                            "purposes only. It is ",
+                            rx.el.strong("not a medical device"),
+                            " and provides no medical advice. "
+                            "The genetic modules and polygenic risk scores here are ",
+                            rx.el.strong("not clinically validated"),
+                            ". Do not use this tool for diagnostic or medical decisions. "
+                            "Interesting findings should be re-tested with a clinically "
+                            "validated method in a certified lab.",
+                            style={"margin": "0", "lineHeight": "1.4", "fontSize": "0.8rem"},
                         ),
-                        style={"display": "flex", "alignItems": "start", "marginBottom": "15px"}
+                        class_name="content",
                     ),
-                    rx.el.div(
-                        fomantic_icon("warning sign", size=20, color="#767676", style={"marginRight": "12px"}),
-                        rx.el.div(
-                            rx.el.strong("Scientific realism"),
-                            rx.el.div("Modules, PRS, and especially AI-generated content can be wrong, incomplete, or clinically irrelevant.", style={"fontSize": "0.9rem", "color": "#666"}),
-                            style={"flex": "1"}
-                        ),
-                        style={"display": "flex", "alignItems": "start"}
-                    ),
+                    class_name="ui icon red message",
+                    style={
+                        "maxWidth": "840px",
+                        "width": "100%",
+                        "textAlign": "left",
+                        "margin": "0",
+                        "padding": "10px 14px",
+                    },
                 ),
-                style={"flex": "1", "paddingRight": "40px", "borderRight": "1px solid #eee"}
+                style={
+                    "display": "flex",
+                    "justifyContent": "center",
+                    "width": "100%",
+                    "marginBottom": "16px",
+                },
             ),
-            
-            # Right: Workflow
-            rx.el.div(
-                rx.el.h3("How to use", class_name="ui large header", style={"textAlign": "left", "marginBottom": "20px"}),
-                workflow_step(
-                    "1", "#21ba45", "cloud-upload",
-                    "Upload a VCF sample",
-                    "Use the \"Add Sample\" form in the left column to upload a VCF file.",
-                ),
-                workflow_step(
-                    "2", "#00b5ad", "dna",
-                    "Select and choose modules",
-                    "Click a sample on the left. Then pick annotation modules that will appear here.",
-                ),
-                workflow_step(
-                    "3", "#2185d0", "play",
-                    "Run and get results",
-                    "Start the pipeline. Outputs and history will appear in this panel.",
-                ),
-                rx.el.div(class_name="ui divider", style={"margin": "16px 0"}),
-                workflow_step(
-                    "~", "#a333c8", "boxes",
-                    "Create custom modules",
-                    "Use the Module Manager tab to upload DSL specs or let the AI agent build one from a research paper.",
-                ),
-                style={"flex": "1", "paddingLeft": "40px"}
-            ),
-            style={"display": "flex", "maxWidth": "900px", "margin": "0 auto", "textAlign": "left"}
+            rx.fragment(),
         ),
-        
-        rx.el.div(class_name="ui divider", style={"margin": "40px 0"}),
-        
-        # Final CTA
+        rx.el.p(
+            "You need a VCF: the file your sequencing provider already produced. "
+            "It is a table of places your DNA differs from a reference genome. "
+            "The diagram below shows how that file is made, and what you do with it here.",
+            style={
+                "fontSize": "1.12rem",
+                "color": "#555",
+                "maxWidth": "820px",
+                "margin": "0 auto 16px auto",
+                "lineHeight": "1.45",
+            },
+        ),
+
+        # Sequencing journey schematic + zoomed-in "how to use" panel
+        sequencing_journey_diagram(),
+
         rx.el.div(
-            fomantic_icon("chevron-left", size=18, color="#aaa", style={"marginRight": "8px"}),
-            rx.el.span("Upload or select a sample in the left column to begin", style={"fontSize": "1.1rem", "color": "#888"}),
-            style={"display": "flex", "alignItems": "center", "justifyContent": "center"},
+            rx.el.div(
+                rx.el.strong("Reference genome. "),
+                "The standard map of human DNA that labs write positions against. "
+                "Most current files use GRCh38; choose that unless your provider used GRCh37/hg19.",
+            ),
+            rx.el.div(
+                rx.el.strong("This tool annotates a VCF. "),
+                "It does not sequence DNA or call variants. The file is only as complete as the lab that made it.",
+            ),
+            rx.el.div(
+                rx.el.strong("23andMe and Ancestry are not sequencing. "),
+                "Those services read a few hundred thousand pre-selected spots on a chip, "
+                "not the whole genome. Support for those files is planned; for now the tool "
+                "is built for whole-genome and whole-exome VCFs.",
+            ),
+            style={
+                "maxWidth": "760px",
+                "margin": "0 auto 28px auto",
+                "textAlign": "left",
+                "fontSize": "0.82rem",
+                "color": "#777",
+                "lineHeight": "1.45",
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "4px",
+            },
         ),
-        
-        style={"textAlign": "center", "padding": "60px 40px"},
+
+        # Core Philosophy (below the journey, 2x2 grid)
+        rx.el.div(
+            rx.el.h3(
+                "Core Philosophy",
+                class_name="ui large header",
+                style={"textAlign": "center", "marginBottom": "24px"},
+            ),
+            rx.el.div(
+                philosophy_item(
+                    "lock", "#2185d0",
+                    "Your data, your call",
+                    "Runs entirely on your machine. Nothing leaves your computer.",
+                ),
+                philosophy_item(
+                    "eye", "#fbbd08",
+                    "Unfiltered access",
+                    "We show the full research view, not a pre-filtered clinical summary.",
+                ),
+                philosophy_item(
+                    "rocket", "#21ba45",
+                    "Speed & Iteration",
+                    "We optimize for rapid exploration and fast module creation, not clinical-style validation cycles.",
+                ),
+                philosophy_item(
+                    "warning sign", "#767676",
+                    "Scientific realism",
+                    "Modules, PRS, and especially AI-generated content can be wrong, incomplete, or clinically irrelevant.",
+                ),
+                style={
+                    "display": "flex",
+                    "flexWrap": "wrap",
+                    "gap": "18px 40px",
+                    "justifyContent": "center",
+                },
+            ),
+            style={"maxWidth": "900px", "margin": "0 auto"},
+        ),
+
+        style={"textAlign": "center", "padding": "4px 24px 32px 24px"},
         id="no-file-selected-message",
     )
 
@@ -3749,17 +4067,30 @@ def right_panel_run_view() -> rx.Component:
     return rx.el.div(
         # Header – DNA gradient banner (green -> teal -> blue from logo)
         rx.el.div(
-            fomantic_icon("dna", size=22, color="#fff"),
             rx.cond(
                 UploadState.has_selected_file,
                 rx.el.span(
-                    " Results for ",
-                    rx.el.strong(UploadState.selected_file, style={"fontWeight": "600"}),
-                    style={"fontSize": "1.1rem", "marginLeft": "8px", "color": "#fff"},
+                    fomantic_icon("dna", size=22, color="#fff"),
+                    rx.el.span(
+                        " Results for ",
+                        rx.el.strong(UploadState.selected_file, style={"fontWeight": "600"}),
+                        style={"fontSize": "1.1rem", "marginLeft": "8px", "color": "#fff"},
+                    ),
+                    style={"display": "inline-flex", "alignItems": "center"},
                 ),
+                # No file selected: animated arrow pointing at the left panel,
+                # right where the user has to act (better than a CTA buried at
+                # the bottom of the welcome page).
                 rx.el.span(
-                    " Select a file to view results and start analysis",
-                    style={"fontSize": "1.1rem", "marginLeft": "8px", "color": "rgba(255,255,255,0.9)"},
+                    rx.el.span(
+                        fomantic_icon("arrow left", size=22, color="#fff"),
+                        class_name="jd-left-nudge",
+                    ),
+                    rx.el.span(
+                        " Start in the left panel \u2014 add or select a sample to begin",
+                        style={"fontSize": "1.1rem", "marginLeft": "10px", "color": "#fff", "fontWeight": "600"},
+                    ),
+                    style={"display": "inline-flex", "alignItems": "center"},
                 ),
             ),
             style={

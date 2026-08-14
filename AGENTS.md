@@ -1056,6 +1056,7 @@ rx.box(class="ui segment")
 - **Forking after Polars/polars-bio/DuckDB has been used** - Silent, unkillable deadlock on the next parallel op. See Process Model & Fork Safety
 - **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
 - **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
+- **`yield EventSpec` from an upload/select-file handler (Reflex 0.9)** - The generator's `EventFuture` is marked done when it exhausts. The frontend then re-dispatches those EventSpecs as children of that finished future and Reflex logs `Cannot add a child to an EventFuture that is already done` (normalization still runs). **Return** a list of EventSpecs instead of yielding them. Fixed upstream in reflex#6801 but not in 0.9.8. Same rule as `poll_run_status`.
 - **Using `@rx.background`** - Does NOT exist in Reflex 0.8.x. Use `@rx.event(background=True)` instead.
 
 ### Fomantic UI + Reflex Gotchas

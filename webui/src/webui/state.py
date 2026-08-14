@@ -33,6 +33,7 @@ from just_dna_pipelines.module_config import (
     build_module_metadata_dict, _load_config,
     is_immutable_mode as _is_immutable_mode,
     get_immutable_config,
+    DefaultSample,
 )
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
@@ -50,6 +51,21 @@ from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public
 logger = logging.getLogger(__name__)
 
 GENERATED_MODULES_DIR: Path = get_generated_modules_dir()
+
+
+def _find_default_sample(zenodo_url: str, filename: str) -> Optional[DefaultSample]:
+    """Match a Zenodo import against the pre-configured public genomes.
+
+    Matches by record URL or by the published VCF filename, so both the
+    one-click import buttons and a manually pasted URL pick up the curated
+    metadata (label, subject id, sex) from ``modules.yaml``.
+    """
+    for sample in get_immutable_config().default_samples:
+        if sample.zenodo_url.rstrip("/") == zenodo_url.rstrip("/"):
+            return sample
+        if sample.filename and sample.filename == filename:
+            return sample
+    return None
 
 
 def _backend_api_url() -> str:
@@ -499,11 +515,16 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         except Exception:
             return None
 
-    async def handle_upload(self, files: list[rx.UploadFile]):
-        """Handle the upload of VCF files and register them in Dagster."""
+    async def handle_upload(self, files: list[rx.UploadFile]) -> list[EventSpec]:
+        """Handle the upload of VCF files and register them in Dagster.
+
+        Returns follow-up events instead of yielding them. Reflex 0.9 marks a
+        generator's EventFuture done when it exhausts; a later ``yield
+        EventSpec`` is then re-dispatched as a child of that finished future
+        and raises ``Cannot add a child to an EventFuture that is already done``.
+        """
         if _is_immutable_mode():
-            yield rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")
-            return
+            return [rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")]
         self.uploading = True
         new_files = []
         try:
@@ -573,29 +594,30 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 }
 
         except Exception as exc:
-            yield rx.toast.error(f"Upload failed: {exc}")
-        finally:
             self.uploading = False
+            return [rx.toast.error(f"Upload failed: {exc}")]
+        self.uploading = False
         if new_files:
-            for ev in self.select_file(new_files[-1]):
-                yield ev
-            yield rx.toast.success(f"Uploaded and registered {len(new_files)} files.")
-        else:
-            yield rx.toast.warning("No files were uploaded")
+            return [
+                *self.select_file(new_files[-1]),
+                rx.toast.success(f"Uploaded and registered {len(new_files)} files."),
+            ]
+        return [rx.toast.warning("No files were uploaded")]
 
-    async def handle_upload_with_metadata(self, files: list[rx.UploadFile]):
+    async def handle_upload_with_metadata(self, files: list[rx.UploadFile]) -> list[EventSpec]:
         """Handle upload of VCF files with metadata from the new sample form.
 
         This combines file upload and metadata registration in a single operation.
         The metadata from the form (subject_id, sex, tissue, species, etc.) is
         stored in the Dagster asset materialization.
+
+        Returns follow-up events (select file, toasts) instead of yielding them.
+        See ``handle_upload`` for why a generator crashes Reflex 0.9 here.
         """
         if _is_immutable_mode():
-            yield rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")
-            return
+            return [rx.toast.warning("File upload is disabled in public demo mode. Install locally to analyze your own genome.")]
         if not files:
-            yield rx.toast.warning("No files selected for upload")
-            return
+            return [rx.toast.warning("No files selected for upload")]
             
         self.uploading = True
         new_files = []
@@ -706,23 +728,21 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 }
 
         except Exception as exc:
-            yield rx.toast.error(f"Upload failed: {exc}")
-        finally:
             self.uploading = False
+            return [rx.toast.error(f"Upload failed: {exc}")]
+        self.uploading = False
 
-        for warning in build_warnings:
-            yield rx.toast.warning(warning)
-
+        events: list[EventSpec] = [rx.toast.warning(warning) for warning in build_warnings]
         if new_files:
             self._reset_new_sample_form()
-            for ev in self.select_file(new_files[-1]):
-                yield ev
-            yield rx.toast.success(f"Added {len(new_files)} sample(s) with metadata")
+            events.extend(self.select_file(new_files[-1]))
+            events.append(rx.toast.success(f"Added {len(new_files)} sample(s) with metadata"))
         else:
-            yield rx.toast.warning("No files were uploaded")
+            events.append(rx.toast.warning("No files were uploaded"))
+        return events
 
     @rx.event(background=True)
-    async def handle_zenodo_import(self) -> None:
+    async def handle_zenodo_import(self) -> list[EventSpec] | None:
         """Import a VCF file from a Zenodo record URL.
 
         Validates the record (open access, permissive license, has VCF),
@@ -753,8 +773,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             async with self:
                 self.zenodo_importing = False
                 self.progress_status = ""
-            yield rx.toast.error(str(exc))
-            return
+            return [rx.toast.error(str(exc))]
 
         size_mb = zenodo_meta["vcf_size_bytes"] / (1024 * 1024)
 
@@ -768,8 +787,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             async with self:
                 self.zenodo_importing = False
                 self.progress_status = ""
-            yield rx.toast.error(f"Download failed: {exc}")
-            return
+            return [rx.toast.error(f"Download failed: {exc}")]
 
         # 3. Place in user input dir
         async with self:
@@ -783,6 +801,13 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         sample_name = filename.replace(".vcf.gz", "").replace(".vcf", "")
         partition_key = f"{safe_user_id}/{sample_name}"
         upload_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # Curated metadata for known public genomes (label, subject id, sex)
+        default_sample = _find_default_sample(url, filename)
+        subject_id = default_sample.subject_id if default_sample and default_sample.subject_id else sample_name
+        sex = default_sample.sex if default_sample else "N/A"
+        species = default_sample.species if default_sample else "Homo sapiens"
+        reference_genome = default_sample.reference_genome if default_sample else "GRCh38"
 
         # 4. Register in Dagster
         instance = get_dagster_instance()
@@ -801,9 +826,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             "zenodo_license": MetadataValue.text(zenodo_meta.get("license", "")),
             "zenodo_creator": MetadataValue.text(zenodo_meta.get("creator", "")),
             "zenodo_title": MetadataValue.text(zenodo_meta.get("title", "")),
-            "species": MetadataValue.text("Homo sapiens"),
-            "reference_genome": MetadataValue.text("GRCh38"),
-            "sex": MetadataValue.text("N/A"),
+            "species": MetadataValue.text(species),
+            "reference_genome": MetadataValue.text(reference_genome),
+            "sex": MetadataValue.text(sex),
+            "subject_id": MetadataValue.text(subject_id),
         }
 
         instance.report_runless_asset_event(
@@ -824,11 +850,11 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 "filename": filename,
                 "sample_name": sample_name,
                 "upload_date": upload_date,
-                "species": "Homo sapiens",
-                "reference_genome": "GRCh38",
-                "sex": "N/A",
+                "species": species,
+                "reference_genome": reference_genome,
+                "sex": sex,
                 "tissue": "Sample tissue",
-                "subject_id": sample_name,
+                "subject_id": subject_id,
                 "study_name": zenodo_meta.get("title", ""),
                 "notes": f"Imported from Zenodo: {url} (License: {zenodo_meta.get('license', 'unknown')})",
                 "size_mb": round(placed_path.stat().st_size / (1024 * 1024), 2),
@@ -843,11 +869,12 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             self.zenodo_url_input = ""
             self.progress_status = ""
 
-        yield rx.toast.success(f"Imported {filename} from Zenodo ({zenodo_meta.get('creator', 'Unknown')})")
-
         async with self:
-            for ev in self.select_file(filename):
-                yield ev
+            followups = self.select_file(filename)
+        return [
+            rx.toast.success(f"Imported {filename} from Zenodo ({zenodo_meta.get('creator', 'Unknown')})"),
+            *followups,
+        ]
 
     def import_default_sample(self, zenodo_url: str):
         """Set Zenodo URL and trigger import (for one-click buttons)."""
@@ -1292,6 +1319,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     show_annotated_files_tab_info: bool = True
     show_reports_tab_info: bool = True
     show_analysis_tab_info: bool = True
+    show_welcome_disclaimer: bool = True
     expanded_run_id: str = ""  # Which run in the timeline is expanded to show logs
     show_outputs_modal: bool = False  # Whether to show the outputs modal (legacy, kept for compatibility)
     
@@ -1348,18 +1376,46 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     def sample_display_names(self) -> Dict[str, str]:
         """
         Map filenames to display names.
-        Shows Subject ID if available, otherwise filename.
+
+        Known public genomes (configured as default samples in modules.yaml)
+        show their curated label (e.g. "Livia Zaharia" instead of the
+        provider's anonymized filename). Otherwise Subject ID if available,
+        otherwise the filename stem.
         """
+        default_labels = {
+            s.filename: s.label
+            for s in get_immutable_config().default_samples
+            if s.filename
+        }
         result = {}
         for filename in self.files:
             meta = self.file_metadata.get(filename, {})
-            subject_id = meta.get("subject_id", "")
-            if subject_id and subject_id.strip():
-                result[filename] = subject_id.strip()
+            subject_id = (meta.get("subject_id") or "").strip()
+            if filename in default_labels:
+                result[filename] = default_labels[filename]
+            elif subject_id:
+                result[filename] = subject_id
             else:
                 # Use sample name (filename without extension)
                 result[filename] = filename.replace(".vcf.gz", "").replace(".vcf", "")
         return result
+
+    @rx.var
+    def default_public_samples(self) -> List[Dict[str, Any]]:
+        """Public genomes from modules.yaml with per-sample imported status.
+
+        Drives the "Try a public genome" hint so the list (and the Zenodo
+        URLs) live in config, not in the UI code.
+        """
+        return [
+            {
+                "label": sample.label,
+                "license": sample.license,
+                "zenodo_url": sample.zenodo_url,
+                "imported": bool(sample.filename and sample.filename in self.files),
+            }
+            for sample in get_immutable_config().default_samples
+        ]
 
     @rx.var
     def sample_upload_dates(self) -> Dict[str, str]:
@@ -3044,6 +3100,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     def close_analysis_tab_info(self):
         """Hide the analysis tab explanatory message."""
         self.show_analysis_tab_info = False
+
+    def close_welcome_disclaimer(self):
+        """Hide the welcome-page medical disclaimer for this session."""
+        self.show_welcome_disclaimer = False
 
     def view_run_in_results(self, run_id: str = ""):
         """Switch to annotated files produced by the run.

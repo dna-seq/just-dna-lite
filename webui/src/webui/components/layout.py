@@ -433,7 +433,9 @@ def template(*children: rx.Component) -> rx.Component:
             style={
                 "marginTop": "64px",
                 "padding": "20px",
-                "minHeight": "calc(100vh - 64px)",
+                "height": "calc(100vh - 64px)",
+                "boxSizing": "border-box",
+                "overflow": "hidden",
                 "backgroundColor": "#f5f7fa",
             },
         ),
