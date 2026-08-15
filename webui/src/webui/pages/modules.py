@@ -11,6 +11,7 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
+from webui.features import MODULE_CREATOR_ENABLED
 from webui.state import UploadState, AgentState
 
 
@@ -1257,13 +1258,6 @@ def agent_chat_panel() -> rx.Component:
 # MAIN PAGE
 # ============================================================================
 
-@rx.page(
-    route="/modules",
-    title="Module Creator | Just DNA Lite",
-    on_load=UploadState.load_modules_page,
-    meta=page_meta("/modules"),
-    image=page_image_url(),
-)
 def modules_page() -> rx.Component:
     """Module Manager page — sources, editing slot, and AI agent chat."""
     return template(
@@ -1272,3 +1266,16 @@ def modules_page() -> rx.Component:
             right=agent_chat_panel(),
         ),
     )
+
+
+# The route is only registered when the creator is enabled; while it is off the
+# page is unreachable rather than merely unlinked. `app.add_page(modules_page)`
+# then also skips it, because an undecorated component has no route to add.
+if MODULE_CREATOR_ENABLED:
+    modules_page = rx.page(
+        route="/modules",
+        title="Module Creator | Just DNA Lite",
+        on_load=UploadState.load_modules_page,
+        meta=page_meta("/modules"),
+        image=page_image_url(),
+    )(modules_page)

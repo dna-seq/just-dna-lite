@@ -11,6 +11,7 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
+from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.state import RegistryState
 
 
@@ -161,7 +162,7 @@ def _action_buttons() -> rx.Component:
         rx.cond(
             RegistryState.show_local_actions,
             rx.fragment(
-                rx.el.button(
+                *([rx.el.button(
                     fomantic_icon("edit", size=13),
                     " Edit",
                     on_click=RegistryState.edit_selected,
@@ -169,7 +170,7 @@ def _action_buttons() -> rx.Component:
                     class_name="ui small button",
                     style={"flex": "1"},
                     title="Load into the Module Manager editing slot",
-                ),
+                )] if MODULE_CREATOR_ENABLED else []),
                 rx.el.a(
                     fomantic_icon("download", size=13),
                     " Export",
@@ -413,14 +414,14 @@ def _tab_menu() -> rx.Component:
             on_click=lambda: RegistryState.switch_registry_tab("catalog"),
             style=_TAB_STYLE,
         ),
-        rx.el.a(
+        *([rx.el.a(
             fomantic_icon("upload", size=16,
                           color=rx.cond(RegistryState.registry_active_tab == "publication", "#2185d0", "#888")),
             " Publication",
             class_name=rx.cond(RegistryState.registry_active_tab == "publication", "active item", "item"),
             on_click=lambda: RegistryState.switch_registry_tab("publication"),
             style=_TAB_STYLE,
-        ),
+        )] if REGISTRY_PUBLICATION_ENABLED else []),
         class_name="ui top attached tabular menu",
         style={"marginBottom": "0"},
         id="registry-tab-menu",
@@ -1194,7 +1195,7 @@ def registry_right_panel() -> rx.Component:
             rx.match(
                 RegistryState.registry_active_tab,
                 ("catalog", _catalog_tab()),
-                ("publication", _publication_tab()),
+                *([("publication", _publication_tab())] if REGISTRY_PUBLICATION_ENABLED else []),
                 _catalog_tab(),
             ),
             class_name="ui bottom attached segment",

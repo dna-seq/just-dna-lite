@@ -59,6 +59,7 @@ from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
 from webui.dagster_env import get_dagster_instance
+from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
 from webui.registry_identity import (
     ensure_install_id, load_identity, save_identity, derive_handle, set_env_var,
@@ -5805,6 +5806,10 @@ class RegistryState(rx.State):
 
     @rx.event(background=True)
     async def switch_registry_tab(self, tab: str):
+        # The tab name arrives from the client, so a hidden tab is refused here
+        # too — not only left unrendered.
+        if tab == "publication" and not REGISTRY_PUBLICATION_ENABLED:
+            return
         async with self:
             self.registry_active_tab = tab
         if tab == "publication":
@@ -7047,6 +7052,8 @@ class RegistryState(rx.State):
     @rx.event
     async def edit_selected(self):
         # Load into the Module Manager editing slot, then switch to that page/tab.
+        if not MODULE_CREATOR_ENABLED:
+            return  # /modules is not registered; the redirect would 404.
         agent = await self.get_state(AgentState)
         agent._do_load_custom_module(self.selected_name)
         return rx.redirect("/modules")

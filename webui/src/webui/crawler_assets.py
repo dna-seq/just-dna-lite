@@ -8,6 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from webui.deployment_urls import resolve_public_app_url
+from webui.features import MODULE_CREATOR_ENABLED
 
 SITE_TITLE = "Just DNA Lite"
 SITE_DESCRIPTION = (
@@ -32,6 +33,9 @@ class RouteMetadata:
     priority: str
     changefreq: str = "weekly"
     robots: str = "index, follow"
+    # A gated-off route keeps its entry (so page_meta still resolves it) but is
+    # left out of the sitemap and llms.txt while it is unreachable.
+    enabled: bool = True
 
 
 PUBLIC_ROUTES: tuple[RouteMetadata, ...] = (
@@ -52,6 +56,7 @@ PUBLIC_ROUTES: tuple[RouteMetadata, ...] = (
         title="Module Creator",
         description="Create and manage annotation modules, including AI-assisted module drafts.",
         priority="0.8",
+        enabled=MODULE_CREATOR_ENABLED,
     ),
     RouteMetadata(
         path="/registry",
@@ -149,6 +154,8 @@ def build_sitemap_xml() -> str:
     lastmod = date.today().isoformat()
     entries = []
     for route in PUBLIC_ROUTES:
+        if not route.enabled:
+            continue
         entries.append(
             "  <url>\n"
             f"    <loc>{html.escape(_route_url(route.path))}</loc>\n"
@@ -171,7 +178,9 @@ def build_llms_txt() -> str:
 
     base = resolve_public_app_url()
     route_lines = "\n".join(
-        f"- {_route_url(route.path)}: {route.description}" for route in PUBLIC_ROUTES
+        f"- {_route_url(route.path)}: {route.description}"
+        for route in PUBLIC_ROUTES
+        if route.enabled
     )
     excluded = ", ".join(ROBOT_EXCLUDED_PATHS)
     return (
