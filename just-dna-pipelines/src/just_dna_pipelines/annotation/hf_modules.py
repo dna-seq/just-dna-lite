@@ -518,9 +518,11 @@ def validate_modules(module_names: list[str]) -> list[str]:
 class ModuleOutputMapping(BaseModel):
     """Mapping of output files to their source modules."""
     module: str
-    annotations_path: Optional[str] = None
+    # Which table family actually carried this module's rows. The output file is named
+    # `{module}_weights.parquet` whatever the family, because every downstream consumer globs for
+    # that; this says what is really inside, so `pharmgkb_weights.parquet` is not read as weights.
+    lead_table: str = "weights"
     weights_path: Optional[str] = None
-    studies_path: Optional[str] = None
     logo_path: Optional[str] = None
     metadata_path: Optional[str] = None
 
@@ -530,7 +532,14 @@ class AnnotationManifest(BaseModel):
     user_name: str
     sample_name: str
     source_vcf: str
+    # Where the outputs were written. Stated rather than reconstructed from `modules[0]`, which is
+    # not there to reconstruct from when every selected module was skipped.
+    output_dir: str = ""
     modules: list[ModuleOutputMapping]
+    # Modules asked for that produced no output, by name → reason: an unjoinable lead family
+    # (skipped) or an error (failed). Absent from `modules`, so recorded here instead of lost.
+    skipped_modules: dict[str, str] = {}
+    failed_modules: dict[str, str] = {}
     total_variants_annotated: int = 0
     # Execution metrics
     duration_sec: Optional[float] = None

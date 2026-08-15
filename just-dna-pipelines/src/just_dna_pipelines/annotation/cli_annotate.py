@@ -16,6 +16,7 @@ from dagster import DagsterInstance
 from rich.console import Console
 
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
+from just_dna_pipelines.annotation.hf_modules import AnnotationManifest
 from just_dna_pipelines.annotation.resources import (
     ensure_vcf_in_user_input_dir,
     get_user_output_dir,
@@ -366,7 +367,30 @@ def annotate(
         console.print(f"  Report:  {report_files[-1]}")
     else:
         console.print(f"  Reports: {reports_dir} (no longevity_report_*.html found yet)")
+
+    _report_module_outcomes(modules_dir / "manifest.json")
     console.print()
+
+
+def _report_module_outcomes(manifest_path: Path) -> None:
+    """Say what each requested module actually did, reading the run's manifest.
+
+    A module that produced nothing is a result too. The job succeeds when a module is skipped
+    (an unsupported lead-table family) or fails on its own, so without this the only trace is an
+    absence from the output directory — the user is told "Annotation complete" and left to notice
+    that a module they asked for is simply not there.
+
+    Best-effort: a missing or unreadable manifest is not worth failing a completed run over, since
+    the annotation outputs themselves are already on disk.
+    """
+    if not manifest_path.exists():
+        return
+    manifest = AnnotationManifest.model_validate_json(manifest_path.read_text())
+    for name, reason in manifest.skipped_modules.items():
+        console.print(f"  [yellow]Skipped[/yellow] {name}: {reason}")
+    for name, reason in manifest.failed_modules.items():
+        console.print(f"  [red]Failed[/red] {name}: {reason}")
+    console.print(f"  Variants annotated: {manifest.total_variants_annotated}")
 
 
 def annotate_main() -> None:

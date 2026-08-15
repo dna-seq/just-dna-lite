@@ -335,8 +335,80 @@ authored — so the fix waits on RM43 and a `0.4`-family equivalent of `VariantR
 Two consequences live here. `hf_logic.annotate_vcf_with_module_weights` detects the null-coordinate
 case and downgrades a position join to **rsid + genotype**, because the alternative is annotating
 nothing at all; a VCF with no rsIDs in `ID` (DeepVariant output among them) therefore matches such a
-module on nothing. And registry **0.11.3** reads the same warning to make `trusted` three-valued, so
+module on nothing, and the engine now says so (`step="vcf_has_no_rsids"`) rather than reporting a
+silent zero. And registry **0.11.3** reads the same warning to make `trusted` three-valued, so
 `pharmgkb` publishes as `trusted: false` — correct, not a defect to work around.
+
+### The annotating engine's side of the contract (`hf_logic.py`)
+
+The engine projects **nothing** from a module's lead table — it reads five columns (`rsid`, `chrom`,
+`start`, `ref`, `genotype`) and left-joins the rest opaquely, so all 37 columns of a 0.5 artifact
+already reach the output parquet. Anything missing from a report is missing *in the report*, not
+dropped here. Three rules it does enforce, each with a failure it exists to prevent:
+
+- **A lead table is classified by the schema it has, not by its family name** (`_lead_join_strategy`
+  → `position` | `rsid` | `unsupported`). Ten families exist and the format keeps adding them;
+  `diplotypes`, `pgs`, `allele_function` and the binning families carry no per-variant key at all, and
+  used to raise `ColumnNotFoundError` **and abort every other selected module with it**. They now
+  raise `UnsupportedLeadTable`, which the per-module loop records and skips past. Adding a family to
+  `LEAD_TABLES` therefore cannot break annotation for anyone else.
+- **`_normalize_lead_genotype` puts the lead table's genotype in the representation
+  `weights.parquet` already uses**, mirroring the compiler's own `_split_genotype`: split on `/` or
+  `|`, drop empties, **never sort**. The 0.4 families are materialized verbatim and keep the authored
+  `"C/C"` string, so joining one straight to the VCF's `List(Utf8)` is a `SchemaError` — which is why
+  `pharmgkb` could not be annotated at all. **Do not sort here**: the grammar already requires an
+  unphased `A/G` to be sorted, and a phased `A|G` is held in *homolog order*
+  (`AuthoredModel._validate_genotype`: "phase encodes which allele sits on which homolog"), so
+  sorting folds `A|G` and `G|A` into one key and manufactures a match the module never stated. The
+  first version of this function sorted, and no test in the corpus could have caught it — nothing we
+  ship carries a phased genotype. `report_logic._genotype_alleles` is the Python twin; keep the two
+  documented together.
+- **The position join requires `ref` agreement where the module states one.** Genotype lists hold
+  allele *strings*, so matching them constrains the alleles the sample carries — but the module's
+  `ref` used to be dropped outright, so `G>A` matched a module's `GTGTCT>A` at the same locus. On one
+  real sample that was **6 of 9** reported `pathogenic` findings, every one a different variant whose
+  ALT happened to coincide. String equality is the wrong test for indels in general — one indel has
+  several valid spellings, which is what `just_dna_format.alleles` (`parsimony_reduce` /
+  `event_profile`) is for — but it is right on the set this filter reaches, and that is pinned by a
+  test rather than assumed: once the genotype has matched, a differing `ref` means the two records
+  delete different numbers of bases, which that algebra calls a **positive contradiction**. Verified
+  on all eight real cases (6 contradictions, 2 matches, no "unknown" residual). The genuinely lost
+  matches are elsewhere — two spellings anchored at *different* positions never meet in a position
+  join at all, and settling those needs the enricher's sequence access.
+
+- **Contig spellings go through `just_dna_format.vrs.normalize_chrom`, not a `^chr` strip.** Stripping
+  alone turns an hs38DH sample's `chrM` into `M`, which no module writes, so **every mitochondrial
+  annotation vanished silently** — one of the three samples in this repo is that case, and
+  `heteroplasmy` is a whole 0.4 family about mtDNA. Using the format's own folding is what keeps our
+  spelling and the module's identical by construction. Mapped over the *distinct* contigs and applied
+  as one vectorized replace; a per-row Python call over millions of variants is not acceptable here.
+- **The rsid join keys on each identifier a record carries.** A VCF ID is a semicolon-separated list
+  (`rs123;rs456`), and the authored side names exactly one variant per row, so the split is the
+  consumer's job (just-dna-format RM64). `_vcf_rsid_join_keys` explodes into `_rsid_join_key`, which
+  is dropped after the join so the output keeps the record's ID verbatim.
+
+`AnnotationManifest` records `output_dir`, per-module `lead_table`, and `skipped_modules` /
+`failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
+there when every module was skipped.
+
+**Read `just-dna-format/docs/PROPOSAL_0_6.md` before touching this seam again.** Its RM53–RM67 cluster
+is a VCF-4.4 audit of exactly the assumptions a consumer makes, and three of its items were live
+defects here (RM60, RM64) or corrected our reading of the contract (RM63 — the `variants.csv`
+genotype docstring's "which homolog" claim is acknowledged overreach, being reworded to "phase
+recorded but unaddressable"; do not build on it either way, since artifact self-consistency with
+`_split_genotype` is the argument that actually decides how a consumer spells a genotype).
+
+**The withholding directives are blocked on our own parquet, not merely unused.** `requires_callable`
+/ `callable_from` and `quality_from` / `min_quality` are unpopulated on every module in the corpus, so
+nothing is lost by not honouring them today — but do not implement them as a bare column lookup when
+something does populate them. `user_vcf_normalized` flattens INFO and FORMAT into **one** namespace,
+and `AF`, `DP`, `MQ` and `AD` all collide there; a bare pointer resolved against it reads a
+well-formed number of the wrong kind without error (format RM53 — `AF` as INFO is a cohort frequency,
+as FORMAT it is this person's fraction). Three prerequisites, all named upstream: keep the two
+namespaces distinguishable in the parquet and accept the qualified `INFO/DP` / `FORMAT/DP` pointer
+form (RM53); remember QUAL inverts on a reference record, which is exactly where a
+`requires_callable` row is evaluated (RM57); and for a gVCF read `MIN_DP` with interval containment
+rather than `DP` with an equality join on position (RM57's second half).
 
 ### Building and releasing the modules
 

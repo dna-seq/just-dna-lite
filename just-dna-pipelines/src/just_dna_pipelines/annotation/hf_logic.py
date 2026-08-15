@@ -15,6 +15,7 @@ from typing import Optional
 import polars as pl
 from dagster import MetadataValue
 from eliot import start_action
+from just_dna_format.vrs import normalize_chrom
 
 from just_dna_pipelines.io import read_vcf_file
 from just_dna_pipelines.runtime import resource_tracker
@@ -95,48 +96,148 @@ def prepare_vcf_rsid_only(
     )
 
 
-def _has_coordinates(lead_lf: pl.LazyFrame) -> bool:
-    """Whether a module's lead table can be joined by position.
+class UnsupportedLeadTable(Exception):
+    """A module's lead table carries no key this engine can join a VCF on.
 
-    Both columns must exist *and* hold at least one value: a table typed with `chrom`/`start` but
-    null throughout (an rsid-authored 0.4 table) is not positionally joinable, and treating it as if
-    it were produces an empty annotation rather than an error.
+    Raised rather than returned so the per-module loop can tell "this family is not annotatable
+    yet" apart from "this module is broken", and skip it without failing the whole run.
     """
-    schema = lead_lf.collect_schema().names()
-    if not {"chrom", "start"}.issubset(schema):
-        return False
-    return bool(
-        lead_lf.select(pl.col("chrom").is_not_null().any()).collect().item()
+
+
+def _normalize_lead_genotype(lead_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Put a lead table's `genotype` in the representation `weights.parquet` already uses.
+
+    `weights.parquet` stores a genotype as `List(Utf8)`, but the 0.4 table families
+    (`pharm_variants` and friends) are materialized verbatim from their authored CSV and keep the
+    authored string, e.g. `"G/G"`. The VCF side is always `List(Utf8)`
+    (`io._compute_genotype_expr`), so joining a 0.4 family straight to it raises
+    `SchemaError: datatypes of join keys don't match`.
+
+    This mirrors the compiler's own `_split_genotype` exactly — split on `/` or `|`, drop empty
+    fragments, **do not sort** — so a 0.4 table reaches the join in the same shape the compiler
+    would have given the same alleles in `weights.parquet`. Sorting here would be a second,
+    divergent convention, and on a phased genotype it would destroy information: the format's
+    grammar requires an unphased `A/G` to be sorted already and holds a phased `A|G` in
+    *homolog order*, which `weights.parquet` preserves (phase itself travels in its own `phased`
+    column). Sorting would make `G|A` and `A|G` one key and manufacture a match the module never
+    stated.
+
+    Note the VCF side sorts unconditionally, so a phased authored genotype in non-sorted order
+    matches nothing — the same as for a weights-led module, which is the point: this function
+    removes a representation difference, it does not invent matching semantics.
+
+    The Python twin for a row already read out of a parquet is `report_logic._genotype_alleles`.
+    """
+    schema = lead_lf.collect_schema()
+    if "genotype" not in schema.names() or schema["genotype"] != pl.String:
+        return lead_lf
+    return lead_lf.with_columns(
+        pl.col("genotype")
+        .str.replace_all(r"\|", "/")
+        .str.split("/")
+        .list.eval(pl.element().filter(pl.element().str.len_chars() > 0))
+        .alias("genotype")
     )
 
 
-def _slash_genotype_expr(dtype: pl.DataType) -> pl.Expr:
-    """Sorted slash-separated genotype, from either List[str] or authored 'A/G'."""
-    if dtype == pl.String:
-        return pl.col("genotype").str.split("/").list.sort().list.join("/")
-    return pl.col("genotype").list.sort().list.join("/")
+def _normalize_vcf_contigs(vcf_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Fold the VCF's contig spellings onto the ones a module writes.
 
+    Stripping a leading `chr` is not enough, and the gap is silent. Real GRCh38 files split on the
+    mitochondrion: Ensembl-style writes `MT`, while the analysis set most pipelines align against
+    (hs38DH) writes `chrM`, which our strip turned into `M` — a contig no module has, so **every
+    mitochondrial annotation was dropped without a word**. One of the three samples in this repo is
+    exactly that case, and `heteroplasmy` is an entire 0.4 table family about mtDNA.
 
-def _align_genotype_join_keys(
-    left: pl.LazyFrame, right: pl.LazyFrame
-) -> tuple[pl.LazyFrame, pl.LazyFrame]:
-    """Make genotype joinable when one side is List[str] and the other is String.
+    `just_dna_format.vrs.normalize_chrom` is the format's own folding (it is what mints VRS ids),
+    so using it is what keeps our spelling and the module's identical by construction rather than by
+    a rule we maintain. It is total — a scaffold or an HLA contig comes back unchanged rather than
+    raising — so unmatched contigs simply stay unmatched, as they should.
 
-    VCF / weights.parquet store alleles as a sorted List[String]. 0.4 tables
-    (pharm_variants and friends) store the authored string ('A/G'). Polars refuses
-    that join: `list[str] on left does not match str on right`.
+    Mapped over the *distinct* contigs (a few thousand at most) and applied as one vectorized
+    replace, rather than a per-row Python call over millions of variants.
     """
-    left_schema = left.collect_schema()
-    right_schema = right.collect_schema()
-    if "genotype" not in left_schema.names() or "genotype" not in right_schema.names():
-        return left, right
-    left_dtype = left_schema["genotype"]
-    right_dtype = right_schema["genotype"]
-    if left_dtype == right_dtype:
-        return left, right
-    return (
-        left.with_columns(_slash_genotype_expr(left_dtype).alias("genotype")),
-        right.with_columns(_slash_genotype_expr(right_dtype).alias("genotype")),
+    if "chrom" not in vcf_lf.collect_schema().names():
+        return vcf_lf
+    contigs = vcf_lf.select(pl.col("chrom").unique()).collect().to_series().to_list()
+    mapping = {
+        contig: normalize_chrom(contig)
+        for contig in contigs
+        if contig is not None and normalize_chrom(contig) != contig
+    }
+    if not mapping:
+        return vcf_lf
+    return vcf_lf.with_columns(pl.col("chrom").replace(mapping))
+
+
+# VCF §1.6.1.3: ID is a *semicolon-separated list* of identifiers, so one record may legitimately
+# carry `rs123;rs456`. The authored side names exactly one variant per row (`validate_rsid`), so the
+# split belongs to the consumer — and nothing in the format says so, which is why this is spelled
+# out here (just-dna-format ROADMAP RM64).
+_VCF_ID_SEP: str = ";"
+# The column the rsid join actually keys on. Held apart from `rsid` so the output parquet keeps the
+# record's ID verbatim rather than whichever member happened to match.
+_RSID_KEY: str = "_rsid_join_key"
+
+
+def _vcf_rsid_join_keys(vcf_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Add one row per identifier a VCF record carries, keyed in `_RSID_KEY`.
+
+    A no-op in row count for the usual single-ID record, and it keeps a null ID as one null row
+    rather than dropping it.
+    """
+    # `empty_as_null=True` is pinned rather than left to the default, which flips in Polars 2.0:
+    # an identifier-less record must survive as one null-keyed row, never be dropped from the VCF.
+    return vcf_lf.with_columns(
+        pl.col("rsid").str.split(_VCF_ID_SEP).alias(_RSID_KEY)
+    ).explode(_RSID_KEY, empty_as_null=True)
+
+
+def _vcf_has_rsids(vcf_lf: pl.LazyFrame) -> bool:
+    """Whether a prepared VCF carries any rsID at all.
+
+    An rsid join against a VCF whose ID column is empty throughout matches nothing, and the run
+    otherwise reports success with zero annotations — indistinguishable from a genome that simply
+    carries none of the module's variants.
+    """
+    if "rsid" not in vcf_lf.collect_schema().names():
+        return False
+    return bool(
+        vcf_lf.select(
+            (pl.col("rsid").is_not_null() & pl.col("rsid").str.starts_with("rs")).any()
+        )
+        .collect()
+        .item()
+    )
+
+
+def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
+    """How a module's lead table can be joined to a VCF, and why — `(strategy, reason)`.
+
+    Classified by the schema the table actually has, not by its family name: ten families exist
+    today and the format keeps adding them, so a name-keyed switch would need editing every
+    release while a schema-keyed check absorbs new families for free.
+
+    - `position` — `chrom`/`start` exist *and* hold at least one value. A table typed with
+      coordinates but null throughout (any rsid-authored 0.4 table, since the compiler applies
+      `resolution.csv` to `weights.parquet` alone) is not positionally joinable, and treating it
+      as if it were annotates nothing instead of erroring.
+    - `rsid` — no usable coordinates, but `rsid` + `genotype` are there.
+    - `unsupported` — neither. `diplotypes`, `pgs`, `allele_function` and the binning families
+      carry no per-variant key at all; the caller skips them with the reason recorded rather than
+      dying on a `ColumnNotFoundError`.
+    """
+    schema = set(lead_lf.collect_schema().names())
+    if {"chrom", "start"}.issubset(schema) and bool(
+        lead_lf.select(pl.col("chrom").is_not_null().any()).collect().item()
+    ):
+        return "position", "lead table carries coordinates"
+    if {"rsid", "genotype"}.issubset(schema):
+        return "rsid", "lead table carries no coordinates; joining on rsid + genotype instead"
+    missing = sorted({"rsid", "genotype"} - schema)
+    return "unsupported", (
+        "lead table has no populated coordinates and no rsid + genotype to fall back on "
+        f"(missing: {', '.join(missing)})"
     )
 
 
@@ -170,65 +271,116 @@ def annotate_vcf_with_module_weights(
     """
     with start_action(action_type="annotate_with_module_weights", module=module_name, join_on=join_on) as action:
         # Load the module's lead table (lazy) — weights for most modules, pharm_variants for a
-        # pharmacogenomics one.
+        # pharmacogenomics one — and put its genotype in the VCF's representation before any join.
         weights_lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
+        weights_lf = _normalize_lead_genotype(weights_lf)
 
         # A position join needs coordinates, and the 0.4 table families are materialized verbatim
         # from their authored CSV — the compiler applies resolution.csv to weights.parquet only. So a
         # pharm_variants-led module reaches us with chrom/start null on every row and would join to
-        # nothing at all. Fall back to rsid rather than silently annotating zero variants.
-        if join_on == "position" and not _has_coordinates(weights_lf):
+        # nothing at all. Fall back to rsid rather than silently annotating zero variants, and stop
+        # outright when there is nothing to fall back on.
+        strategy, reason = _lead_join_strategy(weights_lf)
+        if strategy == "unsupported":
+            raise UnsupportedLeadTable(f"{module_name}: {reason}")
+        if join_on == "position" and strategy == "rsid":
             action.log(
                 message_type="info",
                 step="join_strategy_downgraded",
                 module=module_name,
-                reason="lead table carries no coordinates; joining on rsid + genotype instead",
+                reason=reason,
             )
             join_on = "rsid"
 
         if join_on == "rsid":
             # Join on rsid + genotype (requires VCF to have rsids)
-            module_rsids = weights_lf.select("rsid").unique()
-            vcf_filtered = vcf_lf.join(module_rsids, on="rsid", how="semi")
-            vcf_filtered, weights_lf = _align_genotype_join_keys(vcf_filtered, weights_lf)
+            #
+            # A VCF whose ID column is empty throughout — DeepVariant output among others — matches
+            # such a module on nothing at all. That is a property of the input, not a failure, but
+            # it must not read as "this module found nothing in you".
+            if not _vcf_has_rsids(vcf_lf):
+                action.log(
+                    message_type="info",
+                    step="vcf_has_no_rsids",
+                    module=module_name,
+                    reason=(
+                        "this VCF carries no rsIDs, and the module can only be joined on rsid + "
+                        "genotype, so no variant can match"
+                    ),
+                )
+
+            # Key on each identifier the record carries, not on the raw ID cell (RM64).
+            vcf_keyed = _vcf_rsid_join_keys(vcf_lf)
+            module_rsids = weights_lf.select(pl.col("rsid").alias(_RSID_KEY)).unique()
+            vcf_filtered = vcf_keyed.join(module_rsids, on=_RSID_KEY, how="semi")
 
             annotated_lf = vcf_filtered.join(
                 weights_lf,
-                on=["rsid", "genotype"],
+                left_on=[_RSID_KEY, "genotype"],
+                right_on=["rsid", "genotype"],
                 how="left",
                 suffix=f"_{module_name}"
-            )
+            ).drop(_RSID_KEY)
         else:
             # Join on position (chrom, start) + genotype
             # HF modules use 'start' for position, VCF also uses 'start' after polars-bio parsing
-            
+
             # The HF weights table has: chrom, start, ref, alts (list), genotype (list)
             # VCF has: chrom, start, ref, alt (string), genotype (list)
-            
-            # We need to match: VCF.alt should be in weights.alts list
+
             # First, get position keys from module
             module_positions = weights_lf.select(["chrom", "start"]).unique()
-            
+
             # Semi-join to filter VCF to only positions in module
             vcf_filtered = vcf_lf.join(
                 module_positions,
                 on=["chrom", "start"],
                 how="semi"
             )
-            vcf_filtered, weights_for_join = _align_genotype_join_keys(
-                vcf_filtered, weights_lf.drop("ref")
-            )
 
-            # Join on position + genotype
-            # Note: We can't directly match alt with alts list in a join,
-            # so we join on position + genotype first, then filter
+            # Join on position + genotype. The genotype lists hold allele *strings*, not GT
+            # indices, so matching them already requires the alleles themselves to agree — but
+            # only for the alleles the sample carries. The module's `ref` used to be dropped
+            # outright to avoid a name collision, which left nothing to catch two different
+            # representations of the same locus (indel left-alignment above all). Keep it under
+            # the suffix and require agreement where the module states one.
             annotated_lf = vcf_filtered.join(
-                weights_for_join,
+                weights_lf,
                 on=["chrom", "start", "genotype"],
                 how="left",
                 suffix=f"_{module_name}"
             )
-        
+            module_ref = f"ref_{module_name}"
+            ref_agrees = pl.col(module_ref).is_null() | (pl.col(module_ref) == pl.col("ref"))
+            # A left join keeps unmatched VCF rows with every module column null; those carry a
+            # null module ref and survive, which is what `report_logic._annotated_rows` expects.
+            #
+            # String equality is the right test *here*, though it is the wrong test in general —
+            # one indel has several valid spellings, which is what `just_dna_format.alleles`
+            # (`parsimony_reduce` / `event_profile`) exists to compare. It is sufficient on the set
+            # this filter can actually see: for a row to reach it, the genotype allele lists already
+            # matched, so a differing `ref` means the genotype was hom-alt and only the ALT strings
+            # coincided — and then the two records delete different numbers of bases, which is a
+            # *positive* contradiction under that algebra rather than a spelling difference. Checked
+            # against it on every real discard; see `TestPositionJoinRequiresRefAgreement`.
+            #
+            # Costs one extra pass over a frame the semi-join has already made small.
+            discarded = (
+                annotated_lf.filter(~ref_agrees).select(pl.len()).collect().item()
+            )
+            if discarded:
+                action.log(
+                    message_type="info",
+                    step="ref_mismatch_discarded",
+                    module=module_name,
+                    num_discarded=discarded,
+                    reason=(
+                        "matched position and genotype but the module states a different ref "
+                        "allele — a different variant whose ALT string happens to coincide"
+                    ),
+                )
+            annotated_lf = annotated_lf.filter(ref_agrees)
+
         # Write to parquet using streaming
         output_path.parent.mkdir(parents=True, exist_ok=True)
         annotated_lf.sink_parquet(output_path, compression=compression)
@@ -243,111 +395,6 @@ def annotate_vcf_with_module_weights(
             num_variants=num_rows,
             join_on=join_on,
             output_path=str(output_path)
-        )
-        
-        return output_path, num_rows
-
-
-def annotate_vcf_with_module_annotations(
-    vcf_lf: pl.LazyFrame,
-    module_name: str,
-    output_path: Path,
-    compression: str = "zstd",
-    module_info: Optional[ModuleInfo] = None,
-) -> tuple[Path, int]:
-    """
-    Annotate VCF variants with a module's annotations table.
-    
-    Joins on rsid only (annotations are variant-level, not genotype-specific).
-    
-    Args:
-        vcf_lf: Prepared VCF LazyFrame with rsid column
-        module_name: Name of the annotator module (e.g., "longevitymap")
-        output_path: Where to write the output parquet
-        compression: Parquet compression (default: zstd)
-        module_info: Optional ModuleInfo for the module
-        
-    Returns:
-        Tuple of (output_path, num_annotated_variants)
-    """
-    with start_action(action_type="annotate_with_module_annotations", module=module_name) as action:
-        annotations_lf = scan_module_table(module_name, ModuleTable.ANNOTATIONS, module_info=module_info)
-        
-        # Pre-filter VCF to only rsids that exist in the module
-        module_rsids = annotations_lf.select("rsid").unique()
-        vcf_filtered = vcf_lf.join(module_rsids, on="rsid", how="semi")
-        
-        # Join on rsid
-        annotated_lf = vcf_filtered.join(
-            annotations_lf,
-            on="rsid",
-            how="left",
-            suffix=f"_{module_name}"
-        )
-        
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        annotated_lf.sink_parquet(output_path, compression=compression)
-        
-        num_rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
-        
-        action.log(
-            message_type="info",
-            step="annotations_complete",
-            module=module_name,
-            num_variants=num_rows
-        )
-        
-        return output_path, num_rows
-
-
-def annotate_vcf_with_module_studies(
-    vcf_lf: pl.LazyFrame,
-    module_name: str,
-    output_path: Path,
-    compression: str = "zstd",
-    module_info: Optional[ModuleInfo] = None,
-) -> tuple[Path, int]:
-    """
-    Annotate VCF variants with a module's studies table.
-    
-    Joins on rsid only. Note: studies table has one row per (rsid, pmid),
-    so this may produce multiple rows per variant.
-    
-    Args:
-        vcf_lf: Prepared VCF LazyFrame with rsid column
-        module_name: Name of the annotator module (e.g., "longevitymap")
-        output_path: Where to write the output parquet
-        compression: Parquet compression (default: zstd)
-        module_info: Optional ModuleInfo for the module
-        
-    Returns:
-        Tuple of (output_path, num_rows)
-    """
-    with start_action(action_type="annotate_with_module_studies", module=module_name) as action:
-        studies_lf = scan_module_table(module_name, ModuleTable.STUDIES, module_info=module_info)
-        
-        # Pre-filter VCF to only rsids that exist in the module
-        module_rsids = studies_lf.select("rsid").unique()
-        vcf_filtered = vcf_lf.join(module_rsids, on="rsid", how="semi")
-        
-        # Join on rsid
-        annotated_lf = vcf_filtered.join(
-            studies_lf,
-            on="rsid",
-            how="left",
-            suffix=f"_{module_name}"
-        )
-        
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        annotated_lf.sink_parquet(output_path, compression=compression)
-        
-        num_rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
-        
-        action.log(
-            message_type="info",
-            step="studies_complete",
-            module=module_name,
-            num_rows=num_rows
         )
         
         return output_path, num_rows
@@ -413,12 +460,15 @@ def annotate_vcf_with_all_modules(
 ) -> tuple[AnnotationManifest, dict]:
     """
     Annotate VCF with all selected HF modules.
-    
-    Produces one set of parquet files per module:
-    - {module}_weights.parquet (genotype-specific scores)
-    - {module}_annotations.parquet (variant facts, optional)
-    - {module}_studies.parquet (literature evidence, optional)
-    
+
+    Produces one parquet per module, `{module}_weights.parquet`, holding the VCF joined to that
+    module's *lead* table. The name says weights because every downstream consumer globs for it;
+    which family actually led is recorded as `lead_table` on the manifest entry, so a
+    `pharm_variants`-led module is not silently read as a weights one.
+
+    A module that cannot be annotated does not take the others down with it: an unjoinable lead
+    family is skipped and a failing one is recorded, both with their reason, and the run continues.
+
     Args:
         logger: Logger instance
         vcf_path: Path to input VCF (used as fallback and for manifest metadata)
@@ -459,21 +509,42 @@ def annotate_vcf_with_all_modules(
                 info_fields=config.info_fields,
                 format_fields=config.format_fields,
             )
+
+        # Fold contig spellings onto the module's once, here, rather than per module — and on both
+        # inputs, since a normalized parquet written before this existed still carries `M` for the
+        # mitochondrion.
+        vcf_lf = _normalize_vcf_contigs(vcf_lf)
         
         # Process each module
         module_outputs: list[ModuleOutputMapping] = []
         total_annotated = 0
-        
+        skipped: dict[str, str] = {}
+        failed: dict[str, str] = {}
+
         for module_name in selected_names:
             logger.info(f"Processing module: {module_name}")
             info = module_infos[module_name]
-            
-            # Weights (genotype-specific) - main annotation
+
+            # Weights (genotype-specific) - main annotation.
+            #
+            # Modules are remote, user-selectable and third-party, so an artifact this engine
+            # cannot join is a condition of normal operation rather than a bug to surface as a
+            # crash — and one such module must not cost the user every other module's annotation.
+            # Register the outcome here and let the caller decide what to say about it.
             weights_path = output_dir / f"{module_name}_weights.parquet"
-            weights_path, num_weights = annotate_vcf_with_module_weights(
-                vcf_lf, module_name, weights_path, config.compression, module_info=info
-            )
-            
+            try:
+                weights_path, num_weights = annotate_vcf_with_module_weights(
+                    vcf_lf, module_name, weights_path, config.compression, module_info=info
+                )
+            except UnsupportedLeadTable as exc:
+                skipped[module_name] = str(exc)
+                logger.warning(f"  Skipping {module_name}: {exc}")
+                continue
+            except Exception as exc:
+                failed[module_name] = f"{type(exc).__name__}: {exc}"
+                logger.error(f"  Failed to annotate {module_name}: {exc}")
+                continue
+
             # Download logo if exists
             logo_path = None
             if info.logo_url:
@@ -497,6 +568,7 @@ def annotate_vcf_with_all_modules(
             
             module_output = ModuleOutputMapping(
                 module=module_name,
+                lead_table=info.lead_table,
                 weights_path=str(weights_path),
                 logo_path=logo_path,
                 metadata_path=metadata_json_path,
@@ -524,7 +596,10 @@ def annotate_vcf_with_all_modules(
         user_name=user_name,
         sample_name=sample_name,
         source_vcf=str(vcf_path),
+        output_dir=str(output_dir),
         modules=module_outputs,
+        skipped_modules=skipped,
+        failed_modules=failed,
         total_variants_annotated=total_annotated,
         duration_sec=duration_sec,
         cpu_percent=cpu_percent,
@@ -544,11 +619,19 @@ def annotate_vcf_with_all_modules(
         "source_vcf": MetadataValue.path(str(vcf_path.absolute())),
         "output_dir": MetadataValue.path(str(output_dir.absolute())),
         "manifest_path": MetadataValue.path(str(manifest_path.absolute())),
-        "modules_processed": MetadataValue.int(len(selected_names)),
-        "module_names": MetadataValue.text(", ".join(selected_names)),
+        "modules_processed": MetadataValue.int(len(module_outputs)),
+        "modules_requested": MetadataValue.int(len(selected_names)),
+        "module_names": MetadataValue.text(", ".join(m.module for m in module_outputs)),
         "total_variants_annotated": MetadataValue.int(total_annotated),
         "compression": MetadataValue.text(config.compression),
     }
+
+    # A module that produced nothing is as much a result as one that did, so name it rather than
+    # leaving the user to infer it from a shorter module list.
+    if skipped:
+        metadata_dict["modules_skipped"] = MetadataValue.json(skipped)
+    if failed:
+        metadata_dict["modules_failed"] = MetadataValue.json(failed)
     
     # Add resource metrics to Dagster metadata
     if duration_sec is not None:

@@ -334,12 +334,18 @@ def show_manifest(
 
     table = Table(title="Output Files")
     table.add_column("Module", style="cyan")
+    table.add_column("Lead table", style="magenta")
     table.add_column("Weights File", style="green")
 
     for m in manifest["modules"]:
-        table.add_row(m["module"], m.get("weights_path", "N/A"))
+        table.add_row(m["module"], m.get("lead_table", "weights"), m.get("weights_path", "N/A"))
 
     console.print(table)
+
+    for name, reason in manifest.get("skipped_modules", {}).items():
+        console.print(f"[yellow]Skipped[/yellow] {name}: {reason}")
+    for name, reason in manifest.get("failed_modules", {}).items():
+        console.print(f"[red]Failed[/red] {name}: {reason}")
 
 
 def main() -> None:
