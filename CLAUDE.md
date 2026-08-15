@@ -1020,6 +1020,31 @@ Full write-up and reproductions: **[docs/GRANIAN_POLARS_FORK_DEADLOCK.md](docs/G
   sorts; multi-key sorts fully materialize). Sort once to a temp parquet, then slice pages
   off that artifact.
 
+### Ctrl+C: importing Polars takes SIGINT away, with `SA_RESTART`
+
+**A blocking `proc.wait()` is not interruptible in any process that imported Polars.**
+Polars installs its own SIGINT handler through `sigaction` with `SA_RESTART` set, so the
+kernel *restarts* the interrupted `waitpid` instead of returning `EINTR`. CPython never
+reaches the bytecode loop where Python-level handlers run, so `KeyboardInterrupt` is not
+raised until the child exits by itself. Measured: a bare interpreter blocked in
+`Popen.wait()` is interrupted at once; the same code after `import polars` ignores every
+SIGINT. This is why `uv run start` sat through a dozen Ctrl+C presses with the whole stack
+still up — and because every child is started with `start_new_session=True`, the terminal's
+SIGINT does not reach them either. The launcher is the only process that can act on it.
+
+- **`install_launcher_signal_handlers` (in `just_dna_lite.process`) is what makes the wait
+  interruptible again**, and not only because it routes first/second signals: CPython's
+  `signal.signal()` registers with `sa_flags = 0`, which clears `SA_RESTART`. Call it
+  **before** blocking on any child — `start_all` inline, `start_dagster` through
+  `_run_managed_foreground`. A launcher that goes back to a bare `proc.wait()` without it is
+  silently uninterruptible again, with no symptom other than Ctrl+C doing nothing.
+- **The first signal raises `KeyboardInterrupt` into the main flow; the second force-kills**
+  the snapshotted tree and exits. SIGTERM and Ctrl+Z enter the same path, so `kill
+  <launcher>` tears the stack down instead of orphaning it.
+- Regression tests: `tests/test_launcher_shutdown.py` pins the SA_RESTART mechanism, an
+  unclaimed wait sleeping through Ctrl+C, and the claimed wait breaking within a tick.
+  `tests/test_process_shutdown.py` covers what shutdown does once it starts.
+
 ---
 
 ## Reflex UI Framework
@@ -1179,6 +1204,7 @@ rx.box(class="ui segment")
 - **Treating `run_in_executor(None, ...)` as making native work safe** - It moves the Python frame to another thread, but Rayon/Tokio/DuckDB pools are process-global. It neither prevents a fork deadlock nor bounds memory. See Process Model & Fork Safety
 - **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap". Dagster runs belong in `webui.compute.jobs` (a spawned child), not in any thread of the ASGI process
 - **Forking after Polars/polars-bio/DuckDB has been used** - Silent, unkillable deadlock on the next parallel op. See Process Model & Fork Safety
+- **Blocking in `proc.wait()` without claiming SIGINT first** - `import polars` installs an SA_RESTART SIGINT handler, so the wait is restarted instead of interrupted and Ctrl+C does nothing at all. Call `install_launcher_signal_handlers` before the wait. See Process Model & Fork Safety
 - **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
 - **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
 - **Underscore-prefixed state vars are backend-only** - Reflex does not send `_foo` to the client. A remount token used as `key=` on uncontrolled inputs (`default_value`) must be a public var (`form_key`, not `_form_key`), or the Add Sample fields keep the typed values after upload. Also return `rx.clear_selected_files(...)` and do not debounce those setters — a late debounce can write the old value back after reset.
