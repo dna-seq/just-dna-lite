@@ -121,7 +121,9 @@ This ensures consistent matching regardless of phasing or VCF representation.
 
 ## CLI Usage
 
-The `pipelines` command-line tool provides access to the annotation pipeline.
+Annotate a VCF and generate the HTML report through the real Dagster job (visible in
+`uv run dagster-ui` when using the same `DAGSTER_HOME`). Place or copy the VCF under
+`data/input/users/{user}/` automatically via the CLI.
 
 ### List Available Modules
 ```bash
@@ -130,26 +132,18 @@ uv run pipelines list-modules
 
 ### Annotate a Local VCF
 ```bash
-uv run pipelines annotate-modules \
-    --vcf /path/to/sample.vcf \
-    --user myuser \
-    --sample sample1
-```
+# Short alias
+uv run annotate path/to/sample.vcf.gz -m longevitymap -m coronary --user myuser
 
-### Annotate from Zenodo (Recommended for personal health data)
-```bash
-uv run pipelines annotate-modules \
-    --zenodo https://zenodo.org/records/18370498 \
-    --user antonkulaga \
-    --sample genome
-```
+# Built-in public genomes (no VCF path; resolves from modules.yaml / Zenodo cache)
+uv run annotate anton -m longevitymap
+uv run annotate livia -m coronary
 
-### Annotate from HuggingFace
-```bash
-uv run pipelines annotate-modules \
-    --hf-source some-repo/data/sample.vcf \
-    --user someuser \
-    --sample sample1
+# Via the pipelines group
+uv run pipelines annotate path/to/sample.vcf.gz -m longevitymap --user myuser
+
+# Every discovered module, plus Ensembl
+uv run annotate path/to/sample.vcf --all-modules --ensembl --user myuser
 ```
 
 ---

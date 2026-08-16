@@ -306,23 +306,23 @@ Modules are discovered via the registry in `registry.py`. A module typically pro
     uv run dg asset materialize --select user_vcf_normalized --partition "user_id/sample_name"
     ```
     Partition key format: `{user_id}/{sample_name}` (e.g. `anonymous/other_livia`). Sample name is filename stem (e.g. `other_livia.vcf.gz` → `other_livia`).
-*   **Annotate with HF modules (CLI):**
+*   **Annotate with HF modules + report (CLI, via Dagster):**
     ```bash
-    # Local VCF
-    uv run pipelines annotate-modules --vcf /path/to/sample.vcf --user myuser
+    # List discovered modules
+    uv run pipelines list-modules
 
-    # From Zenodo (Recommended for personal health data)
-    uv run pipelines annotate-modules \
-        --zenodo https://zenodo.org/records/18370498 \
-        --user antonkulaga
+    # Annotate a local VCF with selected modules (HTML report under data/output/...)
+    uv run annotate path/to/sample.vcf.gz -m longevitymap -m coronary --user myuser
 
-    # From HuggingFace
-    uv run pipelines annotate-modules \
-        --hf-source some-repo/data/sample.vcf \
-        --user someuser
+    # Built-in public genomes (anton / livia) — no VCF path required
+    uv run annotate anton -m longevitymap
+    uv run annotate livia -m thrombophilia
 
-    # Specific modules only
-    uv run pipelines annotate-modules --vcf /path/to/vcf --user myuser --modules longevitymap,coronary
+    # Same via the pipelines group; optional Ensembl
+    uv run pipelines annotate path/to/sample.vcf --all-modules --ensembl --user myuser
+
+    # Watch the run in another terminal (same DAGSTER_HOME)
+    uv run dagster-ui
     ```
 *   **List available modules:**
     ```bash

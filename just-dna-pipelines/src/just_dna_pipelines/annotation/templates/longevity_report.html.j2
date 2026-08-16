@@ -440,8 +440,8 @@ window.onscroll = function() {
                         {% if v.state %}
                         <tr><th>State</th><td>{{ v.state }}</td></tr>
                         {% endif %}
-                        {% if v.clinvar %}
-                        <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                        {% if v.clin_sig %}
+                        <tr><th>ClinVar</th><td>{{ v.clin_sig }}</td></tr>
                         {% endif %}
                         {% if v.studies %}
                         <tr><td colspan="2">
@@ -563,8 +563,8 @@ window.onscroll = function() {
                     {% if v.state %}
                     <tr><th>State</th><td>{{ v.state }}</td></tr>
                     {% endif %}
-                    {% if v.clinvar %}
-                    <tr><th>ClinVar</th><td>Yes{% if v.pathogenic %} (Pathogenic){% elif v.benign %} (Benign){% endif %}</td></tr>
+                    {% if v.clin_sig %}
+                    <tr><th>ClinVar</th><td>{{ v.clin_sig }}</td></tr>
                     {% endif %}
                     {% if v.studies %}
                     <tr><td colspan="2">

@@ -312,6 +312,24 @@ def _zygosity(genotype: list[str] | str | None) -> str:
     return "hom" if alleles[0] == alleles[1] else "het"
 
 
+def _clin_sig_label(row: dict) -> str:
+    """ClinVar significance for the report: typed ``clin_sig``, not the 0.3 booleans.
+
+    The three ClinVar panels populate ``clin_sig`` on every row (``pathogenic`` /
+    ``likely_pathogenic``). The legacy ``clinvar`` / ``pathogenic`` / ``benign`` flags
+    collapse those two calls into one "Pathogenic" cell. Prefer the closed vocabulary;
+    fall back to the booleans only when the typed column is empty (a pre-0.5 module).
+    """
+    raw = row.get("clin_sig")
+    if raw is not None and str(raw).strip():
+        return str(raw).strip().replace("_", " ")
+    if row.get("pathogenic"):
+        return "pathogenic"
+    if row.get("benign"):
+        return "benign"
+    return ""
+
+
 def load_annotated_weights(
     weights_parquet: Path,
     module_name: str,
@@ -483,9 +501,7 @@ def build_longevity_report_data(
                     "priority": row.get("priority", ""),
                     "conclusion": row.get("conclusion", ""),
                     "method": row.get("method", ""),
-                    "clinvar": row.get("clinvar", False),
-                    "pathogenic": row.get("pathogenic", False),
-                    "benign": row.get("benign", False),
+                    "clin_sig": _clin_sig_label(row),
                     "studies": studies_by_rsid.get(rsid, []),
                 }
                 variants.append(variant)
@@ -572,9 +588,7 @@ def build_module_report_data(
                 "priority": row.get("priority", ""),
                 "conclusion": row.get("conclusion", ""),
                 "method": row.get("method", ""),
-                "clinvar": row.get("clinvar", False),
-                "pathogenic": row.get("pathogenic", False),
-                "benign": row.get("benign", False),
+                "clin_sig": _clin_sig_label(row),
                 "population": row.get("population", ""),
                 "p_value": row.get("p_value", ""),
                 "studies": studies_by_rsid.get(rsid, []),

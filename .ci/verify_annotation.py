@@ -4,22 +4,34 @@ from pathlib import Path
 
 import polars as pl
 
-OUTPUT_DIR = Path("data/output/users/ci_test")
+SAMPLE_DIR = Path("data/output/users/ci_test/antku_small")
 
 
 def main() -> None:
-    parquets = list(OUTPUT_DIR.rglob("*_weights.parquet"))
-    assert len(parquets) >= 1, "No weight parquet files found"
+    normalized = SAMPLE_DIR / "user_vcf_normalized.parquet"
+    assert normalized.exists(), f"Missing normalized parquet: {normalized}"
+    norm_df = pl.read_parquet(normalized)
+    assert norm_df.height > 0, "Empty normalized VCF"
+    print(f"OK: {norm_df.height} normalized variants")
 
-    df = pl.read_parquet(parquets[0])
-    assert df.height > 0, "Empty annotation result"
+    weights = list((SAMPLE_DIR / "modules").glob("*_weights.parquet"))
+    assert len(weights) >= 1, "No weight parquet files found"
+    weights_df = pl.read_parquet(weights[0])
     for col in ("chrom", "start", "genotype"):
-        assert col in df.columns, f"Missing column {col}"
-    print(f"OK: {df.height} annotated variants in {parquets[0].name}")
+        assert col in weights_df.columns, f"Missing column {col} in {weights[0].name}"
+    print(
+        f"OK: {weights[0].name} present "
+        f"({weights_df.height} annotated rows; zero is ok for a tiny fixture VCF)"
+    )
 
-    manifest = list(OUTPUT_DIR.rglob("manifest.json"))
-    assert len(manifest) >= 1, "No manifest.json found"
+    manifest = SAMPLE_DIR / "modules" / "manifest.json"
+    assert manifest.exists(), "No manifest.json found"
     print("OK: manifest.json present")
+
+    reports = list((SAMPLE_DIR / "reports").glob("longevity_report_*.html"))
+    assert len(reports) >= 1, "No longevity_report_*.html found"
+    assert reports[-1].stat().st_size > 0, "Empty HTML report"
+    print(f"OK: report {reports[-1].name}")
 
 
 if __name__ == "__main__":

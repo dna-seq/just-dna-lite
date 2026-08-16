@@ -48,6 +48,7 @@ ui = "webui.run:main"
 serve = "webui.run:serve"
 dagster-ui = "just_dna_lite.cli:_start_dagster_cli"
 pipelines = "just_dna_lite.cli:app"
+annotate = "just_dna_lite.cli:annotate_main"
 kill-ports = "webui.run:kill_ports"
 
 [tool.uv.workspace]

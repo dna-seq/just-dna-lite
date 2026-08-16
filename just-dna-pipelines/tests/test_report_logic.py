@@ -123,6 +123,7 @@ def test_variant_color_direction_only_is_green():
 # --------------------------------------------------------- 0.4 table families in the report
 
 from just_dna_pipelines.annotation.report_logic import (
+    _clin_sig_label,
     _evidence_rank,
     _genotype_alleles,
     _genotype_str,
@@ -155,6 +156,26 @@ def test_genotype_alleles_drops_empty_fragments():
     """A trailing or doubled separator must not become a phantom allele."""
     assert _genotype_alleles("G//G") == ["G", "G"]
     assert _genotype_alleles("G/") == ["G"]
+
+
+def test_clin_sig_label_prefers_typed_column_over_booleans():
+    """The ClinVar panels set pathogenic=True for both pathogenic and likely_pathogenic.
+    Keying the report on the boolean collapses those two calls; clin_sig does not."""
+    assert _clin_sig_label({
+        "clin_sig": "likely_pathogenic",
+        "clinvar": True,
+        "pathogenic": True,
+        "benign": False,
+    }) == "likely pathogenic"
+    assert _clin_sig_label({"clin_sig": "pathogenic", "pathogenic": True}) == "pathogenic"
+    assert _clin_sig_label({"clin_sig": "uncertain_significance"}) == "uncertain significance"
+
+
+def test_clin_sig_label_falls_back_to_booleans_when_typed_column_empty():
+    assert _clin_sig_label({"clin_sig": None, "pathogenic": True}) == "pathogenic"
+    assert _clin_sig_label({"clin_sig": "", "benign": True}) == "benign"
+    assert _clin_sig_label({"clinvar": True}) == ""
+    assert _clin_sig_label({}) == ""
 
 
 def test_evidence_rank_orders_clinpgx_tiers_strongest_first():

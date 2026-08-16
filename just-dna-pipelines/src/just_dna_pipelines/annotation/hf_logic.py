@@ -110,6 +110,36 @@ def _has_coordinates(lead_lf: pl.LazyFrame) -> bool:
     )
 
 
+def _slash_genotype_expr(dtype: pl.DataType) -> pl.Expr:
+    """Sorted slash-separated genotype, from either List[str] or authored 'A/G'."""
+    if dtype == pl.String:
+        return pl.col("genotype").str.split("/").list.sort().list.join("/")
+    return pl.col("genotype").list.sort().list.join("/")
+
+
+def _align_genotype_join_keys(
+    left: pl.LazyFrame, right: pl.LazyFrame
+) -> tuple[pl.LazyFrame, pl.LazyFrame]:
+    """Make genotype joinable when one side is List[str] and the other is String.
+
+    VCF / weights.parquet store alleles as a sorted List[String]. 0.4 tables
+    (pharm_variants and friends) store the authored string ('A/G'). Polars refuses
+    that join: `list[str] on left does not match str on right`.
+    """
+    left_schema = left.collect_schema()
+    right_schema = right.collect_schema()
+    if "genotype" not in left_schema.names() or "genotype" not in right_schema.names():
+        return left, right
+    left_dtype = left_schema["genotype"]
+    right_dtype = right_schema["genotype"]
+    if left_dtype == right_dtype:
+        return left, right
+    return (
+        left.with_columns(_slash_genotype_expr(left_dtype).alias("genotype")),
+        right.with_columns(_slash_genotype_expr(right_dtype).alias("genotype")),
+    )
+
+
 def annotate_vcf_with_module_weights(
     vcf_lf: pl.LazyFrame,
     module_name: str,
@@ -160,7 +190,8 @@ def annotate_vcf_with_module_weights(
             # Join on rsid + genotype (requires VCF to have rsids)
             module_rsids = weights_lf.select("rsid").unique()
             vcf_filtered = vcf_lf.join(module_rsids, on="rsid", how="semi")
-            
+            vcf_filtered, weights_lf = _align_genotype_join_keys(vcf_filtered, weights_lf)
+
             annotated_lf = vcf_filtered.join(
                 weights_lf,
                 on=["rsid", "genotype"],
@@ -184,12 +215,15 @@ def annotate_vcf_with_module_weights(
                 on=["chrom", "start"],
                 how="semi"
             )
-            
+            vcf_filtered, weights_for_join = _align_genotype_join_keys(
+                vcf_filtered, weights_lf.drop("ref")
+            )
+
             # Join on position + genotype
             # Note: We can't directly match alt with alts list in a join,
             # so we join on position + genotype first, then filter
             annotated_lf = vcf_filtered.join(
-                weights_lf.drop("ref"),  # Drop ref to avoid conflict
+                weights_for_join,
                 on=["chrom", "start", "genotype"],
                 how="left",
                 suffix=f"_{module_name}"

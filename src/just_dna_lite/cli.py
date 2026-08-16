@@ -21,6 +21,8 @@ from just_dna_lite.process import (
     reap_webui_leftovers,
     shutdown_managed_processes,
 )
+from just_dna_pipelines.annotation.cli_annotate import annotate as annotate_cmd
+from just_dna_pipelines.annotation.cli_annotate import annotate_main
 from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
@@ -49,6 +51,9 @@ app.add_typer(enricher_app, name="enrich")
 # Marketplace reference client (list/download/publish/import-module/find-by-hash/
 # update-module-version). Reads MARKETPLACE_URL / MARKETPLACE_TOKEN from flags, env, or .env.
 app.add_typer(marketplace_client_app, name="marketplace")
+
+# Same callback as ``uv run annotate``; discovery stays inside the command body.
+app.command("annotate")(annotate_cmd)
 
 
 @app.command("list-modules")

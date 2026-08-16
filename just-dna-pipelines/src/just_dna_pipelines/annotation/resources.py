@@ -16,7 +16,7 @@ from urllib.parse import quote
 import requests
 from platformdirs import user_cache_dir
 
-from just_dna_pipelines.module_config import get_immutable_config
+from just_dna_pipelines.module_config import DefaultSample, get_immutable_config
 from just_dna_pipelines.runtime import load_env
 
 LOGGER = logging.getLogger(__name__)
@@ -464,4 +464,108 @@ def resolve_default_samples(
         })
 
     return results
+
+
+def default_sample_aliases(sample: DefaultSample) -> frozenset[str]:
+    """Aliases that resolve to a configured default sample (e.g. anton, livia)."""
+    aliases: set[str] = set()
+    label = (sample.label or "").strip().lower()
+    if label:
+        aliases.add(label)
+        aliases.add(label.replace(" ", ""))
+        aliases.add(label.replace(" ", "-"))
+        aliases.add(label.replace(" ", "_"))
+        aliases.add(label.split()[0])
+
+    subject_id = (sample.subject_id or "").strip().lower()
+    if subject_id:
+        aliases.add(subject_id)
+
+    filename = (sample.filename or "").strip()
+    if filename:
+        if filename.endswith(".vcf.gz"):
+            stem = filename[: -len(".vcf.gz")]
+        elif filename.endswith(".vcf"):
+            stem = filename[: -len(".vcf")]
+        else:
+            stem = Path(filename).stem
+        aliases.add(stem.lower())
+        aliases.add(stem.split(".", 1)[0].lower())
+
+    return frozenset(alias for alias in aliases if alias)
+
+
+def list_default_sample_alias_map() -> dict[str, DefaultSample]:
+    """Map alias → DefaultSample for every configured public genome."""
+    mapping: dict[str, DefaultSample] = {}
+    for sample in get_immutable_config().default_samples:
+        for alias in default_sample_aliases(sample):
+            mapping.setdefault(alias, sample)
+    return mapping
+
+
+def resolve_default_sample(
+    alias: str,
+    user_name: str = "local",
+    log: Optional[Any] = None,
+) -> dict[str, Any]:
+    """Resolve one named default sample (``anton``, ``livia``, …) to a placed VCF.
+
+    Looks up ``immutable_mode.default_samples`` aliases, then reuses the same
+    cache / Zenodo / ``data/input/users/{user}`` placement path as
+    ``resolve_default_samples``.
+
+    Returns a dict with ``path`` (Path) plus sample metadata fields.
+    Raises ``ValueError`` when the alias is unknown or the VCF cannot be fetched.
+    """
+    _log = log or logger
+    key = alias.strip().lower()
+    alias_map = list_default_sample_alias_map()
+    sample = alias_map.get(key)
+    if sample is None:
+        known = sorted({s.label for s in alias_map.values()})
+        known_aliases = sorted(
+            {
+                next(iter(sorted(default_sample_aliases(s))))
+                for s in get_immutable_config().default_samples
+            }
+        )
+        raise ValueError(
+            f"Unknown default sample {alias!r}. "
+            f"Known genomes: {', '.join(known) or '(none)'}. "
+            f"Try aliases: {', '.join(known_aliases) or '(none)'}."
+        )
+
+    user_input_dir = get_user_input_dir() / user_name
+    placed: Path | None = None
+
+    cached_sample = _cached_default_sample_path(sample, user_input_dir, get_cache_dir())
+    if cached_sample is not None:
+        if cached_sample.parent == user_input_dir:
+            _log.info(f"Using existing default sample in user input directory: {cached_sample}")
+            placed = cached_sample
+        else:
+            placed = ensure_vcf_in_user_input_dir(cached_sample, user_name, _log)
+
+    if placed is None:
+        vcf_path = download_vcf_from_zenodo(
+            sample.zenodo_url,
+            filename=sample.filename or None,
+            logger=_log,
+        )
+        placed = ensure_vcf_in_user_input_dir(vcf_path, user_name, _log)
+
+    return {
+        "path": placed,
+        "filename": placed.name,
+        "label": sample.label,
+        "subject_id": sample.subject_id,
+        "sex": sample.sex,
+        "species": sample.species,
+        "reference_genome": sample.reference_genome,
+        "license": sample.license,
+        "zenodo_url": sample.zenodo_url,
+        "source": "zenodo",
+        "alias": key,
+    }
 

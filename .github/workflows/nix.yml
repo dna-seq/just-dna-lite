@@ -80,10 +80,10 @@ jobs:
             uv sync --all-packages --dev
 
             echo "--- annotate antku_small.vcf ---"
-            uv run pipelines annotate-modules \
-                --vcf data/input/tests/antku_small.vcf \
+            uv run annotate \
+                data/input/tests/antku_small.vcf \
                 --user ci_test \
-                --modules longevitymap
+                -m longevitymap
           '
 
       - name: Verify annotation output

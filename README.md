@@ -321,8 +321,31 @@ uv run start             # Full stack (Web UI + pipeline) — development mode
 uv run serve             # Production mode — single Python process, no Node.js
 uv run ui                # Web UI only (dev mode)
 uv run dagster-ui        # Dagster pipeline UI only
-uv run pipelines --help  # CLI tools
+uv run annotate --help   # Annotate a VCF + report from the CLI (no web UI clicking)
+uv run pipelines --help  # CLI tools (includes annotate, list-modules, …)
 uv run kill-ports        # Kill stale processes on ports 3000/8000
+```
+
+### CLI annotation (no web UI)
+
+To run selected modules on a VCF and get the HTML report without clicking through the app:
+
+```bash
+# See discovered modules
+uv run pipelines list-modules
+
+# Annotate a VCF with specific modules (report under data/output/users/...)
+uv run annotate path/to/genome.vcf.gz -m thrombophilia -m coronary
+
+# Or use a built-in public genome alias (no VCF path needed)
+uv run annotate anton -m longevitymap
+uv run annotate livia -m thrombophilia -m coronary
+
+# Or via the pipelines group; optional Ensembl
+uv run pipelines annotate genome.vcf --all-modules --ensembl
+
+# Watch the run (same DAGSTER_HOME) in another terminal
+uv run dagster-ui
 ```
 
 ### Optional: pre-download Ensembl annotations

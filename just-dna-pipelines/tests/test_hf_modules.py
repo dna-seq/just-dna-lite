@@ -29,8 +29,9 @@ from just_dna_pipelines.annotation.hf_modules import (
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.hf_logic import (
-    prepare_vcf_for_module_annotation,
+    _align_genotype_join_keys,
     annotate_vcf_with_module_weights,
+    prepare_vcf_for_module_annotation,
 )
 
 
@@ -537,11 +538,14 @@ class TestPharmVariantsAnnotation:
         assert not _has_coordinates(pl.scan_parquet(base / "pharm_variants.parquet"))
 
         picks = table.select("rsid", "genotype").unique().head(3)
+        # A real VCF / normalized parquet stores genotype as List[str], not the authored
+        # slash-string the 0.4 table carries. Planting strings here used to hide the
+        # SchemaError that annotation hits on every live pharmgkb run.
         vcf = pl.DataFrame({
             "chrom": ["1"] * 3 + ["2"],
             "start": [100, 200, 300, 400],
             "rsid": picks["rsid"].to_list() + ["rs_absent_from_module"],
-            "genotype": picks["genotype"].to_list() + ["A/A"],
+            "genotype": [gt.split("/") for gt in picks["genotype"].to_list()] + [["A", "A"]],
         }).lazy()
 
         out, n = annotate_vcf_with_module_weights(
@@ -557,3 +561,77 @@ class TestPharmVariantsAnnotation:
         assert n == expected
         # and the pharmacogenomics facts survive the join
         assert {"drug", "evidence_level", "phenotype_category"}.issubset(result.columns)
+
+
+class TestGenotypeJoinKeyAlignment:
+    """VCF genotype is List[str]; 0.4 tables store the authored 'A/G' string."""
+
+    def test_list_versus_string_join_fails_without_alignment(self):
+        """The SchemaError that crashed user_hf_module_annotations on pharmgkb."""
+        vcf = pl.DataFrame({
+            "rsid": ["rs1"],
+            "genotype": [["A", "G"]],
+        }).lazy()
+        module = pl.DataFrame({
+            "rsid": ["rs1"],
+            "genotype": ["A/G"],
+            "drug": ["atorvastatin"],
+        }).lazy()
+        with pytest.raises(pl.exceptions.SchemaError, match="genotype"):
+            vcf.join(module, on=["rsid", "genotype"], how="left").collect()
+
+    def test_alignment_makes_list_and_string_joinable(self):
+        vcf = pl.DataFrame({
+            "rsid": ["rs1", "rs2"],
+            "genotype": [["A", "G"], ["C", "C"]],
+        }).lazy()
+        module = pl.DataFrame({
+            "rsid": ["rs1", "rs2"],
+            "genotype": ["A/G", "C/C"],
+            "drug": ["atorvastatin", "warfarin"],
+        }).lazy()
+        left, right = _align_genotype_join_keys(vcf, module)
+        joined = left.join(right, on=["rsid", "genotype"], how="left").collect()
+        assert joined["drug"].to_list() == ["atorvastatin", "warfarin"]
+        assert joined["genotype"].to_list() == ["A/G", "C/C"]
+
+    def test_same_dtype_is_left_alone(self):
+        both_list = pl.DataFrame({
+            "rsid": ["rs1"],
+            "genotype": [["A", "G"]],
+        }).lazy()
+        left, right = _align_genotype_join_keys(both_list, both_list)
+        assert left.collect_schema()["genotype"] == pl.List(pl.String)
+        assert right.collect_schema()["genotype"] == pl.List(pl.String)
+
+    def test_annotate_joins_vcf_lists_to_authored_strings(self, tmp_path: Path):
+        """End-to-end: a pharm_variants-led module annotates a real-shaped VCF."""
+        lead = tmp_path / "pharm_variants.parquet"
+        pl.DataFrame({
+            "rsid": ["rs1", "rs1", "rs2"],
+            "genotype": ["A/G", "G/G", "C/C"],
+            "drug": ["atorvastatin", "atorvastatin", "warfarin"],
+            "evidence_level": ["1A", "1A", "2A"],
+            "phenotype_category": ["Dosage", "Dosage", "Metabolism"],
+        }).write_parquet(lead)
+        info = ModuleInfo(
+            name="pgx",
+            repo_id="org/repo",
+            path=str(tmp_path),
+            lead_table="pharm_variants",
+            lead_url=str(lead),
+        )
+        vcf = pl.DataFrame({
+            "chrom": ["19", "19", "10"],
+            "start": [1, 1, 2],
+            "rsid": ["rs1", "rs1", "rs_absent"],
+            "genotype": [["A", "G"], ["G", "G"], ["T", "T"]],
+        }).lazy()
+
+        out, n = annotate_vcf_with_module_weights(
+            vcf, "pgx", tmp_path / "annotated.parquet", module_info=info
+        )
+        result = pl.read_parquet(out)
+        assert n == 2
+        assert set(result["rsid"].unique()) == {"rs1"}
+        assert set(result["drug"].drop_nulls().to_list()) == {"atorvastatin"}

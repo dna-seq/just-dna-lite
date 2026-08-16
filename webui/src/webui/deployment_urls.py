@@ -103,11 +103,6 @@ def resolve_public_app_url() -> str:
 
 def resolve_dagster_web_public_url() -> str:
     """Return the Dagster web UI base URL as seen from the user's browser."""
-    pub = os.environ.get("PUBLIC_DAGSTER_WEB_URL", "").strip()
-    if pub:
-        return _strip_base(pub)
-    base = os.environ.get("DAGSTER_WEB_URL", "").strip()
-    if base:
-        return _strip_base(base)
-    port = os.environ.get("DAGSTER_PORT", "3005").strip() or "3005"
-    return f"http://localhost:{port}"
+    from just_dna_pipelines.urls import resolve_dagster_web_public_url as _resolve
+
+    return _resolve()
