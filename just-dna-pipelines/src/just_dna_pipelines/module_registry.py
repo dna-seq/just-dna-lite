@@ -36,6 +36,7 @@ from just_dna_pipelines.module_config import (
     ModulesConfig,
     Source,
     get_config_path,
+    has_lead_table,
     save_config,
 )
 
@@ -247,13 +248,70 @@ def unregister_custom_module(module_name: str) -> bool:
     return True
 
 
+def register_downloaded_module(module_dir: Path) -> str:
+    """Wire an already-compiled module dir into local discovery WITHOUT recompiling.
+
+    Used for registry installs: the tarball we extract into ``CUSTOM_MODULES_DIR/{name}``
+    already contains ``weights.parquet`` + ``manifest.json`` (the server-compiled artifact) plus
+    the spec inputs. Recompiling here would produce a fresh parquet whose digest no longer matches
+    the catalog's, so we only ensure the local collection source exists, copy display metadata from
+    the module's ``manifest.json`` (best-effort), and refresh discovery.
+
+    Args:
+        module_dir: ``CUSTOM_MODULES_DIR/{name}`` — must contain a lead table (``weights.parquet``
+            for most modules, ``pharm_variants.parquet`` for a drug-response one).
+
+    Returns:
+        The module name (``module_dir.name``).
+    """
+    module_dir = Path(module_dir)
+    module_name = module_dir.name
+
+    config_path = get_config_path()
+    config = ModulesConfig.model_validate(
+        yaml.safe_load(config_path.read_text()) or {}
+    ) if config_path.exists() else ModulesConfig()
+
+    config = _ensure_local_source(config)
+
+    manifest_path = module_dir / "manifest.json"
+    if manifest_path.exists():
+        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        display = raw.get("display", {}) if isinstance(raw, dict) else {}
+        config.module_metadata[module_name] = ModuleMetadata(
+            title=display.get("title", module_name),
+            description=display.get("description", ""),
+            report_title=display.get("report_title", display.get("title", module_name)),
+            icon=display.get("icon", "database"),
+            color=display.get("color", "#6435c9"),
+        )
+
+    save_config(config, config_path)
+
+    refreshed = refresh_module_registry()
+
+    log_message(
+        message_type="info",
+        action="register_downloaded_module",
+        module_name=module_name,
+        module_dir=str(module_dir),
+        discovered_modules=refreshed,
+    )
+
+    return module_name
+
+
 def list_custom_modules() -> List[str]:
-    """Return names of all compiled custom modules on disk."""
+    """Return names of all compiled custom modules on disk.
+
+    Keyed on ``has_lead_table``, not on ``weights.parquet``: a drug-response module carries
+    ``pharm_variants`` and no weights at all, and is a module none the less.
+    """
     if not CUSTOM_MODULES_DIR.exists():
         return []
     return sorted(
         d.name for d in CUSTOM_MODULES_DIR.iterdir()
-        if d.is_dir() and (d / "weights.parquet").exists()
+        if d.is_dir() and has_lead_table(d)
     )
 
 
@@ -263,7 +321,7 @@ def get_custom_module_specs() -> Dict[str, Path]:
         return {}
     result: Dict[str, Path] = {}
     for d in sorted(CUSTOM_MODULES_DIR.iterdir()):
-        if d.is_dir() and (d / "weights.parquet").exists():
+        if d.is_dir() and has_lead_table(d):
             result[d.name] = d
     return result
 

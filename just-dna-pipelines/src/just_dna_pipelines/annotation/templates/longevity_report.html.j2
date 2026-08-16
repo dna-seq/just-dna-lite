@@ -180,6 +180,22 @@ div.ui.tiny.circular.compact.negative.button {
 .stat-total .number { color: #269292; }
 .stat-weight .number { color: #5a7a72; }
 
+/* An inferred genotype must never look like a sequenced one. Muted rather than alarming: it is a
+   real result with a real caveat, not a warning. */
+.restored-badge {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border-radius: 0.6rem;
+    border: 1px dashed #b58105;
+    background: rgba(251, 189, 8, 0.14);
+    color: #7d5700;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
 /* ========== Module section ========== */
 .module-section { margin: 0.5rem auto; width: 85%; }
 .module-section .board { width: 100%; }
@@ -318,6 +334,122 @@ window.onscroll = function() {
 </head>
 
 <body>
+{#
+  One rendering for a variant table, shared by the pathway-category path and the per-module path.
+  Those two were near-identical copies differing only in the tbody id and the gene link base, and
+  they had already drifted; every field added below would otherwise have been two edits.
+
+  Three constraints the inline JS above imposes on anything changed here:
+    * `expand`/`collapse` take the detail row as the *immediate next sibling* — no wrapper element.
+    * `collapseExpandAll` picks expandable rows by `children.length > 3`, so the summary row must
+      keep more than three cells and the detail row must stay a single colspan cell.
+    * `colspan` on the detail cell must equal the number of <th> in the header (8).
+
+  Every row below is guarded by `{% if %}`: a column our modules leave empty renders nothing at all
+  rather than an empty row, and a module that starts populating one renders it with no further work.
+#}
+{% macro variant_detail_row(label, value) %}
+{% if value %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endif %}
+{% endmacro %}
+
+{% macro variant_rows(variants, tbody_id, gene_href_base) %}
+<tbody id="{{ tbody_id }}">
+    {% for v in variants %}
+    <tr class="clickable" onclick="doOnClick(this)">
+        <td><div class="ui tiny circular compact positive button">+</div></td>
+        <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
+        <td>{% if v.gene %}<a href="{{ gene_href_base }}{{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
+        <td>{{ v.genotype_str }}{% if v.restored %} <span class="restored-badge" title="Inferred from the absence of a variant call at this position, not directly observed.">inferred</span>{% endif %}</td>
+        <td>{{ v.ref }}</td>
+        {# The module's candidate alleles, which is not the allele this person carries — the two used
+           to share a column heading and a `/` separator with "Your genotype", so a two-allele cell
+           read as a genotype. Labelled for what it is instead. #}
+        <td>{{ v.alt }}</td>
+        <td>{{ v.zygosity }}</td>
+        <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+    </tr>
+    <tr class="hidden" style="display:none;"><td colspan="8">
+        <table class="ui padded table">
+        <tbody>
+            {% if v.restored %}
+            <tr><th>Genotype source</th><td><span class="restored-badge">inferred</span>
+                No variant was called at this position. In a callset that only records differences
+                from the reference genome, that normally means the reference genotype — but it can
+                also mean the position was not covered well enough to call, and this file cannot tell
+                the two apart. The nearest called variant is {{ v.restored_flank_bp }} bp away.
+                Treat this as weaker than a directly sequenced result.</td></tr>
+            {% endif %}
+            {{ variant_detail_row("Conclusion", v.conclusion) }}
+            {{ variant_detail_row("Method", v.method) }}
+            {# The 0.3 axis, already derived from `state` when the column is empty. Format 1.0
+               removes `state`, so the raw column is deliberately not rendered. #}
+            {{ variant_detail_row("Direction", v.direction | capitalize) }}
+            {{ variant_detail_row("Priority", v.priority) }}
+            {# clin_sig, not the legacy boolean: the booleans cannot express `likely_pathogenic`
+               and rendering them collapsed that tier into plain "Pathogenic". #}
+            {% if v.clin_sig_label %}
+            <tr><th>ClinVar</th><td>{{ v.clin_sig_label }}</td></tr>
+            {% elif v.clinvar %}
+            <tr><th>ClinVar</th><td>Yes</td></tr>
+            {% endif %}
+            {{ variant_detail_row("Drug", v.drug) }}
+            {{ variant_detail_row("Response", v.response) }}
+            {{ variant_detail_row("Evidence level", v.evidence_level) }}
+            {{ variant_detail_row("Phenotype category", v.phenotype_category) }}
+            {{ variant_detail_row("Effect size", v.effect_size) }}
+            {{ variant_detail_row("Effect measure", v.effect_measure) }}
+            {{ variant_detail_row("Effect allele", v.effect_allele) }}
+            {{ variant_detail_row("Statistical significance", v.stat_significance) }}
+            {{ variant_detail_row("Does not apply to", v.negatives) }}
+            {{ variant_detail_row("Trait (EFO)", v.trait_efo_id) }}
+            {{ variant_detail_row("Flags", v.flags) }}
+            {{ variant_detail_row("Population", v.population) }}
+            {{ variant_detail_row("p-value", v.p_value) }}
+            {% if v.studies %}
+            <tr><td colspan="2">
+            <table class="ui selectable celled teal table table variants">
+                <thead>
+                    <tr>
+                        <th>Pubmed ID</th>
+                        <th>Population</th>
+                        <th>Study design</th>
+                        <th>Conclusions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in v.studies %}
+                    <tr>
+                        <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
+                        <td style="font-weight: normal;">{{ s.population }}</td>
+                        <td style="font-weight: normal;">{{ s.study_design }}</td>
+                        <td style="font-weight: normal;">{{ s.conclusion }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </td></tr>
+            {% endif %}
+        </tbody></table>
+    </td></tr>
+    {% endfor %}
+</tbody>
+{% endmacro %}
+
+{% macro variant_table_head(toggle_target) %}
+<thead>
+    <tr>
+        <th class="clickable title" onclick="collapseExpandAll(this, '{{ toggle_target }}')"><div class="ui tiny circular compact positive button">+</div></th>
+        <th>RSID</th>
+        <th>Gene</th>
+        <th>Your genotype</th>
+        <th>Ref allele</th>
+        <th>Module alt alleles</th>
+        <th>Zygosity</th>
+        <th>Weight</th>
+    </tr>
+</thead>
+{% endmacro %}
+
 <div id="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
     <section class="line-nav arrow-nav"></section>
     <section class="bodypart arrow-nav"></section>
@@ -352,6 +484,15 @@ window.onscroll = function() {
         {% for mod in other_modules %}
         <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
         {% endfor %}
+        {% for mod in pgx_modules %}
+        <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
+        {% endfor %}
+        {% if module_provenance %}
+        <li><a href="#modules" class="li1">Modules in this report</a></li>
+        {% endif %}
+        {% if credits %}
+        <li><a href="#credits" class="li1">Data sources and licences</a></li>
+        {% endif %}
     </ul>
 </div>
 
@@ -384,6 +525,12 @@ window.onscroll = function() {
         <div class="number">{{ longevity.summary.total_weight }}</div>
         <div class="label">Net weight</div>
     </div>
+    {% if longevity.summary.total_restored %}
+    <div class="stat-box" style="background: rgba(251, 189, 8, 0.14); border-color: #b58105;">
+        <div class="number">{{ longevity.summary.total_restored }}</div>
+        <div class="label">Inferred</div>
+    </div>
+    {% endif %}
 </div>
 
 {# Pathway categories with variants #}
@@ -404,73 +551,8 @@ window.onscroll = function() {
     </button>
     <div class="content content-variants">
         <table class="ui selectable celled teal table table variants">
-            <thead>
-                <tr>
-                    <th class="clickable title" onclick="collapseExpandAll(this, '{{ cat_key }}TBody')"><div class="ui tiny circular compact positive button">+</div></th>
-                    <th>RSID</th>
-                    <th>Gene</th>
-                    <th>Your genotype</th>
-                    <th>Ref allele</th>
-                    <th>Alt allele</th>
-                    <th>Zygosity</th>
-                    <th>Weight</th>
-                </tr>
-            </thead>
-            <tbody id="{{ cat_key }}TBody">
-                {% for v in cat.variants %}
-                <tr class="clickable" onclick="doOnClick(this)">
-                    <td><div class="ui tiny circular compact positive button">+</div></td>
-                    <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
-                    <td>{% if v.gene %}<a href="https://genomics.senescence.info/longevity/gene.php?id={{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
-                    <td>{{ v.genotype_str }}</td>
-                    <td>{{ v.ref }}</td>
-                    <td>{{ v.alt }}</td>
-                    <td>{{ v.zygosity }}</td>
-                    <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
-                </tr>
-                <tr class="hidden" style="display:none;"><td colspan="8">
-                    <table class="ui padded table">
-                    <tbody>
-                        {% if v.conclusion %}
-                        <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
-                        {% endif %}
-                        {% if v.method %}
-                        <tr><th>Method</th><td>{{ v.method }}</td></tr>
-                        {% endif %}
-                        {% if v.state %}
-                        <tr><th>State</th><td>{{ v.state }}</td></tr>
-                        {% endif %}
-                        {% if v.clin_sig %}
-                        <tr><th>ClinVar</th><td>{{ v.clin_sig }}</td></tr>
-                        {% endif %}
-                        {% if v.studies %}
-                        <tr><td colspan="2">
-                        <table class="ui selectable celled teal table table variants">
-                            <thead>
-                                <tr>
-                                    <th>Pubmed ID</th>
-                                    <th>Population</th>
-                                    <th>Study design</th>
-                                    <th>Conclusions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for s in v.studies %}
-                                <tr>
-                                    <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
-                                    <td style="font-weight: normal;">{{ s.population }}</td>
-                                    <td style="font-weight: normal;">{{ s.study_design }}</td>
-                                    <td style="font-weight: normal;">{{ s.conclusion }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        </td></tr>
-                        {% endif %}
-                    </tbody></table>
-                </td></tr>
-                {% endfor %}
-            </tbody>
+            {{ variant_table_head(cat_key ~ 'TBody') }}
+            {{ variant_rows(cat.variants, cat_key ~ 'TBody', 'https://genomics.senescence.info/longevity/gene.php?id=') }}
         </table>
     </div>
 
@@ -520,6 +602,12 @@ window.onscroll = function() {
         <div class="number">{{ mod.summary.total_weight }}</div>
         <div class="label">Net weight</div>
     </div>
+    {% if mod.summary.total_restored %}
+    <div class="stat-box" style="background: rgba(251, 189, 8, 0.14); border-color: #b58105;">
+        <div class="number">{{ mod.summary.total_restored }}</div>
+        <div class="label">Inferred</div>
+    </div>
+    {% endif %}
 </div>
 
 <button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
@@ -527,73 +615,8 @@ window.onscroll = function() {
 </button>
 <div class="content content-variants module-section">
     <table class="ui selectable celled teal table table variants">
-        <thead>
-            <tr>
-                <th class="clickable title" onclick="collapseExpandAll(this, '{{ mod.module_name }}TBody')"><div class="ui tiny circular compact positive button">+</div></th>
-                <th>RSID</th>
-                <th>Gene</th>
-                <th>Your genotype</th>
-                <th>Ref allele</th>
-                <th>Alt allele</th>
-                <th>Zygosity</th>
-                <th>Weight</th>
-            </tr>
-        </thead>
-        <tbody id="{{ mod.module_name }}TBody">
-            {% for v in mod.variants %}
-            <tr class="clickable" onclick="doOnClick(this)">
-                <td><div class="ui tiny circular compact positive button">+</div></td>
-                <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
-                <td>{% if v.gene %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
-                <td>{{ v.genotype_str }}</td>
-                <td>{{ v.ref }}</td>
-                <td>{{ v.alt }}</td>
-                <td>{{ v.zygosity }}</td>
-                <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
-            </tr>
-            <tr class="hidden" style="display:none;"><td colspan="8">
-                <table class="ui padded table">
-                <tbody>
-                    {% if v.conclusion %}
-                    <tr><th>Conclusion</th><td>{{ v.conclusion }}</td></tr>
-                    {% endif %}
-                    {% if v.method %}
-                    <tr><th>Method</th><td>{{ v.method }}</td></tr>
-                    {% endif %}
-                    {% if v.state %}
-                    <tr><th>State</th><td>{{ v.state }}</td></tr>
-                    {% endif %}
-                    {% if v.clin_sig %}
-                    <tr><th>ClinVar</th><td>{{ v.clin_sig }}</td></tr>
-                    {% endif %}
-                    {% if v.studies %}
-                    <tr><td colspan="2">
-                    <table class="ui selectable celled teal table table variants">
-                        <thead>
-                            <tr>
-                                <th>Pubmed ID</th>
-                                <th>Population</th>
-                                <th>Study design</th>
-                                <th>Conclusions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for s in v.studies %}
-                            <tr>
-                                <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
-                                <td style="font-weight: normal;">{{ s.population }}</td>
-                                <td style="font-weight: normal;">{{ s.study_design }}</td>
-                                <td style="font-weight: normal;">{{ s.conclusion }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    </td></tr>
-                    {% endif %}
-                </tbody></table>
-            </td></tr>
-            {% endfor %}
-        </tbody>
+        {{ variant_table_head(mod.module_name ~ 'TBody') }}
+        {{ variant_rows(mod.variants, mod.module_name ~ 'TBody', 'https://www.ncbi.nlm.nih.gov/gene/?term=') }}
     </table>
 </div>
 
@@ -601,6 +624,124 @@ window.onscroll = function() {
 <p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
 {% endif %}
 {% endfor %}
+
+{# ===== PHARMACOGENOMICS (pharm_variants-led modules) ===== #}
+{% for mod in pgx_modules %}
+<h2 id="module-{{ mod.module_name }}">{{ mod.display_name }}</h2>
+
+{% if mod.drugs %}
+<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
+    <p>This section groups your variants by the <strong>drug</strong> they affect, because that is the unit a prescriber acts on. A pharmacogenomics module states no effect weights, so entries are ranked by evidence level rather than by weight.</p>
+    <p><strong>Evidence levels</strong> follow ClinPGx: <strong>1A</strong> is a variant with a published prescribing guideline, <strong>1B</strong> a strong association, <strong>2A/2B</strong> moderate, <strong>3</strong> and <strong>4</strong> preliminary or single-report.</p>
+</div>
+
+<div class="summary-card">
+    <div class="stat-box stat-total">
+        <div class="number">{{ mod.summary.total_variants }}</div>
+        <div class="label">Variants matched</div>
+    </div>
+    <div class="stat-box stat-total">
+        <div class="number">{{ mod.summary.total_drugs }}</div>
+        <div class="label">Drugs affected</div>
+    </div>
+    <div class="stat-box stat-negative">
+        <div class="number">{{ mod.summary.guideline_count }}</div>
+        <div class="label">Guideline-level (1A/1B)</div>
+    </div>
+</div>
+
+{% for d in mod.drugs %}
+<div class="section-heading">{{ d.drug | capitalize }}{% if d.best_evidence %} &mdash; evidence {{ d.best_evidence }}{% endif %}</div>
+<div class="basic-panel" id="drug-{{ mod.module_name }}-{{ loop.index }}">
+    {% if d.genes %}
+    <div class="board" style="width: 80%; margin: 0 auto; padding: 1vw 2vw;">
+        <p>Genes involved: {% for g in d.genes %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ g }}">{{ g }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    </div>
+    {% endif %}
+    <button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
+        <div class="arrow-indicator"></div> {{ d.total_count }} variant{% if d.total_count != 1 %}s{% endif %}
+    </button>
+    <div class="content content-variants module-section">
+        <table class="ui selectable celled teal table table variants">
+            {{ variant_table_head(mod.module_name ~ loop.index ~ 'TBody') }}
+            {{ variant_rows(d.variants, mod.module_name ~ loop.index ~ 'TBody', 'https://www.ncbi.nlm.nih.gov/gene/?term=') }}
+        </table>
+    </div>
+    <div style="height: 4vw;"></div>
+</div>
+{% endfor %}
+
+{% else %}
+<p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
+{% endif %}
+{% endfor %}
+
+{# ===== MODULES IN THIS REPORT ===== #}
+{% if module_provenance %}
+<h2 id="modules">Modules in this report</h2>
+<div class="board" style="width: 75%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
+    <p>Annotation modules are curated databases that are revised over time, so these are the versions this report was built from. A later run against an updated module can reach a different conclusion from the same genome.</p>
+    <table class="ui celled teal table">
+        <thead>
+            <tr>
+                <th>Module</th>
+                <th>Version</th>
+                <th>Build</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in module_provenance %}
+            <tr>
+                <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                {# Empty means the acquisition path never stated it — a module read straight from a
+                   remote parquet has no manifest to read. Never render that as "unversioned". #}
+                <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
+                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                <td>{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{# ===== CREDITS ===== #}
+{% if credits %}
+<h2 id="credits">Data sources and licences</h2>
+<div class="board" style="width: 75%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
+    <p>This report redistributes curated content from the databases below. Only sources that contribute annotation content are listed; references consulted solely to place a variant's coordinates carry no such terms.</p>
+    <table class="ui celled teal table">
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Used by</th>
+                <th>Licence</th>
+                <th>Attribution</th>
+                <th>Terms</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in credits %}
+            <tr>
+                <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
+                <td>{{ c.modules | join(', ') }}</td>
+                <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>
+                <td>{{ c.attribution }}{% if c.notice %}<br><small>{{ c.notice }}</small>{% endif %}</td>
+                <td>
+                    {# Tri-state: `None` means the terms could not be established, which is not the
+                       same as permitted. Only an explicit `false` is reported as a restriction. #}
+                    {% if c.share_alike is sameas true %}<div>Share-alike required</div>{% endif %}
+                    {% if c.commercial_use is sameas false %}<div>Non-commercial use only</div>{% endif %}
+                    {% if c.redistribution is sameas false %}<div>Redistribution restricted</div>{% endif %}
+                    {% if c.share_alike is none and c.commercial_use is none and c.redistribution is none %}<div><em>Not stated</em></div>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 <div style="height: 80px;"></div>
 

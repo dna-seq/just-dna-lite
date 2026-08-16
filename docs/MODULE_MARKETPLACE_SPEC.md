@@ -227,7 +227,17 @@ All hashes are SHA-256, lowercase hex, prefixed `sha256:`.
 - **`compile_success`**: `true` only when the server's own `compile_module()` returned
   success. A downloader treats `false`, or a foreign `compiled_by`, as untrusted.
 
-**Client verify-then-install flow:**
+**Client verify-then-install flow — specified, NOT implemented.** `register_downloaded_module()`
+extracts the tarball, copies display metadata out of `manifest.json` and registers the directory.
+Nothing in this repo calls `just_dna_format.integrity.verify_manifest`, and neither
+`compile_success` nor `compiled_by` is ever read back from a downloaded manifest — the only
+occurrences of `compiled_by` are as a value our own compile CLI *writes*. Steps 2–5 below are
+therefore what a client should do, not what this one does. Two notes for whoever wires it:
+`verify_manifest(module_dir, manifest, *, require_marketplace=True, …)` defaults to the marketplace
+policy, so a local compile (whose `compiled_by` is null by design) needs `require_marketplace=False`;
+and the digest recorded on an annotation run today is the module's *claimed* one, so it must not be
+presented to a reader as verified until this flow exists.
+
 1. Fetch `manifest.json`.
 2. For each `artifact.files[]`: download, compute SHA-256, compare. Any mismatch → abort.
 3. Recompute `artifact.digest` from the verified file list; compare to the manifest.

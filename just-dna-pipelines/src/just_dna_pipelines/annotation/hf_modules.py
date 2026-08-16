@@ -8,16 +8,24 @@ Sources are configured in modules.yaml (see module_config.py).
 
 import re
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 import polars as pl
 from eliot import log_message
+from just_dna_format.manifest import read_manifest
 from pydantic import BaseModel, model_validator
 
 from just_dna_pipelines.annotation.module_cache import (
     invalidate_module_cache_on_version_change,
 )
-from just_dna_pipelines.module_config import DEFAULT_REPOS, LEAD_TABLES, MODULES_CONFIG, Source
+from just_dna_pipelines.module_config import (
+    DEFAULT_REPOS,
+    LEAD_TABLES,
+    MODULES_CONFIG,
+    Source,
+    spec_version,
+)
 
 
 # Backward-compatible aliases sourced from modules.yaml
@@ -25,7 +33,7 @@ HF_DEFAULT_REPOS: list[str] = DEFAULT_REPOS
 HF_REPO_ID: str = HF_DEFAULT_REPOS[0] if HF_DEFAULT_REPOS else ""
 
 # Tables available in each module
-MODULE_TABLES = ["annotations", "studies", "weights"]
+MODULE_TABLES = ["annotations", "studies", "weights", "sources"]
 
 
 class ModuleInfo(BaseModel):
@@ -48,6 +56,10 @@ class ModuleInfo(BaseModel):
     weights_url: Optional[str] = None
     annotations_url: Optional[str] = None
     studies_url: Optional[str] = None
+    # Licensing provenance for the data this module redistributes. Every module the compiler emits
+    # carries one, and a report that embeds a module's curated prose owes its attribution — so this
+    # is discovered rather than left to a consumer that happens to know the file is there.
+    sources_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
 
@@ -122,6 +134,7 @@ def _probe_module_at_path(
 
     annotations_path = f"{base_path}/annotations.parquet"
     studies_path = f"{base_path}/studies.parquet"
+    sources_path = f"{base_path}/sources.parquet"
     metadata_json_path = f"{base_path}/metadata.json"
     metadata_yaml_path = f"{base_path}/metadata.yaml"
 
@@ -151,6 +164,7 @@ def _probe_module_at_path(
         weights_url=lead_url if lead_table == "weights" else None,
         annotations_url=_build_url(protocol, annotations_path) if fs.exists(annotations_path) else None,
         studies_url=_build_url(protocol, studies_path) if fs.exists(studies_path) else None,
+        sources_url=_build_url(protocol, sources_path) if fs.exists(sources_path) else None,
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
     )
@@ -402,6 +416,7 @@ class ModuleTable(str, Enum):
     ANNOTATIONS = "annotations"
     STUDIES = "studies"
     WEIGHTS = "weights"
+    SOURCES = "sources"
     # Whichever table family carries this module's rows — weights for most, pharm_variants for a
     # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
     LEAD = "lead"
@@ -445,6 +460,10 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
         if not info.studies_url:
             raise ValueError(f"Module {module_name} does not have a studies table")
         return info.studies_url
+    elif table_name == "sources":
+        if not info.sources_url:
+            raise ValueError(f"Module {module_name} does not have a sources table")
+        return info.sources_url
 
     # Fallback for unknown tables
     return f"{info.path}/{table_name}.parquet"
@@ -515,14 +534,80 @@ def validate_modules(module_names: list[str]) -> list[str]:
     return valid
 
 
+def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
+    """The module's directory when its bytes live on this filesystem, else ``None``.
+
+    A registry install or a local compile is a real directory under the registered-modules dir
+    (the local source's URL is a bare absolute path, so `ModuleInfo.path` is that directory). An
+    HF- or HTTP-discovered module has a relative or remote base path and no local directory —
+    `scan_module_table` goes straight to the parquet URL and never fetches a manifest.
+    """
+    if info is None:
+        return None
+    path = Path(info.path)
+    if not path.is_absolute() or not path.is_dir():
+        return None
+    return path
+
+
+def read_module_provenance(
+    info: Optional[ModuleInfo],
+) -> tuple[Optional[str], Optional[str]]:
+    """``(version, artifact digest)`` for the module's bytes, as far as the source states them.
+
+    `None` means *not established*, never "unversioned" or "unverified": only an acquisition path
+    that puts `manifest.json` on disk can answer at all, and HF discovery is not one of them.
+
+    The digest is the value the module **claims** — read from its manifest, not recomputed. Nothing
+    in this repo calls `just_dna_format.integrity.verify_manifest`, so recording it ties a report to
+    a stated identity, not to a checked one. Do not present it to a reader as verification.
+    """
+    module_dir = local_module_dir(info)
+    if module_dir is None:
+        return (None, None)
+
+    manifest_path = module_dir / "manifest.json"
+    version: Optional[str] = None
+    digest: Optional[str] = None
+    if manifest_path.exists():
+        try:
+            manifest = read_manifest(manifest_path)
+        except (ValueError, OSError) as exc:
+            log_message(
+                message_type="warning",
+                action="unreadable_module_manifest",
+                path=str(manifest_path),
+                reason=str(exc),
+            )
+        else:
+            version = manifest.identity.version or None
+            digest = manifest.artifact.digest or None
+
+    # The compiler leaves `identity.version` null — the registry stamps identity at publish time —
+    # so a locally-compiled module's version lives only in the authored spec.
+    if version is None:
+        version = spec_version(module_dir) or None
+
+    return (version, digest)
+
+
 class ModuleOutputMapping(BaseModel):
     """Mapping of output files to their source modules."""
     module: str
-    annotations_path: Optional[str] = None
+    # Which table family actually carried this module's rows. The output file is named
+    # `{module}_weights.parquet` whatever the family, because every downstream consumer globs for
+    # that; this says what is really inside, so `pharmgkb_weights.parquet` is not read as weights.
+    lead_table: str = "weights"
     weights_path: Optional[str] = None
-    studies_path: Optional[str] = None
     logo_path: Optional[str] = None
     metadata_path: Optional[str] = None
+    # Which module *bytes* produced these rows, so a saved report can be tied to them and a stale
+    # one can be told from a current one. All three are `None` where the acquisition path does not
+    # state them — see `read_module_provenance`: HF discovery reads the parquet URL and nothing
+    # else, so only `source_url` is known there. `None` means not established, never "none".
+    version: Optional[str] = None
+    digest: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 class AnnotationManifest(BaseModel):
@@ -530,8 +615,22 @@ class AnnotationManifest(BaseModel):
     user_name: str
     sample_name: str
     source_vcf: str
+    # Where the outputs were written. Stated rather than reconstructed from `modules[0]`, which is
+    # not there to reconstruct from when every selected module was skipped.
+    output_dir: str = ""
     modules: list[ModuleOutputMapping]
+    # Modules asked for that produced no output, by name → reason: an unjoinable lead family
+    # (skipped) or an error (failed). Absent from `modules`, so recorded here instead of lost.
+    skipped_modules: dict[str, str] = {}
+    failed_modules: dict[str, str] = {}
+    # Rows that actually matched a module entry — NOT the height of the parquets, which keep the
+    # unmatched rows of a position join on purpose.
     total_variants_annotated: int = 0
+    # Rows reported from the *absence* of a call: the module authored the reference genotype and the
+    # callset, being variant-only, emitted no record at that site. Held apart from the annotated
+    # total because these were inferred, never observed, and a reader is owed that distinction.
+    restored_variants: dict[str, int] = {}
+    total_variants_restored: int = 0
     # Execution metrics
     duration_sec: Optional[float] = None
     cpu_percent: Optional[float] = None

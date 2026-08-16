@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import base64
 import gc
 import logging
 import os
 import queue
+import re
 import shutil
 import asyncio
+import tarfile
 import tempfile
 import time
 import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import polars as pl
 import reflex as rx
@@ -33,18 +36,41 @@ from just_dna_pipelines.module_config import (
     build_module_metadata_dict, _load_config,
     is_immutable_mode as _is_immutable_mode,
     get_immutable_config,
+    has_lead_table,
+    spec_version,
     DefaultSample,
 )
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
     register_custom_module,
+    register_downloaded_module,
     unregister_custom_module,
     list_custom_modules,
     refresh_module_registry,
 )
+from just_dna_registry import RegistryClient, RegistryError
+from just_dna_registry.client import VersionMismatchError
+from just_dna_format.identity import is_valid_namespace
+from just_dna_compiler.compiler import _OUTPUT_FILES as _COMPILER_OUTPUT_FILES
+from just_dna_compiler.compiler import content_signature
+from just_dna_format.integrity import IntegrityError, build_artifact
+from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
 from webui.dagster_env import get_dagster_instance
+from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
+from webui.registry_identity import (
+    ensure_install_id, load_identity, save_identity, derive_handle, set_env_var,
+)
+
+# Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
+_DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
+
+# Shown when the catalog server's contract (API / just-dna-format / compiler) is newer than
+# this app's client — swapping compiled artifacts would collide, so we refuse and tell the user.
+_REGISTRY_MISMATCH_HINT: str = (
+    "This app is out of date with the catalog server — update just-dna-lite to continue."
+)
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
 
@@ -4813,7 +4839,7 @@ class AgentState(rx.State):
     slot_replace_pending_name: str = ""   # module name queued for confirm-replace
 
     # -- API key settings UI --------------------------------------------------
-    settings_expanded: bool = True   # open by default so first-time users see it
+    settings_expanded: bool = False  # hidden; opened via the header gear button
 
     def toggle_settings(self):
         self.settings_expanded = not self.settings_expanded
@@ -4885,6 +4911,11 @@ class AgentState(rx.State):
     def set_agent_use_team(self, value: bool) -> None:
         """Explicit setter for agent_use_team (avoids deprecation warning)."""
         self.agent_use_team = value
+
+    def set_agent_mode(self, value: Union[str, List[str]]) -> None:
+        """Set module creator mode from segmented control value."""
+        mode = value[0] if isinstance(value, list) and value else value
+        self.agent_use_team = mode == "team"
 
     def _reset_agent_input(self) -> None:
         """Clear chat input and remount uncontrolled textarea."""
@@ -5413,3 +5444,1589 @@ class AgentState(rx.State):
         self.slot_module_icon = ""
         self.slot_module_color = ""
         self.slot_version = 0
+
+
+# ============================================================================
+# REGISTRY STATE
+# ============================================================================
+
+def _registry_url() -> str:
+    """Base URL of the module registry server (env-overridable)."""
+    return os.getenv("REGISTRY_URL", "https://module-marketplace.just-dna.life").rstrip("/")
+
+
+# Compiled artifact files the digest is computed over. Taken from the compiler rather than
+# restated, because a hand-copied list silently stops mirroring it: this was frozen at the
+# original three while 0.5 grew the set to sixteen (the 0.4 table families plus the enrichment
+# sidecars `frequencies`/`gene_metrics`/`literature`/`sources`), so the digest computed here
+# ignored every one of them and could not equal the server's for any enriched module.
+# `build_artifact` skips absent files, so passing the full set is safe for a minimal module.
+_ARTIFACT_FILES: tuple = tuple(_COMPILER_OUTPUT_FILES)
+
+
+#: Tables that can lead a module, newest-first — mirrors the order
+#: `scripts/registry_precheck.py` uses. The leading table's row count is what the server's
+#: enrichment limit counts.
+_LEAD_TABLES: tuple = ("variants.csv", "pharm_variants.csv", "diplotypes.csv", "pgs.csv")
+
+#: The server's ceiling on the enrichment half of `/check` (`REGISTRY_ENRICH_MAX_VARIANTS`).
+#: Past it the endpoint answers `422 too_many_variants`, so a bigger module goes to `/validate` —
+#: which has no network tier and is the half that decides publishability anyway.
+_ENRICH_MAX_VARIANTS: int = 500
+
+#: Raw spec bytes past which the spec is packed into one archive rather than sent as loose parts.
+#: The server bounds the wire at 25 MiB.
+_PACK_ABOVE_BYTES: int = 20 * 1024 * 1024
+
+
+def _trust_word(trusted: Optional[bool]) -> str:
+    """Flatten `ResolutionInfo.trusted` to a branchable word, keeping all three states.
+
+    `None` is not "untrusted": it means the server said nothing, which is what an older release
+    predating the field looks like. Collapsing it into `False` would label such a version as
+    positionally unjoinable when nothing established that.
+    """
+    if trusted is True:
+        return "yes"
+    if trusted is False:
+        return "no"
+    return "unknown"
+
+
+def _authored_row_count(module_dir: Path) -> int:
+    """Rows in whichever table leads the module — what the enrichment limit counts."""
+    for table in _LEAD_TABLES:
+        path = module_dir / table
+        if path.exists():
+            with path.open(encoding="utf-8") as handle:
+                return max(sum(1 for _ in handle) - 1, 0)
+    return 0
+
+
+def _spec_bytes(module_dir: Path) -> int:
+    """Raw size of the authored parts, which is what decides loose-parts vs packed archive."""
+    return sum(
+        f.stat().st_size
+        for pattern in ("module_spec.yaml", "*.csv", "*.log")
+        for f in module_dir.glob(pattern)
+        if f.is_file()
+    )
+
+
+def _local_key(namespace: str, name: str) -> str:
+    """Local registry key for a registry module: ``{namespace}__{name}``.
+
+    Namespacing keeps a registry install from colliding with (and being shadowed by) a
+    same-named HF module or a same-named module from a different namespace — they install and
+    appear in annotation as distinct modules. Locally-authored modules (no namespace) keep their
+    bare name. The namespace is sanitized to ``[a-z0-9_]`` (e.g. ``just-dna-seq`` → ``just_dna_seq``)
+    so the key stays a valid module-name token.
+    """
+    if not namespace:
+        return name
+    safe_ns = "".join(ch if ch.isalnum() else "_" for ch in namespace.lower()).strip("_")
+    return f"{safe_ns}__{name}"
+
+
+def _scan_local_modules() -> List[Dict[str, Any]]:
+    """Scan the local custom-modules dir → one dict per registered module.
+
+    Two content identities are recorded, because they answer different questions:
+
+    ``signature`` is ``content_signature`` over the *authored* CSVs — name- and
+    Ensembl-independent, and **the value the registry gates 409 duplicate_content on**. It is
+    therefore the one that predicts whether a publish will be rejected. It is also stable across
+    a recompile, which the artifact digest is not: rebuilding a module always mints a new digest,
+    so a digest-only check reports "not published" for a module that merely got rebuilt and then
+    offers a Publish button the server rejects.
+
+    ``digest`` is the compiled-artifact digest, still computed from the files on disk (not read
+    from ``manifest.json``), and still the only identity available for a **compiled-only import**
+    that carries no spec CSVs — a metadata-stripped module shared peer-to-peer.
+
+    ``manifest.json`` is used only for optional display metadata (version/namespace/title).
+    ``has_spec`` marks whether spec files are present (needed for Edit-into-slot). Pure function
+    — no client and no HTTP (``content_signature`` parses CSVs locally) — safe in an executor.
+    """
+    out: List[Dict[str, Any]] = []
+    if not CUSTOM_MODULES_DIR.exists():
+        return out
+    for d in sorted(CUSTOM_MODULES_DIR.iterdir()):
+        # Any lead table, not just weights — a `pharm_variants`-led install is a module, and
+        # testing for weights here made one annotatable but unlistable, unpublishable and
+        # uneditable from this pane.
+        if not (d.is_dir() and has_lead_table(d)):
+            continue
+        name = d.name
+        try:
+            digest = build_artifact(d, list(_ARTIFACT_FILES)).digest
+        except Exception:  # noqa: BLE001 - unreadable artifact → no digest, treat as unclassified
+            digest = ""
+        has_spec = (d / "module_spec.yaml").exists()
+        signature = ""
+        if has_spec:
+            try:
+                signature = content_signature(d)
+            except Exception:  # noqa: BLE001 - unauthored/invalid spec → fall back to digest
+                signature = ""
+        entry: Dict[str, Any] = {
+            "name": name, "version": "", "digest": digest, "signature": signature,
+            "namespace": "",
+            "catalog_name": name, "title": name, "icon": "database", "color": "#6435c9",
+            "has_spec": has_spec, "in_catalog": False,
+        }
+        manifest_path = d / "manifest.json"
+        if manifest_path.exists():
+            try:
+                mf = read_manifest(manifest_path)
+                entry["version"] = mf.identity.version or ""
+                entry["namespace"] = mf.identity.namespace or ""
+                entry["catalog_name"] = mf.identity.name or name
+                entry["title"] = mf.display.title or name
+                entry["icon"] = mf.display.icon or "database"
+                entry["color"] = mf.display.color or "#6435c9"
+            except Exception:  # noqa: BLE001 - manifest is best-effort metadata
+                pass
+        # The compiler leaves manifest identity.version null (marketplace-assigned at publish
+        # time); fall back to the authored spec version so the publish pane shows a version and
+        # enables the Publish button.
+        if not entry["version"]:
+            entry["version"] = spec_version(d)
+        out.append(entry)
+    return out
+
+
+class RegistryState(rx.State):
+    """Module Registry: local registry cross-referenced against the remote catalog.
+
+    Network calls run in ``@rx.event(background=True)`` handlers off the Reflex state lock.
+    """
+
+    # --- Right-pane tab ---
+    registry_active_tab: str = "catalog"
+
+    # --- Catalog (Catalog tab) ---
+    query: str = ""
+    sort: str = "name"
+    group_filter: str = ""                # 0.8.0 listing group ("" = default; test spaces hidden)
+    namespace_filter: str = ""            # "" = all namespaces
+    namespace_options: List[str] = []     # namespaces discovered from catalog results
+    page: int = 1
+    per_page: int = 24
+    cards: List[Dict[str, Any]] = []
+    total: int = 0
+    catalog_loading: bool = False
+    catalog_error: str = ""
+    server_incompatible: bool = False   # server contract newer than this client (0.7.1 guard)
+
+    # --- Local registry snapshot (name -> metadata + in_catalog flag) ---
+    local_modules: List[Dict[str, Any]] = []
+    _local_names: List[str] = []
+
+    # --- Selection (left pane) ---
+    selected_name: str = ""              # local registry key (namespaced for registry modules)
+    selected_catalog_name: str = ""      # catalog module name (for API calls)
+    selected_namespace: str = ""
+    selected_title: str = ""
+    selected_description: str = ""
+    selected_author: str = ""
+    selected_icon: str = "database"
+    selected_color: str = "#6435c9"
+    selected_variant_count: int = 0
+    selected_gene_count: int = 0
+    selected_logo_url: str = ""          # absolute logo URL (schema 0.3.0), "" → fall back to icon
+    selected_clinvar_count: int = 0
+    selected_pathogenic_count: int = 0
+    selected_benign_count: int = 0
+    selected_version: str = ""
+    selected_versions: List[str] = []
+    _remote_versions: List[str] = []
+    _remote_digests: Dict[str, str] = {}
+    # version -> "yes" | "no" | "unknown". `ResolutionInfo.trusted` is three-valued in registry
+    # 0.11.3 and the third state is not a detail: `false` means the compiler reported a positional
+    # table that joins by rsID only, and `null` means the server did not say. Carried as a string
+    # because an Optional[bool] cannot be branched on with rx.cond without collapsing None to False.
+    _remote_trust: Dict[str, str] = {}
+    detail_loading: bool = False
+    detail_error: str = ""
+
+    # --- Action status + gating ---
+    action_busy: bool = False
+    action_message: str = ""
+    pending_action: Dict[str, Any] = {}   # {} = none
+
+    # --- Publication identity + profile ---
+    install_id: str = ""
+    token: str = ""
+    account: str = ""              # immutable account handle, once registered
+    namespaces: List[str] = []     # namespaces this account owns / belongs to
+    display_name: str = ""         # mandatory-to-register, regex-guarded
+    email: str = ""
+    avatar_local: str = ""         # local-only avatar (data URI); never uploaded
+    roles: List[Dict[str, str]] = []       # [{namespace, role}] from members()
+    account_stats: Dict[str, Any] = {}     # summed catalog_stats over owned namespaces
+    profile_message: str = ""
+
+    # --- Publication flow ---
+    publish_namespace: str = ""    # target namespace for publishing
+    new_namespace: str = ""        # create-namespace input
+    ns_available: str = ""         # "" | checking | yes | no | invalid
+    publish_state: str = ""        # new | new_version | published_identical | yanked | conflict
+    publish_version: str = ""
+    published_digest: str = ""
+    publish_busy: bool = False
+    publish_message: str = ""
+
+    # --- Pre-publish rehearsal (registry 0.11 `/check` and `/validate`) ---
+    precheck_busy: bool = False
+    precheck_endpoint: str = ""    # "" | check | validate — which half actually ran
+    precheck_verdict: str = ""     # "" | pass | fail | blocked | rate_limited | error
+    precheck_message: str = ""
+    precheck_findings: List[str] = []
+
+    # ------------------------------------------------------------------ helpers
+
+    @rx.var
+    def _selected_local(self) -> Dict[str, Any]:
+        for m in self.local_modules:
+            if m.get("name") == self.selected_name:
+                return m
+        return {}
+
+    @rx.var
+    def has_selection(self) -> bool:
+        return self.selected_name != ""
+
+    @rx.var
+    def sel_status(self) -> str:
+        """State machine for (selected_name, selected_version) vs local + catalog."""
+        if not self.selected_name:
+            return "none"
+        li = self._selected_local
+        installed_here = bool(li) and li.get("version", "") == self.selected_version
+        remote_here = self.selected_version in self._remote_versions
+        if installed_here:
+            if li.get("in_catalog"):
+                return "installed"
+            return "mismatch" if remote_here else "local_only"
+        return "not_installed" if remote_here else "not_available"
+
+    @rx.var
+    def sel_status_label(self) -> str:
+        return {
+            "installed": "Installed",
+            "mismatch": "Version mismatch",
+            "local_only": "Local only",
+            "not_installed": "Not installed",
+            "not_available": "Not available",
+        }.get(self.sel_status, "")
+
+    @rx.var
+    def sel_status_color(self) -> str:
+        return {
+            "installed": "#21ba45",
+            "mismatch": "#f2711c",
+            "local_only": "#a333c8",
+            "not_installed": "#2185d0",
+            "not_available": "#767676",
+        }.get(self.sel_status, "#767676")
+
+    @rx.var
+    def show_download(self) -> bool:
+        # Only remote-present + local-absent, per name+version.
+        return self.sel_status == "not_installed"
+
+    @rx.var
+    def show_local_actions(self) -> bool:
+        # Edit/Export/Uninstall/Upload apply when the selected version is the installed one.
+        li = self._selected_local
+        return bool(li) and li.get("version", "") == self.selected_version
+
+    @rx.var
+    def edit_enabled(self) -> bool:
+        li = self._selected_local
+        return bool(li) and li.get("has_spec", False) and li.get("version", "") == self.selected_version
+
+    @rx.var
+    def export_url(self) -> str:
+        if not self.selected_name:
+            return ""
+        return f"{_backend_api_url()}/api/module-zip/{self.selected_name}"
+
+    @rx.var
+    def has_pending(self) -> bool:
+        return bool(self.pending_action)
+
+    @rx.var
+    def pending_warn(self) -> str:
+        return self.pending_action.get("warn", "")
+
+    @rx.var
+    def can_prev(self) -> bool:
+        return self.page > 1
+
+    @rx.var
+    def can_next(self) -> bool:
+        return self.page * self.per_page < self.total
+
+    def _client_args(self):
+        return _registry_url(), (self.token or None)
+
+    # ------------------------------------------------------------------ setters
+
+    def set_query(self, value: str) -> None:
+        self.query = value
+
+    @rx.event(background=True)
+    async def switch_registry_tab(self, tab: str):
+        # The tab name arrives from the client, so a hidden tab is refused here
+        # too — not only left unrendered.
+        if tab == "publication" and not REGISTRY_PUBLICATION_ENABLED:
+            return
+        async with self:
+            self.registry_active_tab = tab
+        if tab == "publication":
+            if self.token:
+                await self._refresh_account()
+            await self._load_publish_state()
+
+    def set_selected_version(self, version: str) -> None:
+        self.selected_version = version
+
+    def cancel_pending(self) -> None:
+        self.pending_action = {}
+
+    # ------------------------------------------------------------------ loaders
+
+    async def _refresh_upload_ui(self) -> None:
+        """Refresh the annotate-page module list after an install/uninstall.
+
+        Must acquire the state context: in a background task, ``get_state`` on another state is
+        only valid inside ``async with self`` (StateProxy is immutable otherwise).
+        """
+        async with self:
+            upload_state = await self.get_state(UploadState)
+            upload_state._refresh_module_ui_state()
+
+    async def _refresh_local(self) -> None:
+        """Rescan local registry and classify each module against the catalog.
+
+        Signature first, digest only as a fallback. The registry gates 409 duplicate_content on
+        the authored-content signature, so that is what predicts a rejected publish; the artifact
+        digest changes on every recompile and would report a merely-rebuilt module as unpublished.
+        Modules with no spec CSVs (compiled-only imports) have no signature and keep the digest
+        route. Both lookups are batched, so this stays at most two requests for the whole corpus.
+        """
+        async with self:
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+        local = await loop.run_in_executor(None, _scan_local_modules)
+        signatures = [m["signature"] for m in local if m.get("signature")]
+        digests = [m["digest"] for m in local if m["digest"] and not m.get("signature")]
+        sig_matches: Dict[str, list] = {}
+        matches: Dict[str, list] = {}
+        if signatures or digests:
+            def _lookup():
+                with RegistryClient(url, token) as c:
+                    sigs = c.lookup_by_signatures(signatures) if signatures else {}
+                    digs = c.lookup_by_digests(digests) if digests else {}
+                    return sigs, digs
+            try:
+                sig_matches, matches = await loop.run_in_executor(None, _lookup)
+            except Exception:  # noqa: BLE001 - offline classification degrades to local-only
+                sig_matches, matches = {}, {}
+        for m in local:
+            # lookup_by_signatures returns VersionRef models; lookup_by_digests returns dicts.
+            ms = list(sig_matches.get(m.get("signature", ""), []) or []) if m.get("signature") else []
+            by_signature = bool(ms)
+            if not ms:
+                ms = matches.get(m["digest"]) or []
+            m["in_catalog"] = bool(ms)
+            if ms:
+                # Content matched the catalog — backfill identity the local copy is missing
+                # (covers metadata-stripped imports shared peer-to-peer).
+                best = ms[0]
+                get = (lambda k, d="": getattr(best, k, d)) if by_signature else (lambda k, d="": best.get(k, d))
+                if not m["namespace"]:
+                    m["namespace"] = get("namespace")
+                if not m["version"]:
+                    m["version"] = get("version")
+                m["catalog_name"] = get("name", m["name"]) or m["name"]
+        names = [m["name"] for m in local]
+        async with self:
+            self.local_modules = local
+            self._local_names = names
+
+    async def _do_search(self) -> None:
+        async with self:
+            self.catalog_loading = True
+            self.catalog_error = ""
+            q, sort, page, per_page = self.query, self.sort, self.page, self.per_page
+            group = self.group_filter
+            ns_filter = self.namespace_filter
+            url, token = self._client_args()
+            local_names = list(self._local_names)
+        loop = asyncio.get_event_loop()
+
+        def _list():
+            # Reads are contract-tolerant, so we do NOT gate them on the version guard: a flaky
+            # or unwired `/version` (502/404) must never block browsing. The compatibility guard
+            # is applied only where it matters — installing an artifact (see `_do_install`).
+            with RegistryClient(url, token) as c:
+                return c.list_modules(
+                    q=(q or None), sort=sort, group=(group or None),
+                    namespace=(ns_filter or None), page=page, per_page=per_page,
+                )
+
+        try:
+            body = await loop.run_in_executor(None, _list)
+        except VersionMismatchError as e:
+            async with self:
+                self.catalog_loading = False
+                self.server_incompatible = True
+                self.catalog_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self.cards = []
+                self.total = 0
+            return
+        except Exception as e:  # noqa: BLE001 - surface a message, don't crash the page
+            async with self:
+                self.catalog_loading = False
+                self.catalog_error = f"Could not reach the registry: {e}"
+                self.cards = []
+                self.total = 0
+            return
+        items = body.get("items", []) or []
+        local_keys = set(local_names)
+        for card in items:
+            stats = card.get("stats") or {}
+            card["installed"] = _local_key(card.get("namespace", ""), card.get("name", "")) in local_keys
+            card["variant_count"] = int(stats.get("variant_count") or 0)
+            card["gene_count"] = int(stats.get("gene_count") or 0)
+            card["clinvar_count"] = int(stats.get("clinvar_count") or 0)
+            card["pathogenic_count"] = int(stats.get("pathogenic_count") or 0)
+            # Server-relative logo → absolute URL for the browser (schema 0.3.0 surfacing).
+            logo = card.get("logo_url") or ""
+            card["logo_full"] = (url + logo) if logo.startswith("/") else logo
+        async with self:
+            self.cards = items
+            self.total = int(body.get("total", 0) or 0)
+            # Grow the namespace filter options from whatever we've seen (only when unfiltered,
+            # so the option set stays complete rather than collapsing to the active filter).
+            if not ns_filter:
+                seen = set(self.namespace_options) | {c.get("namespace", "") for c in items}
+                self.namespace_options = sorted(n for n in seen if n)
+            self.server_incompatible = False
+            self.catalog_loading = False
+
+    async def _ensure_identity(self) -> None:
+        """Load (or mint + persist) the publishing install-id. Backend groundwork only."""
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, load_identity)
+        install_id = data.get("install_id", "")
+        token = data.get("token", "")
+        account = data.get("account", "")
+        namespaces = data.get("namespaces", []) or []
+        display_name = data.get("display_name", "")
+        email = data.get("email", "")
+        avatar_local = data.get("avatar_local", "")
+        if not install_id:
+            install_id = await loop.run_in_executor(None, ensure_install_id)  # ~1s proof-of-work
+        async with self:
+            self.install_id = install_id
+            if token:
+                self.token = token
+            self.account = account
+            self.namespaces = namespaces
+            self.display_name = display_name
+            self.email = email
+            self.avatar_local = avatar_local
+            if namespaces and not self.publish_namespace:
+                self.publish_namespace = namespaces[0]
+
+    def _persist_identity(self) -> None:
+        """Write the current identity+profile back to the JSON store (call inside a sync context)."""
+        save_identity({
+            "install_id": self.install_id, "token": self.token, "account": self.account,
+            "namespaces": list(self.namespaces), "display_name": self.display_name,
+            "email": self.email, "avatar_local": self.avatar_local,
+        })
+
+    @rx.event(background=True)
+    async def load_registry(self):
+        await self._ensure_identity()
+        await self._refresh_local()
+        await self._do_search()
+        if self.token:
+            await self._refresh_account()
+
+    @rx.event(background=True)
+    async def search(self):
+        async with self:
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_sort(self, value: str):
+        async with self:
+            self.sort = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_group_filter(self, value: str):
+        async with self:
+            self.group_filter = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def set_namespace_filter(self, value: str):
+        async with self:
+            self.namespace_filter = value
+            self.page = 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def next_page(self):
+        async with self:
+            if not (self.page * self.per_page < self.total):
+                return
+            self.page += 1
+        await self._do_search()
+
+    @rx.event(background=True)
+    async def prev_page(self):
+        async with self:
+            if self.page <= 1:
+                return
+            self.page -= 1
+        await self._do_search()
+
+    # ------------------------------------------------------------------ selection
+
+    async def _load_detail(self, namespace: str, name: str, registry_name: str = "") -> None:
+        # `name` is the catalog name used for the API; `registry_name` (if given) is the local
+        # registry key the selection should track (they differ for peer-shared imports).
+        selection_key = registry_name or name
+        async with self:
+            self.detail_loading = True
+            self.detail_error = ""
+            url, token = self._client_args()
+            li = next((m for m in self.local_modules if m.get("name") == selection_key), {})
+            installed_version = li.get("version", "")
+        loop = asyncio.get_event_loop()
+
+        def _detail():
+            with RegistryClient(url, token) as c:
+                return c.get_module(namespace, name)
+
+        try:
+            detail = await loop.run_in_executor(None, _detail)
+        except VersionMismatchError as e:
+            async with self:
+                self.detail_loading = False
+                self.server_incompatible = True
+                self.detail_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.detail_loading = False
+                self.detail_error = f"Could not load details: {e}"
+            return
+        versions = detail.get("versions", []) or []
+        # Only offer versions that match the current schema/compiler contract. The live catalog
+        # holds a mix; the `revalidate` audit sets `needs_upgrade=True` on stale ones (which show
+        # up as the un-bumped `x.y.0` releases), and re-published ones clear it. Filtering here
+        # keeps the version dropdown to installable, current-schema releases.
+        compatible = [v for v in versions if v.get("version") and not v.get("needs_upgrade", False)]
+        remote_versions = [v.get("version") for v in compatible]
+        remote_digests = {v.get("version"): (v.get("artifact_digest") or "") for v in compatible}
+        # Trust is per *version*, not per module: it describes how that build's variants were
+        # pinned to the genome, so a module can hold a trusted release and an untrusted one.
+        remote_trust = {
+            v.get("version"): _trust_word((v.get("resolution") or {}).get("trusted"))
+            for v in compatible
+        }
+        stats = detail.get("stats") or {}
+        union = list(remote_versions)
+        if installed_version and installed_version not in union:
+            union.append(installed_version)  # always keep what's actually installed selectable
+        # Default to the newest compatible version (catalog `latest_version` may be a stale one).
+        latest_compatible = remote_versions[0] if remote_versions else ""
+        default_v = installed_version if installed_version in union else latest_compatible
+        async with self:
+            self.selected_name = selection_key
+            self.selected_catalog_name = name
+            self.selected_namespace = namespace
+            self.selected_title = detail.get("title") or name
+            self.selected_description = detail.get("description") or ""
+            self.selected_author = detail.get("owner") or ""
+            self.selected_icon = detail.get("icon") or "database"
+            self.selected_color = detail.get("color") or "#6435c9"
+            self.selected_variant_count = int(stats.get("variant_count") or 0)
+            self.selected_gene_count = int(stats.get("gene_count") or 0)
+            self.selected_clinvar_count = int(stats.get("clinvar_count") or 0)
+            self.selected_pathogenic_count = int(stats.get("pathogenic_count") or 0)
+            self.selected_benign_count = int(stats.get("benign_count") or 0)
+            logo = detail.get("logo_url") or ""
+            self.selected_logo_url = (url + logo) if logo.startswith("/") else logo
+            self._remote_versions = remote_versions
+            self._remote_digests = remote_digests
+            self._remote_trust = remote_trust
+            self.selected_versions = union
+            self.selected_version = default_v
+            self.detail_loading = False
+
+    @rx.event(background=True)
+    async def select_catalog(self, namespace: str, name: str):
+        # Track selection under the namespaced local key so status/install line up whether or not
+        # it's installed (an installed copy lives at CUSTOM_MODULES_DIR/{namespace}__{name}).
+        await self._load_detail(namespace, name, registry_name=_local_key(namespace, name))
+
+    @rx.event(background=True)
+    async def select_local(self, name: str):
+        async with self:
+            li = next((m for m in self.local_modules if m.get("name") == name), {})
+            namespace = li.get("namespace", "")
+            catalog_name = li.get("catalog_name", name)
+        if namespace:
+            await self._load_detail(namespace, catalog_name, registry_name=name)
+            return
+        async with self:
+            self.selected_name = name
+            self.selected_catalog_name = li.get("catalog_name", name)
+            self.selected_namespace = ""
+            self.selected_title = li.get("title", name)
+            self.selected_description = ""
+            self.selected_author = ""
+            self.selected_icon = li.get("icon", "database")
+            self.selected_color = li.get("color", "#6435c9")
+            self.selected_logo_url = ""
+            self.selected_variant_count = 0
+            self.selected_gene_count = 0
+            self.selected_clinvar_count = 0
+            self.selected_pathogenic_count = 0
+            self.selected_benign_count = 0
+            version = li.get("version", "")
+            self.selected_version = version
+            self.selected_versions = [version] if version else []
+            self._remote_versions = []
+            self._remote_digests = {}
+
+    # ------------------------------------------------------------------ install
+
+    async def _do_install(self, namespace: str, name: str, version: str) -> None:
+        # `name` is the catalog module name; the local install lives under a namespaced key so it
+        # never collides with a same-named HF module or another namespace's module.
+        key = _local_key(namespace, name)
+        async with self:
+            self.action_busy = True
+            self.action_message = f"Downloading {name} {version}…"
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+
+        def _install():
+            dest = CUSTOM_MODULES_DIR / key
+            with tempfile.TemporaryDirectory() as td:
+                tarball = Path(td) / f"{key}.tar.gz"
+                with RegistryClient(url, token) as c:
+                    # get_tarball does not self-guard (unlike download/publish), so check first:
+                    # a format/compiler mismatch would otherwise yield an unusable artifact.
+                    # Only a genuine mismatch blocks; a flaky/unwired /version (5xx/404) must not —
+                    # let the download itself surface any real transport error.
+                    try:
+                        c.assert_compatible()
+                    except VersionMismatchError:
+                        raise
+                    except RegistryError:
+                        pass
+                    c.get_tarball(namespace, name, version, tarball)
+                if dest.exists():
+                    shutil.rmtree(dest)
+                dest.mkdir(parents=True, exist_ok=True)
+                with tarfile.open(tarball, "r:gz") as tf:
+                    tf.extractall(dest, filter="data")
+            register_downloaded_module(dest)
+
+        try:
+            await loop.run_in_executor(None, _install)
+        except VersionMismatchError as e:
+            async with self:
+                self.action_busy = False
+                self.server_incompatible = True
+                self.action_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Install failed: {e}"
+            return
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = f"Installed {name} {version}."
+
+    @rx.event(background=True)
+    async def request_download(self):
+        async with self:
+            key = self.selected_name                       # local registry key
+            catalog_name = self.selected_catalog_name      # name for the API
+            ns = self.selected_namespace
+            version = self.selected_version
+            li = next((m for m in self.local_modules if m.get("name") == key), {})
+            installed_v = li.get("version", "")
+            unmirrored = bool(li) and not li.get("in_catalog", False)
+        if li and installed_v and installed_v != version and unmirrored:
+            async with self:
+                self.pending_action = {
+                    "kind": "download", "name": catalog_name, "namespace": ns, "version": version,
+                    "warn": (f"Installing {catalog_name} {version} will replace your local copy of "
+                             f"{installed_v}, which has no matching catalog copy to restore."),
+                }
+            return
+        await self._do_install(ns, catalog_name, version)
+
+    @rx.event(background=True)
+    async def quick_install(self, namespace: str, name: str, version: str):
+        async with self:
+            already = _local_key(namespace, name) in {m.get("name") for m in self.local_modules}
+        if already:
+            return
+        await self._do_install(namespace, name, version)
+        # Land the freshly-installed module in the left details pane (under its namespaced key).
+        await self._load_detail(namespace, name, registry_name=_local_key(namespace, name))
+
+    # ------------------------------------------------------------------ uninstall
+
+    async def _do_uninstall(self, name: str) -> None:
+        async with self:
+            self.action_busy = True
+            self.action_message = f"Uninstalling {name}…"
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, unregister_custom_module, name)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Uninstall failed: {e}"
+            return
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = f"Uninstalled {name}."
+
+    @rx.event(background=True)
+    async def request_uninstall(self):
+        async with self:
+            name = self.selected_name
+            gate = self.sel_status in ("local_only", "mismatch")
+        if gate:
+            async with self:
+                self.pending_action = {
+                    "kind": "uninstall", "name": name,
+                    "warn": (f"Uninstalling {name} removes it permanently — it has no matching "
+                             f"catalog copy to reinstall."),
+                }
+            return
+        await self._do_uninstall(name)
+
+    # ------------------------------------------------------------------ import / upload
+
+    async def _do_register_temp(self, spec_dir: str) -> None:
+        async with self:
+            self.action_busy = True
+            self.action_message = "Importing module…"
+        loop = asyncio.get_event_loop()
+        try:
+            result = await loop.run_in_executor(None, register_custom_module, Path(spec_dir))
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.action_busy = False
+                self.action_message = f"Import failed: {e}"
+            return
+        ok = getattr(result, "success", False)
+        errs = "; ".join(getattr(result, "errors", []) or [])
+        await self._refresh_local()
+        await self._refresh_upload_ui()
+        async with self:
+            self.action_busy = False
+            self.action_message = "Imported module." if ok else f"Import failed: {errs}"
+
+    @rx.event
+    async def upload_import(self, files: list[rx.UploadFile]):
+        """Persist uploaded spec files, decide gating, then chain to the background importer.
+
+        Upload handlers cannot be ``background=True``, so this only does the quick file save +
+        gate decision; the heavy compile happens in ``start_import``.
+        """
+        tmp = Path(tempfile.mkdtemp(prefix="mp_import_"))
+        for f in files:
+            data = await f.read()
+            (tmp / Path(f.filename).name).write_bytes(data)
+        zips = list(tmp.glob("*.zip"))
+        if len(zips) == 1 and len(list(tmp.iterdir())) == 1:
+            with zipfile.ZipFile(zips[0]) as zf:
+                zf.extractall(tmp)
+            zips[0].unlink()
+        spec_dir = tmp
+        if not (spec_dir / "module_spec.yaml").exists():
+            subs = [d for d in tmp.iterdir() if d.is_dir() and (d / "module_spec.yaml").exists()]
+            if subs:
+                spec_dir = subs[0]
+        if not (spec_dir / "module_spec.yaml").exists():
+            self.action_message = "Import needs module_spec.yaml (+ variants.csv), or a .zip containing them."
+            return
+        raw = yaml.safe_load((spec_dir / "module_spec.yaml").read_text(encoding="utf-8")) or {}
+        name = ((raw.get("module") or {}).get("name")) or ""
+        li = next((m for m in self.local_modules if m.get("name") == name), {})
+        unmirrored = bool(li) and not li.get("in_catalog", False)
+        if unmirrored:
+            self.pending_action = {
+                "kind": "upload", "name": name, "spec_dir": str(spec_dir),
+                "warn": (f"Importing will overwrite your installed {name}, which has no "
+                         f"matching catalog copy to restore."),
+            }
+            return
+        return RegistryState.start_import(str(spec_dir))
+
+    @rx.event(background=True)
+    async def start_import(self, spec_dir: str):
+        await self._do_register_temp(spec_dir)
+
+    # ------------------------------------------------------------------ gating dispatch
+
+    @rx.event(background=True)
+    async def confirm_pending(self):
+        async with self:
+            pa = dict(self.pending_action)
+            self.pending_action = {}
+        kind = pa.get("kind")
+        if kind == "uninstall":
+            await self._do_uninstall(pa["name"])
+        elif kind == "download":
+            await self._do_install(pa["namespace"], pa["name"], pa["version"])
+        elif kind == "upload":
+            await self._do_register_temp(pa["spec_dir"])
+
+    # ================================================================== publication
+    # ---- computed ----
+    @rx.var
+    def is_registered(self) -> bool:
+        return bool(self.token) and bool(self.account)
+
+    @rx.var
+    def display_name_valid(self) -> bool:
+        return bool(_DISPLAY_NAME_RE.match(self.display_name or ""))
+
+    @rx.var
+    def namespaces_full(self) -> bool:
+        return len(self.namespaces) >= 5
+
+    @rx.var
+    def can_create_namespace(self) -> bool:
+        return (
+            self.display_name_valid
+            and is_valid_namespace((self.new_namespace or "").strip().lower())
+            and len(self.namespaces) < 5
+        )
+
+    @rx.var
+    def token_masked(self) -> str:
+        t = self.token or ""
+        return (t[:8] + "…" + t[-4:]) if len(t) > 16 else ("•" * len(t))
+
+    @rx.var
+    def publish_has_spec(self) -> bool:
+        li = self._selected_local
+        return bool(li) and li.get("has_spec", False)
+
+    @rx.var
+    def selected_in_catalog(self) -> bool:
+        """Whether the selected module's content already exists in the catalog.
+
+        Set by ``_refresh_local``, which matches on ``content_signature`` (the authored-data
+        identity the registry actually gates 409 ``duplicate_content`` on) and falls back to the
+        artifact digest only for compiled-only imports that carry no spec. This lets us pre-empt
+        the rejection instead of offering a Publish button the server refuses.
+        """
+        return bool(self._selected_local.get("in_catalog", False))
+
+    @rx.var
+    def selected_catalog_ref(self) -> str:
+        """``namespace/name@version`` of the catalog match for the selected module (else "")."""
+        li = self._selected_local
+        if not li.get("in_catalog", False):
+            return ""
+        ns, name, ver = li.get("namespace", ""), li.get("catalog_name", ""), li.get("version", "")
+        return f"{ns}/{name}@{ver}" if ns and name else ""
+
+    @rx.var
+    def selected_trusted(self) -> str:
+        """Trust of the *selected version*: ``yes`` | ``no`` | ``unknown``.
+
+        ``unknown`` also covers a locally-installed version that the catalog does not list, which
+        is why this reads the map rather than defaulting to a bool.
+        """
+        return self._remote_trust.get(self.selected_version, "unknown")
+
+    @rx.var
+    def selected_trust_hint(self) -> str:
+        """Why the selected version carries that trust, in the terms the registry means it."""
+        word = self.selected_trusted
+        if word == "yes":
+            return "Variants are pinned to genome coordinates, so this joins to a VCF by position."
+        if word == "no":
+            return (
+                "This build's table has no coordinates — it joins on rsID and genotype only, so a "
+                "VCF without rsIDs in its ID column will match nothing. Published as untrusted "
+                "deliberately; it is not a defect."
+            )
+        return "The catalog did not report a trust level for this version."
+
+    @rx.var
+    def can_publish(self) -> bool:
+        # Content already in the catalog can't be republished (the server rejects it as
+        # duplicate_content); don't offer the button for it.
+        return (
+            self.publish_state in ("new", "new_version")
+            and self.publish_has_spec
+            and not self.selected_in_catalog
+        )
+
+    @rx.var
+    def publish_is_published(self) -> bool:
+        return self.publish_state in ("published_identical", "yanked", "conflict")
+
+    @rx.var
+    def show_yank(self) -> bool:
+        return self.publish_state == "published_identical"
+
+    @rx.var
+    def show_unyank(self) -> bool:
+        return self.publish_state == "yanked"
+
+    @rx.var
+    def can_update_meta(self) -> bool:
+        return self.publish_state in ("published_identical", "yanked")
+
+    token_revealed: bool = False
+
+    # ---- setters ----
+    def set_new_namespace(self, value: str) -> None:
+        self.new_namespace = value
+        # Live client-side check so the hint shows while typing; on_blur then checks availability.
+        norm = (value or "").strip().lower()
+        self.ns_available = "invalid" if norm and not is_valid_namespace(norm) else ""
+
+    def toggle_token(self) -> None:
+        self.token_revealed = not self.token_revealed
+
+    @rx.var
+    def token_display(self) -> str:
+        return self.token if self.token_revealed else self.token_masked
+
+    @rx.event
+    async def set_avatar(self, files: list[rx.UploadFile]):
+        """Store a local-only avatar as a data URI (never uploaded to the server)."""
+        if not files:
+            return
+        f = files[0]
+        data = await f.read()
+        mime = "image/png" if str(f.filename).lower().endswith("png") else "image/jpeg"
+        self.avatar_local = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+        self._persist_identity()
+
+    # ---- profile ----
+    @rx.event
+    def save_profile(self, form_data: dict):
+        name = (form_data.get("display_name") or "").strip()
+        email = (form_data.get("email") or "").strip()
+        if not _DISPLAY_NAME_RE.match(name):
+            self.profile_message = "Display name must be 2–32 chars: letters, digits, or underscore only."
+            return
+        self.display_name = name
+        self.email = email
+        self._persist_identity()
+        self.profile_message = "Saved."
+        if self.token:
+            return RegistryState.push_profile
+
+    @rx.event(background=True)
+    async def push_profile(self):
+        async with self:
+            url, token = self._client_args()
+            display_name, email = self.display_name, self.email
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with RegistryClient(url, token) as c:
+                return c.update_profile(display_name=display_name, email=email)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.profile_message = f"Saved locally; server profile update failed: {e}"
+            return
+        async with self:
+            self.profile_message = "Profile updated."
+
+    # ---- namespace availability + creation ----
+    @rx.event(background=True)
+    async def check_namespace(self):
+        """Check availability of the current `new_namespace` (reads state; on_blur triggers it)."""
+        async with self:
+            value = (self.new_namespace or "").strip().lower()
+            self.new_namespace = value
+            if not value:
+                self.ns_available = ""
+                return
+            self.ns_available = "checking"
+            url, token = self._client_args()
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with RegistryClient(url, token) as c:
+                return c.namespace_available(value)
+
+        try:
+            res = await loop.run_in_executor(None, _do)
+        except Exception:  # noqa: BLE001
+            async with self:
+                self.ns_available = ""
+            return
+        async with self:
+            if not res.get("valid", False):
+                self.ns_available = "invalid"
+            else:
+                self.ns_available = "yes" if res.get("available", False) else "no"
+
+    @rx.event
+    def create_namespace(self, form_data: dict):
+        ns = (form_data.get("new_namespace") or "").strip().lower()
+        if not self.display_name_valid:
+            self.publish_message = "Set a valid display name in the account pane first."
+            return
+        if not ns:
+            self.publish_message = "Enter a namespace name."
+            return
+        if len(self.namespaces) >= 5:
+            self.publish_message = "Namespace limit reached (5 per account)."
+            return
+        return RegistryState.do_create_namespace(ns)
+
+    @rx.event(background=True)
+    async def do_create_namespace(self, ns: str):
+        async with self:
+            self.publish_busy = True
+            self.publish_message = f"Creating namespace {ns}…"
+            url, token = self._client_args()
+            install_id, display_name = self.install_id, self.display_name
+        loop = asyncio.get_event_loop()
+
+        # 1. Register the account (mint token) if this is the first namespace.
+        if not token:
+            def _register():
+                last = None
+                with RegistryClient(url, None) as c:
+                    for _ in range(6):
+                        handle = derive_handle(display_name)
+                        try:
+                            return c.register(install_id, handle)
+                        except RegistryError as e:
+                            if e.status_code == 409:  # handle collision → new suffix
+                                last = e
+                                continue
+                            raise
+                raise last or RuntimeError("could not register account")
+            try:
+                reg = await loop.run_in_executor(None, _register)
+            except Exception as e:  # noqa: BLE001
+                async with self:
+                    self.publish_busy = False
+                    self.publish_message = f"Registration failed: {e}"
+                return
+            async with self:
+                self.token = reg.get("token", "")
+                self.account = reg.get("account", "")
+                self.namespaces = reg.get("namespaces", []) or []
+                token = self.token
+                self._persist_identity()
+            if token:
+                await loop.run_in_executor(None, set_env_var, "REGISTRY_TOKEN", token)
+
+        # 2. Claim the namespace.
+        def _claim():
+            with RegistryClient(url, token) as c:
+                avail = c.namespace_available(ns)
+                if not avail.get("valid", False):
+                    raise RuntimeError("invalid namespace name")
+                if not avail.get("available", False):
+                    raise RuntimeError("namespace already taken")
+                return c.claim_namespace(ns)
+
+        try:
+            await loop.run_in_executor(None, _claim)
+        except RegistryError as e:
+            async with self:
+                self.publish_busy = False
+                self.publish_message = (
+                    "Namespace limit reached (5 per account)."
+                    if e.status_code == 403 else f"Could not claim namespace: {e.detail}"
+                )
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Could not claim namespace: {e}"
+            return
+        async with self:
+            if ns not in self.namespaces:
+                self.namespaces = self.namespaces + [ns]
+            self.publish_namespace = ns
+            self.new_namespace = ""
+            self.ns_available = ""
+            self._persist_identity()
+            self.publish_busy = False
+            self.publish_message = f"Created namespace {ns}."
+        await self._refresh_account()
+        await self._load_publish_state()
+
+    @rx.event(background=True)
+    async def set_publish_namespace(self, value: str):
+        async with self:
+            self.publish_namespace = value
+        await self._load_publish_state()
+
+    # ---- publish state machine ----
+    async def _load_publish_state(self) -> None:
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            local_version = li.get("version", "") if li else ""
+            local_digest = li.get("digest", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and li):
+            async with self:
+                self.publish_state = ""
+                self.published_digest = ""
+                self.publish_version = local_version
+            return
+        loop = asyncio.get_event_loop()
+
+        def _versions():
+            with RegistryClient(url, token) as c:
+                try:
+                    return c.versions(ns, catalog_name).get("items", [])
+                except RegistryError as e:
+                    if e.status_code == 404:
+                        return []
+                    raise
+
+        try:
+            vers = await loop.run_in_executor(None, _versions)
+        except Exception:  # noqa: BLE001 - unknown; leave state blank
+            async with self:
+                self.publish_state = ""
+                self.publish_version = local_version
+            return
+        match = next((v for v in vers if v.get("version") == local_version), None)
+        async with self:
+            self.publish_version = local_version
+            if match is None:
+                self.publish_state = "new_version" if vers else "new"
+                self.published_digest = ""
+            else:
+                self.published_digest = match.get("artifact_digest", "")
+                if match.get("yanked", False):
+                    self.publish_state = "yanked"
+                elif self.published_digest == local_digest:
+                    self.publish_state = "published_identical"
+                else:
+                    self.publish_state = "conflict"
+
+    @rx.event(background=True)
+    async def precheck_selected(self):
+        """Rehearse the publish server-side before uploading anything.
+
+        Which endpoint runs is decided here rather than left to the user, because the choice is
+        mechanical: `/check` is the full dry run (validation plus the server's network tier) but its
+        enrichment half is capped at `_ENRICH_MAX_VARIANTS`, and a module over that answers
+        `422 too_many_variants`. `/validate` has no network tier and is the half that decides
+        publishability, so it is both the fallback and the right answer for a large module. A spec
+        too large to send as loose parts is packed — before client/server 0.11.1 there was no
+        archive form at all, so a big module could be published but never rehearsed.
+        """
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            key = li.get("name", "") if li else ""
+            catalog_name = li.get("catalog_name", "") if li else ""
+            has_spec = li.get("has_spec", False) if li else False
+            url, token = self._client_args()
+        if not (ns and catalog_name):
+            return
+        if not has_spec:
+            async with self:
+                self.precheck_verdict = "error"
+                self.precheck_message = "This module has no spec files to check."
+                self.precheck_findings = []
+            return
+
+        spec_dir = CUSTOM_MODULES_DIR / key
+        async with self:
+            self.precheck_busy = True
+            self.precheck_verdict = ""
+            self.precheck_findings = []
+            self.precheck_endpoint = ""
+            self.precheck_message = f"Checking {catalog_name} against {ns}…"
+
+        loop = asyncio.get_event_loop()
+
+        def _run() -> tuple[str, Any]:
+            rows = _authored_row_count(spec_dir)
+            pack = _spec_bytes(spec_dir) > _PACK_ABOVE_BYTES
+            with RegistryClient(url, token) as c:
+                if rows <= _ENRICH_MAX_VARIANTS:
+                    try:
+                        return "check", c.check(ns, catalog_name, spec_dir, pack=pack)
+                    except RegistryError as exc:
+                        # Only the size ceiling is worth downgrading for; anything else is a real
+                        # answer and belongs to the caller.
+                        if not (exc.status_code == 422 and "too_many_variants" in str(exc.detail)):
+                            raise
+                return "validate", c.validate(ns, catalog_name, spec_dir, pack=pack)
+
+        try:
+            endpoint, report = await loop.run_in_executor(None, _run)
+        except VersionMismatchError as e:
+            async with self:
+                self.precheck_busy = False
+                self.server_incompatible = True
+                self.precheck_verdict = "error"
+                self.precheck_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+            return
+        except RegistryError as e:
+            async with self:
+                self.precheck_busy = False
+                self.precheck_findings = []
+                if e.status_code == 429:
+                    # The rate limiter says "not yet" — emphatically not "would not publish".
+                    self.precheck_verdict = "rate_limited"
+                    self.precheck_message = (
+                        "The check endpoint is rate limited right now. This says nothing about "
+                        "whether the module would publish — try again in a minute."
+                    )
+                elif e.status_code == 403:
+                    self.precheck_verdict = "blocked"
+                    self.precheck_message = (
+                        f"Your token does not own the namespace {ns}, so the server refused the "
+                        f"check. This reads like a spec problem and is not one. ({e.detail})"
+                    )
+                elif e.status_code == 413:
+                    self.precheck_verdict = "blocked"
+                    self.precheck_message = f"Spec is too large for the server to accept: {e.detail}"
+                else:
+                    self.precheck_verdict = "error"
+                    self.precheck_message = f"Check failed: {e.detail}"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.precheck_busy = False
+                self.precheck_verdict = "error"
+                self.precheck_message = f"Check failed: {e}"
+            return
+
+        # A CheckReport wraps the ValidationReport; a ValidationReport is its own validation half.
+        validation = getattr(report, "validation", report)
+        passed = bool(report.would_publish) if endpoint == "check" else bool(validation.valid)
+        findings: List[str] = []
+        for level in ("errors", "warnings"):
+            entries = list(getattr(validation, level, []) or [])
+            for entry in entries[:5]:
+                findings.append(f"{level[:-1]}: {str(entry)[:220]}")
+            if len(entries) > 5:
+                findings.append(f"… and {len(entries) - 5} more {level}")
+
+        stats = getattr(validation, "stats", None)
+        counts = ""
+        if stats is not None:
+            counts = (
+                f" — {getattr(stats, 'variant_count', 0):,} variants, "
+                f"{getattr(stats, 'study_count', 0):,} studies, "
+                f"{getattr(stats, 'gene_count', 0):,} genes"
+            )
+        skipped = getattr(report, "skipped_reason", "") if endpoint == "check" else ""
+
+        async with self:
+            self.precheck_busy = False
+            self.precheck_endpoint = endpoint
+            self.precheck_verdict = "pass" if passed else "fail"
+            verb = "would publish" if endpoint == "check" else "validates"
+            if passed:
+                self.precheck_message = f"{catalog_name} {verb}{counts}."
+            else:
+                self.precheck_message = f"{catalog_name} would be rejected{counts}."
+            if endpoint == "validate":
+                self.precheck_message += (
+                    " Validation tier only — this module is over the server's enrichment limit, "
+                    "so the network passes did not run."
+                )
+            if skipped:
+                self.precheck_message += f" Enrichment skipped: {skipped}."
+            self.precheck_findings = findings
+
+    @rx.event(background=True)
+    async def publish_selected(self):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            key = li.get("name", "") if li else ""
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            has_spec = li.get("has_spec", False) if li else False
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        if not has_spec:
+            async with self:
+                self.publish_message = "This module has no spec files to publish."
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = f"Publishing {catalog_name} {version} to {ns}…"
+        loop = asyncio.get_event_loop()
+
+        def _pub():
+            with RegistryClient(url, token) as c:
+                return c.publish(ns, catalog_name, version, CUSTOM_MODULES_DIR / key, changelog="")
+
+        try:
+            manifest = await loop.run_in_executor(None, _pub)
+        except VersionMismatchError as e:
+            async with self:
+                self.publish_busy = False
+                self.server_incompatible = True
+                self.publish_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+            return
+        except RegistryError as e:
+            async with self:
+                self.publish_busy = False
+                # The registry uses 409 for both "this version number is taken" and "this exact
+                # data is already published (possibly under another name)". Surface the difference.
+                if e.status_code == 409 and "duplicate_content" in str(e.detail):
+                    self.publish_message = f"Not published: {e.detail}"
+                elif e.status_code == 409:
+                    self.publish_message = (
+                        f"Version {version} already exists in {ns} — bump the version (Edit) to publish changes."
+                    )
+                else:
+                    self.publish_message = f"Publish failed: {e.detail}"
+            return
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Publish failed: {e}"
+            return
+        # The server recompiles the uploaded spec with its pinned Ensembl reference, so the
+        # published artifact digest can legitimately differ from our locally-compiled bytes (e.g.
+        # when the local Ensembl cache was incomplete). We just published this spec, so trust the
+        # server's returned manifest as authoritative rather than recomputing a local-vs-server
+        # "conflict" (which would falsely tell the user their fresh publish differs).
+        server_digest = manifest.artifact.digest if manifest and manifest.artifact else ""
+        local_digest = li.get("digest", "") if li else ""
+        recompiled = bool(server_digest) and bool(local_digest) and server_digest != local_digest
+        await self._refresh_local()
+        await self._refresh_account()
+        async with self:
+            self.publish_state = "published_identical"
+            self.published_digest = server_digest
+            self.publish_version = version
+            self.publish_busy = False
+            if recompiled:
+                self.publish_message = (
+                    f"Published {ns}/{catalog_name}@{version}. The registry recompiled from your "
+                    "spec with its reference Ensembl build, so the published artifact differs from "
+                    "your local copy — reinstall to sync it."
+                )
+            else:
+                self.publish_message = f"Published {ns}/{catalog_name}@{version}."
+
+    async def _set_yank(self, yanked: bool) -> None:
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = ("Yanking " if yanked else "Restoring ") + version + "…"
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with RegistryClient(url, token) as c:
+                return c.yank(ns, catalog_name, version) if yanked else c.unyank(ns, catalog_name, version)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"{'Yank' if yanked else 'Restore'} failed: {e}"
+            return
+        await self._load_publish_state()
+        async with self:
+            self.publish_busy = False
+            self.publish_message = ("Yanked " if yanked else "Restored ") + version + "."
+
+    @rx.event(background=True)
+    async def yank_selected(self):
+        await self._set_yank(True)
+
+    @rx.event(background=True)
+    async def unyank_selected(self):
+        await self._set_yank(False)
+
+    # ---- metadata (out-of-digest; no version bump) ----
+    @rx.event
+    def update_meta(self, form_data: dict):
+        changelog = (form_data.get("changelog") or "").strip()
+        if not changelog:
+            self.publish_message = "Enter release notes to update."
+            return
+        return RegistryState.do_update_changelog(changelog)
+
+    @rx.event(background=True)
+    async def do_update_changelog(self, changelog: str):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        async with self:
+            self.publish_busy = True
+            self.publish_message = "Updating release notes…"
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with RegistryClient(url, token) as c:
+                return c.amend_changelog(ns, catalog_name, version, changelog)
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_busy = False
+                self.publish_message = f"Metadata update failed: {e}"
+            return
+        async with self:
+            self.publish_busy = False
+            self.publish_message = "Release notes updated — no version bump needed."
+
+    @rx.event
+    async def update_logo(self, files: list[rx.UploadFile]):
+        if not files:
+            return
+        f = files[0]
+        data = await f.read()
+        tmp = Path(tempfile.mkdtemp(prefix="reg_logo_")) / Path(f.filename).name
+        tmp.write_bytes(data)
+        return RegistryState.do_update_logo(str(tmp))
+
+    @rx.event(background=True)
+    async def do_update_logo(self, logo_path: str):
+        async with self:
+            ns = self.publish_namespace
+            li = self._selected_local
+            catalog_name = li.get("catalog_name", "") if li else ""
+            version = li.get("version", "") if li else ""
+            url, token = self._client_args()
+        if not (ns and catalog_name and version):
+            return
+        loop = asyncio.get_event_loop()
+
+        def _do():
+            with RegistryClient(url, token) as c:
+                return c.amend_logo(ns, catalog_name, version, Path(logo_path))
+
+        try:
+            await loop.run_in_executor(None, _do)
+        except Exception as e:  # noqa: BLE001
+            async with self:
+                self.publish_message = f"Logo update failed: {e}"
+            return
+        async with self:
+            self.publish_message = "Logo updated — out-of-digest, no version bump."
+
+    # ---- account refresh (roles + stats) ----
+    async def _refresh_account(self) -> None:
+        async with self:
+            url, token = self._client_args()
+            fallback_ns = list(self.namespaces)
+            fallback_account = self.account
+        if not token:
+            return
+        loop = asyncio.get_event_loop()
+
+        def _fetch():
+            roles: List[Dict[str, str]] = []
+            stats = {"modules": 0, "downloads": 0, "stars": 0, "reviews": 0}
+            with RegistryClient(url, token) as c:
+                try:
+                    who = c.whoami()
+                except Exception:  # noqa: BLE001
+                    who = {}
+                acct = who.get("account") or fallback_account
+                ns_list = who.get("namespaces", fallback_ns) or fallback_ns
+                for ns in ns_list:
+                    try:
+                        members = c.members(ns)
+                        role = next((m.get("role") for m in members if m.get("account") == acct), "member")
+                    except Exception:  # noqa: BLE001
+                        role = "owner"
+                    roles.append({"namespace": ns, "role": role})
+                    try:
+                        st = c.catalog_stats(namespace=ns)
+                        for k in ("modules", "downloads", "stars", "reviews"):
+                            stats[k] += int(st.get(k, 0) or 0)
+                    except Exception:  # noqa: BLE001
+                        pass
+                return who, ns_list, roles, stats
+
+        try:
+            who, ns_list, roles, stats = await loop.run_in_executor(None, _fetch)
+        except Exception:  # noqa: BLE001
+            return
+        async with self:
+            if who:
+                self.account = who.get("account", self.account)
+                if who.get("display_name"):
+                    self.display_name = who.get("display_name")
+                if who.get("email"):
+                    self.email = who.get("email")
+            self.namespaces = ns_list
+            self.roles = roles
+            self.account_stats = stats
+            if ns_list and not self.publish_namespace:
+                self.publish_namespace = ns_list[0]
+            self._persist_identity()
+
+    # ------------------------------------------------------------------ edit (cross-page)
+
+    @rx.event
+    async def edit_selected(self):
+        # Load into the Module Manager editing slot, then switch to that page/tab.
+        if not MODULE_CREATOR_ENABLED:
+            return  # /modules is not registered; the redirect would 404.
+        agent = await self.get_state(AgentState)
+        agent._do_load_custom_module(self.selected_name)
+        return rx.redirect("/modules")

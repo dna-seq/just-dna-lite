@@ -150,10 +150,9 @@ def user_hf_module_annotations(
     else:
         metadata_dict["vcf_source_type"] = MetadataValue.text("local")
     
-    # Return the manifest path (directory containing all module outputs)
-    output_dir = Path(manifest.modules[0].weights_path).parent if manifest.modules else Path(config.output_dir or "")
-    
-    return Output(output_dir, metadata=metadata_dict)
+    # Return the directory containing all module outputs. The manifest states it, so this holds
+    # even when every selected module was skipped and there is no `modules[0]` to read it off.
+    return Output(Path(manifest.output_dir), metadata=metadata_dict)
 
 
 # ============================================================================

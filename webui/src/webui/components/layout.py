@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import reflex as rx
 from just_dna_pipelines.module_config import is_immutable_mode as _check_immutable
+from webui.features import MODULE_CREATOR_ENABLED
 
 
 def fomantic_icon(name: str, size: int | str | None = None, color: str | None = None, style: dict | None = None) -> rx.Component:
@@ -199,8 +200,10 @@ def topbar() -> rx.Component:
         ),
         # Center: Navigation tabs
         rx.el.div(
-            _nav_tab("Annotation", "dna", "/", (current_path != "/modules") & (current_path != "/faq")),
-            _nav_tab("Module Manager", "boxes", "/modules", current_path == "/modules"),
+            _nav_tab("Annotation", "dna", "/", (current_path != "/modules") & (current_path != "/registry") & (current_path != "/faq")),
+            *([_nav_tab("Module Manager", "boxes", "/modules", current_path == "/modules")]
+              if MODULE_CREATOR_ENABLED else []),
+            _nav_tab("Module Catalog", "book", "/registry", current_path == "/registry"),
             _nav_tab("FAQ", "help circle", "/faq", current_path == "/faq"),
             style={"display": "flex", "alignItems": "center", "gap": "8px", "flex": "1 1 auto", "justifyContent": "center"},
         ),
