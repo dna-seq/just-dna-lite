@@ -30,6 +30,13 @@ from just_dna_pipelines.annotation.hf_modules import (
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.resources import get_user_output_dir
+from just_dna_pipelines.annotation.restoration import (
+    EVIDENCE_CALLED,
+    EVIDENCE_COLUMN,
+    RestorationContext,
+    build_restoration_context,
+    restored_rows,
+)
 
 
 def prepare_vcf_for_module_annotation(
@@ -248,7 +255,8 @@ def annotate_vcf_with_module_weights(
     compression: str = "zstd",
     join_on: str = "position",
     module_info: Optional[ModuleInfo] = None,
-) -> tuple[Path, int]:
+    restoration: Optional[RestorationContext] = None,
+) -> tuple[Path, int, dict[str, int]]:
     """
     Annotate VCF variants with a module's weights table.
     
@@ -265,9 +273,19 @@ def annotate_vcf_with_module_weights(
         compression: Parquet compression (default: zstd)
         join_on: Join strategy - "position" or "rsid"
         module_info: Optional ModuleInfo for the module
-        
+        restoration: Sample-side inputs for reference-genotype restoration. When given (and the
+            callset is variant-only), the module's authored hom-ref rows at sites the callset never
+            emitted are appended, marked ``genotype_evidence="restored_hom_ref"``. See
+            ``restoration`` for why this is the annotator's call and not the module's.
+
     Returns:
-        Tuple of (output_path, num_annotated_variants)
+        Tuple of (output_path, num_matched_variants, restoration_stats).
+
+        **The count is matched rows, not written rows.** A position join keeps every unmatched VCF
+        row (the report needs them to distinguish "probed and did not match" from "never looked"), so
+        the parquet's height is a *positions probed* number. Reporting it as "variants annotated"
+        made `total_variants_annotated` read 567 against a real 259 on a WGS genome, and told the
+        user "cancer: 29 variants" for a module that annotated none of them.
     """
     with start_action(action_type="annotate_with_module_weights", module=module_name, join_on=join_on) as action:
         # Load the module's lead table (lazy) — weights for most modules, pharm_variants for a
@@ -381,23 +399,53 @@ def annotate_vcf_with_module_weights(
                 )
             annotated_lf = annotated_lf.filter(ref_agrees)
 
+        # Mark every row the caller actually supplied, so the restored rows appended below are
+        # distinguishable from them in the parquet itself and not only in the report.
+        annotated_lf = annotated_lf.with_columns(
+            pl.lit(EVIDENCE_CALLED).alias(EVIDENCE_COLUMN)
+        )
+
+        restoration_stats: dict[str, int] = {}
+        if restoration is not None:
+            extra, restoration_stats = restored_rows(
+                vcf_lf, weights_lf, module_name, restoration
+            )
+            if extra is not None:
+                annotated_lf = pl.concat([annotated_lf, extra], how="diagonal_relaxed")
+                action.log(
+                    message_type="info",
+                    step="hom_ref_restored",
+                    module=module_name,
+                    **restoration_stats,
+                )
+
         # Write to parquet using streaming
         output_path.parent.mkdir(parents=True, exist_ok=True)
         annotated_lf.sink_parquet(output_path, compression=compression)
-        
-        # Get row count for metadata (efficient - reads parquet metadata)
-        num_rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
-        
+
+        # Two numbers, because they answer different questions and conflating them is how a module
+        # that annotated nothing reported 29 variants. `written` is what the parquet holds — the
+        # position join keeps unmatched rows on purpose. `matched` is what was actually annotated,
+        # detected the same way `report_logic._annotated_rows` detects it.
+        written_lf = pl.scan_parquet(output_path)
+        num_written = written_lf.select(pl.len()).collect().item()
+        num_matched = (
+            written_lf.filter(pl.col("module").is_not_null()).select(pl.len()).collect().item()
+            if "module" in written_lf.collect_schema().names()
+            else num_written
+        )
+
         action.log(
             message_type="info",
             step="weights_annotation_complete",
             module=module_name,
-            num_variants=num_rows,
+            num_matched=num_matched,
+            num_written=num_written,
             join_on=join_on,
             output_path=str(output_path)
         )
-        
-        return output_path, num_rows
+
+        return output_path, num_matched, restoration_stats
 
 
 def download_file(url: str, output_path: Path) -> Path:
@@ -514,12 +562,25 @@ def annotate_vcf_with_all_modules(
         # inputs, since a normalized parquet written before this existed still carries `M` for the
         # mitochondrion.
         vcf_lf = _normalize_vcf_contigs(vcf_lf)
-        
+
+        # Sample-side inputs for reference-genotype restoration, computed once for all modules: the
+        # callset's own (chrom, start) set is a 4.3M-row frame on a WGS genome and every module
+        # would otherwise rebuild it.
+        restoration = build_restoration_context(vcf_lf, config.restoration_max_flank_bp)
+        logger.info(
+            f"Reference-genotype restoration: "
+            f"{'ON' if restoration.enabled else 'OFF'} — callset is "
+            f"{restoration.mode.value} / {restoration.scope.value}; {restoration.scope_reason}"
+            + (f" (flank <= {config.restoration_max_flank_bp:,} bp)" if restoration.enabled else "")
+        )
+
         # Process each module
         module_outputs: list[ModuleOutputMapping] = []
         total_annotated = 0
+        total_restored = 0
         skipped: dict[str, str] = {}
         failed: dict[str, str] = {}
+        restored_by_module: dict[str, int] = {}
 
         for module_name in selected_names:
             logger.info(f"Processing module: {module_name}")
@@ -533,8 +594,9 @@ def annotate_vcf_with_all_modules(
             # Register the outcome here and let the caller decide what to say about it.
             weights_path = output_dir / f"{module_name}_weights.parquet"
             try:
-                weights_path, num_weights = annotate_vcf_with_module_weights(
-                    vcf_lf, module_name, weights_path, config.compression, module_info=info
+                weights_path, num_weights, restore_stats = annotate_vcf_with_module_weights(
+                    vcf_lf, module_name, weights_path, config.compression,
+                    module_info=info, restoration=restoration,
                 )
             except UnsupportedLeadTable as exc:
                 skipped[module_name] = str(exc)
@@ -576,8 +638,18 @@ def annotate_vcf_with_all_modules(
             
             total_annotated += num_weights
             module_outputs.append(module_output)
-            
-            logger.info(f"  {module_name}: {num_weights} variants with weights")
+
+            restored = restore_stats.get("restored", 0)
+            if restored:
+                restored_by_module[module_name] = restored
+                total_restored += restored
+
+            suffix = (
+                f" ({restored} restored from reference, "
+                f"{restore_stats.get('hom_ref_rows', 0)} hom-ref rows authored)"
+                if restored else ""
+            )
+            logger.info(f"  {module_name}: {num_weights} variants annotated{suffix}")
     
     # Get execution metrics from resource tracker
     from datetime import datetime, timezone
@@ -601,6 +673,8 @@ def annotate_vcf_with_all_modules(
         skipped_modules=skipped,
         failed_modules=failed,
         total_variants_annotated=total_annotated,
+        restored_variants=restored_by_module,
+        total_variants_restored=total_restored,
         duration_sec=duration_sec,
         cpu_percent=cpu_percent,
         peak_memory_mb=peak_memory_mb,
@@ -632,6 +706,9 @@ def annotate_vcf_with_all_modules(
         metadata_dict["modules_skipped"] = MetadataValue.json(skipped)
     if failed:
         metadata_dict["modules_failed"] = MetadataValue.json(failed)
+    if restored_by_module:
+        metadata_dict["variants_restored"] = MetadataValue.json(restored_by_module)
+        metadata_dict["total_variants_restored"] = MetadataValue.int(total_restored)
     
     # Add resource metrics to Dagster metadata
     if duration_sec is not None:

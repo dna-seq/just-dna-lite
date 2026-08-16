@@ -142,6 +142,20 @@ class HfModuleAnnotationConfig(Config, SampleInfo):
     # Output settings
     output_dir: Optional[str] = None  # If None, uses data/output/users/{user_name}/modules/
     compression: str = "zstd"
+
+    # Reference-genotype restoration has **no on/off switch**, by design: whether a module's
+    # authored hom-ref row can be inferred is a fact about the callset in front of us, and
+    # `restoration.RestorationContext.enabled` measures it (variant-only *and* whole-genome). A
+    # boolean here could only be a guess at what those two already establish, and a wrong guess
+    # either fabricates rows on an exome or withholds real results on a genome.
+    #
+    # This is the one genuine parameter: how far the nearest called variant may be for the callset
+    # to count as having reached a site's neighbourhood. 10 kb sits just above the 99th percentile
+    # of consecutive-call spacing measured across every WGS sample in this repo (~6 kb), so it means
+    # "as densely called as this genome usually is". Coarse by design and not a callability proof —
+    # the rigorous test is the format's requires_callable/callable_from against a gVCF's MIN_DP, and
+    # those columns are unpopulated corpus-wide.
+    restoration_max_flank_bp: int = 10_000
     
     # VCF parsing options
     info_fields: Optional[list[str]] = None

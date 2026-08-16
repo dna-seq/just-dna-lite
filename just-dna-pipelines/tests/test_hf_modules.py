@@ -152,6 +152,7 @@ class TestModuleTableUrl:
             weights_url=f"hf://{base}/weights.parquet",
             annotations_url=f"hf://{base}/annotations.parquet",
             studies_url=f"hf://{base}/studies.parquet",
+            sources_url=f"hf://{base}/sources.parquet",
         )
         for table in ModuleTable:
             url = get_module_table_url(module_name, table, module_info=info)
@@ -347,7 +348,7 @@ class TestAnnotationWithRealData:
         
         # Annotate with position-based join
         output_path = tmp_path / "longevitymap_weights.parquet"
-        result_path, num_rows = annotate_vcf_with_module_weights(
+        result_path, num_rows, _ = annotate_vcf_with_module_weights(
             vcf_lf,
             "longevitymap",
             output_path,
@@ -378,7 +379,7 @@ class TestAnnotationWithRealData:
         
         for module_name in modules_to_test:
             output_path = tmp_path / f"{module_name}_weights.parquet"
-            result_path, num_rows = annotate_vcf_with_module_weights(
+            result_path, num_rows, _ = annotate_vcf_with_module_weights(
                 vcf_lf,
                 module_name,
                 output_path,
@@ -693,7 +694,7 @@ class TestVcfSpellingsTheEngineMustFold:
             "chrom": ["1"], "start": [100], "rsid": ["rs123;rs456"], "genotype": [["A", "G"]]
         })
 
-        out, n = annotate_vcf_with_module_weights(
+        out, n, _ = annotate_vcf_with_module_weights(
             vcf, "pgx", tmp_path / "out.parquet", module_info=info
         )
         assert n == 1, "a record's second ID must be matchable"
@@ -745,7 +746,7 @@ class TestPharmVariantsAnnotation:
         }).lazy()
         assert vcf.collect_schema()["genotype"] == pl.List(pl.String)
 
-        out, n = annotate_vcf_with_module_weights(
+        out, n, _ = annotate_vcf_with_module_weights(
             vcf, "pharmgkb", tmp_path / "pgx.parquet", module_info=info
         )
         assert n > 0, "the default position join must downgrade to rsid rather than annotate nothing"
@@ -788,7 +789,7 @@ class TestPharmVariantsAnnotation:
             "genotype": [["A", "G"], ["G", "G"], ["T", "T"]],
         }).lazy()
 
-        out, n = annotate_vcf_with_module_weights(
+        out, n, _ = annotate_vcf_with_module_weights(
             vcf, "pgx", tmp_path / "annotated.parquet", module_info=info
         )
         result = pl.read_parquet(out)
@@ -910,7 +911,7 @@ class TestPositionJoinRequiresRefAgreement:
             "genotype": [["A", "A"], ["C", "T"]],
         })
 
-        out, _ = annotate_vcf_with_module_weights(
+        out, _, _ = annotate_vcf_with_module_weights(
             vcf, "panel", tmp_path / "out.parquet", module_info=info
         )
         result = pl.read_parquet(out).filter(pl.col("module").is_not_null())

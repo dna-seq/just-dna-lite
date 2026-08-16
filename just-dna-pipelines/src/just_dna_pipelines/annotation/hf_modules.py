@@ -25,7 +25,7 @@ HF_DEFAULT_REPOS: list[str] = DEFAULT_REPOS
 HF_REPO_ID: str = HF_DEFAULT_REPOS[0] if HF_DEFAULT_REPOS else ""
 
 # Tables available in each module
-MODULE_TABLES = ["annotations", "studies", "weights"]
+MODULE_TABLES = ["annotations", "studies", "weights", "sources"]
 
 
 class ModuleInfo(BaseModel):
@@ -48,6 +48,10 @@ class ModuleInfo(BaseModel):
     weights_url: Optional[str] = None
     annotations_url: Optional[str] = None
     studies_url: Optional[str] = None
+    # Licensing provenance for the data this module redistributes. Every module the compiler emits
+    # carries one, and a report that embeds a module's curated prose owes its attribution — so this
+    # is discovered rather than left to a consumer that happens to know the file is there.
+    sources_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
 
@@ -122,6 +126,7 @@ def _probe_module_at_path(
 
     annotations_path = f"{base_path}/annotations.parquet"
     studies_path = f"{base_path}/studies.parquet"
+    sources_path = f"{base_path}/sources.parquet"
     metadata_json_path = f"{base_path}/metadata.json"
     metadata_yaml_path = f"{base_path}/metadata.yaml"
 
@@ -151,6 +156,7 @@ def _probe_module_at_path(
         weights_url=lead_url if lead_table == "weights" else None,
         annotations_url=_build_url(protocol, annotations_path) if fs.exists(annotations_path) else None,
         studies_url=_build_url(protocol, studies_path) if fs.exists(studies_path) else None,
+        sources_url=_build_url(protocol, sources_path) if fs.exists(sources_path) else None,
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
     )
@@ -402,6 +408,7 @@ class ModuleTable(str, Enum):
     ANNOTATIONS = "annotations"
     STUDIES = "studies"
     WEIGHTS = "weights"
+    SOURCES = "sources"
     # Whichever table family carries this module's rows — weights for most, pharm_variants for a
     # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
     LEAD = "lead"
@@ -445,6 +452,10 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
         if not info.studies_url:
             raise ValueError(f"Module {module_name} does not have a studies table")
         return info.studies_url
+    elif table_name == "sources":
+        if not info.sources_url:
+            raise ValueError(f"Module {module_name} does not have a sources table")
+        return info.sources_url
 
     # Fallback for unknown tables
     return f"{info.path}/{table_name}.parquet"
@@ -540,7 +551,14 @@ class AnnotationManifest(BaseModel):
     # (skipped) or an error (failed). Absent from `modules`, so recorded here instead of lost.
     skipped_modules: dict[str, str] = {}
     failed_modules: dict[str, str] = {}
+    # Rows that actually matched a module entry — NOT the height of the parquets, which keep the
+    # unmatched rows of a position join on purpose.
     total_variants_annotated: int = 0
+    # Rows reported from the *absence* of a call: the module authored the reference genotype and the
+    # callset, being variant-only, emitted no record at that site. Held apart from the annotated
+    # total because these were inferred, never observed, and a reader is owed that distinction.
+    restored_variants: dict[str, int] = {}
+    total_variants_restored: int = 0
     # Execution metrics
     duration_sec: Optional[float] = None
     cpu_percent: Optional[float] = None

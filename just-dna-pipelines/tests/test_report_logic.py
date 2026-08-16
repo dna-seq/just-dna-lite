@@ -124,6 +124,7 @@ def test_variant_color_direction_only_is_green():
 
 from just_dna_pipelines.annotation.report_logic import (
     _clin_sig_label,
+    _effective_clin_sig,
     _evidence_rank,
     _genotype_alleles,
     _genotype_str,
@@ -158,24 +159,50 @@ def test_genotype_alleles_drops_empty_fragments():
     assert _genotype_alleles("G/") == ["G"]
 
 
-def test_clin_sig_label_prefers_typed_column_over_booleans():
+def _row_clin_sig_label(row: dict) -> str:
+    """What the report shows for a parquet row: the effective tier, rendered.
+
+    `_build_variant` does exactly this pair — `_effective_clin_sig` to settle the tier across the
+    format transition, then `_clin_sig_label` to render it — so the tests below exercise the same
+    path the report takes rather than a display helper on its own.
+    """
+    return _clin_sig_label(
+        _effective_clin_sig(
+            row.get("clin_sig"), row.get("pathogenic"), row.get("benign"), row.get("clinvar")
+        )
+    )
+
+
+def test_clin_sig_prefers_typed_column_over_booleans():
     """The ClinVar panels set pathogenic=True for both pathogenic and likely_pathogenic.
     Keying the report on the boolean collapses those two calls; clin_sig does not."""
-    assert _clin_sig_label({
+    assert _row_clin_sig_label({
         "clin_sig": "likely_pathogenic",
         "clinvar": True,
         "pathogenic": True,
         "benign": False,
-    }) == "likely pathogenic"
-    assert _clin_sig_label({"clin_sig": "pathogenic", "pathogenic": True}) == "pathogenic"
-    assert _clin_sig_label({"clin_sig": "uncertain_significance"}) == "uncertain significance"
+    }) == "Likely pathogenic"
+    assert _row_clin_sig_label({"clin_sig": "pathogenic", "pathogenic": True}) == "Pathogenic"
+    assert _row_clin_sig_label({"clin_sig": "uncertain_significance"}) == "Uncertain significance"
 
 
-def test_clin_sig_label_falls_back_to_booleans_when_typed_column_empty():
-    assert _clin_sig_label({"clin_sig": None, "pathogenic": True}) == "pathogenic"
-    assert _clin_sig_label({"clin_sig": "", "benign": True}) == "benign"
-    assert _clin_sig_label({"clinvar": True}) == ""
-    assert _clin_sig_label({}) == ""
+def test_clin_sig_falls_back_to_booleans_when_typed_column_empty():
+    assert _row_clin_sig_label({"clin_sig": None, "pathogenic": True}) == "Pathogenic"
+    assert _row_clin_sig_label({"clin_sig": "", "benign": True}) == "Benign"
+    assert _row_clin_sig_label({}) == ""
+
+
+def test_a_clinvar_record_that_is_neither_pathogenic_nor_benign_is_vus():
+    """Not "" — a ClinVar record with both calls false is uncertain significance.
+
+    This is the format's own `clin_sig_from_booleans` leaf rather than a rule of ours, and it is
+    the one case where deriving beats reporting nothing: the variant *was* reviewed, and saying so
+    is different from saying nothing is known.
+    """
+    assert _row_clin_sig_label({"clinvar": True}) == "Uncertain significance"
+    assert _row_clin_sig_label({"clinvar": True, "pathogenic": False, "benign": False}) == (
+        "Uncertain significance"
+    )
 
 
 def test_evidence_rank_orders_clinpgx_tiers_strongest_first():
@@ -185,3 +212,400 @@ def test_evidence_rank_orders_clinpgx_tiers_strongest_first():
     assert _evidence_rank("") < _evidence_rank("4")
     assert _evidence_rank(None) < _evidence_rank("4")
     assert _evidence_rank("nonsense") < _evidence_rank("4")
+
+
+# ============================================================ 0.5 contract: the annotations join
+
+from pathlib import Path
+
+from just_dna_pipelines.annotation.hf_modules import ModuleInfo
+from just_dna_pipelines.annotation.report_logic import (
+    _annotations_keying,
+    _build_variant,
+    _effective_clin_sig,
+    _genotype_join_key,
+    build_report_credits,
+    load_annotated_weights,
+    load_module_credits,
+)
+
+V1_PORT = Path(__file__).resolve().parents[2] / "data" / "interim" / "v1_port"
+
+
+def _weights_frame() -> pl.DataFrame:
+    """Two variants; rs1 is poly-effect (two real annotations), rs2 has one."""
+    return pl.DataFrame(
+        {
+            "rsid": ["rs1", "rs2"],
+            "variant_key": ["rs1", "rs2"],
+            "genotype": [["A", "G"], ["C", "C"]],
+            "phased": [False, False],
+            "module": ["m", "m"],
+            "weight": [1.0, -1.0],
+            "state": ["risk", "protective"],
+        }
+    )
+
+
+def _annotations_frame(era: str) -> pl.DataFrame:
+    """The same two variants' annotations, spelled the way each artifact generation spells them."""
+    base = {
+        "rsid": ["rs1", "rs1", "rs2"],
+        "gene": ["G1", "G1", "G2"],
+        "category": ["lipids", "lipids", "insulin"],
+        "phenotype": ["p1", "p2", "p3"],
+    }
+    if era == "rsid":
+        return pl.DataFrame(base)
+    base["variant_key"] = ["rs1", "rs1", "rs2"]
+    if era == "variant_key":
+        return pl.DataFrame(base)
+    # 0.6 / RM80: the annotation is keyed by the genotype it applies to
+    base["genotype"] = ["A/G", "G/G", "C/C"]
+    return pl.DataFrame(base)
+
+
+@pytest.mark.parametrize("era", ["rsid", "variant_key", "genotype"])
+def test_annotations_join_never_inflates_the_variant_count(tmp_path, era):
+    """Regression: joining annotations on rsid fanned a poly-effect variant out into one report row
+    per annotation. Measured on real data at coronary 81 -> 231 (x2.85), lipidmetabolism x2.73,
+    vo2max x2.15 — silently inflating total_variants and every count derived from it."""
+    weights_path = tmp_path / "m_weights.parquet"
+    _weights_frame().write_parquet(weights_path)
+    ann_path = tmp_path / "annotations.parquet"
+    _annotations_frame(era).write_parquet(ann_path)
+
+    info = ModuleInfo(
+        name="m", repo_id="local", path=str(tmp_path),
+        lead_table="weights", lead_url=str(weights_path),
+        weights_url=str(weights_path), annotations_url=str(ann_path),
+    )
+
+    out = load_annotated_weights(weights_path, "m", info)
+    assert out.height == 2, f"{era} keying inflated {2} rows to {out.height}"
+    # the annotation actually landed
+    assert set(out["gene"].to_list()) == {"G1", "G2"}
+
+
+def test_annotations_keying_is_detected_from_the_columns_present():
+    """Three generations of artifact are in circulation at once, so the key is detected, not assumed."""
+    schema = pl.Schema({"genotype": pl.List(pl.String), "variant_key": pl.String})
+    assert _annotations_keying(
+        ["variant_key", "genotype"], ["variant_key", "genotype", "gene"], schema
+    ) == "genotype"
+    assert _annotations_keying(
+        ["variant_key", "genotype"], ["variant_key", "gene"], schema
+    ) == "variant_key"
+    assert _annotations_keying(["rsid"], ["rsid", "gene"], schema) == "rsid"
+    # a 0.4-family lead table stores the genotype as a string, so it cannot take the genotype key
+    str_schema = pl.Schema({"genotype": pl.String, "variant_key": pl.String})
+    assert _annotations_keying(
+        ["variant_key", "genotype"], ["variant_key", "genotype"], str_schema
+    ) == "variant_key"
+
+
+def test_genotype_join_key_matches_the_compilers_round_trip():
+    """The rebuilt key must be the spelling `reverse_module` re-emits: phased keeps authored order,
+    unphased is sorted. Ground truth is the compiler's own splitter, not a hardcoded string."""
+    from just_dna_compiler.compiler import _split_genotype
+
+    for authored, phased in [("A|G", True), ("G|A", True), ("A/G", False), ("C/C", False), ("A", False)]:
+        alleles = _split_genotype(authored)
+        assert _genotype_join_key(alleles, phased) == authored, authored
+
+    # phase is not folded away: A|G and G|A stay distinct keys
+    assert _genotype_join_key(["A", "G"], True) != _genotype_join_key(["G", "A"], True)
+    # unphased is, because the grammar requires the sorted spelling
+    assert _genotype_join_key(["G", "A"], False) == _genotype_join_key(["A", "G"], False) == "A/G"
+
+
+# ============================================================ clin_sig as the primary clinical axis
+
+
+def test_clin_sig_column_wins_over_the_lossy_booleans():
+    """The booleans cannot express `likely_pathogenic`. Our ClinVar panels populate the column AND
+    the booleans, so reading the boolean rendered 214,827 likely_pathogenic rows identically to
+    402,174 pathogenic ones."""
+    assert _effective_clin_sig("likely_pathogenic", True, False, True) == "likely_pathogenic"
+    assert _effective_clin_sig("likely_benign", False, True, True) == "likely_benign"
+
+
+def test_clin_sig_is_derived_when_only_the_legacy_booleans_are_present():
+    assert _effective_clin_sig("", True, False, True) == "pathogenic"
+    assert _effective_clin_sig(None, False, True, True) == "benign"
+    assert _effective_clin_sig(None, False, False, True) == "uncertain_significance"
+    # nothing established -> nothing said, rather than a fabricated default
+    assert _effective_clin_sig(None, None, None, None) == ""
+    assert _effective_clin_sig(None, False, False, False) == ""
+
+
+# ==================================================== render-if-present: the axes our corpus lacks
+
+import jinja2
+
+from just_dna_pipelines.annotation.report_logic import (
+    _AUTHORED_AXES,
+    build_module_report_data,
+    build_pharmacogenomics_report_data,
+)
+
+TEMPLATE_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "src" / "just_dna_pipelines" / "annotation" / "templates"
+)
+
+
+def _render(**context) -> str:
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True
+    )
+    ctx = {
+        "user_name": "t", "sample_name": "s", "longevity": None,
+        "other_modules": [], "pgx_modules": [], "credits": [],
+        "module_display_names": {}, "umami_script_tag": "",
+    }
+    ctx.update(context)
+    return env.get_template("longevity_report.html.j2").render(**ctx)
+
+
+def _module_data(variants: list[dict]) -> dict:
+    return {
+        "module_name": "synthetic", "display_name": "Synthetic",
+        "variants": variants,
+        "summary": {"total_variants": len(variants), "total_positive": 0,
+                    "total_negative": 0, "total_weight": 0.0},
+    }
+
+
+def test_a_populated_0_5_axis_reaches_the_html():
+    """The test that keeps the deferral honest.
+
+    Every module in our corpus is a Gen-I port authored against 0.2 and mechanically uplifted, so
+    these axes are empty everywhere — that is a property of the corpus, not of the format. A newly
+    authored module will carry them, and this fails the day the view model or the macro starts
+    dropping a populated column, which is the defect this whole pass exists to undo.
+    """
+    populated = {
+        "effect_size": "1.42", "effect_measure": "OR", "effect_allele": "T",
+        "stat_significance": "genome_wide", "negatives": "not in East Asian cohorts",
+        "trait_efo_id": "EFO:0001645", "flags": "low_coverage",
+        "priority": "high", "population": "European", "p_value": "3e-9",
+    }
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": 0.5, "state": "risk", **populated}
+    variant = _build_variant(row, {})
+
+    # the view model carries every one
+    for axis, value in populated.items():
+        assert variant[axis] == value, axis
+
+    html = _render(other_modules=[_module_data([variant])])
+    for axis, value in populated.items():
+        assert value in html, f"{axis}={value!r} never reached the rendered report"
+
+
+def test_an_empty_axis_emits_no_row_rather_than_an_empty_one():
+    """The converse. Absent means render nothing, never a fabricated default or a blank row."""
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": 0.5, "state": "risk"}
+    variant = _build_variant(row, {})
+    html = _render(other_modules=[_module_data([variant])])
+    for label in ("Effect size", "Effect measure", "Trait (EFO)", "Does not apply to"):
+        assert label not in html, f"{label} rendered a row for an absent value"
+
+
+def test_the_template_renders_direction_not_the_raw_state():
+    """Format 1.0 removes `state`; the report must key on the derived direction instead."""
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": None, "state": "protective"}
+    variant = _build_variant(row, {})
+    assert variant["direction"] == "protective"
+    html = _render(other_modules=[_module_data([variant])])
+    assert "<th>Direction</th>" in html
+    assert "<th>State</th>" not in html
+
+
+def test_clin_sig_tier_is_what_the_report_shows():
+    row = {"rsid": "rs1", "genotype": ["A", "T"], "module": "m", "weight": None,
+           "clin_sig": "likely_pathogenic", "pathogenic": True, "clinvar": True}
+    variant = _build_variant(row, {})
+    html = _render(other_modules=[_module_data([variant])])
+    assert "Likely pathogenic" in html
+    # the old rendering collapsed the tier to a bare "(Pathogenic)"
+    assert "Yes (Pathogenic)" not in html
+
+
+# ============================================== pharmacogenomics: a 0.4-family lead table's report
+
+pytestmark_v1 = pytest.mark.skipif(
+    not (V1_PORT / "pharmgkb" / "pharm_variants.parquet").exists(),
+    reason="v1_port modules not built (uv run pipelines v1-port pharmgkb)",
+)
+
+
+@pytestmark_v1
+def test_pharmacogenomics_report_groups_by_drug_and_ranks_by_evidence(tmp_path):
+    """A pharmacogenomics module states no weights, so |weight| ordering leaves it in scan order.
+    The unit a reader acts on is the drug, and the ranking axis is the ClinPGx evidence level."""
+    src = pl.read_parquet(V1_PORT / "pharmgkb" / "pharm_variants.parquet")
+    # stand in for the engine's output: the matched subset, named the way it names outputs
+    matched = src.head(200)
+    weights_path = tmp_path / "pharmgkb_weights.parquet"
+    matched.write_parquet(weights_path)
+
+    info = ModuleInfo(
+        name="pharmgkb", repo_id="local", path=str(V1_PORT / "pharmgkb"),
+        lead_table="pharm_variants", lead_url=str(weights_path),
+        sources_url=str(V1_PORT / "pharmgkb" / "sources.parquet"),
+    )
+    data = build_pharmacogenomics_report_data(weights_path, "pharmgkb", info)
+
+    assert data["drugs"], "no drug groups built"
+    # every matched variant lands in exactly one group
+    assert sum(d["total_count"] for d in data["drugs"]) == data["summary"]["total_variants"]
+    assert data["summary"]["total_variants"] == matched.height
+
+    # groups are ordered by their strongest evidence, strongest first
+    ranks = [_evidence_rank(d["best_evidence"]) for d in data["drugs"]]
+    assert ranks == sorted(ranks, reverse=True)
+    # and within a group too
+    for d in data["drugs"]:
+        inner = [_evidence_rank(v["evidence_level"]) for v in d["variants"]]
+        assert inner == sorted(inner, reverse=True), d["drug"]
+
+    # the strongest tier present in the source is the one that leads the report
+    best_in_source = max(_evidence_rank(x) for x in matched["evidence_level"].to_list())
+    assert _evidence_rank(data["drugs"][0]["best_evidence"]) == best_in_source
+
+
+@pytestmark_v1
+def test_pharmacogenomics_variants_survive_the_0_4_genotype_string(tmp_path):
+    """pharm_variants keeps the authored genotype string; treating it as characters produced
+    'G///G' and read zygosity off the separator."""
+    src = pl.read_parquet(V1_PORT / "pharmgkb" / "pharm_variants.parquet").head(50)
+    weights_path = tmp_path / "pharmgkb_weights.parquet"
+    src.write_parquet(weights_path)
+    info = ModuleInfo(name="pharmgkb", repo_id="local", path=str(tmp_path),
+                      lead_table="pharm_variants", lead_url=str(weights_path))
+    data = build_pharmacogenomics_report_data(weights_path, "pharmgkb", info)
+
+    rendered = [v for d in data["drugs"] for v in d["variants"]]
+    authored = src["genotype"].to_list()
+    for v in rendered:
+        assert "//" not in v["genotype_str"]
+        assert v["zygosity"] in ("hom", "het", "")
+    # zygosity agrees with the authored string it came from
+    by_pair = {(v["rsid"], v["genotype_str"]) for v in rendered}
+    for rsid, gt in zip(src["rsid"].to_list(), authored):
+        if gt:
+            assert (rsid, gt) in by_pair or "|" in gt
+
+
+@pytestmark_v1
+def test_credits_list_only_the_annotation_layer(tmp_path):
+    """SCHEMAS.md SourceRow: only the `annotation` layer carries the derivative-work obligation. A
+    reference consulted to place a coordinate (Ensembl, layer `resolution`) is recorded for
+    provenance without tainting the module's terms, so crediting it would misstate what is owed."""
+    info = ModuleInfo(
+        name="pharmgkb", repo_id="local", path=str(V1_PORT / "pharmgkb"),
+        lead_table="pharm_variants",
+        lead_url=str(V1_PORT / "pharmgkb" / "pharm_variants.parquet"),
+        sources_url=str(V1_PORT / "pharmgkb" / "sources.parquet"),
+    )
+    credits = load_module_credits("pharmgkb", info)
+
+    raw = pl.read_parquet(V1_PORT / "pharmgkb" / "sources.parquet")
+    expected = set(raw.filter(pl.col("layer") == "annotation")["source"].to_list())
+    assert {c["source"] for c in credits} == expected
+    # the resolution-layer source is present in the artifact but deliberately not credited
+    assert "ensembl" in set(raw["source"].to_list())
+    assert "ensembl" not in {c["source"] for c in credits}
+
+    clinpgx = next(c for c in credits if c["source"] == "clinpgx")
+    assert clinpgx["license"] == "CC-BY-SA-4.0"
+    assert clinpgx["share_alike"] is True
+    assert clinpgx["commercial_use"] is False
+    assert clinpgx["attribution"]
+
+
+@pytestmark_v1
+def test_credits_are_deduplicated_across_modules_but_keep_who_used_them(tmp_path):
+    infos = {
+        name: ModuleInfo(
+            name=name, repo_id="local", path=str(V1_PORT / "pharmgkb"),
+            lead_table="pharm_variants",
+            lead_url=str(V1_PORT / "pharmgkb" / "pharm_variants.parquet"),
+            sources_url=str(V1_PORT / "pharmgkb" / "sources.parquet"),
+        )
+        for name in ("a", "b")
+    }
+    credits = build_report_credits(["a", "b"], infos)
+    # two modules on the same upstream release owe one attribution, not two
+    assert len(credits) == 1
+    assert credits[0]["modules"] == ["a", "b"]
+
+
+def test_credits_absent_when_the_module_has_no_sources_table(tmp_path):
+    """A 0.3 module published before sources.parquet existed must not break the report."""
+    info = ModuleInfo(name="old", repo_id="local", path=str(tmp_path),
+                      lead_table="weights", lead_url=str(tmp_path / "w.parquet"))
+    assert load_module_credits("old", info) == []
+    assert build_report_credits(["old"], {"old": info}) == []
+
+
+def test_weightless_lead_family_does_not_raise_on_the_weight_sum(tmp_path):
+    """`annotated.select("weight").sum()` raised ColumnNotFoundError for any lead family with no
+    weight column — latent while only longevitymap took that path, live once routing changed."""
+    from just_dna_pipelines.annotation.report_logic import build_longevity_report_data
+
+    pl.DataFrame({
+        "rsid": ["rs1"], "genotype": ["C/C"], "module": ["m"],
+        "gene": ["G"], "category": ["lipids"], "conclusion": ["c"],
+    }).write_parquet(tmp_path / "m_weights.parquet")
+    info = ModuleInfo(name="m", repo_id="local", path=str(tmp_path),
+                      lead_table="pharm_variants", lead_url=str(tmp_path / "m_weights.parquet"))
+
+    data = build_longevity_report_data(tmp_path / "m_weights.parquet", "m", info)
+    assert data["summary"]["total_variants"] == 1
+    assert data["summary"]["total_weight"] == 0.0
+
+
+# =============================================== end to end, against a real sample when present
+
+REAL_SAMPLE = Path(
+    "/data/just-dna-lite/output/users/anonymous/M8UBMVNLH.hard-filtered/user_vcf_normalized.parquet"
+)
+
+
+@pytest.mark.skipif(
+    not REAL_SAMPLE.exists() or not (V1_PORT / "pharmgkb" / "pharm_variants.parquet").exists(),
+    reason="real sample or v1_port pharmgkb not present on this machine",
+)
+def test_pharmgkb_on_a_real_genome_produces_a_drug_keyed_section(tmp_path):
+    """The measured end-to-end case: pharmgkb matches 63 rows on this sample, and every one must
+    survive into a drug group. Pinned to the engine's own count rather than a literal, so the test
+    tracks the module rather than a snapshot of it."""
+    from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_module_weights
+
+    src = V1_PORT / "pharmgkb"
+    info = ModuleInfo(
+        name="pharmgkb", repo_id="local", path=str(src), lead_table="pharm_variants",
+        lead_url=str(src / "pharm_variants.parquet"),
+        sources_url=str(src / "sources.parquet"),
+    )
+    out = tmp_path / "pharmgkb_weights.parquet"
+    _, matched, _ = annotate_vcf_with_module_weights(
+        pl.scan_parquet(REAL_SAMPLE), "pharmgkb", out, join_on="rsid", module_info=info
+    )
+    assert matched > 0, "engine matched nothing — the 0.4 genotype join regressed"
+
+    data = build_pharmacogenomics_report_data(out, "pharmgkb", info)
+    # nothing is lost between the engine and the report
+    assert data["summary"]["total_variants"] == matched
+    assert sum(d["total_count"] for d in data["drugs"]) == matched
+    # the strongest evidence leads
+    assert data["drugs"][0]["best_evidence"] == "1A"
+    ranks = [_evidence_rank(d["best_evidence"]) for d in data["drugs"]]
+    assert ranks == sorted(ranks, reverse=True)
+    # a real PGx result names genes, not just rsids
+    assert any(d["genes"] for d in data["drugs"])

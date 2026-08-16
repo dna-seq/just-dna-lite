@@ -391,6 +391,80 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
 `failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
 there when every module was skipped.
 
+**The count the engine returns is matched rows, never the parquet's height.** A position join keeps
+every unmatched VCF row on purpose (the report needs them to tell "probed and did not match" apart
+from "never looked"), so the height is a *positions probed* number. Reporting it as variants
+annotated made `total_variants_annotated` read **567 against a real 259** on Anton's genome and told
+the user "cancer: 29 variants" for a module that annotated none. `annotate_vcf_with_module_weights`
+returns `(path, num_matched, restoration_stats)`; both numbers travel on the eliot log
+(`num_matched` / `num_written`) because they answer different questions.
+
+### Reference-genotype restoration (`restoration.py`)
+
+A module may author a row whose genotype **is** the reference genotype — `lactose_tolerance` states
+`G/G` for rs4988235 ("adult-type hypolactasia"), the most common lactose result there is. A
+variant-only callset emits no record where the sample matches the reference, so that row could never
+match and the reader was told "no variants found" instead of their result. **Whether such a row is
+reachable is a property of the callset, not of the module** — a gVCF carries the reference block, an
+array genotypes every probe, a variant-only VCF carries nothing — so the module cannot mark these
+rows and the decision lives here. Corpus-wide it is not a rarity: 193 of longevitymap's 1039 rows,
+and one row in three of every hand-curated module.
+
+The design is `just-prs`'s (`just_prs.reference_allele`, `just_prs.prs.RestorationScope`, whose
+docstring names just-dna-lite as the embedder that would inject its own position set). Three
+properties are taken directly: restoration is **scoped to a supplied position set** (a module's
+authored hom-ref sites, tiny — 2 for lactose, 193 rows for longevitymap), provenance is a
+**tri-state carried on the row** (`genotype_evidence` ∈ `called` | `restored_hom_ref`), and a case
+that cannot be established **stays unestablished** rather than being filled.
+
+Where we deliberately diverge: `compute_prs` fills hom-ref for *every* absent locus with a known
+reference allele and no locality gate — sound when one wrong locus among thousands moves a score by a
+rounding error, not sound when one restored row becomes one rendered sentence about a person. So:
+
+**There is no on/off config flag, deliberately.** Whether a hom-ref row can be inferred is a fact
+about the callset, and the callset is in front of us — `RestorationContext.enabled` measures it and
+nothing else decides. A default would only be a guess at what the two gates below already establish,
+and a wrong guess either fabricates rows on an exome or withholds real results on a genome. The one
+real parameter is `restoration_max_flank_bp`.
+
+- **Only a `variant_only` callset is restored into**, classified by `infer_genotype_input_mode` (a
+  re-derivation of just-prs's private `_infer_genotype_input_mode`: `<NON_REF>` allele or `RefCall`
+  filter). **Classify the parquet, not the raw VCF** — our own `pass_filters` drops `FILTER=RefCall`,
+  so a real gVCF arrives here already stripped of reference blocks and is variant-only *as far as
+  annotation is concerned*; classifying the raw file would disable restoration and leave those rows
+  unreportable from either direction.
+- **Only a whole-genome callset is restored into** (`detect_callset_scope` → `CallsetScope`). This is
+  the gate `GenotypeInputMode` cannot supply and the one that matters most: on an exome or panel the
+  overwhelming majority of the genome was never captured, so absence carries no information — and the
+  per-site flanking test is *actively misleading* there, because exonic calls cluster densely enough
+  that an uncaptured intronic site kilobases away still has a neighbour. Two signals:
+  `MIN_WGS_SITES` (1M; WGS carries 4.3–4.7M across every sample here, an exome ~50–100k) and
+  `MIN_WGS_BREADTH` (0.75) — the share of the callset's span lying within one flank of a call, i.e.
+  **the same question the per-site test asks, applied genome-wide**, so the two gates are one rule at
+  two scales. Measured **0.942–0.950** on all four real samples against **0.21** for a clustered
+  callset of comparable size. A gap percentile was tried first and **rejected**: 20 calls 50 bp apart
+  every 100 kb puts 95% of gaps at 50 bp, so p90 reports it dense while 79% of the span is nowhere
+  near a call. Breadth weights a gap by its length instead of counting it once.
+- **A site the caller emitted is never restored.** It was observed; whatever it says there is the
+  answer.
+- **A site needs a called variant within `restoration_max_flank_bp` (default 10 kb)**, and the
+  distance travels on `restored_flank_bp`. This is coarse and is *not* a callability proof — the
+  rigorous test is `requires_callable` / `callable_from` (RM6) against a gVCF's `MIN_DP` with
+  interval containment, and those are **unpopulated across the whole corpus**. Until they are, this
+  is the strongest honest gate, which is why the evidence column exists and why the report renders
+  restored rows with an `inferred` badge and an explicit "this can also mean the position was not
+  covered" note. **Never merge the two categories.**
+- `hom_ref_rows` returns `None` for a lead table with no `ref`/coordinates, so `pharm_variants` is
+  excluded **by schema rather than by name** — format 0.6's RM43 fill switches it on with no code
+  change here.
+
+The restored frame is built by pouring module values into `vcf_lf.limit(0)` and `hstack`-ing, so it
+carries the annotated schema by construction rather than by a hand-maintained copy that drifts the
+first time the VCF reader gains a column. `restored_variants` / `total_variants_restored` on the
+manifest are held apart from `total_variants_annotated` for the same reason the column is: these were
+inferred, never observed. Tests: `tests/test_restoration.py` (which `load_env()`s at import — locally
+registered modules are discovered from `JUST_DNA_PIPELINES_OUTPUT_DIR`).
+
 **Read `just-dna-format/docs/PROPOSAL_0_6.md` before touching this seam again.** Its RM53–RM67 cluster
 is a VCF-4.4 audit of exactly the assumptions a consumer makes, and three of its items were live
 defects here (RM60, RM64) or corrected our reading of the contract (RM63 — the `variants.csv`
@@ -409,6 +483,56 @@ namespaces distinguishable in the parquet and accept the qualified `INFO/DP` / `
 form (RM53); remember QUAL inverts on a reference record, which is exactly where a
 `requires_callable` row is evaluated (RM57); and for a gVCF read `MIN_DP` with interval containment
 rather than `DP` with an equality join on position (RM57's second half).
+
+### The report's side of the contract (`report_logic.py` + `longevity_report.html.j2`)
+
+The engine projects nothing, so all 37 columns of a 0.5 artifact reach the user's parquet; the report
+is where they were being lost (it read ~14 and rendered 11). Four rules now hold it to the contract.
+
+- **`annotations.parquet` is keyed per *annotation*, not per variant, so joining it on `rsid` fans a
+  poly-effect variant out into one report row each** — measured coronary **81 → 231** (×2.85),
+  lipidmetabolism ×2.73, vo2max ×2.15, inflating `total_variants` and every count derived from it.
+  `_join_annotations` detects the key from the columns present (`_annotations_keying`) because three
+  artifact generations are live at once: 0.3 on HuggingFace (rsid only), 0.5 as we compile today
+  (`variant_key`, no genotype), 0.6 (`genotype`, per format **RM80**). Dedup-on-`variant_key` is used
+  **only** in the 0.5 era, where the artifact offers no finer key — the RM80 reply rejects it as the
+  general answer, since a genuine poly-effect variant is one locus with two real annotations.
+- **`_effective_clin_sig` is the exact counterpart of `_effective_direction`** — authored column
+  first, else `derive.clin_sig_from_booleans`. COMPILER.md: the fallback "lives in Python and does
+  not travel with the parquet", so a polars-side consumer applies it itself. Prefer the column and
+  never round-trip: the booleans cannot express `likely_pathogenic`, and reading them rendered
+  **214,827 `likely_pathogenic` rows identically to 402,174 `pathogenic`** ones.
+- **`_genotype_join_key` sorts an unphased genotype; the engine's `_normalize_lead_genotype` must
+  not.** They look like the same operation and are opposites: this rebuilds the *authored* key the
+  module wrote (COMPILER.md § Reverse — phased keeps order and joins on `|`, unphased sorts and joins
+  on `/`), whereas the engine matches a sample's call against the artifact's own representation and
+  sorting there would fold `A|G` and `G|A` into one key. Keep the two documented together, as with
+  `_genotype_alleles`, which this is the inverse of.
+- **Render-if-present, never a fixed field list.** `_AUTHORED_AXES` is carried into the view model
+  and each axis gets an `{% if %}` row in the template macro, so a module that populates
+  `effect_size` or `negatives` shows it the day it publishes. Most are empty across our whole corpus,
+  but **that is a property of the corpus, not the format** — every module we hold is a Gen-I port
+  authored against 0.2 and mechanically uplifted, and the compiler correctly never fills a cell an
+  author left blank. A fixed field list is exactly how the template came to render 11 of 37;
+  `test_a_populated_0_5_axis_reaches_the_html` fails the day one is dropped again, and its converse
+  pins that an absent value emits no row rather than a blank one.
+
+Two structural changes go with them. Report routing dispatches on **`lead_table`** (read from the
+run's `manifest.json` through `AnnotationManifest`, whose default supplies `"weights"` for manifests
+written before the engine knew about lead tables) instead of a hardcoded `== "longevitymap"`, so a
+`pharm_variants`-led module gets a drug-keyed section ranked by ClinPGx evidence — the right shape
+for a module whose every weight is `0.0`. And the report now credits its sources: discovery gained
+`sources_url` / `ModuleTable.SOURCES`, and the footer lists distinct terms across the modules
+rendered, **restricted to `layer == "annotation"`** (SCHEMAS.md § SourceRow — only that layer carries
+the derivative-work obligation; Ensembl at layer `resolution` is recorded without tainting).
+Permission booleans stay **tri-state**: `None` means the terms could not be established, which the
+footer renders as "Not stated" and never as permission.
+
+The two variant tables were near-duplicate copies that had already drifted; they are now one Jinja
+macro (`variant_rows` / `variant_table_head`). Three constraints the inline JS imposes on it: the
+detail row must be the **immediate next sibling** (no wrapper), `collapseExpandAll` picks expandable
+rows by `children.length > 3` (so the summary row keeps >3 cells and the detail row stays a single
+`colspan` cell), and that `colspan` must equal the header's `<th>` count.
 
 ### Building and releasing the modules
 
