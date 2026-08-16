@@ -10,21 +10,18 @@ Right Panel (Run-Centric View):
 """
 from __future__ import annotations
 
-from typing import Any, Optional
-
 import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
 from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
-from reflex_mui_datagrid import data_grid, lazyframe_grid
-from prs_ui import (
-    prs_progress_section,
-    prs_results_with_chart,
-    trait_results_with_chart,
-)
-from prs_ui.grid_style import data_grid_scroll_container
+from reflex_mui_datagrid import lazyframe_grid
+from prs_ui import prs_scores_selector
+from prs_ui.components.prs_section import prs_workbench_mode_panel
+from prs_ui.grid_style import data_grid_scroll_css
+from prs_ui.mixin import sample_color
+from prs_ui.pages.traits import trait_selector
 
 
 RIGHT_PANEL_TAB_STYLE = {
@@ -42,56 +39,6 @@ RIGHT_PANEL_TAB_BADGE_STYLE = {
     "marginLeft": "4px",
     "fontSize": "0.8rem",
     "padding": "4px 7px",
-}
-
-PRS_MODE_TAB_STYLE = {
-    "cursor": "pointer",
-    "display": "flex",
-    "alignItems": "center",
-    "gap": "8px",
-    "fontSize": "1rem",
-    "fontWeight": "700",
-    "padding": "14px 24px",
-    "minHeight": "54px",
-}
-
-PRS_SUPERPOPULATION_LABELS = {
-    "AFR": "African",
-    "AMR": "American",
-    "EAS": "East Asian",
-    "EUR": "European",
-    "SAS": "South Asian",
-}
-
-PRS_CONTROL_ROW_STYLE = {
-    "display": "flex",
-    "alignItems": "center",
-    "alignContent": "center",
-    "gap": "10px",
-    "flexWrap": "wrap",
-    "width": "100%",
-    "minHeight": "34px",
-    "lineHeight": "1.2",
-}
-
-PRS_CONTROL_GROUP_STYLE = {
-    "display": "flex",
-    "alignItems": "center",
-    "alignContent": "center",
-    "gap": "6px",
-    "minHeight": "32px",
-    "lineHeight": "1.2",
-}
-
-PRS_CHECKBOX_STYLE = {
-    "display": "inline-flex",
-    "alignItems": "center",
-    "justifyContent": "center",
-    "gap": "6px",
-    "minHeight": "32px",
-    "margin": "0",
-    "lineHeight": "1.2",
-    "whiteSpace": "nowrap",
 }
 
 PRS_ALIGNMENT_CSS = """
@@ -137,181 +84,7 @@ PRS_ALIGNMENT_CSS = """
     margin-bottom: 0;
     vertical-align: middle;
 }
-
-#segment-prs [style*="--blue-a2"][style*="--blue-a5"] {
-    display: inline-flex !important;
-    align-items: center !important;
-    box-sizing: border-box;
-    max-width: 100%;
-    min-height: 34px;
-    overflow-x: auto;
-    vertical-align: middle;
-}
-
-#segment-prs [style*="--blue-a2"][style*="--blue-a5"] > .rt-Flex {
-    align-items: center !important;
-    flex-wrap: nowrap !important;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-#segment-prs [style*="--blue-a2"][style*="--blue-a5"] .rt-Text {
-    display: inline-flex;
-    align-items: center;
-    line-height: 1.2;
-}
-
-#segment-prs .prs-section-heading-row,
-#segment-prs .prs-control-row,
-#segment-prs .prs-control-group,
-#segment-prs .prs-selector-toolbar,
-#segment-prs .prs-selection-badges,
-#segment-prs .prs-inline-stats-chip {
-    display: flex;
-    align-items: center;
-    align-content: center;
-    gap: 0.5rem;
-    line-height: 1.2;
-}
-
-#segment-prs .prs-section-heading-row {
-    flex-wrap: wrap;
-}
-
-#segment-prs .prs-control-row {
-    width: 100%;
-    min-height: 34px;
-    flex-wrap: wrap;
-}
-
-#segment-prs .prs-control-row > *,
-#segment-prs .prs-control-group > *,
-#segment-prs .prs-selector-toolbar > *,
-#segment-prs .prs-selection-badges > * {
-    display: inline-flex !important;
-    align-items: center !important;
-    line-height: 1.2 !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    vertical-align: middle !important;
-}
-
-#segment-prs .prs-control-row .rt-SelectTrigger,
-#segment-prs .prs-control-row [role="combobox"],
-#segment-prs .prs-control-row button {
-    min-height: 26px;
-    display: inline-flex !important;
-    align-items: center !important;
-}
-
-#segment-prs .prs-control-row .rt-Text,
-#segment-prs .prs-control-row .rt-Badge,
-#segment-prs .prs-control-row span,
-#segment-prs .prs-control-row i.icon {
-    min-height: 26px;
-}
-
-#segment-prs .prs-control-row .rt-Text,
-#segment-prs .prs-control-group .rt-Text,
-#segment-prs .prs-section-heading-row .rt-Text,
-#segment-prs .prs-selector-toolbar .rt-Text,
-#segment-prs .prs-selection-badges .rt-Text {
-    display: inline-flex !important;
-    align-items: center !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 26px;
-    line-height: 1.2 !important;
-}
-
-#segment-prs .prs-control-row label.rt-Text,
-#segment-prs .prs-control-group label.rt-Text {
-    display: inline-flex !important;
-    align-items: center !important;
-    min-height: 26px;
-    margin: 0 !important;
-    padding: 0 !important;
-    line-height: 1.2 !important;
-}
-
-#segment-prs .prs-control-row label.rt-Text > .rt-Flex,
-#segment-prs .prs-control-group label.rt-Text > .rt-Flex {
-    display: inline-flex !important;
-    align-items: center !important;
-    min-height: 26px;
-    gap: 0.45rem;
-    line-height: 1.2 !important;
-}
-
-#segment-prs .prs-control-row .rt-CheckboxRoot,
-#segment-prs .prs-control-group .rt-CheckboxRoot,
-#segment-prs .prs-control-row .rt-CheckboxIndicator,
-#segment-prs .prs-control-group .rt-CheckboxIndicator {
-    align-self: center !important;
-    margin: 0 !important;
-    line-height: 1 !important;
-}
-
-#segment-prs .prs-control-row .rt-SelectTrigger,
-#segment-prs .prs-control-group .rt-SelectTrigger {
-    align-self: center !important;
-    box-sizing: border-box !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 26px !important;
-    min-height: 26px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    line-height: 26px !important;
-    margin: 0 !important;
-}
-
-#segment-prs .prs-control-row .prs-select-trigger,
-#segment-prs .prs-control-group .prs-select-trigger {
-    line-height: 26px !important;
-    text-align: center !important;
-}
-
-#segment-prs .prs-control-row .prs-select-trigger *,
-#segment-prs .prs-control-group .prs-select-trigger * {
-    line-height: 26px !important;
-    vertical-align: middle !important;
-}
-
-#segment-prs .prs-selector-toolbar {
-    width: 100%;
-    flex-wrap: nowrap;
-    min-height: 36px;
-    overflow-x: auto;
-}
-
-#segment-prs .prs-inline-stats-chip {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 100%;
-    min-height: 34px;
-    padding: 0.4em 0.8em;
-    border: 1px solid var(--blue-a5);
-    border-radius: 6px;
-    background: var(--blue-a2);
-    white-space: nowrap;
-}
-
-#segment-prs .prs-selection-badges {
-    flex: 0 0 auto;
-    white-space: nowrap;
-}
 """
-
-PRS_RESULTS_TITLE_STYLE = {
-    "display": "flex",
-    "alignItems": "center",
-    "gap": "10px",
-    "color": "#1f2933",
-    "fontSize": "1.15rem",
-    "fontWeight": "800",
-}
 
 OUTPUT_CARD_META_ROW_STYLE = {
     "display": "flex",
@@ -2085,205 +1858,6 @@ def _reports_content() -> rx.Component:
     )
 
 
-def _prs_results_header() -> rx.Component:
-    """Readable PRS results title and export action."""
-    return rx.el.div(
-        rx.el.div(
-            fomantic_icon("chart-bar", size=18, color="#2185d0"),
-            rx.el.span("PRS Results", style={"color": "#1f2933"}),
-            rx.cond(
-                PRSState.prs_results_genome_label != "",
-                rx.el.span(
-                    PRSState.prs_results_genome_label,
-                    class_name="ui mini grey label",
-                    style={"marginLeft": "8px"},
-                ),
-                rx.fragment(),
-            ),
-            style=PRS_RESULTS_TITLE_STYLE,
-        ),
-        rx.button(
-            fomantic_icon("download", size=14),
-            "CSV",
-            on_click=PRSState.download_prs_results_csv,
-            color_scheme="green",
-            variant="soft",
-            size="2",
-        ),
-        style={
-            "display": "flex",
-            "alignItems": "center",
-            "justifyContent": "spaceBetween",
-            "width": "100%",
-        },
-    )
-
-
-def _prs_results_tab_menu() -> rx.Component:
-    """Attached tab menu for switching between grouped and individual PRS results."""
-    return rx.el.div(
-        rx.el.a(
-            fomantic_icon("layers", size=16),
-            " Grouped",
-            on_click=PRSState.set_prs_view_mode("grouped"),
-            class_name=rx.cond(
-                PRSState.prs_view_mode == "grouped",
-                "active item",
-                "item",
-            ),
-            style=PRS_MODE_TAB_STYLE,
-        ),
-        rx.el.a(
-            fomantic_icon("list", size=16),
-            " Individual",
-            on_click=PRSState.set_prs_view_mode("individual"),
-            class_name=rx.cond(
-                PRSState.prs_view_mode == "individual",
-                "active item",
-                "item",
-            ),
-            style=PRS_MODE_TAB_STYLE,
-        ),
-        class_name="ui top attached tabular menu",
-        style={"margin": "0"},
-    )
-
-
-def _prs_results_panel() -> rx.Component:
-    """Bordered PRS results panel with attached view tabs."""
-    return rx.el.div(
-        _prs_results_tab_menu(),
-        rx.el.div(
-            # Altair-based redesign (prs-ui 0.3.8): a compact clickable table
-            # with an always-visible bell-curve distribution chart below it.
-            # Each variant self-gates on prs_view_mode, matching the tab menu
-            # above; show_header=False because the webui renders its own header.
-            trait_results_with_chart(PRSState),
-            prs_results_with_chart(PRSState, show_header=False),
-            class_name="ui bottom attached segment",
-            style={
-                "padding": "18px",
-                "overflow": "hidden",
-                "borderColor": "#d4d4d5",
-                "boxShadow": "0 1px 3px rgba(34, 36, 38, 0.08)",
-            },
-        ),
-        style={"width": "100%", "minWidth": "0"},
-    )
-
-
-def _prs_results_content() -> rx.Component:
-    """PRS results section with attached tabs and a readable local header."""
-    return rx.cond(
-        PRSState.prs_results.length() > 0,
-        rx.vstack(
-            rx.cond(
-                PRSState.low_match_warning,
-                rx.callout(
-                    "One or more scores have a match rate below 10%. "
-                    "This may indicate a genome build mismatch between "
-                    "the VCF and scoring files. Check your genome build selection.",
-                    icon="triangle_alert",
-                    color_scheme="red",
-                    size="1",
-                    width="100%",
-                ),
-            ),
-            _prs_results_header(),
-            _prs_results_panel(),
-            spacing="3",
-            width="100%",
-        ),
-        rx.el.div(
-            fomantic_icon("chart-bar", size=30, color="#ccc"),
-            rx.el.div(
-                "No PRS results yet",
-                style={"color": "#888", "marginTop": "8px", "fontSize": "0.95rem"},
-            ),
-            rx.el.div(
-                "Compute PRS scores using the Polygenic Risk Scores panel above",
-                style={"color": "#aaa", "marginTop": "4px", "fontSize": "0.82rem"},
-            ),
-            style={"textAlign": "center", "padding": "20px 16px"},
-        ),
-    )
-
-
-def _prs_interpretation_guide() -> rx.Component:
-    """Collapsible guide explaining how to read PRS results.
-
-    Uses an inline span in the native summary so the browser disclosure
-    triangle and title stay on the same baseline.
-    """
-    return rx.el.details(
-        rx.el.summary(
-            rx.el.span(
-                "How to interpret PRS results",
-                style={
-                    "fontSize": "0.875rem",
-                    "fontWeight": "500",
-                    "cursor": "pointer",
-                    "verticalAlign": "middle",
-                },
-            ),
-            style={
-                "cursor": "pointer",
-                "lineHeight": "1.4",
-            },
-        ),
-        rx.vstack(
-            rx.text(
-                "The raw PRS score (e.g. 0.098) is model-specific and unitless - "
-                "it cannot be read as 'protective' or 'risky' on its own, and scores "
-                "from different PGS models cannot be compared to each other.",
-                size="2",
-            ),
-            rx.text(
-                "The percentile is the key number. It shows where your score falls "
-                "relative to a reference population of the same ancestry. "
-                "For virtually all standard PRS models, higher percentile = more "
-                "genetic variants associated with increased risk for that trait.",
-                size="2",
-            ),
-            rx.hstack(
-                rx.badge("< 25th", color_scheme="blue", size="1", variant="soft"),
-                rx.text("Below average predisposition", size="2"),
-                spacing="2",
-                align="center",
-            ),
-            rx.hstack(
-                rx.badge("25th - 75th", color_scheme="gray", size="1", variant="soft"),
-                rx.text("Average predisposition", size="2"),
-                spacing="2",
-                align="center",
-            ),
-            rx.hstack(
-                rx.badge("75th - 90th", color_scheme="orange", size="1", variant="soft"),
-                rx.text("Above average predisposition", size="2"),
-                spacing="2",
-                align="center",
-            ),
-            rx.hstack(
-                rx.badge("> 90th", color_scheme="red", size="1", variant="soft"),
-                rx.text("High predisposition", size="2"),
-                spacing="2",
-                align="center",
-            ),
-            rx.text(
-                "PRS captures only inherited genetic variants - not lifestyle, "
-                "environment, or treatment. Most people with a high PRS never develop "
-                "the condition, and many with a low PRS do. This is a research tool, "
-                "not a diagnostic test.",
-                size="2",
-                color="var(--gray-11)",
-            ),
-            spacing="2",
-            padding_top="8px",
-            padding_x="4px",
-        ),
-    )
-
-
 def _output_preview_grid() -> rx.Component:
     """Inline output preview grid inside the Outputs section.
 
@@ -3321,373 +2895,129 @@ def _input_tab_content() -> rx.Component:
     )
 
 
-def _prs_mode_tab_menu() -> rx.Component:
-    """Attached tab menu for switching between trait-grouped and individual PRS selection."""
-    return rx.el.div(
-        rx.el.a(
-            fomantic_icon("layers", size=16),
-            " By Trait",
-            on_click=PRSState.set_prs_selection_mode("traits"),
-            class_name=rx.cond(
-                PRSState.prs_selection_mode == "traits",
-                "active item",
-                "item",
+def _prs_workbench_tab_trigger(
+    label: str,
+    icon_name: str,
+    value: str,
+    description: str,
+) -> rx.Component:
+    """Radix tab trigger matching the standalone prs-ui By Trait / By PRS tabs."""
+    return rx.tabs.trigger(
+        rx.hstack(
+            rx.icon(icon_name, size=18),
+            rx.text(label, size="3", weight="bold"),
+            rx.tooltip(
+                rx.icon("info", size=14, color="gray"),
+                content=description,
             ),
-            style=PRS_MODE_TAB_STYLE,
+            spacing="2",
+            align="center",
         ),
-        rx.el.a(
-            fomantic_icon("list", size=16),
-            " By PRS",
-            on_click=PRSState.set_prs_selection_mode("individual"),
-            class_name=rx.cond(
-                PRSState.prs_selection_mode == "individual",
-                "active item",
-                "item",
-            ),
-            style=PRS_MODE_TAB_STYLE,
-        ),
-        class_name="ui top attached tabular menu",
-        style={"margin": "0"},
+        value=value,
+        padding="10px 20px",
+        cursor="pointer",
     )
 
 
-def _prs_trait_selector() -> rx.Component:
-    """Trait selection grid for grouped-by-trait PRS input."""
-    return _local_trait_selector(PRSTraitState, normalizing=UploadState.vcf_preview_loading)
-
-
-def _resolve_prs_normalizing(normalizing: Optional[Any]) -> Any:
-    """Resolve an optional external normalizing flag for local PRS selectors."""
-    return False if normalizing is None else normalizing
-
-
-def _prs_inline_stats_chip(state: type[rx.State]) -> rx.Component:
-    """Compact LazyFrame stats chip that stays in the selector toolbar row."""
+def _prs_ancestry_chip() -> rx.Component:
+    """Detected super-population badge for the current-sample row."""
     return rx.cond(
-        state.lf_grid_stats != "",
-        rx.el.div(
-            rx.el.span(
-                state.lf_grid_row_count.to(str),  # type: ignore[union-attr]
-                " rows (filtered)",
-                style={"fontWeight": "700", "fontSize": "0.9rem"},
+        PRSState.ancestry_detection_status == "detecting",
+        rx.hstack(
+            rx.spinner(size="1"),
+            rx.text("Detecting ancestry…", size="1", color="gray"),
+            align="center",
+            spacing="1",
+        ),
+        rx.cond(
+            PRSState.ancestry_chip_label != "",
+            rx.badge(
+                rx.hstack(
+                    rx.icon("shield-check", size=12),
+                    rx.text(PRSState.ancestry_chip_label, size="1", weight="medium"),
+                    rx.cond(
+                        PRSState.ancestry_chip_confidence != "",
+                        rx.text(PRSState.ancestry_chip_confidence, size="1", color="gray"),
+                    ),
+                    align="center",
+                    spacing="1",
+                ),
+                color_scheme="green",
+                variant="soft",
+                size="1",
+                title=(
+                    "Genetic ancestry autodetected from this genome against the "
+                    "1000 Genomes reference panel, with the classifier's "
+                    "confidence. The trait dashboard Population dropdown is the "
+                    "override for card numbers; chart curves stay per-population."
+                ),
             ),
-            rx.el.span("|", style={"color": "#7aa7c7", "fontSize": "0.9rem"}),
-            rx.el.span(
-                state.lf_grid_stats,
-                style={
-                    "color": "#64748b",
-                    "fontFamily": "monospace",
-                    "fontSize": "0.78rem",
-                },
+            rx.cond(
+                PRSState.ancestry_detection_status == "unknown",
+                rx.badge(
+                    "Ancestry unknown",
+                    color_scheme="gray",
+                    variant="soft",
+                    size="1",
+                ),
+                rx.fragment(),
             ),
-            class_name="prs-inline-stats-chip",
+        ),
+    )
+
+
+def _prs_fine_population_chip() -> rx.Component:
+    """Closest 1000G cohort, linked to IGSR when the code is known."""
+    return rx.cond(
+        PRSState.detected_fine_label != "",
+        rx.cond(
+            PRSState.detected_fine_url != "",
+            rx.link(
+                rx.hstack(
+                    rx.text(PRSState.detected_fine_label, size="1"),
+                    rx.cond(
+                        PRSState.detected_fine_confidence_label != "",
+                        rx.text(PRSState.detected_fine_confidence_label, size="1", color="gray"),
+                    ),
+                    rx.icon("external-link", size=10),
+                    align="center",
+                    spacing="1",
+                ),
+                href=PRSState.detected_fine_url,
+                is_external=True,
+                title=PRSState.detected_fine_title,
+                size="1",
+                color_scheme="green",
+                underline="hover",
+            ),
+            rx.hstack(
+                rx.text(PRSState.detected_fine_label, size="1", color="gray"),
+                rx.cond(
+                    PRSState.detected_fine_confidence_label != "",
+                    rx.text(PRSState.detected_fine_confidence_label, size="1", color="gray"),
+                ),
+                align="center",
+                spacing="1",
+            ),
         ),
         rx.fragment(),
     )
 
 
-def _local_trait_selector(
-    state: type[rx.State],
-    normalizing: Optional[Any] = None,
-) -> rx.Component:
-    """Trait selection grid with a single centered toolbar row."""
-    is_normalizing = _resolve_prs_normalizing(normalizing)
-    selection_ready = (state.prs_genotypes_path != "") & (is_normalizing == False)  # noqa: E712
-    selection_disabled = ~selection_ready  # type: ignore[operator]
-    return rx.vstack(
-        rx.cond(
-            is_normalizing,
-            rx.callout(
-                "Normalizing your VCF. Trait selection will unlock automatically "
-                "once the genotype table is ready.",
-                icon="loader",
-                color_scheme="blue",
-                size="1",
-                width="100%",
-            ),
-            rx.cond(
-                state.prs_genotypes_path == "",
-                rx.callout(
-                    "Upload a VCF above to enable trait selection. The table below "
-                    "is read-only until genotypes are loaded.",
-                    icon="upload",
-                    color_scheme="blue",
-                    size="1",
-                    width="100%",
-                ),
-            ),
+def _prs_current_sample_row() -> rx.Component:
+    """One sample row for the genome already selected in the left panel."""
+    return rx.hstack(
+        rx.box(
+            width="12px",
+            height="12px",
+            border_radius="50%",
+            background=sample_color(0),
+            flex_shrink="0",
         ),
-        rx.el.div(
-            fomantic_icon("layers", size=16),
-            rx.el.span(
-                "Select Traits",
-                style={"fontSize": "1rem", "fontWeight": "700", "lineHeight": "1.2"},
-            ),
-            rx.el.span(
-                "Choose traits to compute PRS for all associated scoring models.",
-                style={"fontSize": "0.875rem", "color": "var(--gray-10)", "lineHeight": "1.2"},
-            ),
-            class_name="prs-section-heading-row",
-        ),
-        rx.el.div(
-            rx.button(
-                fomantic_icon("list", size=14),
-                "Select Filtered",
-                on_click=state.select_filtered_traits,
-                variant="outline",
-                size="2",
-                disabled=(~state.traits_loaded) | selection_disabled,  # type: ignore[operator]
-            ),
-            rx.button(
-                "Clear Selection",
-                on_click=state.deselect_all_traits,
-                variant="outline",
-                color_scheme="gray",
-                size="2",
-                disabled=(state.selected_traits.length() == 0) | selection_disabled,  # type: ignore[operator]
-            ),
-            _prs_inline_stats_chip(state),
-            rx.el.div(style={"flex": "1 1 auto", "minWidth": "12px"}),
-            rx.cond(
-                state.selected_traits.length() > 0,  # type: ignore[operator]
-                rx.el.div(
-                    rx.badge(
-                        rx.text(state.selected_traits.length(), " traits"),  # type: ignore[operator]
-                        color_scheme="blue",
-                        size="2",
-                    ),
-                    rx.badge(
-                        rx.text(state.selected_pgs_ids.length(), " PGS IDs"),  # type: ignore[operator]
-                        color_scheme="green",
-                        size="2",
-                    ),
-                    class_name="prs-selection-badges",
-                ),
-            ),
-            class_name="prs-selector-toolbar",
-        ),
-        rx.cond(
-            state.traits_loaded,
-            rx.box(
-                data_grid_scroll_container(
-                    lazyframe_grid(
-                        state,
-                        height="400px",
-                        density="compact",
-                        column_header_height=56,
-                        checkbox_selection=selection_ready,
-                    ),
-                ),
-                key=state.lf_grid_view_token.to(str),
-                opacity=rx.cond(selection_ready, 1.0, 0.55),
-                pointer_events=rx.cond(selection_ready, "auto", "none"),
-                position="relative",
-                width="100%",
-            ),
-            rx.hstack(
-                rx.spinner(size="3"),
-                rx.text("Loading traits from PGS Catalog...", size="2", color="gray"),
-                spacing="2",
-                align="center",
-                padding="16px",
-            ),
-        ),
-        spacing="3",
-        width="100%",
-    )
-
-
-def _local_prs_scores_selector(
-    state: type[rx.State],
-    normalizing: Optional[Any] = None,
-) -> rx.Component:
-    """Score selection grid with a single centered toolbar row."""
-    is_normalizing = _resolve_prs_normalizing(normalizing)
-    selection_ready = (state.prs_genotypes_path != "") & (is_normalizing == False)  # noqa: E712
-    selection_disabled = ~selection_ready  # type: ignore[operator]
-    return rx.vstack(
-        rx.cond(
-            is_normalizing,
-            rx.callout(
-                "Normalizing your VCF. Score selection will unlock automatically "
-                "once the genotype table is ready.",
-                icon="loader",
-                color_scheme="blue",
-                size="1",
-                width="100%",
-            ),
-            rx.cond(
-                state.prs_genotypes_path == "",
-                rx.callout(
-                    "Upload a VCF above to enable score selection. The table below "
-                    "is read-only until genotypes are loaded.",
-                    icon="upload",
-                    color_scheme="blue",
-                    size="1",
-                    width="100%",
-                ),
-            ),
-        ),
-        rx.el.div(
-            rx.input(
-                placeholder="Search PGS ID, name, reported trait, or EFO trait...",
-                value=state.prs_catalog_query,
-                on_change=state.set_prs_catalog_query,
-                on_key_down=lambda key: rx.cond(
-                    key == "Enter",
-                    state.apply_prs_catalog_query(),
-                    rx.noop(),
-                ),
-                size="2",
-                flex="1 1 280px",
-                min_width="240px",
-                disabled=~state.compute_scores_loaded,
-            ),
-            rx.button(
-                fomantic_icon("search", size=14),
-                "Search Catalog",
-                on_click=state.apply_prs_catalog_query,
-                variant="outline",
-                size="2",
-                disabled=~state.compute_scores_loaded,
-            ),
-            rx.button(
-                "Reset Search",
-                on_click=state.clear_prs_catalog_query,
-                variant="outline",
-                color_scheme="gray",
-                size="2",
-                disabled=(~state.compute_scores_loaded) | (state.prs_catalog_query == ""),
-            ),
-            class_name="prs-selector-toolbar",
-        ),
-        rx.el.div(
-            rx.button(
-                fomantic_icon("list", size=14),
-                "Select Filtered",
-                on_click=state.select_filtered_scores,
-                variant="outline",
-                size="2",
-                disabled=(~state.compute_scores_loaded) | selection_disabled,  # type: ignore[operator]
-            ),
-            rx.button(
-                "Clear Selection",
-                on_click=state.deselect_all_scores,
-                variant="outline",
-                color_scheme="gray",
-                size="2",
-                disabled=(state.selected_pgs_ids.length() == 0) | selection_disabled,  # type: ignore[operator]
-            ),
-            _prs_inline_stats_chip(state),
-            rx.el.div(style={"flex": "1 1 auto", "minWidth": "12px"}),
-            rx.cond(
-                state.selected_pgs_ids.length() > 0,  # type: ignore[operator]
-                rx.badge(
-                    rx.text(state.selected_pgs_ids.length(), " selected"),  # type: ignore[operator]
-                    color_scheme="green",
-                    size="2",
-                ),
-            ),
-            class_name="prs-selector-toolbar",
-        ),
-        rx.cond(
-            state.compute_scores_loaded,
-            rx.box(
-                data_grid_scroll_container(
-                    lazyframe_grid(
-                        state,
-                        height="400px",
-                        density="compact",
-                        column_header_height=56,
-                        checkbox_selection=selection_ready,
-                    ),
-                ),
-                key=state.lf_grid_view_token.to(str),
-                opacity=rx.cond(selection_ready, 1.0, 0.55),
-                pointer_events=rx.cond(selection_ready, "auto", "none"),
-                position="relative",
-                width="100%",
-            ),
-            rx.hstack(
-                rx.spinner(size="3"),
-                rx.text("Loading PGS Catalog scores...", size="2", color="gray"),
-                spacing="2",
-                align="center",
-                padding="16px",
-            ),
-        ),
-        spacing="3",
-        width="100%",
-    )
-
-
-def _prs_selection_panel() -> rx.Component:
-    """Bordered PRS mode panel with attached tab navigation."""
-    return rx.el.div(
-        _prs_mode_tab_menu(),
-        rx.el.div(
-            rx.cond(
-                PRSState.prs_selection_mode == "traits",
-                _prs_trait_selector(),
-                _local_prs_scores_selector(PRSState, normalizing=UploadState.vcf_preview_loading),
-            ),
-            class_name="ui bottom attached segment",
-            style={
-                "padding": "20px",
-                "minHeight": "520px",
-                "overflow": "hidden",
-                "borderColor": "#d4d4d5",
-                "boxShadow": "0 1px 3px rgba(34, 36, 38, 0.08)",
-            },
-        ),
-        style={
-            "width": "100%",
-            "minWidth": "0",
-            "marginTop": "4px",
-            "marginBottom": "4px",
-        },
-    )
-
-
-def _prs_genome_control_row() -> rx.Component:
-    """Compact genome, sequencing-type, and ancestry controls."""
-    return rx.el.div(
-        rx.el.div(
-            rx.el.span(
-                "Genome",
-                style={"fontSize": "0.875rem", "fontWeight": "600", "lineHeight": "1.2"},
-            ),
-            rx.tooltip(
-                fomantic_icon("info circle", size=13, color="#6b7280"),
-                content=(
-                    "Just-DNA-Lite currently supports GRCh38 VCF files for PRS computation."
-                ),
-            ),
-            class_name="prs-control-group",
-            style=PRS_CONTROL_GROUP_STYLE,
-        ),
-        rx.badge(
-            "GRCh38",
-            color_scheme="gray",
-            variant="soft",
-            size="2",
-            style={"display": "flex", "alignItems": "center", "minHeight": "26px"},
-        ),
+        rx.text(UploadState.selected_file, size="2", weight="bold"),
+        rx.badge("GRCh38", color_scheme="blue", variant="soft", size="1"),
         rx.select.root(
-            rx.select.trigger(
-                variant="soft",
-                class_name="prs-select-trigger",
-                style={
-                    "display": "inline-flex",
-                    "alignItems": "center",
-                    "justifyContent": "center",
-                    "height": "26px",
-                    "minHeight": "26px",
-                    "paddingTop": "0",
-                    "paddingBottom": "0",
-                    "lineHeight": "26px",
-                },
-            ),
+            rx.select.trigger(size="1"),
             rx.select.content(
                 rx.select.item("WGS", value="wgs"),
                 rx.select.item("Array / targeted", value="array"),
@@ -3698,231 +3028,93 @@ def _prs_genome_control_row() -> rx.Component:
         ),
         rx.cond(
             PRSState.sample_type_label != "",
-            rx.el.span(
-                PRSState.sample_type_label,
-                style={
-                    "display": "inline-flex",
-                    "alignItems": "center",
-                    "fontSize": "0.75rem",
-                    "color": "var(--gray-10)",
-                    "lineHeight": "1.2",
-                },
-            ),
+            rx.text(PRSState.sample_type_label, size="1", color="gray"),
             rx.fragment(),
         ),
-        _prs_ancestry_detection_badge(),
-        class_name="prs-control-row",
-        style=PRS_CONTROL_ROW_STYLE,
-    )
-
-
-def _prs_ancestry_detection_badge() -> rx.Component:
-    """Auto-detected ancestry status shown inline with genome controls."""
-    return rx.cond(
-        PRSState.ancestry_detection_status == "detecting",
-        rx.el.div(
-            rx.spinner(size="1"),
-            rx.el.span(
-                "Detecting sample ancestry…",
-                style={"fontSize": "0.75rem", "color": "var(--gray-11)", "lineHeight": "1.2"},
-            ),
-            class_name="prs-control-group",
-            style=PRS_CONTROL_GROUP_STYLE,
-        ),
+        rx.spacer(),
+        _prs_ancestry_chip(),
+        _prs_fine_population_chip(),
         rx.cond(
-            PRSState.ancestry_detection_status == "done",
-            rx.badge(
-                fomantic_icon("shield alternate", size=12),
-                PRSState.ancestry_detection_label,
-                color_scheme="green",
-                variant="soft",
-                size="2",
-                style={"display": "flex", "alignItems": "center", "minHeight": "26px"},
-            ),
-            rx.cond(
-                PRSState.ancestry_detection_status == "unknown",
-                rx.badge(
-                    PRSState.ancestry_detection_label,
-                    color_scheme="gray",
-                    variant="soft",
-                    size="2",
-                    style={"display": "flex", "alignItems": "center", "minHeight": "26px"},
-                ),
-                rx.fragment(),
-            ),
+            PRSState.sample_variant_label != "",
+            rx.text(PRSState.sample_variant_label, size="1", color="gray"),
+            rx.fragment(),
         ),
+        align="center",
+        spacing="2",
+        width="100%",
+        padding="6px 10px",
+        border="1px solid var(--gray-4)",
+        border_radius="8px",
+        background="var(--gray-1)",
     )
 
 
-def _prs_engine_control() -> rx.Component:
-    """Right-aligned PRS computation engine selector."""
-    return rx.el.div(
-        rx.el.span(
-            "Engine:",
-            style={"fontSize": "0.875rem", "fontWeight": "600", "lineHeight": "1.2"},
-        ),
-        rx.select.root(
-            rx.select.trigger(
-                variant="soft",
-                class_name="prs-select-trigger",
-                style={
-                    "display": "inline-flex",
-                    "alignItems": "center",
-                    "justifyContent": "center",
-                    "height": "26px",
-                    "minHeight": "26px",
-                    "paddingTop": "0",
-                    "paddingBottom": "0",
-                    "lineHeight": "26px",
-                },
-            ),
-            rx.select.content(
-                rx.select.item("duckdb", value="duckdb"),
-                rx.select.item("polars", value="polars"),
-            ),
-            value=PRSState.prs_engine,
-            on_change=PRSState.set_prs_engine,
-            size="1",
-        ),
-        rx.tooltip(
-            fomantic_icon("info circle", size=13, color="#6b7280"),
-            content=(
-                "DuckDB is the default for large PRS files because it can spill to disk. "
-                "Polars is faster when everything fits comfortably in memory."
-            ),
-        ),
-        class_name="prs-control-group",
-        style={**PRS_CONTROL_GROUP_STYLE, "flexWrap": "nowrap"},
-    )
-
-
-def _prs_reference_populations_row() -> rx.Component:
-    """Reference population controls with the engine selector aligned right."""
-    checkbox_handlers = {
-        "AFR": PRSState.set_reference_population_AFR,
-        "AMR": PRSState.set_reference_population_AMR,
-        "EAS": PRSState.set_reference_population_EAS,
-        "EUR": PRSState.set_reference_population_EUR,
-        "SAS": PRSState.set_reference_population_SAS,
-    }
-    checked_vars = {
-        "AFR": PRSState.show_reference_AFR,
-        "AMR": PRSState.show_reference_AMR,
-        "EAS": PRSState.show_reference_EAS,
-        "EUR": PRSState.show_reference_EUR,
-        "SAS": PRSState.show_reference_SAS,
-    }
-    population_boxes = [
-        rx.checkbox(
-            f"{code} {PRS_SUPERPOPULATION_LABELS[code]}",
-            checked=checked_vars[code],
-            on_change=checkbox_handlers[code],
-            size="2",
-            style=PRS_CHECKBOX_STYLE,
-        )
-        for code in PRS_SUPERPOPULATION_LABELS
-    ]
-    return rx.el.div(
-        rx.el.div(
-            rx.el.span(
-                "Reference populations:",
-                style={"fontSize": "0.875rem", "fontWeight": "600", "lineHeight": "1.2"},
-            ),
-            rx.button(
-                "Native",
-                on_click=PRSState.select_native_reference_population,
-                size="1",
-                variant="soft",
-                color_scheme="gray",
-                style={"minHeight": "26px"},
-            ),
-            *population_boxes,
-            style={
-                **PRS_CONTROL_GROUP_STYLE,
-                "gap": "12px",
-                "flex": "1 1 520px",
-                "minWidth": "0",
-                "flexWrap": "wrap",
-            },
-            class_name="prs-control-group",
-        ),
-        class_name="prs-control-row",
-        style=PRS_CONTROL_ROW_STYLE,
-    )
-
-
-def _prs_harmonized_row() -> rx.Component:
-    """Harmonized-score toggle."""
-    return rx.el.div(
-        rx.checkbox(
-            "Include GRCh37->GRCh38 harmonized scores",
-            checked=PRSState.include_harmonized,
-            on_change=PRSState.set_include_harmonized,
-            size="2",
-            style=PRS_CHECKBOX_STYLE,
-        ),
-        class_name="prs-control-row",
-        style=PRS_CONTROL_ROW_STYLE,
-    )
-
-
-def _prs_compute_button() -> rx.Component:
-    """Compute PRS button without the generic upstream disclaimer."""
-    is_normalizing = UploadState.vcf_preview_loading
-    not_ready = (
-        (PRSState.selected_pgs_ids.length() == 0)
-        | (PRSState.prs_genotypes_path == "")
-        | is_normalizing
-    )
-    return rx.el.div(
-        rx.el.div(
-            rx.button(
-                fomantic_icon("calculator", size=14),
-                "Compute PRS",
-                on_click=PRSState.compute_selected_prs,
-                loading=PRSState.prs_computing,
-                disabled=not_ready,
-                color_scheme="green",
-                size="3",
-            ),
-            rx.cond(
-                not_ready,
-                rx.text(
-                    rx.cond(
-                        is_normalizing,
-                        "VCF normalization in progress...",
-                        rx.cond(
-                            PRSState.prs_genotypes_path == "",
-                            "Load genomic data to enable computation.",
-                            "Select at least one score to enable computation.",
-                        ),
+def _prs_current_sample_source() -> rx.Component:
+    """Host-app genotype source: the selected left-panel sample, not a dropzone."""
+    return rx.vstack(
+        rx.cond(
+            UploadState.has_selected_file,
+            rx.vstack(
+                rx.text("Sample", size="1", weight="bold", color="gray"),
+                _prs_current_sample_row(),
+                rx.cond(
+                    PRSState.detected_fine_label != "",
+                    rx.text(
+                        "Closest 1000G cohort is the nearest of the 1000 Genomes "
+                        "reference cohorts (26 worldwide) — a reference point, not a "
+                        "nationality. Many populations have no dedicated cohort in the "
+                        "panel (e.g. Slavic / Eastern European genomes usually land on "
+                        "the Northern/Western European cohort as their closest match).",
+                        size="1",
+                        color="gray",
                     ),
-                    size="2",
-                    color="gray",
+                    rx.fragment(),
                 ),
+                rx.checkbox(
+                    "Force recompute (ignore saved results)",
+                    checked=PRSState.prs_force_recompute,
+                    on_change=PRSState.set_prs_force_recompute,
+                    size="1",
+                    color_scheme="gray",
+                ),
+                spacing="1",
+                width="100%",
             ),
-            class_name="prs-control-group",
-            style={**PRS_CONTROL_GROUP_STYLE, "gap": "12px", "flex": "1 1 420px"},
+            rx.callout(
+                "Select a sample in the left panel to compute PRS. "
+                "The catalog below stays browsable; selection unlocks once "
+                "the genotype table is ready.",
+                icon="arrow-left",
+                color_scheme="blue",
+                size="1",
+                width="100%",
+            ),
         ),
-        _prs_engine_control(),
-        class_name="prs-control-row",
-        style={
-            **PRS_CONTROL_ROW_STYLE,
-            "justifyContent": "space-between",
-            "gap": "16px",
-        },
+        spacing="2",
+        width="100%",
     )
 
 
 def _prs_tab_content() -> rx.Component:
-    """Content for the PRS tab.
-
-    Compose the reusable PRS controls locally so the result grid can use a
-    row-count-based height instead of the fixed 500px height in `prs_section`.
-    Supports both trait-grouped (default) and individual PRS selection modes.
-    """
+    """PRS tab: prs-ui workbench layout driven by the selected left-panel genome."""
+    normalizing = UploadState.vcf_preview_loading
+    trait_panel = prs_workbench_mode_panel(
+        PRSState,
+        lambda: trait_selector(PRSTraitState, normalizing=normalizing),
+        "grouped",
+        "Compute PRS for Selected Traits",
+        normalizing=normalizing,
+    )
+    prs_panel = prs_workbench_mode_panel(
+        PRSState,
+        lambda: prs_scores_selector(PRSState, normalizing=normalizing),
+        "individual",
+        "Compute PRS",
+        normalizing=normalizing,
+    )
     return rx.el.div(
         rx.el.style(PRS_ALIGNMENT_CSS),
+        data_grid_scroll_css(),
         _tab_info_message(
             UploadState.show_prs_tab_info,
             UploadState.close_prs_tab_info,
@@ -3932,20 +3124,31 @@ def _prs_tab_content() -> rx.Component:
         ),
         rx.theme(
             rx.vstack(
-                _prs_genome_control_row(),
-                _prs_reference_populations_row(),
-                _prs_harmonized_row(),
-                _prs_selection_panel(),
-                _prs_compute_button(),
-                rx.checkbox(
-                    "Force recompute (ignore saved results)",
-                    checked=PRSState.prs_force_recompute,
-                    on_change=PRSState.set_prs_force_recompute,
-                    size="1",
-                    color_scheme="gray",
+                _prs_current_sample_source(),
+                rx.tabs.root(
+                    rx.tabs.list(
+                        _prs_workbench_tab_trigger(
+                            "By Trait",
+                            "layers",
+                            "trait",
+                            "Start from a disease or phenotype, then compute related "
+                            "PGS models together.",
+                        ),
+                        _prs_workbench_tab_trigger(
+                            "By PRS",
+                            "list-checks",
+                            "prs",
+                            "Choose specific PGS Catalog scoring models and compute "
+                            "them for the selected genome.",
+                        ),
+                        size="2",
+                    ),
+                    rx.tabs.content(trait_panel, value="trait", width="100%"),
+                    rx.tabs.content(prs_panel, value="prs", width="100%"),
+                    value=PRSState.compute_mode,
+                    on_change=PRSState.set_compute_mode,
+                    width="100%",
                 ),
-                prs_progress_section(PRSState),
-                _prs_results_content(),
                 width="100%",
                 spacing="4",
             ),

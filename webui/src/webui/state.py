@@ -3499,6 +3499,7 @@ class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 from prs_ui import PRSComputeStateMixin
 import prs_ui
 import prs_ui.mixin as _prs_ui_mixin
+from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
@@ -3506,6 +3507,9 @@ from just_prs.prs import ReferenceUniverse as _ReferenceUniverse
 from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
 from just_prs.enrich import enrich_prs_result as _enrich_prs_result
 from just_prs.reference import SUPERPOPULATIONS
+from just_prs.viz import FINE_POPULATION_LABELS as _FINE_POPULATION_LABELS
+from just_prs.viz import IGSR_POPULATION_URL as _IGSR_POPULATION_URL
+from just_prs.viz import fine_population_label as _fine_population_label
 
 _prs_catalog_instance: Optional[_PRSCatalog] = None
 _PRS_REQUIRED_SCORE_COLUMNS = {
@@ -3818,20 +3822,22 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
     genome_build: str = "GRCh38"
     cache_dir: str = str(_prs_resolve_cache_dir())
     status_message: str = ""
-    prs_expanded: bool = False
     prs_initialized_for_file: str = ""
     prs_results_source_file: str = ""
     prs_compute_token: int = 0
     prs_selection_mode: str = "traits"
+    compute_mode: str = "trait"
     prs_force_recompute: bool = False
     _ignore_empty_selection_replay: bool = False
 
     # --- Auto-detected sample ancestry (just-prs 0.5.1 ancestry epic) ---
-    # Inferred on file load; preselects the reference population so percentiles
-    # default to the matched-ancestry panel.  No button — detect + preselect.
+    # Inferred on file load; sets selected_ancestry so percentiles default to
+    # the matched panel. Shown on the sample row; the trait dashboard Population
+    # dropdown is the override. No toolbar selector.
     detected_ancestry: str = ""           # super-pop code (AFR/AMR/EAS/EUR/SAS) or ""
     detected_ancestry_confidence: float = 0.0
     detected_fine_population: str = ""     # within-continent call, when available
+    detected_fine_confidence: float = 0.0
     ancestry_detection_status: str = ""    # "" | detecting | done | unknown | failed
 
     # --- Sequencing type (WGS vs array) — drives reference-allele restoration ---
@@ -3877,6 +3883,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         self.detected_ancestry = ""
         self.detected_ancestry_confidence = 0.0
         self.detected_fine_population = ""
+        self.detected_fine_confidence = 0.0
         self.ancestry_detection_status = ""
         self.detected_sample_type = ""
         self.sample_type_confidence = 0.0
@@ -3932,6 +3939,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
     def handle_lf_grid_row_selection(self, model: dict) -> None:
         """Keep PGS selection across a sample remount; ignore the empty replay."""
+        if self.prs_selection_mode == "traits":
+            return
         if is_stale_grid_view_replay(self._lf_grid_replay_selection, model):
             self._lf_grid_replay_selection = ""
             return
@@ -3975,43 +3984,6 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         self.sample_type = "wgs" if value == "wgs" else "array"
         self.sample_type_source = "user"
 
-    def _native_reference_code(self) -> str:
-        """Return the best available sample-native 1000G population code."""
-        code = (self.detected_ancestry or self.selected_ancestry or "EUR").upper()
-        return code if code in SUPERPOPULATIONS else "EUR"
-
-    def select_native_reference_population(self) -> None:
-        """Use the detected sample ancestry as the visible reference population."""
-        code = self._native_reference_code()
-        self.selected_ancestry = code
-        self.selected_reference_populations = [code]
-        self.compute_all_populations = True
-        self._sync_reference_population_flags()
-        if self.prs_results:
-            self._build_prs_results_grid()
-
-    def set_reference_population(self, code: str, value: bool) -> None:
-        """Toggle visible reference populations and keep percentile lookup aligned."""
-        normalized = code.upper()
-        if normalized not in SUPERPOPULATIONS:
-            return
-
-        selected = [sp for sp in self.selected_reference_populations if sp in SUPERPOPULATIONS]
-        if value:
-            if normalized not in selected:
-                selected.append(normalized)
-            self.selected_ancestry = normalized
-        else:
-            selected = [sp for sp in selected if sp != normalized]
-            if self.selected_ancestry == normalized:
-                self.selected_ancestry = selected[0] if selected else self._native_reference_code()
-
-        self.selected_reference_populations = selected
-        self.compute_all_populations = bool(selected)
-        self._sync_reference_population_flags()
-        if self.prs_results:
-            self._build_prs_results_grid()
-
     @rx.var
     def sample_type_label(self) -> str:
         """Confidence note for the detected sequencing type."""
@@ -4023,26 +3995,80 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         return ""
 
     @rx.var
-    def ancestry_detection_label(self) -> str:
-        """Human-readable ancestry-detection status for the control-row badge."""
-        if self.ancestry_detection_status == "detecting":
-            return "Detecting ancestry…"
-        if self.ancestry_detection_status == "done" and self.detected_ancestry:
-            pct = round(self.detected_ancestry_confidence * 100)
-            fine = f" · {self.detected_fine_population}" if self.detected_fine_population else ""
-            return f"Ancestry: {self.detected_ancestry} ({pct}% confidence){fine}"
-        if self.ancestry_detection_status == "unknown":
-            return "Ancestry: insufficient coverage to infer"
-        return ""
+    def ancestry_chip_label(self) -> str:
+        """Compact super-population label for the current-sample row."""
+        if self.ancestry_detection_status != "done" or not self.detected_ancestry:
+            return ""
+        name = _SUPERPOPULATION_LABELS.get(self.detected_ancestry, self.detected_ancestry)
+        return f"{name} ({self.detected_ancestry})"
+
+    @rx.var
+    def ancestry_chip_confidence(self) -> str:
+        """Classifier confidence shown next to the ancestry chip."""
+        if self.ancestry_detection_status != "done" or not self.detected_ancestry:
+            return ""
+        return f"{round(self.detected_ancestry_confidence * 100)}%"
+
+    @rx.var
+    def detected_fine_label(self) -> str:
+        """Closest 1000G cohort label for the current-sample row."""
+        if self.ancestry_detection_status != "done" or not self.detected_fine_population:
+            return ""
+        return _fine_population_label(self.detected_fine_population)
+
+    @rx.var
+    def detected_fine_url(self) -> str:
+        """IGSR population page for a known 1000G fine-population code."""
+        code = self.detected_fine_population
+        if self.ancestry_detection_status != "done" or not code:
+            return ""
+        if code not in _FINE_POPULATION_LABELS:
+            return ""
+        return _IGSR_POPULATION_URL.format(code=code)
+
+    @rx.var
+    def detected_fine_title(self) -> str:
+        """Tooltip describing the closest 1000G cohort."""
+        code = self.detected_fine_population
+        if self.ancestry_detection_status != "done" or not code:
+            return ""
+        entry = _FINE_POPULATION_LABELS.get(code)
+        if entry is None:
+            return (
+                "Closest reference cohort in the ancestry model. This is a "
+                "nearest reference point, not a nationality."
+            )
+        return (
+            f"{entry[1]}. This is the nearest 1000 Genomes cohort, not a nationality."
+        )
+
+    @rx.var
+    def detected_fine_confidence_label(self) -> str:
+        """Fine-population classifier confidence, when available."""
+        if (
+            self.ancestry_detection_status != "done"
+            or not self.detected_fine_population
+            or self.detected_fine_confidence <= 0
+        ):
+            return ""
+        return f"{round(self.detected_fine_confidence * 100)}%"
+
+    @rx.var
+    def sample_variant_label(self) -> str:
+        """Variant count for the current-sample row."""
+        if self.sample_variant_count <= 0:
+            return ""
+        return f"{self.sample_variant_count:,} variants"
 
     @rx.event(background=True)
     async def detect_sample_ancestry(self) -> None:
-        """Infer the sample's genetic ancestry and preselect the reference panel.
+        """Infer the sample's genetic ancestry and set the percentile fallback.
 
         Runs in the background (first call lazy-pulls ~250 MB of reference
         models from HuggingFace) so the UI stays responsive.  On success the
-        detected super-population becomes the primary percentile reference and
-        its comparison curve is enabled — the user can still override.
+        detected super-population is shown on the sample row and becomes
+        ``selected_ancestry``. The trait dashboard Population dropdown is the
+        override for card numbers.
         """
         async with self:
             if self._get_genotypes_lf() is None:
@@ -4060,6 +4086,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             self.detected_ancestry = ""
             self.detected_ancestry_confidence = 0.0
             self.detected_fine_population = ""
+            self.detected_fine_confidence = 0.0
 
         try:
             catalog = _get_prs_catalog(cache_dir_str)
@@ -4080,18 +4107,27 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 self.detected_ancestry = superpop
                 self.detected_ancestry_confidence = float(sample_ancestry.confidence or 0.0)
                 self.detected_fine_population = sample_ancestry.fine_population or ""
+                self.detected_fine_confidence = float(sample_ancestry.fine_confidence or 0.0)
                 self.ancestry_detection_status = "done"
-                # Preselect the detected super-pop so the checkbox and compute
-                # reference match what the user sees.
-                self.select_native_reference_population()
+                if superpop in SUPERPOPULATIONS:
+                    self.set_selected_ancestry(superpop)
         except Exception as exc:
             logger.warning("Sample ancestry inference failed: %s", exc)
             async with self:
                 if self._prs_compute_still_current(token, source_file):
                     self.ancestry_detection_status = "failed"
 
+    def set_compute_mode(self, value: str | list[str]) -> None:
+        """Switch the By Trait / By PRS workbench tab."""
+        mode = value if isinstance(value, str) else (value[0] if value else "trait")
+        if mode not in ("trait", "prs"):
+            mode = "trait"
+        self.compute_mode = mode
+        self.set_prs_selection_mode("traits" if mode == "trait" else "individual")
+
     def set_prs_selection_mode(self, mode: str) -> None:
         self.prs_selection_mode = mode
+        self.compute_mode = "trait" if mode == "traits" else "prs"
         self.prs_view_mode = "grouped" if mode == "traits" else "individual"
         if mode == "individual" and self.selected_pgs_ids:
             self._sync_loaded_grid_selection(self.selected_pgs_ids)
@@ -4116,22 +4152,6 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         """Load PRS scores after refreshing stale metadata caches."""
         _ensure_prs_catalog_cache_current(self.cache_dir)
         yield from PRSComputeStateMixin.load_compute_scores(self)
-
-    def toggle_prs_expanded(self) -> None:
-        self.prs_expanded = not self.prs_expanded
-
-    @rx.var
-    def prs_results_grid_height(self) -> str:
-        """Height for the PRS results grid based on row count.
-
-        The PRS results grid is the last element in the PRS tab, so it should
-        grow with its rows and let the page scroll naturally instead of showing
-        a mostly-empty fixed-height internal viewport.
-        """
-        row_count = len(self.prs_results_rows) or len(self.prs_results)
-        if row_count <= 0:
-            return "160px"
-        return f"{max(160, 64 + (row_count * 42))}px"
 
     @rx.var
     def prs_dagster_url(self) -> str:
@@ -4181,8 +4201,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
         yield PRSTraitState.initialize_traits(self.genome_build, ready_parquet_path, self.include_harmonized)
 
-        # Auto-detect sequencing type + ancestry for a newly loaded sample
-        # (no buttons — detect and preselect, user can override).
+        # Auto-detect sequencing type + ancestry for a newly loaded sample.
         if not same_file and ready_parquet_path:
             self._detect_sample_type(ready_parquet_path)
             self.ancestry_detection_status = ""
@@ -4258,6 +4277,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             ancestry = self.selected_ancestry
             all_pops = self.compute_all_populations
             sample_type = self.sample_type
+            refresh_reference_cache = self.refresh_reference_cache_before_compute
             self.prs_compute_token += 1
             token = self.prs_compute_token
             source_file = self.prs_initialized_for_file or vcf_path
@@ -4301,6 +4321,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
         try:
             catalog = _get_prs_catalog(cache_dir_str)
+            if refresh_reference_cache:
+                catalog.refresh_reference_cache(panel="1000g")
             cache_path = Path(cache_dir_str) / "scores"
             best_perf_df = catalog.best_performance().collect()
 

@@ -1323,8 +1323,8 @@ The web UI integrates the `prs-ui` PyPI package for polygenic risk score computa
 
 ### Dependencies
 
-- **`just-prs>=0.4.7`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
-- **`prs-ui>=0.3.3`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench()`, score grid, results table
+- **`just-prs>=0.9.0`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
+- **`prs-ui>=0.3.15`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench_mode_panel()`, score grid, results table
 
 Both are added to `webui/pyproject.toml`.
 
@@ -1339,7 +1339,6 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     genome_build: str = "GRCh38"
     cache_dir: str = str(resolve_cache_dir())  # ~/.cache/just-prs/
     status_message: str = ""
-    prs_expanded: bool = False
 ```
 
 ### Data flow
@@ -1362,13 +1361,13 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 | File | What it does |
 |------|-------------|
 | `webui/src/webui/state.py` (`PRSState`) | PRS computation state, inherits `PRSComputeStateMixin` + `LazyFrameGridMixin` |
-| `webui/src/webui/pages/annotate.py` | Collapsible PRS section between VCF Preview and Outputs |
+| `webui/src/webui/pages/annotate.py` | PRS tab uses the prs-ui workbench layout with a current-sample row instead of a second VCF upload |
 
 ### Important patterns
 
 - **LazyFrame is the preferred input** — `set_prs_genotypes_lf(pl.scan_parquet(path))` avoids redundant I/O. The parquet path is also set as string fallback.
 - **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
-- **`prs_section()` uses Radix components** (`rx.hstack`, `rx.badge`, `rx.table`) which render without Radix theming in our `theme=None` app. Functional but unstyled. Future work: Fomantic-styled wrappers.
+- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs.
 - **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
 - **PRS results are per-genome** — `select_file` must reset PRS sample state even when the new parquet is still normalizing. `prs_results`, the Altair/iframe chart (`selected_result_*`), and `prs_results_source_file` belong to one sample. Compute snapshots `prs_compute_token` + the parquet path and must discard writes if the user switched genomes. Never treat a leftover PGS ID as "already computed" for a different file.
 - **Remount the sample workspace, not individual widgets** — the right-panel tabs/content wrap with `key=UploadState.selected_file`. One sample = one React tree (grids, Vega charts, reports, analysis). Destroying that subtree is cheap; the cost is the parquet page. Do not keep a widget per genome, and do not reuse one MUI/Vega instance across partitions. The left file list and top nav stay mounted. Sort artifacts must include the source path, not just the state class name.

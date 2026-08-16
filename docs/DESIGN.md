@@ -677,8 +677,9 @@ webui/
 │  - Server-side data grid (UploadSt) │
 │  - Filtering, sorting, scroll-load  │
 ├─────────────────────────────────────┤
-│  PRS Section                        │  ← Polygenic Risk Scores
-│  - prs_section(PRSState) from prs-ui│
+│  PRS tab                            │  ← Polygenic Risk Scores
+│  - prs-ui workbench (By Trait/PRS)  │
+│  - current left-panel sample only   │
 ├─────────────────────────────────────┤
 │  Outputs (teal segment)             │  ← Results
 │  - File list with download buttons  │

@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-lite"
-version = "0.3.17"
+version = "0.3.18"
 description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
@@ -10,7 +10,7 @@ dependencies = [
   "webui",
   "pyyaml>=6.0.3",
   "dagster-dg-cli>=1.13.17",
-  "just-prs>=0.7.7",
+  "just-prs>=0.9.0",
   # The catalog client, pinned to the server's own version — `GET /api/v1/version` on
   # module-marketplace.just-dna.life reports registry 0.14.0, and 0.14.0 is on PyPI. Anything older
   # than 0.11.0 is unusable against that server: `just-dna-marketplace` was this package's old name,

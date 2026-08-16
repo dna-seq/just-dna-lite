@@ -96,7 +96,7 @@ This is the primary workspace and the entry point for end users. It acts as the 
 A dedicated suite for computing Polygenic Risk Scores from the [PGS Catalog](https://www.pgscatalog.org/). It acts as a pure Python alternative to tools like PLINK2.
 
 - **`just_prs` (Core Library)**: Parses scoring files, normalizes variants, and computes scores using `pgenlib`, Polars, and NumPy.
-- **`prs-ui`**: Reusable Reflex components (`PRSComputeStateMixin`, `prs_section()`) that provide the UI for browsing the PGS Catalog and computing scores. `just-dna-lite` embeds these components directly.
+- **`prs-ui`**: Reusable Reflex components (`PRSComputeStateMixin`, `prs_workbench_mode_panel()`) that provide the UI for browsing the PGS Catalog and computing scores. `just-dna-lite` embeds By Trait / By PRS panels in the PRS tab and drives them from the selected left-panel genome instead of a second upload.
 - **`prs-pipeline`**: A Dagster pipeline that computes reference distributions (percentiles) by scoring thousands of PGS IDs against population panels (like 1000 Genomes).
 
 **Role in Ecosystem:**
