@@ -487,6 +487,9 @@ window.onscroll = function() {
         {% for mod in pgx_modules %}
         <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
         {% endfor %}
+        {% if module_provenance %}
+        <li><a href="#modules" class="li1">Modules in this report</a></li>
+        {% endif %}
         {% if credits %}
         <li><a href="#credits" class="li1">Data sources and licences</a></li>
         {% endif %}
@@ -672,6 +675,36 @@ window.onscroll = function() {
 <p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
 {% endif %}
 {% endfor %}
+
+{# ===== MODULES IN THIS REPORT ===== #}
+{% if module_provenance %}
+<h2 id="modules">Modules in this report</h2>
+<div class="board" style="width: 75%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
+    <p>Annotation modules are curated databases that are revised over time, so these are the versions this report was built from. A later run against an updated module can reach a different conclusion from the same genome.</p>
+    <table class="ui celled teal table">
+        <thead>
+            <tr>
+                <th>Module</th>
+                <th>Version</th>
+                <th>Build</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in module_provenance %}
+            <tr>
+                <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                {# Empty means the acquisition path never stated it — a module read straight from a
+                   remote parquet has no manifest to read. Never render that as "unversioned". #}
+                <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
+                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                <td>{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 {# ===== CREDITS ===== #}
 {% if credits %}

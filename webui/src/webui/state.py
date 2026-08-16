@@ -36,6 +36,8 @@ from just_dna_pipelines.module_config import (
     build_module_metadata_dict, _load_config,
     is_immutable_mode as _is_immutable_mode,
     get_immutable_config,
+    has_lead_table,
+    spec_version,
     DefaultSample,
 )
 from just_dna_pipelines.module_registry import (
@@ -48,11 +50,7 @@ from just_dna_pipelines.module_registry import (
 )
 from just_dna_registry import RegistryClient, RegistryError
 from just_dna_registry.client import VersionMismatchError
-from just_dna_format.identity import (
-    is_valid_namespace,
-    is_valid_version,
-    version_from_legacy,
-)
+from just_dna_format.identity import is_valid_namespace
 from just_dna_compiler.compiler import _OUTPUT_FILES as _COMPILER_OUTPUT_FILES
 from just_dna_compiler.compiler import content_signature
 from just_dna_format.integrity import IntegrityError, build_artifact
@@ -5530,34 +5528,6 @@ def _local_key(namespace: str, name: str) -> str:
     return f"{safe_ns}__{name}"
 
 
-def _spec_version(module_dir: Path) -> str:
-    """Publish version from the authored spec (``module.version``), normalized to SemVer.
-
-    Identity beyond ``name`` (version/namespace/canonical_id) is a marketplace concern assigned at
-    publish time — the compiler emits ``Identity(name=...)`` only, so a locally-compiled
-    manifest.json carries a null identity.version. The authored version still lives in
-    ``module_spec.yaml`` (possibly a legacy int/``vN`` like ``2``), so read it there and coerce
-    (``2``/``v2`` → ``2.0.0``). Returns ``""`` when no usable version is found.
-    """
-    spec_path = module_dir / "module_spec.yaml"
-    if not spec_path.exists():
-        return ""
-    try:
-        raw = yaml.safe_load(spec_path.read_text()) or {}
-    except Exception:  # noqa: BLE001 - spec is best-effort metadata
-        return ""
-    version = (raw.get("module") or {}).get("version")
-    if version is None or str(version).strip() == "":
-        return ""
-    candidate = str(version).strip()
-    if is_valid_version(candidate):
-        return candidate
-    try:
-        return version_from_legacy(candidate)
-    except ValueError:
-        return ""
-
-
 def _scan_local_modules() -> List[Dict[str, Any]]:
     """Scan the local custom-modules dir → one dict per registered module.
 
@@ -5582,7 +5552,10 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
     if not CUSTOM_MODULES_DIR.exists():
         return out
     for d in sorted(CUSTOM_MODULES_DIR.iterdir()):
-        if not (d.is_dir() and (d / "weights.parquet").exists()):
+        # Any lead table, not just weights — a `pharm_variants`-led install is a module, and
+        # testing for weights here made one annotatable but unlistable, unpublishable and
+        # uneditable from this pane.
+        if not (d.is_dir() and has_lead_table(d)):
             continue
         name = d.name
         try:
@@ -5618,7 +5591,7 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
         # time); fall back to the authored spec version so the publish pane shows a version and
         # enables the Publish button.
         if not entry["version"]:
-            entry["version"] = _spec_version(d)
+            entry["version"] = spec_version(d)
         out.append(entry)
     return out
 

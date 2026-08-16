@@ -36,6 +36,7 @@ from just_dna_pipelines.module_config import (
     ModulesConfig,
     Source,
     get_config_path,
+    has_lead_table,
     save_config,
 )
 
@@ -257,7 +258,8 @@ def register_downloaded_module(module_dir: Path) -> str:
     the module's ``manifest.json`` (best-effort), and refresh discovery.
 
     Args:
-        module_dir: ``CUSTOM_MODULES_DIR/{name}`` — must contain ``weights.parquet``.
+        module_dir: ``CUSTOM_MODULES_DIR/{name}`` — must contain a lead table (``weights.parquet``
+            for most modules, ``pharm_variants.parquet`` for a drug-response one).
 
     Returns:
         The module name (``module_dir.name``).
@@ -300,12 +302,16 @@ def register_downloaded_module(module_dir: Path) -> str:
 
 
 def list_custom_modules() -> List[str]:
-    """Return names of all compiled custom modules on disk."""
+    """Return names of all compiled custom modules on disk.
+
+    Keyed on ``has_lead_table``, not on ``weights.parquet``: a drug-response module carries
+    ``pharm_variants`` and no weights at all, and is a module none the less.
+    """
     if not CUSTOM_MODULES_DIR.exists():
         return []
     return sorted(
         d.name for d in CUSTOM_MODULES_DIR.iterdir()
-        if d.is_dir() and (d / "weights.parquet").exists()
+        if d.is_dir() and has_lead_table(d)
     )
 
 
@@ -315,7 +321,7 @@ def get_custom_module_specs() -> Dict[str, Path]:
         return {}
     result: Dict[str, Path] = {}
     for d in sorted(CUSTOM_MODULES_DIR.iterdir()):
-        if d.is_dir() and (d / "weights.parquet").exists():
+        if d.is_dir() and has_lead_table(d):
             result[d.name] = d
     return result
 

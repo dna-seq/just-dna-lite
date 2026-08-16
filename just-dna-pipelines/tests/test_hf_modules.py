@@ -12,11 +12,17 @@ import polars as pl
 import pytest
 from huggingface_hub import hf_hub_download
 
+from just_dna_format.integrity import build_artifact
+from just_dna_format.manifest import Display, Identity, ModuleManifest, write_manifest
+
+from just_dna_pipelines.module_config import find_lead_table, has_lead_table
 from just_dna_pipelines.annotation.hf_modules import (
     ModuleInfo,
     ModuleTable,
     ModuleOutputMapping,
     AnnotationManifest,
+    local_module_dir,
+    read_module_provenance,
     get_module_table_url,
     scan_module_table,
     scan_module_weights,
@@ -230,6 +236,111 @@ class TestAnnotationManifest:
         parsed = AnnotationManifest.model_validate_json(json_str)
         assert parsed.user_name == manifest.user_name
         assert len(parsed.modules) == 2
+
+    def test_provenance_absent_from_an_older_manifest_reads_as_not_established(self):
+        """A manifest written before provenance existed must parse, with `None` in those fields.
+
+        `None` is the "not established" value the report renders as *Not stated*; a manifest that
+        failed to parse would take the whole report's lead-table routing down with it.
+        """
+        legacy = (
+            '{"user_name": "u", "sample_name": "s", "source_vcf": "/x.vcf", '
+            '"modules": [{"module": "longevitymap", '
+            '"weights_path": "/out/longevitymap_weights.parquet"}]}'
+        )
+        parsed = AnnotationManifest.model_validate_json(legacy)
+        entry = parsed.modules[0]
+        assert entry.lead_table == "weights"
+        assert (entry.version, entry.digest, entry.source_url) == (None, None, None)
+
+
+class TestModuleProvenance:
+    """Which module bytes produced a run — `read_module_provenance` and its lead-table predicate."""
+
+    def _write_manifest(
+        self, module_dir: Path, lead: str, identity_version: str | None
+    ) -> str:
+        """Write a real `manifest.json` for the module dir; return its artifact digest."""
+        artifact = build_artifact(module_dir, [f"{lead}.parquet"])
+        manifest = ModuleManifest(
+            identity=Identity(name=module_dir.name, version=identity_version),
+            display=Display(
+                title=module_dir.name,
+                description=f"{module_dir.name} test module",
+                report_title=module_dir.name,
+            ),
+            artifact=artifact,
+        )
+        write_manifest(manifest, module_dir / "manifest.json")
+        return artifact.digest
+
+    def _write_module(
+        self, root: Path, name: str, lead: str, version: str | None
+    ) -> Path:
+        module_dir = root / name
+        module_dir.mkdir(parents=True)
+        pl.DataFrame({"rsid": ["rs1"]}).write_parquet(module_dir / f"{lead}.parquet")
+        module_dir.joinpath("module_spec.yaml").write_text(
+            "module:\n  name: %s\n  version: %s\n"
+            % (name, "null" if version is None else f'"{version}"'),
+            encoding="utf-8",
+        )
+        return module_dir
+
+    def test_a_pharm_variants_module_is_a_module(self):
+        """`weights.parquet` is not the test — a drug-response module carries no weights at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pgx = self._write_module(root, "pharmgkb", "pharm_variants", "1.0.0")
+            snp = self._write_module(root, "coronary", "weights", "2.0.0")
+            not_a_module = root / "scratch"
+            not_a_module.mkdir()
+
+            assert find_lead_table(pgx) == "pharm_variants"
+            assert find_lead_table(snp) == "weights"
+            assert find_lead_table(not_a_module) is None
+            assert [d.name for d in sorted(root.iterdir()) if has_lead_table(d)] == [
+                "coronary",
+                "pharmgkb",
+            ]
+
+    def test_local_module_provenance_prefers_the_manifest_and_falls_back_to_the_spec(self):
+        """Version comes from `identity.version`, else the authored spec; digest from the manifest.
+
+        The compiler leaves `identity.version` null (the registry stamps identity at publish), so
+        the spec fallback is the *normal* path for a locally-compiled module, not an edge case.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = self._write_module(root, "coronary", "weights", "2.1.0")
+            expected_digest = self._write_manifest(module_dir, "weights", None)
+
+            info = ModuleInfo(
+                name="coronary",
+                repo_id=str(root),
+                source_url=str(root),
+                path=str(module_dir),
+                lead_table="weights",
+                lead_url=f"file://{module_dir}/weights.parquet",
+            )
+            version, digest = read_module_provenance(info)
+            assert version == "2.1.0"  # spec fallback, manifest identity is null
+            assert digest == expected_digest
+
+            # A stamped identity wins over the spec.
+            self._write_manifest(module_dir, "weights", "3.0.0")
+            assert read_module_provenance(info)[0] == "3.0.0"
+
+    def test_a_remote_module_states_nothing_rather_than_guessing(self):
+        """HF discovery reads the parquet URL and never fetches a manifest, so both are unknown."""
+        remote = ModuleInfo(
+            name="longevitymap",
+            repo_id="just-dna-seq/annotators",
+            path="datasets/just-dna-seq/annotators/data/longevitymap",
+            weights_url="hf://datasets/just-dna-seq/annotators/data/longevitymap/weights.parquet",
+        )
+        assert read_module_provenance(remote) == (None, None)
+        assert local_module_dir(remote) is None
 
 
 # ============================================================================

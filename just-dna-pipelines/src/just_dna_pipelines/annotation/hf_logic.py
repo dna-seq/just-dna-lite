@@ -26,6 +26,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     AnnotationManifest,
     scan_module_table,
     get_module_info,
+    read_module_provenance,
     ModuleInfo,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
@@ -628,12 +629,19 @@ def annotate_vcf_with_all_modules(
                 except Exception as e:
                     logger.warning(f"  Failed to download metadata for {module_name}: {e}")
             
+            # Record which module bytes produced these rows. Without it a rendered report cannot be
+            # tied to the module version behind it, and nothing can answer "which of my saved
+            # results are stale" — the missing prerequisite under any later verification harness.
+            module_version, module_digest = read_module_provenance(info)
             module_output = ModuleOutputMapping(
                 module=module_name,
                 lead_table=info.lead_table,
                 weights_path=str(weights_path),
                 logo_path=logo_path,
                 metadata_path=metadata_json_path,
+                version=module_version,
+                digest=module_digest,
+                source_url=info.source_url or info.lead_url or None,
             )
             
             total_annotated += num_weights

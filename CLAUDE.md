@@ -391,6 +391,35 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
 `failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
 there when every module was skipped.
 
+**A run also records which module *bytes* produced it** — `ModuleOutputMapping.version` / `digest` /
+`source_url`, filled by `read_module_provenance` (`hf_modules.py`) and rendered as the report's
+"Modules in this report" table. Without it a saved report cannot be tied to the module version behind
+it and nothing can answer *which of my results are stale*, which is also the missing prerequisite
+under any later verification harness (the format tier's RM7). Three rules:
+- **All three are tri-state**: `None` means *not established*, never "unversioned". Only an
+  acquisition path that puts `manifest.json` on disk (a registry install or a local compile) can
+  answer at all — `scan_module_table` reads a remote parquet URL and never fetches a manifest, so an
+  HF-discovered module states `source_url` and nothing else. The template renders the rest as
+  *Not stated*.
+- **The digest is the module's claim, not a check.** Nothing in this repo calls
+  `just_dna_format.integrity.verify_manifest` (the verify-then-install flow in
+  `docs/MODULE_MARKETPLACE_SPEC.md` is specified and unimplemented, and marked as such), so it ties a
+  report to a *stated* identity. Do not present it to a reader as verification. If you do wire
+  verification: `require_marketplace=True` is the default and would reject every locally-compiled
+  module, whose `compiled_by` is null by design.
+- **Version falls back from `identity.version` to the authored spec** (`module_config.spec_version`),
+  because the compiler leaves identity null — the registry stamps it at publish. Six of our own
+  Gen-I ports author `version: null`, so *Not stated* is currently the common case; that is the
+  porting pipeline's gap, not the report's.
+
+**"Is this a module" is one predicate, `module_config.has_lead_table` / `find_lead_table`** — the
+local-filesystem twin of discovery's fsspec `_find_lead_table`, both keyed on `LEAD_TABLES`. Probing
+`weights.parquet` is not the test: a drug-response module carries `pharm_variants` and no weights, and
+testing for weights in `list_custom_modules`, `get_custom_module_specs` and the webui's
+`_scan_local_modules` left a `pharm_variants`-led registry install annotatable but **absent from the
+publish/edit pane**, so it could not be published or edited at all. A new 0.4 family is one edit in
+`LEAD_TABLES` for both sides.
+
 **The count the engine returns is matched rows, never the parquet's height.** A position join keeps
 every unmatched VCF row on purpose (the report needs them to tell "probed and did not match" apart
 from "never looked"), so the height is a *positions probed* number. Reporting it as variants

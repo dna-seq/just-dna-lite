@@ -8,16 +8,24 @@ Sources are configured in modules.yaml (see module_config.py).
 
 import re
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 import polars as pl
 from eliot import log_message
+from just_dna_format.manifest import read_manifest
 from pydantic import BaseModel, model_validator
 
 from just_dna_pipelines.annotation.module_cache import (
     invalidate_module_cache_on_version_change,
 )
-from just_dna_pipelines.module_config import DEFAULT_REPOS, LEAD_TABLES, MODULES_CONFIG, Source
+from just_dna_pipelines.module_config import (
+    DEFAULT_REPOS,
+    LEAD_TABLES,
+    MODULES_CONFIG,
+    Source,
+    spec_version,
+)
 
 
 # Backward-compatible aliases sourced from modules.yaml
@@ -526,6 +534,63 @@ def validate_modules(module_names: list[str]) -> list[str]:
     return valid
 
 
+def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
+    """The module's directory when its bytes live on this filesystem, else ``None``.
+
+    A registry install or a local compile is a real directory under the registered-modules dir
+    (the local source's URL is a bare absolute path, so `ModuleInfo.path` is that directory). An
+    HF- or HTTP-discovered module has a relative or remote base path and no local directory —
+    `scan_module_table` goes straight to the parquet URL and never fetches a manifest.
+    """
+    if info is None:
+        return None
+    path = Path(info.path)
+    if not path.is_absolute() or not path.is_dir():
+        return None
+    return path
+
+
+def read_module_provenance(
+    info: Optional[ModuleInfo],
+) -> tuple[Optional[str], Optional[str]]:
+    """``(version, artifact digest)`` for the module's bytes, as far as the source states them.
+
+    `None` means *not established*, never "unversioned" or "unverified": only an acquisition path
+    that puts `manifest.json` on disk can answer at all, and HF discovery is not one of them.
+
+    The digest is the value the module **claims** — read from its manifest, not recomputed. Nothing
+    in this repo calls `just_dna_format.integrity.verify_manifest`, so recording it ties a report to
+    a stated identity, not to a checked one. Do not present it to a reader as verification.
+    """
+    module_dir = local_module_dir(info)
+    if module_dir is None:
+        return (None, None)
+
+    manifest_path = module_dir / "manifest.json"
+    version: Optional[str] = None
+    digest: Optional[str] = None
+    if manifest_path.exists():
+        try:
+            manifest = read_manifest(manifest_path)
+        except (ValueError, OSError) as exc:
+            log_message(
+                message_type="warning",
+                action="unreadable_module_manifest",
+                path=str(manifest_path),
+                reason=str(exc),
+            )
+        else:
+            version = manifest.identity.version or None
+            digest = manifest.artifact.digest or None
+
+    # The compiler leaves `identity.version` null — the registry stamps identity at publish time —
+    # so a locally-compiled module's version lives only in the authored spec.
+    if version is None:
+        version = spec_version(module_dir) or None
+
+    return (version, digest)
+
+
 class ModuleOutputMapping(BaseModel):
     """Mapping of output files to their source modules."""
     module: str
@@ -536,6 +601,13 @@ class ModuleOutputMapping(BaseModel):
     weights_path: Optional[str] = None
     logo_path: Optional[str] = None
     metadata_path: Optional[str] = None
+    # Which module *bytes* produced these rows, so a saved report can be tied to them and a stale
+    # one can be told from a current one. All three are `None` where the acquisition path does not
+    # state them — see `read_module_provenance`: HF discovery reads the parquet URL and nothing
+    # else, so only `source_url` is known there. `None` means not established, never "none".
+    version: Optional[str] = None
+    digest: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 class AnnotationManifest(BaseModel):

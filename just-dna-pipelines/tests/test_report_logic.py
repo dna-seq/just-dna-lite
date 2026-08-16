@@ -362,6 +362,7 @@ def _render(**context) -> str:
     ctx = {
         "user_name": "t", "sample_name": "s", "longevity": None,
         "other_modules": [], "pgx_modules": [], "credits": [],
+        "module_provenance": [],
         "module_display_names": {}, "umami_script_tag": "",
     }
     ctx.update(context)
@@ -609,3 +610,87 @@ def test_pharmgkb_on_a_real_genome_produces_a_drug_keyed_section(tmp_path):
     assert ranks == sorted(ranks, reverse=True)
     # a real PGx result names genes, not just rsids
     assert any(d["genes"] for d in data["drugs"])
+
+
+# ============================================================================
+# Which module bytes produced the report (AnnotationManifest provenance)
+# ============================================================================
+
+from just_dna_pipelines.annotation.hf_modules import (
+    AnnotationManifest,
+    ModuleOutputMapping,
+)
+from just_dna_pipelines.annotation.report_logic import (
+    _module_outputs_from_manifest,
+    build_module_provenance,
+)
+
+
+def _write_run_manifest(modules_dir: Path, *modules: ModuleOutputMapping) -> None:
+    manifest = AnnotationManifest(
+        user_name="u", sample_name="s", source_vcf="/x.vcf",
+        output_dir=str(modules_dir), modules=list(modules),
+    )
+    (modules_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+
+def test_the_report_reads_back_the_module_version_that_produced_it(tmp_path):
+    """A rendered report must be tie-able to the module bytes behind it.
+
+    The manifest is the only carrier: the parquet next to it says nothing about which version of
+    which module wrote it, so a republished module silently changes what a saved report means.
+    """
+    _write_run_manifest(
+        tmp_path,
+        ModuleOutputMapping(
+            module="coronary", lead_table="weights", version="2.1.0",
+            digest="sha256:0123456789abcdef0123456789abcdef",
+            source_url="/registered/coronary",
+        ),
+    )
+    outputs = _module_outputs_from_manifest(tmp_path)
+    assert outputs["coronary"].version == "2.1.0"
+
+    rows = build_module_provenance(["coronary"], outputs, {})
+    assert rows[0]["version"] == "2.1.0"
+    assert rows[0]["digest_short"] == "0123456789ab"   # readable prefix of the Merkle root
+    assert rows[0]["digest"].startswith("sha256:")     # the full value stays available
+
+    html = _render(module_provenance=rows)
+    assert "Modules in this report" in html
+    assert "2.1.0" in html
+    assert "0123456789ab" in html
+
+
+def test_an_unstated_version_renders_as_not_stated_rather_than_as_unversioned(tmp_path):
+    """`None` means the acquisition path never said, which is not the same as 'no version'.
+
+    An HF-discovered module has no manifest fetched at all, so both fields are genuinely unknown;
+    rendering that as a blank or as "v0" would assert something the run cannot support.
+    """
+    _write_run_manifest(
+        tmp_path, ModuleOutputMapping(module="longevitymap", lead_table="weights")
+    )
+    rows = build_module_provenance(
+        ["longevitymap"], _module_outputs_from_manifest(tmp_path), {}
+    )
+    assert (rows[0]["version"], rows[0]["digest"], rows[0]["digest_short"]) == ("", "", "")
+
+    html = _render(module_provenance=rows)
+    assert "Not stated" in html
+
+
+def test_a_run_with_no_manifest_still_reports_its_modules(tmp_path):
+    """The report is also generated from a directory of parquets alone — that must not crash,
+    and the lead table still falls back to the discovered ModuleInfo (the pre-existing contract)."""
+    assert _module_outputs_from_manifest(tmp_path) == {}
+
+    info = ModuleInfo(
+        name="pharmgkb", repo_id="local", path=str(tmp_path),
+        lead_table="pharm_variants", lead_url=str(tmp_path / "pharm_variants.parquet"),
+        source_url="/registered/pharmgkb",
+    )
+    rows = build_module_provenance(["pharmgkb"], {}, {"pharmgkb": info})
+    assert rows[0]["lead_table"] == "pharm_variants"
+    assert rows[0]["source_url"] == "/registered/pharmgkb"
+    assert rows[0]["version"] == ""

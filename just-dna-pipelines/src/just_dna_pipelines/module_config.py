@@ -36,6 +36,7 @@ from typing import Any, Dict, Literal, Optional
 
 import polars as pl
 import yaml
+from just_dna_format.identity import is_valid_version, version_from_legacy
 from pydantic import BaseModel, model_validator
 
 
@@ -499,6 +500,56 @@ LEAD_TABLES: tuple[str, ...] = (
     "activity_phenotype",
     "allele_function",
 )
+
+
+def find_lead_table(module_dir: Path) -> Optional[str]:
+    """Return the table family leading a compiled module *directory*, or None if it is not one.
+
+    The local-filesystem twin of `annotation.hf_modules._find_lead_table`, which asks the same
+    question of an fsspec path. Both exist so that "is this a module" has one answer keyed on
+    schema rather than on a family name: ten families exist today and the format keeps adding
+    them, so probing `weights.parquet` alone silently excludes every pharmacogenomics, diplotype
+    or PGS module — which is exactly how a `pharm_variants`-led registry install came to be
+    annotatable but impossible to list, edit or publish from the UI.
+    """
+    for table in LEAD_TABLES:
+        if (module_dir / f"{table}.parquet").exists():
+            return table
+    return None
+
+
+def has_lead_table(module_dir: Path) -> bool:
+    """True when the directory holds a compiled module — any lead table, not just weights."""
+    return find_lead_table(module_dir) is not None
+
+
+def spec_version(module_dir: Path) -> str:
+    """Authored version from ``module_spec.yaml`` (``module.version``), normalized to SemVer.
+
+    Identity beyond ``name`` (version/namespace/canonical_id) is a marketplace concern assigned at
+    publish time — the compiler emits ``Identity(name=...)`` only, so a locally-compiled
+    ``manifest.json`` carries a null ``identity.version``. The authored version still lives in the
+    spec (possibly a legacy int/``vN`` like ``2``), so read it there and coerce (``2``/``v2`` →
+    ``2.0.0``). Returns ``""`` when no usable version is found.
+    """
+    spec_path = module_dir / "module_spec.yaml"
+    if not spec_path.exists():
+        return ""
+    try:
+        raw = yaml.safe_load(spec_path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError):
+        return ""
+    version = (raw.get("module") or {}).get("version")
+    if version is None or str(version).strip() == "":
+        return ""
+    candidate = str(version).strip()
+    if is_valid_version(candidate):
+        return candidate
+    try:
+        return version_from_legacy(candidate)
+    except ValueError:
+        return ""
+
 
 # Backward-compatible: list of HF repo IDs extracted from sources
 DEFAULT_REPOS: list[str] = [

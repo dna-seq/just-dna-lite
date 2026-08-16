@@ -18,6 +18,7 @@ from just_dna_pipelines.annotation.analytics import umami_script_tag
 from just_dna_pipelines.annotation.hf_modules import (
     AnnotationManifest,
     ModuleInfo,
+    ModuleOutputMapping,
     ModuleTable,
     scan_module_table,
     discover_hf_modules,
@@ -944,13 +945,14 @@ def build_report_credits(
 MODULE_DISPLAY_NAMES: dict[str, str] = build_display_names_dict(DISCOVERED_MODULES)
 
 
-def _lead_tables_from_manifest(modules_dir: Path) -> dict[str, str]:
-    """Read each annotated module's lead table from the run's ``manifest.json``.
+def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
+    """Read the run's ``manifest.json`` → one ``ModuleOutputMapping`` per annotated module.
 
     Parsed through ``AnnotationManifest`` rather than as raw JSON on purpose: manifests written
     before the engine learned about lead tables carry no ``lead_table`` key at all, and the model's
     default supplies ``"weights"`` — which is what those runs actually were. Reading the dict
-    directly would yield ``None`` and route them nowhere.
+    directly would yield ``None`` and route them nowhere. The same holds for the provenance fields,
+    which are absent from every manifest written before they existed and read back as ``None``.
 
     A missing or unreadable manifest is not an error: the report is also generated from a directory
     of parquets alone, and the caller falls back to the discovered ``ModuleInfo``.
@@ -972,7 +974,50 @@ def _lead_tables_from_manifest(modules_dir: Path) -> dict[str, str]:
         )
         return {}
 
-    return {m.module: m.lead_table for m in manifest.modules}
+    return {m.module: m for m in manifest.modules}
+
+
+def build_module_provenance(
+    module_names: list[str],
+    module_outputs: dict[str, ModuleOutputMapping],
+    module_infos: dict[str, ModuleInfo],
+) -> list[dict]:
+    """One row per rendered module naming the bytes it came from.
+
+    This is what lets a saved report be tied to the module version that produced it, and a stale
+    one be told from a current one — the report used to name only the module, which is a moving
+    target across a republish.
+
+    Every field is reported exactly as far as it was established. A module discovered on
+    HuggingFace has no manifest fetched at all (``scan_module_table`` reads the parquet URL and
+    nothing else), so its version and digest are genuinely unknown here, and the template says so
+    rather than implying an unversioned module. The digest is the module's own claim, never
+    verified against the files — see ``read_module_provenance``.
+    """
+    rows: list[dict] = []
+    for name in module_names:
+        output = module_outputs.get(name)
+        info = module_infos.get(name)
+        digest = (output.digest if output else None) or ""
+        rows.append(
+            {
+                "name": name,
+                "display_name": MODULE_DISPLAY_NAMES.get(
+                    name, name.replace("_", " ").title()
+                ),
+                "version": (output.version if output else None) or "",
+                "digest": digest,
+                # Merkle roots are 64 hex characters and the leading ones identify a build well
+                # enough to compare two reports by eye; the full value stays in manifest.json.
+                "digest_short": digest.split(":")[-1][:12],
+                "lead_table": (output.lead_table if output else None)
+                or (info.lead_table if info is not None else "weights"),
+                "source_url": (output.source_url if output else None)
+                or (info.source_url if info is not None else "")
+                or "",
+            }
+        )
+    return rows
 
 
 def generate_longevity_report(
@@ -1001,7 +1046,8 @@ def generate_longevity_report(
     with start_action(action_type="generate_longevity_report", modules_dir=str(modules_dir)):
         # Discover module infos
         module_infos = discover_hf_modules()
-        lead_tables = _lead_tables_from_manifest(modules_dir)
+        module_outputs = _module_outputs_from_manifest(modules_dir)
+        lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
 
         # Find available parquet files
         available_modules: list[str] = []
@@ -1045,6 +1091,9 @@ def generate_longevity_report(
                 other_modules_data.append(mod_data)
 
         credits = build_report_credits(available_modules, module_infos)
+        module_provenance = build_module_provenance(
+            available_modules, module_outputs, module_infos
+        )
 
         # Load and render template
         template_dir = Path(__file__).parent / "templates"
@@ -1065,6 +1114,7 @@ def generate_longevity_report(
             other_modules=other_modules_data,
             pgx_modules=pgx_modules_data,
             credits=credits,
+            module_provenance=module_provenance,
             module_display_names=MODULE_DISPLAY_NAMES,
             umami_script_tag=umami_script_tag(),
         )
