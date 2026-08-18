@@ -15,7 +15,7 @@ import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Callable, Dict, Generator, List, Optional, Sequence, Union
 
 import polars as pl
 import reflex as rx
@@ -78,6 +78,11 @@ from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public
 logger = logging.getLogger(__name__)
 
 GENERATED_MODULES_DIR: Path = get_generated_modules_dir()
+
+_OUTPUT_PREVIEW_SCROLL_SCRIPT: str = (
+    "window.setTimeout(() => document.getElementById('output-preview-heading')"
+    "?.scrollIntoView({behavior: 'smooth', block: 'start'}), 150)"
+)
 
 
 def _find_default_sample(zenodo_url: str, filename: str) -> Optional[DefaultSample]:
@@ -1150,6 +1155,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     def toggle_ensembl(self):
         """Toggle Ensembl variation annotation on/off."""
+        self.last_run_success = False
         self.include_ensembl = not self.include_ensembl
 
     async def run_hf_annotation(self, filename: str = ""):
@@ -1401,6 +1407,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     
     # Tracking for the UI button state
     last_run_success: bool = False
+    focused_output_path: str = ""
     
     # Tab management for two-panel layout (legacy, kept for backwards compatibility)
     active_tab: str = "params"  # "params", "history", "outputs"
@@ -1604,6 +1611,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.output_files = []
         self.report_files = []
         self.outputs_loaded_for_file = ""
+        self.focused_output_path = ""
 
     def _clear_norm_stats(self):
         """Reset normalization filter statistics."""
@@ -2461,7 +2469,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "run_short": report_run_id[:8] if report_run_id else "",
                 })
         
-        reports.sort(key=lambda x: x["name"], reverse=True)
+        reports.sort(key=lambda x: x["materialized_at"], reverse=True)
         self.report_files = reports
         self.outputs_loaded_for_file = self.selected_file
 
@@ -2546,6 +2554,58 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         if not self._outputs_belong_to_selected_file():
             return False
         return len(self.report_files) > 0
+
+    def _output_path_for_run(self, run_id: str) -> str:
+        """Return the first annotation parquet produced by ``run_id``.
+
+        A sample's output directory accumulates files across runs. Match both
+        the materialization run id and the modules selected for the requested
+        run so the Analysis action cannot land on an unrelated older parquet.
+        """
+        if not run_id or not self._outputs_belong_to_selected_file():
+            return ""
+
+        run = next((item for item in self.runs if item.get("run_id") == run_id), None)
+        if run is None:
+            return ""
+
+        modules = set(run.get("modules") or [])
+        if run.get("include_ensembl"):
+            modules.add("ensembl")
+
+        for file_info in self.output_files:
+            if (
+                file_info.get("run_id") == run_id
+                and file_info.get("module") in modules
+                and file_info.get("type") in {"annotations", "data", "weights"}
+            ):
+                return str(file_info.get("path") or "")
+        return ""
+
+    @rx.var
+    def latest_run_output_path(self) -> str:
+        """Annotation parquet to focus for the selected sample's latest run."""
+        return self._output_path_for_run(self.latest_run_id)
+
+    @rx.var
+    def latest_report_url(self) -> str:
+        """Browser URL for the report materialized by the latest run only."""
+        if not self._outputs_belong_to_selected_file():
+            return ""
+
+        run_id = self.latest_run_id
+        for file_info in self.report_files:
+            if file_info.get("run_id") == run_id:
+                return (
+                    f"{self.backend_api_url}/api/report/{self.safe_user_id}/"
+                    f"{file_info['sample_name']}/{file_info['name']}"
+                )
+        return ""
+
+    @rx.var
+    def has_latest_report(self) -> bool:
+        """Whether the latest run generated a report that can be opened."""
+        return bool(self.latest_report_url)
 
     async def delete_file(self, filename: str):
         """Delete an uploaded file from the filesystem and state."""
@@ -2687,26 +2747,13 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         """Get the text for the analysis button based on state."""
         if self.selected_file_is_running:
             return "Analysis Running..."
-        if self.last_run_success:
-            return "Analysis Complete"
         return "Start Analysis"
 
     @rx.var
-    def analysis_button_icon(self) -> str:
-        """Get the icon for the analysis button based on state."""
-        if self.selected_file_is_running:
-            return "loader-circle"
-        if self.last_run_success:
-            return "circle-check"
-        return "play"
-
-    @rx.var
     def analysis_button_color(self) -> str:
-        """Get the color class for the analysis button (DNA palette: yellow=running, green=success, blue=default)."""
+        """Get the color class for the start/running analysis button."""
         if self.selected_file_is_running:
             return "ui yellow right labeled icon large button fluid"
-        if self.last_run_success:
-            return "ui green right labeled icon large button fluid"
         return "ui primary right labeled icon large button fluid"
 
     @rx.var
@@ -2860,6 +2907,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             yield rx.toast.error("Please select at least one module or enable Ensembl annotations")
             return
 
+        self.last_run_success = False
         self.running = True
         self.run_logs = []  # Clear previous logs
         self._add_log("Starting annotation job...")
@@ -2993,6 +3041,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             "filename": self.selected_file,
             "sample_name": sample_name,
             "modules": modules_to_use,
+            "include_ensembl": has_ensembl,
             "status": "QUEUED",
             "started_at": datetime.now().isoformat(),
             "ended_at": None,
@@ -3291,15 +3340,30 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         """Hide the welcome-page medical disclaimer for this session."""
         self.show_welcome_disclaimer = False
 
-    def view_run_in_results(self, run_id: str = ""):
-        """Switch to annotated files produced by the run.
-
-        ``run_id`` is accepted for forward compatibility (e.g. future
-        scroll-into-view of the matching output card) but is currently unused.
-        """
-        del run_id  # currently unused; retained for future highlight logic
+    def view_run_in_results(self, run_id: str = "") -> list[EventSpec] | None:
+        """Switch to, focus, and preload the annotation parquet for ``run_id``."""
         self.right_panel_active_tab = "annotated_files"
         self.outputs_expanded = True
+        self.focused_output_path = self._output_path_for_run(run_id)
+
+        if self.focused_output_path:
+            return [
+                OutputPreviewState.view_output_file(self.focused_output_path),
+                rx.call_script(
+                    "window.setTimeout(() => "
+                    "document.getElementById('focused-annotated-file')"
+                    "?.scrollIntoView({behavior: 'smooth', block: 'center'}), 150)"
+                ),
+            ]
+        return None
+
+    def preview_output_file(self, file_path: str) -> list[EventSpec]:
+        """Select ``file_path``, load its preview, then focus the preview heading."""
+        self.focused_output_path = file_path
+        return [
+            OutputPreviewState.view_output_file(file_path),
+            rx.call_script(_OUTPUT_PREVIEW_SCROLL_SCRIPT),
+        ]
 
     def view_prs_in_outputs(self):
         """Switch the right panel to the PRS tab."""
@@ -3345,11 +3409,18 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         if value:
             self._load_output_files_sync()
 
-    async def rerun_with_same_modules(self):
+    async def rerun_with_same_modules(self) -> AsyncGenerator[EventSpec | None, None]:
         """Re-run annotation with the same modules as the last run."""
         last_run = self.last_run_for_file
-        if last_run and last_run.get("modules"):
-            self.selected_modules = last_run["modules"].copy()
+        if last_run:
+            previous_modules = last_run.get("modules") or []
+            available_modules = set(self.available_modules)
+            self.selected_modules = [
+                module for module in previous_modules if module in available_modules
+            ]
+            self.include_ensembl = bool(
+                last_run.get("include_ensembl") or "ensembl" in previous_modules
+            )
         # Start the annotation
         async for event in self.start_annotation_run():
             yield event
@@ -3535,6 +3606,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 "filename": filename,
                 "sample_name": sample_name,
                 "modules": modules or [],
+                "include_ensembl": bool(duckdb_config),
                 "status": self._get_run_status_str(run.status),
                 "started_at": started_at,
                 "ended_at": ended_at,
@@ -3560,9 +3632,8 @@ class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     completely separate LazyFrame cache, column defs, rows, etc. from
     the VCF input grid managed by ``UploadState``.
 
-    The ``on_click`` handler in the output file card calls
-    ``OutputPreviewState.view_output_file`` **directly** — no bridge
-    through ``UploadState`` is needed.
+    Output-card clicks go through ``UploadState.preview_output_file`` so the
+    card selection and this independent preview grid update together.
     """
 
     output_preview_loading: bool = False
@@ -3585,12 +3656,13 @@ class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         """True when the last output preview load failed."""
         return bool(self.output_preview_error)
 
-    def view_output_file(self, file_path: str):
+    def view_output_file(
+        self, file_path: str
+    ) -> Generator[None, None, None]:
         """Load an output data file into the output preview grid.
 
-        Generator — use ``yield from`` or call directly from ``on_click``.
-        Reflex will iterate the generator and push intermediate state
-        updates to the frontend.
+        Generator dispatched by ``UploadState.preview_output_file``. Reflex
+        iterates it and pushes intermediate loading state to the frontend.
         """
         path = Path(file_path)
         if not path.exists():
@@ -4720,7 +4792,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             refresh_reference_cache = self.refresh_reference_cache_before_compute
             self.prs_compute_token += 1
             token = self.prs_compute_token
-            source_file = self.prs_initialized_for_file or vcf_path
+            source_file = self.prs_initialized_for_file or self.prs_genotypes_path
             if not source_file:
                 self.status_message = "Normalized VCF not found — run normalization first."
                 return

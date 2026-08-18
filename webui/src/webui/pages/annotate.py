@@ -1595,6 +1595,7 @@ def _output_card_meta_row(file_info: rx.Var[dict]) -> rx.Component:
 
 def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
     """Card for a single output file with view and download buttons."""
+    is_focused = file_info["path"].to(str) == UploadState.focused_output_path
     download_url = rx.cond(
         file_info["type"].to(str) == "vcf_export",
         UploadState.backend_api_url + "/api/download-vcf/" + UploadState.safe_user_id + "/" + file_info["sample_name"].to(str) + "/" + file_info["name"].to(str),
@@ -1609,7 +1610,7 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
             rx.el.div(
                 rx.el.span(
                     file_info["name"].to(str),
-                    on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
+                    on_click=UploadState.preview_output_file(file_info["path"].to(str)),
                     style={
                         "fontSize": "1.12rem",
                         "fontWeight": "700",
@@ -1657,7 +1658,7 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
                 # View in grid button
                 rx.el.button(
                     fomantic_icon("eye", size=15),
-                    on_click=OutputPreviewState.view_output_file(file_info["path"].to(str)),
+                    on_click=UploadState.preview_output_file(file_info["path"].to(str)),
                     class_name="ui icon button",
                     title="Preview in data grid",
                 ),
@@ -1675,7 +1676,11 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
         style={
             "padding": "16px 12px",
             "borderBottom": "1px solid #eee",
+            "borderLeft": rx.cond(is_focused, "4px solid #2185d0", "4px solid transparent"),
+            "backgroundColor": rx.cond(is_focused, "#f3f8fc", "transparent"),
+            "transition": "background-color 0.2s ease, border-color 0.2s ease",
         },
+        id=rx.cond(is_focused, "focused-annotated-file", ""),
     )
 
 
@@ -1909,7 +1914,9 @@ def _output_preview_grid() -> rx.Component:
                     "padding": "8px 0",
                     "marginBottom": "10px",
                     "borderBottom": "1px solid #e0e0e0",
+                    "scrollMarginTop": "50px",
                 },
+                id="output-preview-heading",
             ),
             # Loading spinner
             rx.cond(
@@ -1957,6 +1964,7 @@ def _output_preview_grid() -> rx.Component:
             style={
                 "marginTop": "18px",
             },
+            id="output-preview",
         ),
         rx.fragment(),
     )
@@ -2381,24 +2389,72 @@ def new_analysis_section() -> rx.Component:
                 ),
             },
         ),
-        rx.el.button(
-            UploadState.analysis_button_text,
-            rx.el.i(
-                "",
-                class_name=rx.cond(
-                    UploadState.selected_file_is_running,
-                    "spinner loading icon",
-                    rx.cond(
-                        UploadState.last_run_success,
-                        "check circle icon",
+        rx.cond(
+            UploadState.last_run_success,
+            rx.el.div(
+                rx.cond(
+                    UploadState.has_latest_report,
+                    rx.el.a(
+                        "Analysis completed",
+                        rx.el.i("", class_name="external alternate icon"),
+                        href=UploadState.latest_report_url,
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        title="Open the generated report in a new window",
+                        class_name="ui green right labeled icon large button",
+                        style={
+                            "display": "inline-flex",
+                            "alignItems": "center",
+                            "justifyContent": "center",
+                            "gap": "6px",
+                            "flex": "1 1 320px",
+                            "maxWidth": "400px",
+                        },
+                    ),
+                    rx.el.button(
+                        "Analysis completed",
+                        rx.el.i("", class_name="check circle icon"),
+                        disabled=True,
+                        title="This run did not generate an HTML report",
+                        class_name="ui green right labeled icon large disabled button",
+                        style={"flex": "1 1 320px", "maxWidth": "400px"},
+                    ),
+                ),
+                rx.el.button(
+                    fomantic_icon("refresh-cw", size=15),
+                    " Regenerate",
+                    on_click=UploadState.rerun_with_same_modules,
+                    disabled=UploadState.selected_file_is_running,
+                    class_name="ui basic large button",
+                    style={
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "gap": "6px",
+                    },
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "stretch",
+                    "gap": "10px",
+                    "flexWrap": "wrap",
+                },
+            ),
+            rx.el.button(
+                UploadState.analysis_button_text,
+                rx.el.i(
+                    "",
+                    class_name=rx.cond(
+                        UploadState.selected_file_is_running,
+                        "spinner loading icon",
                         "play icon",
                     ),
                 ),
+                on_click=UploadState.start_annotation_run,
+                disabled=~UploadState.can_run_annotation,
+                class_name=UploadState.analysis_button_color,
+                style={"maxWidth": "400px"},
             ),
-            on_click=UploadState.start_annotation_run,
-            disabled=~UploadState.can_run_annotation,
-            class_name=UploadState.analysis_button_color,
-            style={"maxWidth": "400px"},
         ),
         style={"padding": "0"},
         id="new-analysis-section",
@@ -3351,16 +3407,21 @@ def _latest_run_status_card() -> rx.Component:
         UploadState.has_last_run,
         rx.el.div(
             rx.el.div(
-                rx.cond(
-                    is_running,
-                    fomantic_icon("loader-circle", size=16, color="#fbbd08"),
-                    fomantic_icon("history", size=16, color="#2185d0"),
-                ),
                 rx.el.span(
-                    rx.cond(is_running, "Run in progress", "Latest run"),
-                    style={"fontWeight": "700", "marginLeft": "8px", "fontSize": "1.05rem"},
+                    rx.cond(is_running, "Run in progress ", "Latest run "),
+                    last["status"].to(str),
+                    style={
+                        "fontWeight": "800",
+                        "fontSize": "1.18rem",
+                        "color": rx.match(
+                            last["status"].to(str),
+                            ("SUCCESS", "#21ba45"),
+                            ("FAILURE", "#db2828"),
+                            ("CANCELED", "#767676"),
+                            "#b58105",
+                        ),
+                    },
                 ),
-                run_status_badge(last["status"].to(str)),
                 rx.el.span(
                     last["started_at"].to(str),
                     style={"marginLeft": "10px", "color": "#666", "fontSize": "0.95rem", "flex": "1"},
@@ -3375,10 +3436,10 @@ def _latest_run_status_card() -> rx.Component:
             ),
             rx.el.div(
                 rx.el.button(
-                    fomantic_icon("history", size=12),
+                    fomantic_icon("external-link", size=12),
                     " View Annotated Files",
                     on_click=lambda: UploadState.view_run_in_results(last_id),
-                    class_name="ui green button",
+                    class_name="ui basic button",
                     style={"display": "inline-flex", "alignItems": "center", "gap": "6px"},
                 ),
                 rx.el.a(
