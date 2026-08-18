@@ -278,7 +278,13 @@ def test_superhuman_port_narrows_and_grounds(sources_cache):
 # ---------------------------------------------------- gene-panel symbol reconciliation (pure)
 
 def test_symbol_resolver_maps_aliases_and_flags_typos():
-    """Legacy aliases resolve to current symbols; true typos are reported, never guessed."""
+    """Legacy aliases resolve to current symbols; true typos are reported, never guessed.
+
+    ``ATK1`` used to be this test's example of an unguessable typo. It is now a *curated* correction
+    (``_CURATED_PANEL_SYMBOL_FIXES``), because leaving it unresolved silently removed AKT1 from the
+    cancer panel — so the placeholder here has to be a symbol nobody has adjudicated, and the curated
+    case gets its own test below.
+    """
     from just_dna_pipelines.v1_port.symbols import SymbolResolver, resolve_panel_genes
 
     resolver = SymbolResolver(
@@ -286,16 +292,47 @@ def test_symbol_resolver_maps_aliases_and_flags_typos():
         synonym_to_official={"MYCL1": "MYCL", "PARK2": "PRKN", "TAZ": "TAFAZZIN"},
     )
     wanted, alias_map, unresolved = resolve_panel_genes(
-        {"MYCL1", "PARK2", "TAZ", "AKT1", "ATK1"}, resolver
+        {"MYCL1", "PARK2", "TAZ", "AKT1", "ZZQQ9"}, resolver
     )
     assert alias_map == {"MYCL1": "MYCL", "PARK2": "PRKN", "TAZ": "TAFAZZIN"}
-    assert unresolved == ["ATK1"]  # not a current symbol nor a known synonym → flagged, not guessed
+    assert unresolved == ["ZZQQ9"]  # not a current symbol nor a known synonym → flagged, not guessed
     assert {"MYCL", "PRKN", "TAFAZZIN", "AKT1"}.issubset(wanted)
-    assert "ATK1" in wanted  # kept (so it's visible), even though it will match nothing
+    assert "ZZQQ9" in wanted  # kept (so it's visible), even though it will match nothing
 
     # No resolver (no gene_info cache) → pass-through, nothing flagged.
     passthrough, aliases, missing = resolve_panel_genes({"MYCL1"}, None)
     assert passthrough == {"MYCL1"} and not aliases and not missing
+
+
+def test_curated_panel_symbol_fixes_recover_the_ocr_damaged_genes():
+    """An OCR-damaged panel symbol resolves to its real gene and is reported as a remap.
+
+    The Gen-I `just_cancer` gene list was scanned from print and carries one substitution class —
+    `B`↔`8`, `5`↔`S`, `D`↔`O`, plus one transposition. Left unresolved the panel never asked ClinVar
+    for those genes at all: 833 pathogenic/likely-pathogenic records at ≥1★ across the 13, ARID1B (526)
+    and KDM5C (175) the largest, with RAD51 and SF3B1 among them. Every entry was verified both ways —
+    the authored spelling resolves to nothing in NCBI `gene_info`, the corrected one to itself.
+    """
+    from just_dna_pipelines.v1_port.symbols import (
+        _CURATED_PANEL_SYMBOL_FIXES,
+        SymbolResolver,
+        resolve_panel_genes,
+    )
+
+    # A resolver that knows the real symbols but none of the damaged spellings, so a pass only happens
+    # through the curated table.
+    resolver = SymbolResolver(
+        official=set(_CURATED_PANEL_SYMBOL_FIXES.values()), synonym_to_official={}
+    )
+    wanted, alias_map, unresolved = resolve_panel_genes(
+        set(_CURATED_PANEL_SYMBOL_FIXES), resolver
+    )
+    assert unresolved == [], "a curated typo must not be reported as unresolvable"
+    assert alias_map == _CURATED_PANEL_SYMBOL_FIXES, "each remap must be reported, not silent"
+    assert set(_CURATED_PANEL_SYMBOL_FIXES.values()).issubset(wanted)
+    # The specific genes whose absence mattered most.
+    for gene in ("ARID1B", "KDM5C", "RAD51", "SF3B1", "AKT1", "CD79B"):
+        assert gene in wanted, gene
 
 
 def test_superhuman_multiallelic_locus_with_no_source_allele_emits_nothing():

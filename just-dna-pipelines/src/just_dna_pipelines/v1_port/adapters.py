@@ -24,6 +24,10 @@ from just_dna_format.normalize import parse_p_value
 
 from just_dna_pipelines.module_compiler.models import RSID_PATTERN
 from just_dna_pipelines.v1_port.alleles import lookup_alleles
+from just_dna_pipelines.v1_port.curation import (
+    apply_study_corrections,
+    apply_variant_corrections,
+)
 from just_dna_pipelines.v1_port.clinvar import (
     CLINVAR_RESOURCE_PMID,
     MAX_ALLELE_LEN,
@@ -90,10 +94,37 @@ def _valid_rsid(raw: object) -> Optional[str]:
     return rsid if RSID_PATTERN.match(rsid) else None
 
 
+def _cyrillic_count(text: str) -> int:
+    return sum(1 for ch in text if "Ѐ" <= ch <= "ӿ")
+
+
+def _demojibake(text: str) -> str:
+    """Undo UTF-8 text that was read as cp1251, where that reading is demonstrably what happened.
+
+    Gen-I curation carries 12 coronary rows of it: ``monocyteвЂђendothelial`` is ``monocyte‐endothelial``
+    (U+2010), ``TGF-ОІ`` is ``TGF-β``, ``adiponectinвЂ™s`` is ``adiponectin’s``. This is an *encoding*
+    repair, not a content one — the bytes already say the right thing and were decoded with the wrong
+    codec — so it does not cross report-never-repair.
+
+    Guarded so it cannot damage legitimate text. The round-trip must succeed, and it must **reduce** the
+    number of Cyrillic-block characters: mojibake is Latin text wearing Cyrillic, so undoing it always
+    removes some, while genuine Cyrillic prose either fails to re-encode or would not lose any. ASCII
+    round-trips unchanged, so the common case is a no-op. thrombophilia's real Cyrillic-ES homoglyph in
+    an allele cell fails the encode and is correctly left alone for a curator to decide on.
+    """
+    if not _cyrillic_count(text):
+        return text
+    try:
+        decoded = text.encode("cp1251").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+    return decoded if _cyrillic_count(decoded) < _cyrillic_count(text) else text
+
+
 def _clean_str(raw: object) -> Optional[str]:
     if raw is None:
         return None
-    text = str(raw).strip()
+    text = _demojibake(str(raw).strip())
     return text or None
 
 
@@ -959,4 +990,11 @@ def run_adapter(
     module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
 ) -> AdapterResult:
     spec, variants, studies, warnings = ADAPTERS[module.adapter](module, db, ensembl_cache)
-    return spec, normalize_genes(variants, warnings), studies, warnings
+    variants = normalize_genes(variants, warnings)
+    # Curated corrections come last, so they act on the rows as finally authored and a reason is
+    # recorded for each. They are the only place this port changes a *fact* the source states — the
+    # adapters transcribe, `normalize_genes` reconciles a symbol to HGNC, and anything that needs a
+    # judgement about the science lives in `data/curation/` with its evidence. See curation.py.
+    variants = apply_variant_corrections(module.name, variants, warnings)
+    studies = apply_study_corrections(module.name, studies, warnings)
+    return spec, variants, studies, warnings

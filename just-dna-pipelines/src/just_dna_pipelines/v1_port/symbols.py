@@ -62,6 +62,39 @@ def load_symbol_resolver(gene_info_path: Path = DEFAULT_GENE_INFO) -> Optional[S
     return SymbolResolver(official, synonym_to_official)
 
 
+#: Curation decisions on the Gen-I panel gene lists, not guesses. Every entry is a **systematic
+#: single-class OCR substitution** of a real, well-annotated cancer-predisposition gene — `B`↔`8`,
+#: `5`↔`S`, `D`↔`O`, plus one letter transposition (`ATK1`/`AKT1`) — in a list that reads as scanned
+#: from a printed panel. Each was verified two ways before being written here: the authored spelling
+#: resolves to **nothing** in NCBI `gene_info` (neither a current symbol nor any known synonym), and
+#: the corrected spelling resolves to itself as a current symbol.
+#:
+#: Left unresolved, these are not merely cosmetic. `resolve_panel_genes` correctly reports rather than
+#: guesses, so the panel simply never asked ClinVar for them: **708 pathogenic/likely-pathogenic
+#: records at ≥1★ are absent from `cancer` because of these 13 strings**, 526 of them ARID1B and 175
+#: KDM5C, and RAD51 and SF3B1 among the rest. That is the highest-consequence failure mode in this
+#: corpus — a cancer panel silently missing a gene reads exactly like a gene with no pathogenic variant.
+#:
+#: This is the panel-route counterpart of `adapters._CURATED_SYMBOL_FIXES`, which does the same job for
+#: the curated modules' per-variant `gene` cells. Anything less certain than these belongs in
+#: `unresolved` and stays reported.
+_CURATED_PANEL_SYMBOL_FIXES: dict[str, str] = {
+    "ARID18": "ARID1B",   # B -> 8
+    "ATK1": "AKT1",       # KT transposed
+    "CD798": "CD79B",     # B -> 8
+    "CDKN18": "CDKN1B",   # B -> 8
+    "CDKN28": "CDKN2B",   # B -> 8
+    "EPHAS": "EPHA5",     # 5 -> S
+    "ETVS": "ETV5",       # 5 -> S
+    "HSO381": "HSD3B1",   # D -> O, B -> 8
+    "INPP48": "INPP4B",   # B -> 8
+    "KDMSC": "KDM5C",     # 5 -> S
+    "LRP18": "LRP1B",     # B -> 8
+    "RADS1": "RAD51",     # 5 -> S
+    "SF381": "SF3B1",     # B -> 8
+}
+
+
 def resolve_panel_genes(
     genes: set[str], resolver: Optional[SymbolResolver]
 ) -> tuple[set[str], dict[str, str], list[str]]:
@@ -71,6 +104,9 @@ def resolve_panel_genes(
     (originals plus resolved current symbols), ``alias_map`` records ``old -> current`` remaps, and
     ``unresolved`` lists symbols that are neither current nor a known synonym (likely typos). Without
     a resolver, everything passes through unchanged and ``unresolved`` is empty.
+
+    ``_CURATED_PANEL_SYMBOL_FIXES`` is consulted first and its remaps appear in ``alias_map`` like any
+    other, so a build states them. They are recorded corrections to the source list, not inferences.
     """
     if resolver is None:
         return set(genes), {}, []
@@ -81,7 +117,7 @@ def resolve_panel_genes(
         g = gene.strip().upper()
         if not g:
             continue
-        current = resolver.current(g)
+        current = _CURATED_PANEL_SYMBOL_FIXES.get(g) or resolver.current(g)
         if current is None:
             unresolved.append(g)
             wanted.add(g)  # keep it anyway; it simply won't match ClinVar

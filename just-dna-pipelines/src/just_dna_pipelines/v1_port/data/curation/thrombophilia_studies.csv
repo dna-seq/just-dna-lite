@@ -1,0 +1,2 @@
+rsid,pmid,field,new_value,reason
+rs2519093,21463476,p_value,8.08E-16,"the authored cell read 8,08E10-16, which parse_p_value refuses; the population text on the same row quotes the paper verbatim as p-value=8.08x10-16, so E10-16 is a transcription slip for E-16"
