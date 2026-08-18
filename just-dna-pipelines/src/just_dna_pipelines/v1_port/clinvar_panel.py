@@ -48,7 +48,7 @@ from just_dna_enricher.locations import resolve_clinvar_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
-from just_dna_pipelines.v1_port.sources import display_meta
+from just_dna_pipelines.v1_port.sources import REGISTRY, display_meta
 
 #: Review-status floor for every ClinVar module here. 1 = "criteria provided, single submitter" —
 #: it drops only the 0★ submissions that assert no criteria at all. The enricher's own default is 2
@@ -86,6 +86,12 @@ class PanelBuild(BaseModel):
 
     name: str
     output_dir: Path
+    # The thresholds this build actually ran with, not the module defaults. The log is the module's
+    # provenance record and is hashed into `manifest.logs`, so it has to state what was used: it
+    # reported the constants, and a caller overriding either got a log that quietly disagreed with
+    # its own artifact.
+    min_review_stars: int = MIN_REVIEW_STARS
+    max_citations: int = MAX_CITATIONS
     genes_requested: int = 0
     genes_matched: int = 0
     clinvar_records: int = 0
@@ -154,6 +160,55 @@ def _allele_index(records: Iterable[dict], ambiguous: set[str]) -> dict[tuple, t
             key = ("coord", str(record.get("chrom") or ""), str(record.get("start") or ""), ref, alt)
             index.setdefault(key, (ref, alt))
     return index
+
+
+def _identity_collapse_note(records: Iterable[dict]) -> Optional[str]:
+    """Report rsIDs whose distinct ClinVar alleles collapse onto one authored row, and are lost.
+
+    ``multi_allelic_rsids`` keys a site as ``(rsid, chrom, start, ref)`` — **`ref` is in the key** —
+    so it flags an rsID naming two alts against one reference, but *not* one whose records differ in
+    the reference itself. That is the ordinary ClinVar dup/del pair (``A>AT`` and ``ATT>A`` at one
+    position): two sites of one alt each, neither flagged, both reduced to the same rsid signature,
+    and ``append_partial_rows`` keeps whichever the selection ordered first.
+
+    Measured on cancer: **1,619 records dropped across 1,481 rsIDs, of which 483 allele events exist
+    nowhere else in the artifact — 454 pathogenic and 29 likely-pathogenic, 108 of them 3★ expert
+    panel, across 63 genes including BRCA1, BRCA2, ATM, MLH1 and MSH2.** And the survivor is not the
+    better-evidenced one: ``ref`` sorts before ``review_stars DESC`` in the selection, so the kept row
+    is the *lower*-starred one in 400 of the 1,481 collapses. rs80359609 keeps a 1★ ``A>AT`` and drops
+    the 3★ BRCA2 ``ATT>A``.
+
+    This cannot be repaired here — ``draft_gene_panel`` re-queries the snapshot itself, so the records
+    are gone before anything local sees the drafted rows, and ``_allele_index``/``_row_key`` key on
+    the same collapsed identity. The fix belongs upstream (drop ``ref`` from the site key). Until then
+    a build says how much it lost instead of shipping the loss silently.
+    """
+    alleles_by_rsid: dict[str, set[tuple]] = {}
+    for record in records:
+        rsid = (record.get("rsid") or "").strip()
+        if not rsid:
+            continue
+        alleles_by_rsid.setdefault(rsid, set()).add((
+            str(record.get("chrom") or ""),
+            str(record.get("start") or ""),
+            (record.get("ref") or "").strip(),
+            (record.get("alt") or "").strip(),
+        ))
+    collapsing = {r: a for r, a in alleles_by_rsid.items() if len(a) > 1}
+    if not collapsing:
+        return None
+    # What the enricher already protects: more than one alt against a single reference.
+    protected = multi_allelic_rsids(list(records))
+    unprotected = {r: a for r, a in collapsing.items() if r not in protected}
+    if not unprotected:
+        return None
+    lost = sum(len(a) - 1 for a in unprotected.values())
+    sample = ", ".join(sorted(unprotected)[:5])
+    return (
+        f"{len(unprotected)} rsID(s) name distinct ClinVar alleles that differ in reference allele "
+        f"and are not flagged multi-allelic, so ~{lost} record(s) collapse onto one authored row and "
+        f"are dropped (upstream: multi_allelic_rsids keys `ref` into the site). e.g. {sample}"
+    )
 
 
 def _row_key(row: dict) -> Optional[tuple]:
@@ -290,7 +345,14 @@ def draft_studies(
         else:
             dropped += max(0, len(pmids) - max_citations)
         for pmid in pmids[:max_citations] if max_citations else pmids[:1]:
-            key = (identity["rsid"], identity["chrom"], identity["start"], pmid)
+            # `ref` belongs in the key because `identity` carries it: two coordinate-authored
+            # variants at one position differing only in reference allele (the ClinVar dup/del pair)
+            # otherwise collide, and only the first keeps its citation. Measured on cancer: 135
+            # identities / 272 authored rows ship with no citation at all — e.g. `5:112818991:CAA>C`
+            # (APC, pathogenic), whose position's only study row is keyed `ref="C"`.
+            key = (
+                identity["rsid"], identity["chrom"], identity["start"], identity["ref"], pmid,
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -338,7 +400,19 @@ def _module_spec_yaml(
             "report_title": meta["report_title"],
             "icon": meta["icon"],
             "color": meta["color"],
-            "version": "1.0.0",
+            # From docs/V1_PARITY.md's "Republish as" column, via the registry, rather than a literal:
+            # the panels were rebuilt on the 0.5 snapshot route and republish as 2.0.0, so a
+            # hardcoded 1.0.0 published a major rebuild under the version of the route it replaced.
+            "version": REGISTRY[name].version,
+        },
+        # Without this the compiler substitutes the format's own placeholder defaults, and every row
+        # of a mechanically-drafted panel asserted `curator: ai-module-creator` and
+        # `method: literature-review` — 115,060 false claims on cardio alone. Nothing here was
+        # literature-reviewed; it is an aggregation of a ClinVar snapshot, and it should say so.
+        # Both fields are free text, so no vocabulary blocks the honest value.
+        "defaults": {
+            "curator": "just-dna-seq",
+            "method": "clinvar-aggregate",
         },
         # Spelled exactly as the ClinVar SourceRow spells it, so the compiler's licence cross-check
         # sees a matching pair. `CC0-1.0` is the same grant in substance and still trips the check.
@@ -432,6 +506,7 @@ def build_clinvar_module(
     records = select_by_gene(
         snapshot, genes, clin_sig=PANEL_CLIN_SIG, min_review_stars=min_review_stars
     )
+    collapse_note = _identity_collapse_note(records)
     release = snapshot_release(snapshot)
     (out_dir / "module_spec.yaml").write_text(
         _module_spec_yaml(name, genes, release, len(records)), encoding="utf-8"
@@ -455,6 +530,8 @@ def build_clinvar_module(
     build = PanelBuild(
         name=name,
         output_dir=out_dir,
+        min_review_stars=min_review_stars,
+        max_citations=max_citations,
         genes_requested=len(genes),
         genes_matched=len({(r.get("gene") or "") for r in records} - {""}),
         clinvar_records=len(records),
@@ -474,7 +551,8 @@ def build_clinvar_module(
             and "unreplaced genotype placeholder" not in w
             and "--max-citations 0" not in w
         ]
-        + study_notes,
+        + study_notes
+        + ([collapse_note] if collapse_note else []),
     )
     _write_log(out_dir, build, release, snapshot)
     return build
@@ -490,8 +568,8 @@ def _write_log(out_dir: Path, build: PanelBuild, release: dict[str, object], sna
         "citations_source_sha256: sha256:"
         + str((release.get("citations") or {}).get("source_sha256", "?")),
         f"clin_sig: {', '.join(sorted(PANEL_CLIN_SIG))}",
-        f"min_review_stars: {MIN_REVIEW_STARS}",
-        f"max_citations: {MAX_CITATIONS}",
+        f"min_review_stars: {build.min_review_stars}",
+        f"max_citations: {build.max_citations}",
         f"genes_requested: {build.genes_requested}",
         f"genes_matched: {build.genes_matched}",
         f"clinvar_records: {build.clinvar_records}",

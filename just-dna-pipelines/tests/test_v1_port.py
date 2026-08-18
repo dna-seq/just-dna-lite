@@ -298,20 +298,40 @@ def test_symbol_resolver_maps_aliases_and_flags_typos():
     assert passthrough == {"MYCL1"} and not aliases and not missing
 
 
-def test_superhuman_genotypes_cover_every_multiallelic_alt():
-    """Regression: a named protective variant with empty source alleles must emit a genotype for
-    EVERY single-base Ensembl alt, not just the first — else a carrier whose real allele is a later
-    alt (e.g. ANGPTL3 rs1168015 C>G where Ensembl lists C -> A|G|T) never matches (v1->v2 0-results
-    bug, 2026-07)."""
+def test_superhuman_multiallelic_locus_with_no_source_allele_emits_nothing():
+    """A source row naming no allele at a multi-allelic locus yields NO genotype.
+
+    This inverts an earlier regression test, and the reason it was written is real, so it is worth
+    stating rather than deleting. That test fixed a *0-results* bug (2026-07): a carrier whose real
+    allele was a later Ensembl alt matched nothing, so the adapter began emitting het+hom for every
+    single-base alt. The cure was worse. Ensembl lists every observed alt at a position, so fanning
+    out asserts the module's protective conclusion once per alt, and the module names only one of
+    them. Measured on the shipped artifact: 31 rsIDs produced 95 of 190 rows, **54 of which name an
+    allele nothing in the provenance chain ever stated**.
+
+    `HBB rs334` is the case that settles the trade. Fanned out, the module asserted `A/T`, `C/T` and
+    `G/T` all as "Malaria resistance". Only `T>A` is HbS. `T>C` is HbC, which the module's own
+    citation (PMID 35811813) reports as **not** protective in that cohort (p=0.26), and `T>G` is
+    Hb-Makassar, a benign non-sickling variant. A missed carrier is a report that says nothing; a
+    fabricated one is a report that tells a person something false about their malaria risk.
+
+    So the miss is accepted and reported by name, and the durable fix is curation — naming the
+    protective allele for those rsIDs, the way the `added` entries already do.
+    """
     row = {"rsid": "rs1168015", "genotype": None, "ref_allele": None,
            "alt_allele": None, "zygosity": "both"}
-    gts = _superhuman_genotypes(row, ("C", "A|G|T"))
-    # the carrier is G/G in the VCF; that genotype must be present
-    assert "G/G" in gts, gts
-    # every single-base alt gets both a het and a hom pairing with the reference
-    for alt in ("A", "G", "T"):
-        assert "/".join(sorted(["C", alt])) in gts, (alt, gts)
-        assert f"{alt}/{alt}" in gts, (alt, gts)
+    assert _superhuman_genotypes(row, ("C", "A|G|T")) == []
+
+
+def test_superhuman_single_alt_locus_is_still_reconstructed():
+    """One alt at the locus is unambiguous, so reconstruction is safe and must still happen.
+
+    The withholding above is scoped to genuine ambiguity. Where Ensembl names a single alt there is
+    nothing to guess, and dropping these too would discard the reconstruction the adapter exists for.
+    """
+    row = {"rsid": "rsX", "genotype": None, "ref_allele": None,
+           "alt_allele": None, "zygosity": "both"}
+    assert sorted(_superhuman_genotypes(row, ("C", "T"))) == ["C/T", "T/T"]
 
 
 def test_superhuman_genotypes_hom_only_and_source_alleles():

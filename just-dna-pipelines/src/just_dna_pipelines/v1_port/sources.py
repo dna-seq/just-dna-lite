@@ -29,6 +29,13 @@ class V1Module(BaseModel):
     repo: str = Field(description="GitHub repo in the dna-seq org, e.g. just_coronary")
     data_path: str = Field(description="Path to the data file inside the repo")
     adapter: AdapterKind = Field(description="Which adapter reads this module's SQLite shape")
+    version: str = Field(
+        description="SemVer to author into `module_spec.yaml`, from docs/V1_PARITY.md's "
+        "'Republish as' column — the authoritative table for what each port publishes as. "
+        "A **string**: an unquoted decimal in YAML is refused outright (1.10 reads as 1.1), and "
+        "leaving it unset authored `version: null` on all six curated ports, which the registry "
+        "cannot stamp and the report renders as *Not stated*."
+    )
     has_studies_table: bool = Field(
         default=False, description="three_table modules: whether a dedicated studies table exists"
     )
@@ -43,43 +50,43 @@ class V1Module(BaseModel):
 # rather than registered here — they don't carry per-variant curated weights.
 REGISTRY: dict[str, V1Module] = {
     "coronary": V1Module(
-        name="coronary", repo="just_coronary", data_path="data/coronary.sqlite", adapter="coronary"
+        name="coronary", version="1.1.0", repo="just_coronary", data_path="data/coronary.sqlite", adapter="coronary"
     ),
     "thrombophilia": V1Module(
-        name="thrombophilia", repo="just_thrombophilia",
+        name="thrombophilia", version="1.1.0", repo="just_thrombophilia",
         data_path="data/thrombophilia.sqlite", adapter="three_table", has_studies_table=True,
     ),
     "lipidmetabolism": V1Module(
-        name="lipidmetabolism", repo="just_lipidmetabolism",
+        name="lipidmetabolism", version="1.1.0", repo="just_lipidmetabolism",
         data_path="data/lipid_metabolism.sqlite", adapter="three_table", has_studies_table=True,
     ),
     "vo2max": V1Module(
-        name="vo2max", repo="just_vo2max",
+        name="vo2max", version="1.1.0", repo="just_vo2max",
         data_path="data/vo2max.sqlite", adapter="three_table", has_studies_table=False,
     ),
     "longevitymap": V1Module(
-        name="longevitymap", repo="just_longevitymap",
+        name="longevitymap", version="1.2.0", repo="just_longevitymap",
         data_path="data/longevitymap.sqlite", adapter="longevitymap",
     ),
     "superhuman": V1Module(
-        name="superhuman", repo="just_superhuman",
+        name="superhuman", version="2.4.0", repo="just_superhuman",
         data_path="data/superhuman.sqlite", adapter="superhuman",
     ),
     # Gene panels: authored source is just a gene list; ClinVar supplies the pathogenic variants.
     # Require the local ClinVar VCF (see clinvar.py DEFAULT_CLINVAR_VCF); skip cleanly if absent.
     "cardio": V1Module(
-        name="cardio", repo="just_cardio", data_path="data/genes.txt",
+        name="cardio", version="2.0.0", repo="just_cardio", data_path="data/genes.txt",
         adapter="gene_panel", needs_ensembl=False,
     ),
     "cancer": V1Module(
-        name="cancer", repo="just_cancer", data_path="data/genes.txt",
+        name="cancer", version="2.0.0", repo="just_cancer", data_path="data/genes.txt",
         adapter="gene_panel", needs_ensembl=False,
     ),
     # pathogenic has no gene list (just_pathogenic ships no data) — it's a genome-wide ClinVar
     # pathogenicity flag. Empty data_path → runner skips the fetch and the adapter keeps every
     # pathogenic variant. This resolves the "no gene list" blocker by deriving it from ClinVar.
     "pathogenic": V1Module(
-        name="pathogenic", repo="just_pathogenic", data_path="",
+        name="pathogenic", version="2.0.0", repo="just_pathogenic", data_path="",
         adapter="gene_panel", needs_ensembl=False,
     ),
 }

@@ -135,6 +135,15 @@ def port_module(
         if pruned:
             # `write_spec_dir` ran before resolution, so the provenance log predates these drops.
             # Append rather than rewrite: the log is what travels with the module.
+            #
+            # The header's own counts are corrected in place, not just annotated. They are written
+            # from the pre-resolution adapter output, so a pruned module shipped a log attesting
+            # numbers that were never true of its files — thrombophilia said `variant_rows: 25` /
+            # `study_rows: 29` against a 24-row and 27-row artifact, lipidmetabolism `study_rows: 43`
+            # against 41. The log is hashed into `manifest.logs` and travels with the module, so a
+            # consumer reading provenance saw a count that contradicted the parquet beside it.
+            _restate_log_counts(out_dir / "v1_port.log", variants_csv=out_dir / "variants.csv",
+                                studies_csv=out_dir / "studies.csv")
             with (out_dir / "v1_port.log").open("a", encoding="utf-8") as handle:
                 handle.write("post-resolution pruning:\n")
                 handle.writelines(f"  - {line}\n" for line in pruned)
@@ -148,6 +157,18 @@ def port_module(
 
     if do_literature and not offline:
         # Online only, and once written the file *is* the pin — later compiles read it offline.
+        #
+        # Delete first, for the same reason `resolution.csv` is deleted above: `enrich_literature`
+        # merges rather than clobbers, so a row written by an earlier run survives every later one.
+        # Measured on longevitymap — `literature.csv` holds 162 PMIDs, the distinct set of the
+        # *pre-prune* 3,102-row studies table, so 36 of them are cited by nothing in the shipped
+        # module and `manifest.literature.row_count` describes citations it does not make. Worse,
+        # merge-not-clobber cannot back-fill 0.6's five new `LiteratureRow` columns (`license`,
+        # `share_alike`, `commercial_use`, `redistribution`, `doi_checked` — RM46 article terms), so
+        # while the file survives, no rebuild can ever populate them. Guarded by `not offline`
+        # because offline the existing file is the only pin there is; deleting it there would
+        # discard the citations with nothing able to re-fetch them.
+        (out_dir / "literature.csv").unlink(missing_ok=True)
         literature = enrich_literature(out_dir, offline=False)
         result.literature_rows = len(literature.rows)
         if literature.missing:
@@ -176,6 +197,32 @@ def port_module(
         result.warnings.extend(compiled.warnings)
 
     return result
+
+
+def _csv_row_count(path: Path) -> Optional[int]:
+    """Data rows in a CSV (header excluded), or None if it is not there."""
+    if not path.exists():
+        return None
+    with path.open(newline="", encoding="utf-8") as handle:
+        return sum(1 for _ in csv.DictReader(handle))
+
+
+def _restate_log_counts(log: Path, *, variants_csv: Path, studies_csv: Path) -> None:
+    """Rewrite the log's `variant_rows:` / `study_rows:` lines to what the CSVs now hold.
+
+    Called after pruning so the provenance record describes the files it ships beside, rather than
+    the adapter output that preceded them. Leaves every other line untouched.
+    """
+    if not log.exists():
+        return
+    counts = {"variant_rows": _csv_row_count(variants_csv), "study_rows": _csv_row_count(studies_csv)}
+    lines = log.read_text(encoding="utf-8").splitlines()
+    out: list[str] = []
+    for line in lines:
+        key = line.split(":", 1)[0].strip()
+        value = counts.get(key)
+        out.append(f"{key}: {value}" if value is not None and ":" in line else line)
+    log.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 def prune_unmatchable_rows(spec_dir: Path) -> list[str]:
@@ -218,16 +265,41 @@ def prune_unmatchable_rows(spec_dir: Path) -> list[str]:
 
     kept: list[dict] = []
     dropped: list[str] = []
+    authored_rsids: set[str] = set()
+    unplaced: set[str] = set()
     for row in rows:
         rsid = (row.get("rsid") or "").strip()
         locus = alleles_at.get(rsid)
         genotype = {a for a in (row.get("genotype") or "").split("/") if a}
+        if rsid:
+            authored_rsids.add(rsid)
+            # An rsID the resolver could not place has an *empty* allele set, so the `locus` test
+            # below is falsy and every one of its rows is exempted — the rows least able to match a
+            # VCF get a free pass, while a row at a placed locus is dropped for the same defect. Not
+            # dropped here (some are a recoverable strand flip and repairing them is curation, not a
+            # rewrite this port may make), but no longer silent either.
+            if not locus:
+                unplaced.add(rsid)
         if rsid and locus and genotype and not genotype <= locus:
             dropped.append(f"{rsid} {row.get('genotype')} (locus has {'/'.join(sorted(locus))})")
             continue
         kept.append(row)
 
     report: list[str] = []
+    vanished = sorted(authored_rsids - {(r.get("rsid") or "").strip() for r in kept})
+    if vanished:
+        # The material event a per-row list cannot state: the module stops mentioning a variant at
+        # all. thrombophilia's rs8176719 (ABO) is the case — the best-established common risk factor
+        # for venous thromboembolism, dropped to nothing with `dropped 1 row(s)` as its only trace.
+        report.append(
+            f"{len(vanished)} rsID(s) lost every row and are absent from the module entirely: "
+            f"{', '.join(vanished)}"
+        )
+    if unplaced:
+        report.append(
+            f"{len(unplaced)} rsID(s) have no resolved locus, so their rows were not allele-checked "
+            f"and can never match a VCF: {', '.join(sorted(unplaced))}"
+        )
     if dropped:
         with variants_csv.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames)

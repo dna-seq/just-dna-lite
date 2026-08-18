@@ -20,6 +20,8 @@ from just_dna_pipelines.module_compiler.models import (
     StudyRow,
     VariantRow,
 )
+from just_dna_format.normalize import parse_p_value
+
 from just_dna_pipelines.module_compiler.models import RSID_PATTERN
 from just_dna_pipelines.v1_port.alleles import lookup_alleles
 from just_dna_pipelines.v1_port.clinvar import (
@@ -95,10 +97,66 @@ def _clean_str(raw: object) -> Optional[str]:
     return text or None
 
 
+#: Typographic dashes Gen-I curation used inside *numeric literals*: U+2212 MINUS SIGN, EN DASH,
+#: EM DASH. Folded to ASCII ``-`` only in the numeric-cell path below — never in prose, where a dash
+#: is a dash and rewriting it would change a `conclusion` the curator wrote.
+_UNICODE_DASHES = str.maketrans({"−": "-", "–": "-", "—": "-"})
+
+
+def _numeric_str(raw: object) -> Optional[str]:
+    """A cell that is meant to *be* a number, with its dash normalized to ASCII.
+
+    ``just_dna_format.normalize.parse_p_value`` reads ``8.68E−6`` (U+2212) as unparseable and returns
+    ``None`` — measured on three vo2max ``p_value`` cells, which is why their ``p_value_num`` was null
+    while the string looked perfectly fine to a reader. Normalizing how a number is *spelled* is not
+    repairing a fact: the value is untouched, only its encoding, so this stays on the right side of
+    report-never-repair. Applied to `p_value`, not to `conclusion`.
+    """
+    text = _clean_str(raw)
+    return text.translate(_UNICODE_DASHES) if text else None
+
+
+#: LongevityMap's `variant.association` column is a significance *verdict*, not a p-value: its only
+#: values are "significant" and "non-significant". It was written into `p_value`, which is documented
+#: as the raw p-value string — so all 671 study rows carried a word where a number belongs, and
+#: `stat_significance`, the standard axis a consumer reads, was empty on every one of them. Mapped
+#: onto `VALID_SIGNIFICANCE` here instead. Anything unrecognised returns None rather than "unknown":
+#: `unknown` is a verdict the source did not give, and an empty cell is the honest reading.
+_SIGNIFICANCE_BY_ASSOCIATION = {
+    "significant": "significant",
+    "non-significant": "not_significant",
+}
+
+
+def _significance(raw: object) -> Optional[str]:
+    """LongevityMap's ``association`` verdict as a ``VALID_SIGNIFICANCE`` member, else ``None``."""
+    text = _clean_str(raw)
+    return _SIGNIFICANCE_BY_ASSOCIATION.get(text.lower()) if text else None
+
+
+def _p_value_pair(raw: object) -> tuple[Optional[str], Optional[float]]:
+    """``(authored spelling, typed value)`` for a p-value cell.
+
+    ``p_value_num`` is **authored**, never derived by the compiler, so a port that fills only the free
+    -form string leaves `p_value_num` and `neg_log10_p` null on every row and the module cannot sort or
+    threshold its own evidence. Gen-I wrote European decimal commas (``3,00E-11``), which
+    ``parse_p_value`` also refuses, so the comma is folded here too.
+
+    Returns ``None`` for the typed half whenever the cell is not a single number — a compound cell
+    like ``'[PMID:24097068]:5E-13; [PMID: 26690388]: 9E-8'`` states two p-values for two papers and
+    picking one would invent an attribution. An unparseable cell keeps its authored spelling and
+    leaves the typed column empty, which is the honest reading.
+    """
+    text = _numeric_str(raw)
+    if text is None:
+        return None, None
+    return text, parse_p_value(text.replace(",", "."))
+
+
 def _build_spec(module: V1Module) -> ModuleSpecConfig:
     meta = display_meta(module.name)
     return ModuleSpecConfig(
-        module=ModuleInfo(name=module.name, **meta),
+        module=ModuleInfo(name=module.name, version=module.version, **meta),
         defaults=Defaults(curator=_CURATOR, method=_METHOD, priority=None),
         genome_build="GRCh38",
     )
@@ -133,6 +191,7 @@ def adapt_coronary(
     study_seen: set[tuple[str, str]] = set()
     studies: list[StudyRow] = []
     skipped = 0
+    unattributed_p = 0
 
     for row in _rows(db, "coronary_disease"):
         rsid = _valid_rsid(row.get("rsid"))
@@ -151,19 +210,29 @@ def adapt_coronary(
             gene=_clean_str(row.get("gene")),
         ))
         population = _clean_str(row.get("population"))
-        p_value = _clean_str(row.get("p_value"))
         study_design = _clean_str(row.get("studydesign") or row.get("gwas_study_design"))
-        for pmid in normalize_pmids(row.get("pmid")):
-            if (rsid, pmid) in study_seen:
-                continue
+        pmids = [p for p in normalize_pmids(row.get("pmid")) if (rsid, p) not in study_seen]
+        # One source row states a single p-value beside a list of papers; copying it onto each row
+        # asserts every one of them reported that figure. Measured: rs1333049 emits 10 study rows and
+        # 81 of 108 rows' p_value text does not cite their own pmid. Attributed only where the row
+        # cites exactly one paper — see `_three_table_studies` for the same rule and its reasoning.
+        p_value, p_value_num = _p_value_pair(row.get("p_value")) if len(pmids) == 1 else (None, None)
+        if len(pmids) > 1 and _clean_str(row.get("p_value")):
+            unattributed_p += 1
+        for pmid in pmids:
             study_seen.add((rsid, pmid))
             studies.append(StudyRow(
                 rsid=rsid, pmid=pmid, population=population,
-                p_value=p_value, study_design=study_design,
+                p_value=p_value, p_value_num=p_value_num, study_design=study_design,
             ))
 
     if skipped:
         warnings.append(f"skipped {skipped} row(s) with invalid rsid/genotype/conclusion")
+    if unattributed_p:
+        warnings.append(
+            f"{unattributed_p} row(s) state one p-value beside several papers — left unattributed "
+            f"rather than copied onto each (it would assert a figure those papers did not report)"
+        )
     return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
 
 
@@ -198,12 +267,21 @@ def adapt_three_table(
 
     variants: list[VariantRow] = []
     skipped = 0
+    # Which rsIDs the source weights, and which of them survived. An rsID losing *every* row is a
+    # different event from losing one: the module stops mentioning a variant at all, and a bare
+    # "skipped N rows" count cannot say so. Measured on thrombophilia: rs8176719 (ABO) vanished
+    # entirely and the only trace was `skipped 4 weight row(s)`.
+    source_rsids: set[str] = set()
+    kept_rsids: set[str] = set()
     for row in _rows(db, weight_table):
         rsid = _valid_rsid(row.get("rsid"))
         genotype = to_slash_genotype(row.get("genotype"))
+        if rsid is not None:
+            source_rsids.add(rsid)
         if rsid is None or genotype is None:
             skipped += 1
             continue
+        kept_rsids.add(rsid)
         weight = _parse_weight(row.get("weight"))
         meta = rsid_meta.get(rsid, {})
         conclusion = (
@@ -222,6 +300,17 @@ def adapt_three_table(
 
     if skipped:
         warnings.append(f"skipped {skipped} weight row(s) with invalid rsid/genotype")
+    vanished = sorted(source_rsids - kept_rsids)
+    if vanished:
+        # Named, not counted: this is the module silently ceasing to mention a variant. thrombophilia's
+        # rs8176719 is the ABO blood-group determinant — the best-established common risk factor for
+        # venous thromboembolism — and it disappears because its source cells are unparseable rather
+        # than because anyone decided it should go. Reported, never guessed at (its `ref` is `-` and its
+        # `alt` is a Cyrillic homoglyph of `C`, neither of which this adapter may silently reinterpret).
+        warnings.append(
+            f"{len(vanished)} rsID(s) lost every weight row and are absent from the module entirely: "
+            f"{', '.join(vanished)}"
+        )
 
     studies = _three_table_studies(db, studies_table, rsid_meta, warnings)
     return _build_spec(module), _dedup_variants(variants, warnings), studies, warnings
@@ -238,10 +327,18 @@ def _three_table_studies(
 
     if studies_table is not None:
         # Dedicated studies table with a clean integer pubmed_id.
+        #
+        # The rsID column is spelled `rsid` in thrombophilia and `snp` in lipidmetabolism. Reading
+        # only `rsid` discarded all 43 lipidmetabolism study rows and fell through to the `rsids.pmids`
+        # fallback below, which happens to also yield 43 — so no row count revealed it. What was lost
+        # was per-study fidelity: the fallback carries one variant-level `population`/`p_value`
+        # repeated across every paper of that variant, so 23 of 36 shipped (rsid, pmid) pairs asserted
+        # a p-value the source never stated for that paper, and 7 study records vanished entirely.
         for row in _rows(db, studies_table):
-            rsid = _valid_rsid(row.get("rsid"))
+            rsid = _valid_rsid(row.get("rsid") or row.get("snp"))
             if rsid is None:
                 continue
+            p_value, p_value_num = _p_value_pair(row.get("p_value"))
             for pmid in normalize_pmids(row.get("pubmed_id")):
                 if (rsid, pmid) in seen:
                     continue
@@ -249,22 +346,38 @@ def _three_table_studies(
                 studies.append(StudyRow(
                     rsid=rsid, pmid=pmid,
                     population=_clean_str(row.get("populations") or row.get("population")),
-                    p_value=_clean_str(row.get("p_value")),
+                    p_value=p_value, p_value_num=p_value_num,
                 ))
-        if studies:
-            return studies
 
-    # No studies table (vo2max) or it was empty: fall back to bracketed pmids on the rsids table.
+    # Top up from the bracketed pmids on the rsids table. This is the *only* source for vo2max (which
+    # has no studies table) and it also covers pairs a dedicated table omits — five shipped
+    # lipidmetabolism pairs exist here and nowhere else, so this is a merge and not an either/or. The
+    # `seen` set means a pair the dedicated table already stated keeps its per-study values.
+    unattributable = 0
     for rsid, meta in rsid_meta.items():
         population = _clean_str(meta.get("population"))
-        p_value = _clean_str(meta.get("p_value"))
-        for pmid in normalize_pmids(meta.get("pmids")):
-            if (rsid, pmid) in seen:
-                continue
+        pmids = [p for p in normalize_pmids(meta.get("pmids")) if (rsid, p) not in seen]
+        # The rsids table states ONE p-value per variant beside a LIST of papers, so copying it onto
+        # every row asserts that each paper reported that figure. Measured on vo2max: 12 of 19 study
+        # rows carried a p-value at most one of the two cited papers could have reported, and on
+        # coronary 81 of 108 rows' p_value did not even cite their own pmid. Attribute it only where
+        # the variant cites a single paper; where it cites several the number is real but
+        # unattributable, and the format's own posture on an ambiguous cell is to leave it empty
+        # rather than pick. The authored string is not lost — it stays in the source and in the log.
+        p_value, p_value_num = _p_value_pair(meta.get("p_value")) if len(pmids) == 1 else (None, None)
+        if len(pmids) > 1 and _clean_str(meta.get("p_value")):
+            unattributable += 1
+        for pmid in pmids:
             seen.add((rsid, pmid))
             studies.append(StudyRow(
-                rsid=rsid, pmid=pmid, population=population, p_value=p_value,
+                rsid=rsid, pmid=pmid, population=population,
+                p_value=p_value, p_value_num=p_value_num,
             ))
+    if unattributable:
+        warnings.append(
+            f"{unattributable} variant(s) state one p-value beside several papers — left unattributed "
+            f"rather than copied onto each (it would assert a figure those papers did not report)"
+        )
     return studies
 
 
@@ -392,7 +505,7 @@ def adapt_longevitymap(
             seen.add((rsid, pmid))
             studies.append(StudyRow(
                 rsid=rsid, pmid=pmid, population=population,
-                p_value=_clean_str(r.get("association")),
+                stat_significance=_significance(r.get("association")),
                 conclusion=conclusion, study_design=study_design,
             ))
 
@@ -485,11 +598,22 @@ def _superhuman_genotypes(
     the genotype allele-list must equal what a carrier's VCF would produce: het = sorted(ref, alt),
     hom = alt/alt. Zygosity ``both`` emits both so heterozygous and homozygous carriers each match.
 
-    Ensembl lists **every** observed alt at the position (``C`` -> ``A|G|T``), so we cannot guess
-    which single alt the carrier has — we emit het/hom for **all** single-base alts and let the
-    position+genotype join keep whichever the user actually carries. Extra genotypes match nobody
-    and are harmless. Indel alts (multi-base) are emitted only when no SNV alt exists; note that
-    indel ref/alt representation can differ between Ensembl and the VCF, so indels may still miss."""
+    Ensembl lists **every** observed alt at the position (``C`` -> ``A|G|T``). We cannot guess which
+    one the source meant, and **guessing is not harmless**: this used to emit het/hom for every
+    single-base alt on the reasoning that "extra genotypes match nobody". They match somebody. Each
+    one is a rendered sentence telling a real carrier they have a protective variant.
+
+    Measured on the shipped module: 31 rsIDs carry no source allele at a multi-allelic locus,
+    producing 95 of 190 weight rows, **54 of which name an allele nothing in the provenance chain
+    ever stated**. `HBB rs334` asserted `A/T`, `C/T` and `G/T` all as "Malaria resistance" — only
+    `T>A` is HbS. `T>C` is HbC, which the module's *own* citation (PMID 35811813) reports as **not**
+    protective in that cohort (p=0.26), and `T>G` is Hb-Makassar, a benign non-sickling variant. Two
+    of those three rows were fabricated claims about a person's malaria risk.
+
+    So: a locus with exactly one alt is unambiguous and is reconstructed. A locus with several, where
+    the source named none, yields **nothing** and is reported — the same rule the rest of this port
+    follows for a symbol it cannot resolve. Indel alts (multi-base) are used only when no SNV alt
+    exists; indel ref/alt spelling can differ between Ensembl and the VCF, so those may still miss."""
     gt = to_slash_genotype(row.get("genotype"))
     if gt:  # explicit two-base genotype in the source (e.g. APOA2 'CC', APOE 'TT')
         return [gt]
@@ -503,9 +627,13 @@ def _superhuman_genotypes(
         ref = ref or _norm_allele(rref)
         clean = [a for a in (_norm_allele(t) for t in str(ralt or "").split("|")) if a]
         singles = [a for a in clean if len(a) == 1]
-        alts = singles or clean  # every SNV alt; fall back to indel alts only if no SNV
+        alts = singles or clean  # SNV alts; fall back to indel alts only if no SNV
         if src_alt is not None and src_alt not in alts:
             alts.append(src_alt)
+        # The source named no allele. One alt at the locus is determined; several is a guess, and a
+        # guess here is a fabricated clinical claim (see the docstring's rs334 case).
+        if src_alt is None and len(alts) > 1:
+            return []
     if not alts:
         return []
 
@@ -532,6 +660,7 @@ def adapt_superhuman(
     study_seen: set[tuple[str, str]] = set()
     skipped = 0
     dropped_unnamed = 0
+    ambiguous_allele: set[str] = set()
 
     curation = _load_superhuman_curation()
 
@@ -577,6 +706,7 @@ def adapt_superhuman(
         genotypes = _superhuman_genotypes(row, ref_alt.get(rsid))
         if not genotypes:
             skipped += 1
+            ambiguous_allele.add(rsid)
             continue
         superability = _clean_str(row.get("superability")) or ""
         adverse = _clean_str(row.get("adverse_effects"))
@@ -597,7 +727,14 @@ def adapt_superhuman(
             if (rsid, pmid) in study_seen:
                 continue
             study_seen.add((rsid, pmid))
-            studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=superability or None))
+            # `conclusion`, not `superability`: the curated override is a *correction* of the source
+            # text, and building the study row from the raw string shipped both readings on one page
+            # — the report renders the study conclusion in the per-variant citations table beside the
+            # corrected weights text. Measured: rs5082 (APOA2) read "Low coronary disease" here while
+            # weights carried "…BMI and food intake (not coronary disease; label corrected per
+            # Corella 2007)", and rs324420 (FAAH) likewise. Those are two of the four flag fixes
+            # GAPS.md records as done; half of each landed.
+            studies.append(StudyRow(rsid=rsid, pmid=pmid, conclusion=conclusion or None))
 
     # New additions not present in the source SQLite (refresh genes + curated missing alleles).
     for rsid, entry in curation.added.items():
@@ -618,6 +755,13 @@ def adapt_superhuman(
 
     if skipped:
         warnings.append(f"skipped {skipped} row(s) with invalid rsid/unresolvable genotype")
+    if ambiguous_allele:
+        warnings.append(
+            f"{len(ambiguous_allele)} rsID(s) name no allele in the source and sit at a multi-allelic "
+            f"locus, so which alt is the protective one cannot be established — no genotype emitted "
+            f"rather than one per alt (that fabricated 54 of 190 rows, incl. HBB rs334 asserting HbC "
+            f"and Hb-Makassar as malaria-protective): {', '.join(sorted(ambiguous_allele))}"
+        )
     warnings.append(
         f"narrowed to {len(variants)} curated protective-allele genotype row(s) across the named "
         f"genes (dropped {dropped_unnamed} unnamed dbSNP variant(s)); grounded {len(studies)} study "

@@ -595,7 +595,11 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         "clinvar": row.get("clinvar", False),
         "clin_sig": clin_sig,
         "clin_sig_label": _clin_sig_label(clin_sig),
-        "studies": studies_by_rsid.get(rsid, []),
+        # Keyed by rsID where the row has one, else by coordinate — a coordinate-authored variant's
+        # citations are keyed the same way in `studies.parquet`. See `_study_key`.
+        "studies": studies_by_rsid.get(
+            _study_key(rsid, row.get("chrom"), row.get("start"), row.get("ref")) or rsid, []
+        ),
         # Pharmacogenomics facts, present only on a pharm_variants-led module. Empty strings
         # elsewhere, so the template can show them unconditionally.
         # Whether the caller supplied this genotype or the engine inferred it from the absence of any
@@ -633,18 +637,66 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
     return variant
 
 
+def _study_key(rsid: object, chrom: object, start: object, ref: object) -> Optional[str]:
+    """The key a study row and a variant row are matched on: the rsID, else the coordinate.
+
+    A ``StudyRow`` names its subject the same way a ``VariantRow`` does — by rsID where the module
+    authored one, and by coordinate where it did not (`REQUIRED_ANY_OF` was ``({rsid}, {chrom})``
+    before RM47 relaxed it to ``()``). Keying study lookup on the rsID alone therefore drops every
+    coordinate-authored citation: measured on cardio, **34,697 of 121,467 study rows (28.6%) carry a
+    null rsid**, so 14,590 of 53,098 loci rendered with no grounding at all even though the module
+    grounds every one of them. cancer and pathogenic have the same shape.
+
+    Returns ``None`` when neither identity is available, so an unkeyable row is skipped rather than
+    collected under a key that would collide with another variant's.
+    """
+    text = str(rsid).strip() if rsid is not None else ""
+    if text:
+        return text
+    if chrom is None or start is None:
+        return None
+    contig, position = str(chrom).strip(), str(start).strip()
+    if not contig or not position:
+        return None
+    # `ref` is part of the key because two records can share a position and differ only in reference
+    # allele — the ClinVar dup/del mirror shape. An empty ref still keys, as an empty final field.
+    return f"{contig}:{position}:{str(ref).strip() if ref is not None else ''}"
+
+
+def _annotated_loci(annotated: pl.DataFrame) -> list[str]:
+    """The ``chrom:start:ref`` keys of the rows that carry no rsID, for coordinate-keyed studies.
+
+    Only rows with a null/blank rsid need one — a row with an rsID is found by it. Returns an empty
+    list when the frame has no coordinate columns, which is the pre-0.5 artifact shape.
+    """
+    if not {"chrom", "start"}.issubset(annotated.columns):
+        return []
+    keys: set[str] = set()
+    for row in annotated.select(
+        [c for c in ("rsid", "chrom", "start", "ref") if c in annotated.columns]
+    ).iter_rows(named=True):
+        if str(row.get("rsid") or "").strip():
+            continue
+        key = _study_key(None, row.get("chrom"), row.get("start"), row.get("ref"))
+        if key is not None:
+            keys.add(key)
+    return sorted(keys)
+
+
 def load_studies_for_variants(
     rsids: list[str],
     module_name: str,
     module_info: Optional[ModuleInfo] = None,
+    loci: Optional[list[str]] = None,
 ) -> dict[str, list[dict[str, str]]]:
     """
-    Load studies data for a set of rsids from an HF module.
+    Load studies data for a set of variants from an HF module.
 
-    Returns a mapping of rsid -> list of study dicts.
+    Returns a mapping of :func:`_study_key` -> list of study dicts: keyed by rsID for a row that has
+    one, and by ``chrom:start:ref`` for a coordinate-authored row.
     """
     with start_action(action_type="load_studies_for_variants", module=module_name):
-        if not rsids:
+        if not rsids and not loci:
             return {}
 
         studies_lf = _scan_optional_module_table(
@@ -655,17 +707,25 @@ def load_studies_for_variants(
         if studies_lf is None:
             return {}
 
-        # Filter to relevant rsids
-        studies_df = studies_lf.filter(
-            pl.col("rsid").is_in(rsids)
-        ).collect()
+        wanted_rsids, wanted_loci = set(rsids or []), set(loci or [])
+        # Collect both identities in one pass. A coordinate-keyed study row is only reachable where
+        # `studies.parquet` carries the coordinate columns at all — they arrived in 0.5, so a 0.3-era
+        # artifact simply has no coordinate branch to take, and `_study_key` falls back to the rsid.
+        columns = set(studies_lf.collect_schema().names())
+        has_coords = {"chrom", "start"}.issubset(columns)
+        studies_df = studies_lf.collect()
 
         result: dict[str, list[dict[str, str]]] = {}
         for row in studies_df.iter_rows(named=True):
-            rsid = row["rsid"]
-            if rsid not in result:
-                result[rsid] = []
-            result[rsid].append({
+            key = _study_key(
+                row.get("rsid"),
+                row.get("chrom") if has_coords else None,
+                row.get("start") if has_coords else None,
+                row.get("ref") if has_coords else None,
+            )
+            if key is None or (key not in wanted_rsids and key not in wanted_loci):
+                continue
+            result.setdefault(key, []).append({
                 "pmid": row.get("pmid", ""),
                 "population": row.get("population", ""),
                 "p_value": row.get("p_value", ""),
@@ -704,7 +764,9 @@ def build_longevity_report_data(
 
         # Get all rsids for study lookup
         rsids = annotated.select("rsid").unique().to_series().to_list()
-        studies_by_rsid = load_studies_for_variants(rsids, module_name, module_info)
+        studies_by_rsid = load_studies_for_variants(
+            rsids, module_name, module_info, loci=_annotated_loci(annotated)
+        )
 
         # Assign null categories to "other"
         annotated = annotated.with_columns(
@@ -801,7 +863,9 @@ def build_module_report_data(
         annotated = _annotated_rows(enriched_df)
 
         rsids = annotated.select("rsid").unique().to_series().to_list()
-        studies_by_rsid = load_studies_for_variants(rsids, module_name, module_info)
+        studies_by_rsid = load_studies_for_variants(
+            rsids, module_name, module_info, loci=_annotated_loci(annotated)
+        )
 
         variants: list[dict] = [
             _build_variant(row, studies_by_rsid) for row in annotated.iter_rows(named=True)
@@ -855,7 +919,9 @@ def build_pharmacogenomics_report_data(
         annotated = _annotated_rows(enriched_df)
 
         rsids = annotated.select("rsid").unique().to_series().to_list()
-        studies_by_rsid = load_studies_for_variants(rsids, module_name, module_info)
+        studies_by_rsid = load_studies_for_variants(
+            rsids, module_name, module_info, loci=_annotated_loci(annotated)
+        )
 
         variants = [
             _build_variant(row, studies_by_rsid) for row in annotated.iter_rows(named=True)
