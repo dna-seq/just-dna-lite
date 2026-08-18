@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-pipelines"
-version = "0.2.3"
+version = "0.2.4"
 description = "Genomic Database Management and Annotation Tool"
 readme = "README.md"
 authors = [
@@ -26,11 +26,22 @@ dependencies = [
     # one of which (RM95) let a non-vocabulary `measure_kind` spelling into `content_signature` —
     # the one identity that cannot be taken back, since it claims a global dedup slot.
     #
-    # The enricher is one patch ahead of the other two and that is the correct state: 0.6.2 is
-    # enricher-only (RM101), giving every pass an unavailability subclass so "the source is down"
-    # and "your data is wrong" are separable by type rather than by reading `exc.__cause__`.
+    # The enricher is ahead of the other two and that is the correct state: 0.6.2 was enricher-only
+    # (RM101), giving every pass an unavailability subclass so "the source is down" and "your data is
+    # wrong" are separable by type rather than by reading `exc.__cause__`.
+    #
+    # 0.6.3 is why this floor moves rather than merely being satisfiable. `clinvar_draft.multi_allelic_rsids`
+    # keyed its site as `(rsid, chrom, start, ref)`, so an rsID whose ClinVar records differ in the
+    # *reference* allele — the ordinary dup/del mirror pair, `A>AT` beside `ATT>A` at one position —
+    # was never flagged multi-allelic, both records collapsed onto one authored row, and the survivor
+    # was decided by allele spelling because `select_by_gene` orders by `ref` before `review_stars`.
+    # Measured on our own panels before the fix: 483 allele events absent from `cancer` entirely (108
+    # at 3 stars, across BRCA1/BRCA2/ATM/MLH1/MSH2) and 3,140 records dropped from `pathogenic`, whose
+    # coordinates then returned via expansion wearing the surviving record's clin_sig and condition.
+    # 0.6.3 groups over the whole event instead. `clinvar_panel._identity_collapse_note` predates the
+    # fix and now reports nothing on a 0.6.3 build — keep it as the regression guard, not a workaround.
     "just-dna-compiler>=0.6.1",
-    "just-dna-enricher>=0.6.2",
+    "just-dna-enricher>=0.6.3",
     "just-dna-format>=0.6.1",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
