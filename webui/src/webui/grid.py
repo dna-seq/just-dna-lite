@@ -217,6 +217,10 @@ class SafeGridMixin(rx.State, mixin=True):
         page_size = int((self.lf_grid_pagination_model or {}).get("pageSize") or _DEFAULT_CHUNK_SIZE)
         self.lf_grid_pagination_model = {"page": 0, "pageSize": page_size}
 
+    def _after_grid_page_published(self) -> None:
+        """Hook after a page of rows is written.  Subclasses re-project selection."""
+        return
+
     # ------------------------------------------------------------------
     # Registration
     # ------------------------------------------------------------------
@@ -315,6 +319,7 @@ class SafeGridMixin(rx.State, mixin=True):
             )
             self._update_filter_debug()
             self.lf_grid_loading = False
+            self._after_grid_page_published()
 
         print(
             f"[SafeGrid] page: offset={offset}, +{len(page.rows)} rows, "
@@ -355,6 +360,7 @@ class SafeGridMixin(rx.State, mixin=True):
 
         async with self:
             if is_stale_grid_view_replay(self._lf_grid_replay_filter, filter_model):
+                print("[SafeGrid] dropped stale filter replay", flush=True)
                 self._lf_grid_replay_filter = ""
                 self._lf_grid_filter = {}
                 self.lf_grid_filter_model = {"items": []}

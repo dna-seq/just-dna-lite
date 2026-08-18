@@ -485,6 +485,8 @@ Full list: https://reflex.dev/docs/library/data-display/icon/#icons-list
 
 ### rx.foreach Limitations
 
+Do not style a row by comparing a **global** state var to a foreach item (`busy_key == card["local_key"]`). Reflex compiles that as one shared comparison, so every card takes the same branch. Stamp a bool on the item and read `item["busy"].to(bool)`.
+
 Inside `rx.foreach`, values from dictionaries are typed as `Any`. This breaks components that require specific types:
 
 ```python
@@ -679,7 +681,8 @@ webui/
 ├─────────────────────────────────────┤
 │  PRS tab                            │  ← Polygenic Risk Scores
 │  - prs-ui workbench (By Trait/PRS)  │
-│  - current left-panel sample only   │
+│  - current sample + Compare peers   │
+│  - Add for comparison under rows    │
 ├─────────────────────────────────────┤
 │  Outputs (teal segment)             │  ← Results
 │  - File list with download buttons  │

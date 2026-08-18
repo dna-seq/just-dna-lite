@@ -3005,6 +3005,28 @@ def _prs_fine_population_chip() -> rx.Component:
     )
 
 
+def _prs_sample_identity(display_name: rx.Var, filename: rx.Var) -> rx.Component:
+    """Sample name on top, VCF filename underneath — people know the name."""
+    return rx.vstack(
+        rx.text(
+            display_name,
+            size="2",
+            weight="bold",
+            style={"lineHeight": "1.2"},
+        ),
+        rx.text(
+            filename,
+            size="1",
+            color="gray",
+            style={"lineHeight": "1.2"},
+        ),
+        spacing="0",
+        align_items="start",
+        min_width="0",
+        flex="1",
+    )
+
+
 def _prs_current_sample_row() -> rx.Component:
     """One sample row for the genome already selected in the left panel."""
     return rx.hstack(
@@ -3015,7 +3037,10 @@ def _prs_current_sample_row() -> rx.Component:
             background=sample_color(0),
             flex_shrink="0",
         ),
-        rx.text(UploadState.selected_file, size="2", weight="bold"),
+        _prs_sample_identity(
+            UploadState.sample_display_names[UploadState.selected_file],
+            UploadState.selected_file,
+        ),
         rx.badge("GRCh38", color_scheme="blue", variant="soft", size="1"),
         rx.select.root(
             rx.select.trigger(size="1"),
@@ -3047,6 +3072,118 @@ def _prs_current_sample_row() -> rx.Component:
         border="1px solid var(--gray-4)",
         border_radius="8px",
         background="var(--gray-1)",
+        wrap="wrap",
+    )
+
+
+def _prs_compare_peer_row(chip: rx.Var) -> rx.Component:
+    """One extra left-panel genome included in the current PRS comparison."""
+    return rx.hstack(
+        rx.box(
+            width="12px",
+            height="12px",
+            border_radius="50%",
+            background=chip["color"].to(str),
+            flex_shrink="0",
+        ),
+        _prs_sample_identity(chip["label"].to(str), chip["filename"].to(str)),
+        rx.badge(
+            UploadState.current_reference_genome,
+            color_scheme="blue",
+            variant="soft",
+            size="1",
+        ),
+        rx.cond(
+            chip["ancestry"].to(str) != "",
+            rx.badge(
+                chip["ancestry"].to(str),
+                color_scheme="green",
+                variant="soft",
+                size="1",
+            ),
+            rx.fragment(),
+        ),
+        rx.spacer(),
+        rx.button(
+            "Remove",
+            size="1",
+            variant="ghost",
+            color_scheme="gray",
+            disabled=PRSState.prs_computing,
+            on_click=lambda: PRSState.remove_compare_sample(chip["filename"].to(str)),
+        ),
+        align="center",
+        spacing="2",
+        width="100%",
+        padding="6px 10px",
+        border="1px solid var(--gray-4)",
+        border_radius="8px",
+        background="var(--gray-1)",
+        wrap="wrap",
+    )
+
+
+def _prs_add_for_comparison() -> rx.Component:
+    """One control: pick a sample and it is added. No separate Compare then Add."""
+    add_button = rx.el.button(
+        PRSState.compare_add_label,
+        type="button",
+        class_name="ui big primary button",
+        disabled=PRSState.prs_computing,
+        on_click=PRSState.add_only_compare_choice,
+        style={"width": "100%"},
+    )
+    add_picker = rx.select.root(
+        rx.select.trigger(
+            placeholder="Add for comparison",
+            size="3",
+            width="100%",
+            style={
+                "minHeight": "48px",
+                "fontSize": "1.15rem",
+                "fontWeight": "700",
+            },
+        ),
+        rx.select.content(
+            rx.foreach(
+                PRSState.compare_choices,
+                lambda choice: rx.select.item(
+                    choice["choice_label"].to(str),
+                    value=choice["filename"].to(str),
+                ),
+            ),
+        ),
+        value="",
+        on_change=PRSState.add_compare_sample,
+        size="3",
+        disabled=PRSState.prs_computing,
+        key=PRSState.compare_add_key,
+        width="100%",
+    )
+    return rx.hstack(
+        rx.cond(
+            PRSState.has_remaining_compare_choices,
+            rx.cond(
+                PRSState.has_one_compare_choice,
+                add_button,
+                rx.box(add_picker, style={"flex": "1", "minWidth": "0"}),
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            PRSState.is_comparing,
+            rx.el.button(
+                "Clear comparison",
+                type="button",
+                class_name="ui big button",
+                disabled=PRSState.prs_computing,
+                on_click=PRSState.clear_compare_samples,
+            ),
+            rx.fragment(),
+        ),
+        spacing="2",
+        width="100%",
+        style={"marginTop": "4px"},
     )
 
 
@@ -3056,8 +3193,14 @@ def _prs_current_sample_source() -> rx.Component:
         rx.cond(
             UploadState.has_selected_file,
             rx.vstack(
-                rx.text("Sample", size="1", weight="bold", color="gray"),
+                rx.text(PRSState.compare_heading, size="1", weight="bold", color="gray"),
                 _prs_current_sample_row(),
+                rx.foreach(PRSState.prs_compare_chips, _prs_compare_peer_row),
+                rx.cond(
+                    PRSState.has_remaining_compare_choices | PRSState.is_comparing,
+                    _prs_add_for_comparison(),
+                    rx.fragment(),
+                ),
                 rx.cond(
                     PRSState.detected_fine_label != "",
                     rx.text(
@@ -3098,20 +3241,23 @@ def _prs_current_sample_source() -> rx.Component:
 
 def _prs_tab_content() -> rx.Component:
     """PRS tab: prs-ui workbench layout driven by the selected left-panel genome."""
-    normalizing = UploadState.vcf_preview_loading
+    # Do not pass UploadState.vcf_preview_loading: that flag tracks the Input
+    # tab paging millions of VCF rows, and prs-ui treats it as "lock the catalog
+    # grids" (pointer-events none, including the trait filter). PRS already
+    # gates on prs_genotypes_path.
     trait_panel = prs_workbench_mode_panel(
         PRSState,
-        lambda: trait_selector(PRSTraitState, normalizing=normalizing),
+        lambda: trait_selector(PRSTraitState, normalizing=False),
         "grouped",
         "Compute PRS for Selected Traits",
-        normalizing=normalizing,
+        normalizing=False,
     )
     prs_panel = prs_workbench_mode_panel(
         PRSState,
-        lambda: prs_scores_selector(PRSState, normalizing=normalizing),
+        lambda: prs_scores_selector(PRSState, normalizing=False),
         "individual",
         "Compute PRS",
-        normalizing=normalizing,
+        normalizing=False,
     )
     return rx.el.div(
         rx.el.style(PRS_ALIGNMENT_CSS),

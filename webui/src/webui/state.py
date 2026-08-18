@@ -15,7 +15,7 @@ import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import polars as pl
 import reflex as rx
@@ -260,6 +260,89 @@ def _parquet_is_empty(path: Path) -> bool:
 def _parquet_is_ready(path: Path) -> bool:
     """Return whether a parquet exists, is readable, and contains rows."""
     return not _parquet_is_empty(path)
+
+
+def _vcf_sample_stem(filename: str) -> str:
+    """Sample folder name used under the user output directory."""
+    if filename.endswith(".vcf.gz"):
+        return filename[: -len(".vcf.gz")]
+    if filename.endswith(".vcf"):
+        return filename[: -len(".vcf")]
+    return Path(filename).stem
+
+
+def _sample_choice_label(display_name: str, filename: str) -> str:
+    """Dropdown text: sample name with the VCF filename when they differ."""
+    if not display_name or display_name in {filename, _vcf_sample_stem(filename)}:
+        return filename
+    return f"{display_name} ({filename})"
+
+
+def _normalized_parquet_for_vcf(safe_user_id: str, filename: str) -> Path:
+    """Canonical normalized parquet path for a left-panel VCF filename."""
+    return (
+        get_user_output_dir()
+        / safe_user_id
+        / _vcf_sample_stem(filename)
+        / "user_vcf_normalized.parquet"
+    )
+
+
+def comparable_prs_samples(
+    files: Sequence[str],
+    selected_file: str,
+    file_metadata: Dict[str, Dict[str, Any]],
+    is_ready: Callable[[str], bool],
+    display_names: Dict[str, str] | None = None,
+) -> List[Dict[str, str]]:
+    """Left-panel samples that can join the current genome in a PRS comparison.
+
+    A peer must share species and reference genome with the selected file and
+    already have a prepared genotype table. The selected file is never returned.
+    ``display_names`` is the left-panel map (curated label / subject ID / stem).
+    """
+    if not selected_file:
+        return []
+    current = file_metadata.get(selected_file, {})
+    species = str(current.get("species") or "Homo sapiens")
+    genome = str(current.get("reference_genome") or "GRCh38")
+    names = display_names or {}
+    peers: List[Dict[str, str]] = []
+    for filename in files:
+        if filename == selected_file:
+            continue
+        meta = file_metadata.get(filename, {})
+        if str(meta.get("species") or "Homo sapiens") != species:
+            continue
+        if str(meta.get("reference_genome") or "GRCh38") != genome:
+            continue
+        if not is_ready(filename):
+            continue
+        display_name = str(
+            names.get(filename)
+            or meta.get("sample_name")
+            or _vcf_sample_stem(filename)
+        )
+        peers.append(
+            {
+                "filename": filename,
+                "label": display_name,
+                "display_name": display_name,
+                "choice_label": _sample_choice_label(display_name, filename),
+                "species": species,
+                "reference_genome": genome,
+            }
+        )
+    return peers
+
+
+def _prs_result_cache_key(row: dict) -> str:
+    """Index cached PRS rows by PGS ID, and by sample when comparing genomes."""
+    pgs_id = str(row.get("pgs_id") or "")
+    sample = str(row.get("sample") or "")
+    if sample:
+        return f"{pgs_id}::{sample}"
+    return pgs_id
 
 
 def _normalize_run_config_if_stale(
@@ -1428,8 +1511,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             elif subject_id:
                 result[filename] = subject_id
             else:
-                # Use sample name (filename without extension)
-                result[filename] = filename.replace(".vcf.gz", "").replace(".vcf", "")
+                result[filename] = _vcf_sample_stem(filename)
         return result
 
     @rx.var
@@ -2006,6 +2088,32 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         if not self.selected_file:
             return "GRCh38"
         return self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
+
+    @rx.var
+    def prs_comparable_samples(self) -> List[Dict[str, str]]:
+        """Other left-panel samples that share species + genome and are PRS-ready."""
+        if not self.selected_file or not self.safe_user_id:
+            return []
+        user_id = self.safe_user_id
+        return comparable_prs_samples(
+            list(self.files),
+            self.selected_file,
+            self.file_metadata,
+            is_ready=lambda filename: _parquet_is_ready(
+                _normalized_parquet_for_vcf(user_id, filename)
+            ),
+            display_names=self.sample_display_names,
+        )
+
+    @rx.var
+    def prs_comparable_sample_filenames(self) -> List[str]:
+        """Filenames for the PRS compare dropdown."""
+        return [sample["filename"] for sample in self.prs_comparable_samples]
+
+    @rx.var
+    def has_prs_comparable_samples(self) -> bool:
+        """True when at least one other prepared sample can join a PRS comparison."""
+        return len(self.prs_comparable_samples) > 0
 
     @rx.var
     def current_sex(self) -> str:
@@ -3527,6 +3635,7 @@ import prs_ui
 import prs_ui.mixin as _prs_ui_mixin
 from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
+from prs_ui.mixin import loaded_grid_selection_model as _loaded_grid_selection_model
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
 from just_prs.prs import ReferenceUniverse as _ReferenceUniverse
@@ -3536,6 +3645,17 @@ from just_prs.reference import SUPERPOPULATIONS
 from just_prs.viz import FINE_POPULATION_LABELS as _FINE_POPULATION_LABELS
 from just_prs.viz import IGSR_POPULATION_URL as _IGSR_POPULATION_URL
 from just_prs.viz import fine_population_label as _fine_population_label
+
+
+def _scan_prs_genotypes(path: Path | str) -> pl.LazyFrame:
+    """Scan a just-dna-lite parquet as just-prs genotypes.
+
+    Annotation parquets keep polars-bio ``start``. Ancestry and scoring look
+    up ``pos``. ``_get_genotypes_lf()`` already aliases; any extra
+    ``scan_parquet`` into just-prs must go through this helper too.
+    """
+    return _prs_ui_mixin._normalize_genotypes_lf(pl.scan_parquet(str(path)))
+
 
 _prs_catalog_instance: Optional[_PRSCatalog] = None
 _PRS_REQUIRED_SCORE_COLUMNS = {
@@ -3651,20 +3771,28 @@ def _prs_reusable_results_for_file(
     source_file: str,
     current_file: str,
     force_recompute: bool,
+    allowed_source_files: set[str] | None = None,
 ) -> dict[str, dict]:
-    """Index cached PRS rows that belong to ``current_file``.
+    """Index cached PRS rows that belong to the current genome or comparison set.
 
     Rows from another genome, or any cache when force-recompute is on, are
     ignored so Compute cannot skip work by PGS ID after a file switch.
+    Comparison rows are keyed by ``pgs_id::sample`` so two genomes never share
+    a cache slot.
     """
-    if force_recompute or not current_file or source_file != current_file:
+    allowed = allowed_source_files if allowed_source_files is not None else (
+        {current_file} if current_file else set()
+    )
+    if force_recompute or not allowed or not source_file:
+        return {}
+    if source_file not in allowed:
         return {}
     existing_by_id: dict[str, dict] = {}
     for row in results:
         pgs_id = str(row.get("pgs_id") or "")
         row_file = str(row.get("_source_file") or source_file)
-        if pgs_id and row_file == current_file:
-            existing_by_id[pgs_id] = row
+        if pgs_id and row_file in allowed:
+            existing_by_id[_prs_result_cache_key(row)] = row
     return existing_by_id
 
 
@@ -3837,6 +3965,30 @@ def _classify_sample_type(variant_count: int) -> tuple[str, float]:
     return "array", 0.85
 
 
+def _restoration_settings_for_parquet(
+    parquet_path: str,
+    sample_type: str | None = None,
+) -> tuple[bool, str]:
+    """Return ``(reference_restoration, genotype_input_mode)`` for one genome.
+
+    The selected left-panel sample uses the user-facing WGS/array toggle.
+    Comparison peers are classified from variant density so an array is never
+    restored as if it were whole-genome.
+    """
+    if sample_type == "wgs":
+        return True, "variant_only"
+    if sample_type == "array":
+        return False, "auto"
+    try:
+        n = int(pl.scan_parquet(parquet_path).select(pl.len()).collect().item())
+    except Exception:
+        return False, "auto"
+    kind, _confidence = _classify_sample_type(n)
+    if kind == "wgs":
+        return True, "variant_only"
+    return False, "auto"
+
+
 class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
     """PRS computation state — delegates entirely to PRSComputeStateMixin.
 
@@ -3876,8 +4028,19 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
     sample_type_source: str = ""           # "" | detected | metadata | user
     sample_variant_count: int = 0
 
+    # Extra left-panel genomes scored alongside the selected sample. Filenames
+    # only — paths are resolved from UploadState when the comparison is applied.
+    compare_filenames: list[str] = []
+    compare_choices: list[dict] = []
+
     def set_prs_force_recompute(self, value: bool) -> None:
         self.prs_force_recompute = bool(value)
+
+    def _after_grid_page_published(self) -> None:
+        """Re-project selected PGS IDs onto the current (filtered/sorted) rows."""
+        self.lf_grid_row_selection_model = _loaded_grid_selection_model(
+            self.lf_grid_rows, self.selected_pgs_ids, "pgs_id"
+        )
 
     def _prs_compute_still_current(self, token: int, source_file: str) -> bool:
         """Return True if a background PRS task still belongs to this genome."""
@@ -3915,6 +4078,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         self.sample_type_confidence = 0.0
         self.sample_type_source = ""
         self.sample_variant_count = 0
+        self.compare_filenames = []
+        self.compare_choices = []
         self.prs_computing = False
         self.prs_progress = 0
         self.status_message = ""
@@ -4086,6 +4251,254 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             return ""
         return f"{self.sample_variant_count:,} variants"
 
+    @rx.var
+    def is_comparing(self) -> bool:
+        """True when extra left-panel genomes are included in this PRS run."""
+        return len(self.compare_filenames) > 0
+
+    @rx.var
+    def compare_heading(self) -> str:
+        """Sample-section title: one genome, or a comparison of several."""
+        n = 1 + len(self.compare_filenames)
+        if n <= 1:
+            return "Sample"
+        return f"Comparing {n} samples"
+
+    @rx.var
+    def prs_compare_chips(self) -> list[dict]:
+        """Peer rows for the Compare UI (selected file stays on the primary row)."""
+        samples = list(self.prs_samples)
+        chips: list[dict] = []
+        for i, filename in enumerate(self.compare_filenames):
+            sample = samples[i + 1] if i + 1 < len(samples) else {}
+            chips.append(
+                {
+                    "filename": filename,
+                    "label": str(sample.get("label") or _vcf_sample_stem(filename)),
+                    "color": str(
+                        sample.get("color") or _prs_ui_mixin.sample_color(i + 1)
+                    ),
+                    "ancestry": _prs_ui_mixin._ancestry_chip_text(sample),
+                }
+            )
+        return chips
+
+    async def _refresh_compare_choices(self) -> None:
+        """Dropdown options: comparable peers that are not already selected."""
+        upload = await self.get_state(UploadState)
+        taken = set(self.compare_filenames)
+        choices = [
+            {
+                "filename": peer["filename"],
+                "display_name": peer.get("display_name") or peer.get("label") or "",
+                "choice_label": peer.get("choice_label")
+                or _sample_choice_label(
+                    str(peer.get("display_name") or peer.get("label") or ""),
+                    peer["filename"],
+                ),
+            }
+            for peer in upload.prs_comparable_samples
+            if peer["filename"] not in taken
+        ]
+        self.compare_choices = choices
+
+    @rx.var
+    def has_remaining_compare_choices(self) -> bool:
+        """True when another left-panel sample can still be added."""
+        return len(self.compare_choices) > 0
+
+    @rx.var
+    def has_one_compare_choice(self) -> bool:
+        """One leftover peer: the add button can skip a picker."""
+        return len(self.compare_choices) == 1
+
+    @rx.var
+    def compare_add_label(self) -> str:
+        """Button text: name the leftover sample when there is only one."""
+        if len(self.compare_choices) != 1:
+            return "Add for comparison"
+        name = str(self.compare_choices[0].get("display_name") or "sample")
+        return f"Add {name} for comparison"
+
+    @rx.var
+    def compare_add_key(self) -> str:
+        """Remount the add picker after a sample is added so it stays empty."""
+        return ",".join(self.compare_filenames)
+
+    async def _apply_compare_set(self) -> None:
+        """Rebuild mixin ``prs_samples`` from the left-panel selection + peers."""
+        upload = await self.get_state(UploadState)
+        selected = upload.selected_file
+        user_id = upload.safe_user_id
+        if not selected or not user_id:
+            return
+        comparable = {peer["filename"]: peer for peer in upload.prs_comparable_samples}
+        peers = [name for name in self.compare_filenames if name in comparable]
+        if peers != list(self.compare_filenames):
+            self.compare_filenames = peers
+        primary_path = self.prs_initialized_for_file or str(
+            _normalized_parquet_for_vcf(user_id, selected)
+        )
+        if not primary_path or not Path(primary_path).exists():
+            return
+        if not peers:
+            self.load_genotypes(primary_path)
+            samples = list(self.prs_samples)
+            if samples:
+                samples[0] = {
+                    **samples[0],
+                    "ancestry": self.detected_ancestry,
+                    "ancestry_confidence": self.detected_ancestry_confidence,
+                    "fine_population": self.detected_fine_population,
+                    "fine_confidence": self.detected_fine_confidence,
+                }
+                self.prs_samples = samples
+            return
+        display_names = upload.sample_display_names
+        payload: list[dict] = [
+            {
+                "label": str(
+                    display_names.get(selected) or _vcf_sample_stem(selected)
+                ),
+                "path": primary_path,
+                "ancestry": self.detected_ancestry,
+                "ancestry_confidence": self.detected_ancestry_confidence,
+                "fine_population": self.detected_fine_population,
+                "fine_confidence": self.detected_fine_confidence,
+            }
+        ]
+        for filename in peers:
+            peer = comparable[filename]
+            payload.append(
+                {
+                    "label": str(
+                        peer.get("display_name")
+                        or peer.get("label")
+                        or display_names.get(filename)
+                        or _vcf_sample_stem(filename)
+                    ),
+                    "path": str(_normalized_parquet_for_vcf(user_id, filename)),
+                }
+            )
+        self.load_samples(payload)
+
+    async def refresh_compare_choices(self) -> None:
+        """Reload leftover comparable samples for the add-for-comparison control."""
+        await self._refresh_compare_choices()
+
+    async def add_compare_sample(self, filename: str | list[str]) -> Any:
+        """Add one left-panel sample to the comparison in a single step."""
+        if self.prs_computing:
+            return
+        chosen = filename[0] if isinstance(filename, list) else filename
+        if not chosen or chosen in self.compare_filenames:
+            return
+        upload = await self.get_state(UploadState)
+        if chosen not in upload.prs_comparable_sample_filenames:
+            return
+        self.compare_filenames = [*self.compare_filenames, chosen]
+        await self._apply_compare_set()
+        await self._refresh_compare_choices()
+        if self.compare_filenames:
+            return PRSState.detect_compare_ancestries
+
+    async def add_only_compare_choice(self) -> Any:
+        """Add the last remaining comparable sample without a picker."""
+        if self.prs_computing or len(self.compare_choices) != 1:
+            return
+        filename = str(self.compare_choices[0].get("filename") or "")
+        return await self.add_compare_sample(filename)
+
+    async def remove_compare_sample(self, filename: str) -> Any:
+        """Drop one comparison peer; the left-panel sample always stays."""
+        if self.prs_computing:
+            return
+        self.compare_filenames = [name for name in self.compare_filenames if name != filename]
+        await self._apply_compare_set()
+        await self._refresh_compare_choices()
+        if self.compare_filenames:
+            return PRSState.detect_compare_ancestries
+
+    async def clear_compare_samples(self) -> None:
+        """Return to scoring only the left-panel sample."""
+        if self.prs_computing:
+            return
+        self.compare_filenames = []
+        await self._apply_compare_set()
+        await self._refresh_compare_choices()
+
+    @rx.event(background=True)
+    async def detect_compare_ancestries(self) -> None:
+        """Fill ancestry on comparison peers without resetting computed results.
+
+        ``load_samples`` already copied the primary sample's call. Peers are
+        inferred here and patched onto ``prs_samples`` in place — calling
+        ``load_samples`` again would wipe results.
+        """
+        async with self:
+            if not self.is_multi_sample:
+                return
+            snapshots = [dict(sample) for sample in self.prs_samples]
+            token = self.prs_compute_token
+            source_file = self.prs_initialized_for_file
+            build = self.genome_build
+            cache_dir_str = self.cache_dir
+
+        catalog = _get_prs_catalog(cache_dir_str)
+        loop = asyncio.get_event_loop()
+        changed = False
+        for index, sample in enumerate(snapshots):
+            if index == 0 or str(sample.get("ancestry") or ""):
+                continue
+            path = str(sample.get("path") or "")
+            if not path or not Path(path).exists():
+                continue
+            genotypes_lf = _scan_prs_genotypes(path)
+            try:
+                sample_ancestry = await loop.run_in_executor(
+                    None,
+                    lambda lf=genotypes_lf: catalog.infer_sample_ancestry(
+                        genotypes_lf=lf, sample_build=build
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("Compare-sample ancestry inference failed: %s", exc)
+                continue
+            superpop = getattr(sample_ancestry, "superpopulation", None)
+            if not sample_ancestry or not superpop or superpop == "UNKNOWN":
+                continue
+            sample["ancestry"] = superpop
+            sample["ancestry_confidence"] = float(sample_ancestry.confidence or 0.0)
+            sample["fine_population"] = sample_ancestry.fine_population or ""
+            sample["fine_confidence"] = float(sample_ancestry.fine_confidence or 0.0)
+            changed = True
+
+        if not changed:
+            return
+        async with self:
+            if not self._prs_compute_still_current(token, source_file):
+                return
+            by_path = {str(sample.get("path") or ""): sample for sample in snapshots}
+            merged: list[dict] = []
+            for row in self.prs_samples:
+                extra = by_path.get(str(row.get("path") or ""), {})
+                merged.append(
+                    {
+                        **row,
+                        "ancestry": extra.get("ancestry") or row.get("ancestry") or "",
+                        "ancestry_confidence": extra.get("ancestry_confidence")
+                        or row.get("ancestry_confidence")
+                        or 0.0,
+                        "fine_population": extra.get("fine_population")
+                        or row.get("fine_population")
+                        or "",
+                        "fine_confidence": extra.get("fine_confidence")
+                        or row.get("fine_confidence")
+                        or 0.0,
+                    }
+                )
+            self.prs_samples = merged
+
     @rx.event(background=True)
     async def detect_sample_ancestry(self) -> None:
         """Infer the sample's genetic ancestry and set the percentile fallback.
@@ -4227,6 +4640,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
         yield PRSTraitState.initialize_traits(self.genome_build, ready_parquet_path, self.include_harmonized)
 
+        yield PRSState.refresh_compare_choices
+
         # Auto-detect sequencing type + ancestry for a newly loaded sample.
         if not same_file and ready_parquet_path:
             self._detect_sample_type(ready_parquet_path)
@@ -4298,8 +4713,6 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
             genome_build = self.genome_build
             cache_dir_str = self.cache_dir
-            vcf_path = self.prs_genotypes_path
-            genotypes_lf = self._get_genotypes_lf()
             ancestry = self.selected_ancestry
             all_pops = self.compute_all_populations
             sample_type = self.sample_type
@@ -4311,15 +4724,39 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 self.status_message = "Normalized VCF not found — run normalization first."
                 return
 
+            sample_jobs: list[tuple[str, str, pl.LazyFrame, bool, str]] = []
+            for index, (label, path, lf) in enumerate(self._iter_sample_genotypes()):
+                if not path:
+                    continue
+                if index == 0:
+                    restore, mode = _restoration_settings_for_parquet(
+                        path, sample_type=sample_type
+                    )
+                else:
+                    restore, mode = _restoration_settings_for_parquet(path)
+                sample_jobs.append((label, path, lf, restore, mode))
+            if not sample_jobs:
+                self.status_message = "Normalized VCF not found — run normalization first."
+                return
+            color_map = self._sample_color_map()
+            comparing = self.is_multi_sample
+            allowed_files = {path for _label, path, _lf, _restore, _mode in sample_jobs}
+            allowed_files.add(source_file)
             existing_by_id = _prs_reusable_results_for_file(
                 list(self.prs_results),
                 self.prs_results_source_file,
                 source_file,
                 self.prs_force_recompute,
+                allowed_source_files=allowed_files,
             )
 
-            ids_to_compute = [pid for pid in selected_ids if pid not in existing_by_id]
-            total = len(ids_to_compute)
+            work_items: list[tuple[str, str, str, pl.LazyFrame, bool, str]] = []
+            for label, path, lf, restore, mode in sample_jobs:
+                for pid in selected_ids:
+                    cache_key = _prs_result_cache_key({"pgs_id": pid, "sample": label})
+                    if cache_key not in existing_by_id:
+                        work_items.append((pid, label, path, lf, restore, mode))
+            total = len(work_items)
 
             self.prs_computing = True
             self.prs_progress = 0
@@ -4331,11 +4768,12 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 self.prs_results_column_groups = []
                 self._reset_selected_result()
 
-            if not ids_to_compute:
+            if not work_items:
                 self._build_prs_results_grid()
                 self.prs_computing = False
                 self.prs_progress = 100
-                self.status_message = f"All {len(selected_ids)} selected score(s) already computed"
+                n_selected = len(selected_ids) * max(len(sample_jobs), 1)
+                self.status_message = f"All {n_selected} selected score(s) already computed"
                 if self.prs_results:
                     self.build_trait_summary()
                     self._ensure_result_chart_selected()
@@ -4357,15 +4795,15 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             # Restoration only engages in just-prs' variant_only mode, so WGS must
             # force it (auto would mis-detect DeepVariant RefCall VCFs as all_sites
             # and silently skip restoration).  Arrays keep auto: absent means
-            # untyped, never hom-ref, so they must not impute.
-            restoration = sample_type == "wgs"
-            genotype_mode = "variant_only" if sample_type == "wgs" else "auto"
+            # untyped, never hom-ref, so they must not impute.  Comparison peers
+            # are classified independently so an array is never restored as WGS.
+            any_restoration = any(restore for _label, _path, _lf, restore, _mode in sample_jobs)
             # Parse the catalog-wide (~34M-row) reference-allele universe ONCE and
             # reuse the in-memory handle across every selected score, instead of
             # re-parsing + re-joining it per score (the dominant cost — ~8.4 s/score
             # vs ~1.2 s/score with the prepared handle).
             reference_universe: Optional[_ReferenceUniverse] = None
-            if restoration:
+            if any_restoration:
                 try:
                     reference_universe = catalog.prepare_reference_universe(genome_build)
                 except Exception as exc:
@@ -4374,7 +4812,14 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                         exc,
                     )
                 if reference_universe is None:
-                    restoration = False
+                    sample_jobs = [
+                        (label, path, lf, False, "auto" if restore else mode)
+                        for label, path, lf, restore, mode in sample_jobs
+                    ]
+                    work_items = [
+                        (pid, label, path, lf, False, "auto" if restore else mode)
+                        for pid, label, path, lf, restore, mode in work_items
+                    ]
                     logger.info("WGS restoration requested but universe unavailable for %s", genome_build)
                 else:
                     logger.info(
@@ -4387,44 +4832,53 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             any_low_match = False
             failed_ids: List[str] = []
 
-            for i, pgs_id in enumerate(ids_to_compute, start=1):
+            for i, (pgs_id, sample_label, sample_path, sample_lf, restoration, genotype_mode) in enumerate(
+                work_items, start=1
+            ):
                 async with self:
                     if not self._prs_compute_still_current(token, source_file):
                         logger.info("Aborting PRS compute; genome switched")
                         return
                     self.prs_progress = round(i / total * 100)
-                    self.status_message = f"Computing {i}/{total}: {pgs_id}..."
+                    sample_note = f" ({sample_label})" if sample_label else ""
+                    self.status_message = f"Computing {i}/{total}: {pgs_id}{sample_note}..."
 
                 loop = asyncio.get_event_loop()
                 try:
                     row = await loop.run_in_executor(
                         None,
-                        lambda pid=pgs_id: _compute_single_prs_with_cache_repair(
-                            pgs_id=pid,
-                            vcf_path=vcf_path,
-                            genome_build=genome_build,
-                            cache_dir=cache_path,
-                            genotypes_lf=genotypes_lf,
-                            catalog=catalog,
-                            best_perf_df=best_perf_df,
-                            ancestry=ancestry,
-                            compute_all_populations=all_pops,
-                            reference_restoration=restoration,
-                            reference_universe=reference_universe,
-                            sample_build=genome_build,
-                            genotype_input_mode=genotype_mode,
+                        lambda pid=pgs_id, path=sample_path, lf=sample_lf, restore=restoration, mode=genotype_mode: (
+                            _compute_single_prs_with_cache_repair(
+                                pgs_id=pid,
+                                vcf_path=path,
+                                genome_build=genome_build,
+                                cache_dir=cache_path,
+                                genotypes_lf=lf,
+                                catalog=catalog,
+                                best_perf_df=best_perf_df,
+                                ancestry=ancestry,
+                                compute_all_populations=all_pops,
+                                reference_restoration=restore,
+                                reference_universe=reference_universe if restore else None,
+                                sample_build=genome_build,
+                                genotype_input_mode=mode,
+                            )
                         ),
                     )
                 except Exception as score_exc:
                     logger.warning("PRS compute failed for %s: %s", pgs_id, score_exc)
-                    failed_ids.append(pgs_id)
+                    failed_ids.append(pgs_id if not sample_label else f"{pgs_id} ({sample_label})")
                     gc.collect()
                     continue
 
                 if row.pop("_low_match", False):
                     any_low_match = True
-                row["_source_file"] = source_file
+                row["_source_file"] = sample_path
+                if sample_label:
+                    row["sample"] = sample_label
+                    row["sample_color"] = color_map.get(sample_label, "")
                 new_results.append(row)
+                cache_key = _prs_result_cache_key(row)
 
                 # Persist per-score (by-readiness), not once at the end. By-trait
                 # selects many scores in a single call, so an end-of-loop-only
@@ -4438,12 +4892,13 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                             pgs_id,
                         )
                         return
-                    existing_by_id[pgs_id] = row
+                    existing_by_id[cache_key] = row
                     self.prs_results = list(existing_by_id.values())
                     self.prs_results_source_file = source_file
                     self._build_prs_results_grid()
                     self.low_match_warning = any_low_match
-                    self._checkpoint_prs_to_dagster()
+                    if not comparing:
+                        self._checkpoint_prs_to_dagster()
                     # Invalidate + rebuild the trait summary on EACH added score so
                     # the grouped view tracks computed scores live instead of caching
                     # a stale snapshot (e.g. "13 models" while the rest stream in).
@@ -4472,7 +4927,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 if failed_ids:
                     parts.append(f"{len(failed_ids)} failed: {', '.join(failed_ids[:5])}")
                 self.status_message = "Computed " + "; ".join(parts)
-                self._checkpoint_prs_to_dagster()
+                if not comparing:
+                    self._checkpoint_prs_to_dagster()
                 # Build the trait summary in isolation: the per-score results are
                 # already persisted above, so a summary/UI failure must never
                 # discard them — surface a notice instead of losing the run.
@@ -4497,6 +4953,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
     def _checkpoint_prs_to_dagster(self) -> None:
         """Persist current PRS results to Dagster for cross-session restore."""
         import json
+        if self.is_multi_sample:
+            return
         parquet_path = self.prs_initialized_for_file
         if not parquet_path or not self.prs_results:
             return
@@ -4551,6 +5009,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 return
             data = results_meta.data
             rows = data.get("rows", []) if isinstance(data, dict) else []
+            rows = [row for row in rows if not str(row.get("sample") or "")]
             if rows:
                 source_file = self.prs_initialized_for_file
                 stamped = []
@@ -4618,6 +5077,12 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     _traits_genome_build: str = ""
     _traits_include_harmonized: bool = True
 
+    def _after_grid_page_published(self) -> None:
+        """Re-project selected traits onto the current (filtered/sorted) rows."""
+        self.lf_grid_row_selection_model = _loaded_grid_selection_model(
+            self.lf_grid_rows, self.selected_traits, "trait"
+        )
+
     def _build_trait_df(self, genome_build: str, include_harmonized: bool = True) -> pl.DataFrame:
         """Group PGS Catalog scores by trait and return a summary DataFrame."""
         _ensure_prs_catalog_cache_current(str(_prs_resolve_cache_dir()))
@@ -4675,6 +5140,7 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         yield from self.set_lazyframe(
             trait_df.lazy(),
             chunk_size=500,
+            eager_value_options_row_limit=0,
             column_overrides=_build_trait_column_overrides(),
         )
 
@@ -5528,6 +5994,40 @@ def _local_key(namespace: str, name: str) -> str:
     return f"{safe_ns}__{name}"
 
 
+def _without_local_module(modules: List[Dict[str, Any]], name: str) -> List[Dict[str, Any]]:
+    """Drop one installed row from the left-pane list without rescanning disk."""
+    return [m for m in modules if m.get("name") != name]
+
+
+def _cards_with_installed(
+    cards: List[Dict[str, Any]],
+    local_names: List[str],
+    busy_key: str = "",
+) -> List[Dict[str, Any]]:
+    """Stamp each catalog card with local key, installed, and per-card Get busy.
+
+    The browse grid reads ``installed`` / ``local_key`` / ``busy`` per card.
+    Updating those in place (a new list, so Reflex notices) is what flips
+    Get ↔ Installed without a catalog round-trip.
+
+    ``busy`` must live on the card. Comparing a global ``busy_key`` to
+    ``card["local_key"]`` inside ``rx.foreach`` compiles as one shared Var, so
+    every Get button looks clicked.
+    """
+    keys = set(local_names)
+    out: List[Dict[str, Any]] = []
+    for card in cards:
+        updated = dict(card)
+        local_key = updated.get("local_key") or _local_key(
+            str(updated.get("namespace") or ""), str(updated.get("name") or ""),
+        )
+        updated["local_key"] = local_key
+        updated["installed"] = local_key in keys
+        updated["busy"] = bool(busy_key) and local_key == busy_key
+        out.append(updated)
+    return out
+
+
 def _scan_local_modules() -> List[Dict[str, Any]]:
     """Scan the local custom-modules dir → one dict per registered module.
 
@@ -5652,6 +6152,11 @@ class RegistryState(rx.State):
 
     # --- Action status + gating ---
     action_busy: bool = False
+    # Local registry key of the card currently installing ("" if none / uninstall / import).
+    # Backend-only: the catalog grid reads ``card["busy"]``, stamped by
+    # ``_cards_with_installed``. Do not compare this to ``card["local_key"]`` in
+    # ``rx.foreach`` — that compiles as one shared Var and lights every Get.
+    _busy_key: str = ""
     action_message: str = ""
     pending_action: Dict[str, Any] = {}   # {} = none
 
@@ -5772,6 +6277,32 @@ class RegistryState(rx.State):
     def _client_args(self):
         return _registry_url(), (self.token or None)
 
+    def _begin_action(self, message: str, busy_key: str = "") -> None:
+        """Mark an install/uninstall in progress. Call inside ``async with self``."""
+        self.action_busy = True
+        self._busy_key = busy_key
+        self.action_message = message
+        self.cards = _cards_with_installed(list(self.cards), list(self._local_names), busy_key)
+
+    def _end_action(self, message: str) -> None:
+        """Clear the in-progress mark. Call inside ``async with self``."""
+        self.action_busy = False
+        self._busy_key = ""
+        self.action_message = message
+        self.cards = _cards_with_installed(list(self.cards), list(self._local_names), "")
+
+    def _publish_local_snapshot(self, modules: List[Dict[str, Any]]) -> None:
+        """Push a local-registry snapshot to the left list and the browse cards.
+
+        Call inside ``async with self``. Assigns new lists so Reflex sends a delta;
+        mutating ``local_modules`` in place would leave the Installed list stale until
+        the catalog search returned.
+        """
+        names = [m["name"] for m in modules]
+        self.local_modules = modules
+        self._local_names = names
+        self.cards = _cards_with_installed(list(self.cards), names, self._busy_key)
+
     # ------------------------------------------------------------------ setters
 
     def set_query(self, value: str) -> None:
@@ -5852,10 +6383,8 @@ class RegistryState(rx.State):
                 if not m["version"]:
                     m["version"] = get("version")
                 m["catalog_name"] = get("name", m["name"]) or m["name"]
-        names = [m["name"] for m in local]
         async with self:
-            self.local_modules = local
-            self._local_names = names
+            self._publish_local_snapshot(local)
 
     async def _do_search(self) -> None:
         async with self:
@@ -5896,10 +6425,8 @@ class RegistryState(rx.State):
                 self.total = 0
             return
         items = body.get("items", []) or []
-        local_keys = set(local_names)
         for card in items:
             stats = card.get("stats") or {}
-            card["installed"] = _local_key(card.get("namespace", ""), card.get("name", "")) in local_keys
             card["variant_count"] = int(stats.get("variant_count") or 0)
             card["gene_count"] = int(stats.get("gene_count") or 0)
             card["clinvar_count"] = int(stats.get("clinvar_count") or 0)
@@ -5908,7 +6435,7 @@ class RegistryState(rx.State):
             logo = card.get("logo_url") or ""
             card["logo_full"] = (url + logo) if logo.startswith("/") else logo
         async with self:
-            self.cards = items
+            self.cards = _cards_with_installed(items, local_names, self._busy_key)
             self.total = int(body.get("total", 0) or 0)
             # Grow the namespace filter options from whatever we've seen (only when unfiltered,
             # so the option set stays complete rather than collapsing to the active filter).
@@ -6120,8 +6647,9 @@ class RegistryState(rx.State):
         # never collides with a same-named HF module or another namespace's module.
         key = _local_key(namespace, name)
         async with self:
-            self.action_busy = True
-            self.action_message = f"Downloading {name} {version}…"
+            if self.action_busy:
+                return
+            self._begin_action(f"Downloading {name} {version}…", busy_key=key)
             url, token = self._client_args()
         loop = asyncio.get_event_loop()
 
@@ -6152,20 +6680,17 @@ class RegistryState(rx.State):
             await loop.run_in_executor(None, _install)
         except VersionMismatchError as e:
             async with self:
-                self.action_busy = False
                 self.server_incompatible = True
-                self.action_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self._end_action(f"{_REGISTRY_MISMATCH_HINT} ({e.detail})")
             return
         except Exception as e:  # noqa: BLE001
             async with self:
-                self.action_busy = False
-                self.action_message = f"Install failed: {e}"
+                self._end_action(f"Install failed: {e}")
             return
         await self._refresh_local()
         await self._refresh_upload_ui()
         async with self:
-            self.action_busy = False
-            self.action_message = f"Installed {name} {version}."
+            self._end_action(f"Installed {name} {version}.")
 
     @rx.event(background=True)
     async def request_download(self):
@@ -6201,21 +6726,25 @@ class RegistryState(rx.State):
 
     async def _do_uninstall(self, name: str) -> None:
         async with self:
-            self.action_busy = True
-            self.action_message = f"Uninstalling {name}…"
+            if self.action_busy:
+                return
+            # Drop the row now — unregister + catalog classification can take seconds
+            # (artifact hashing, HF rediscovery, signature lookup) and used to leave
+            # the Installed list frozen until all of that finished.
+            self._begin_action(f"Uninstalling {name}…")
+            self._publish_local_snapshot(_without_local_module(list(self.local_modules), name))
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(None, unregister_custom_module, name)
         except Exception as e:  # noqa: BLE001
+            await self._refresh_local()
             async with self:
-                self.action_busy = False
-                self.action_message = f"Uninstall failed: {e}"
+                self._end_action(f"Uninstall failed: {e}")
             return
         await self._refresh_local()
         await self._refresh_upload_ui()
         async with self:
-            self.action_busy = False
-            self.action_message = f"Uninstalled {name}."
+            self._end_action(f"Uninstalled {name}.")
 
     @rx.event(background=True)
     async def request_uninstall(self):
@@ -6236,23 +6765,20 @@ class RegistryState(rx.State):
 
     async def _do_register_temp(self, spec_dir: str) -> None:
         async with self:
-            self.action_busy = True
-            self.action_message = "Importing module…"
+            self._begin_action("Importing module…")
         loop = asyncio.get_event_loop()
         try:
             result = await loop.run_in_executor(None, register_custom_module, Path(spec_dir))
         except Exception as e:  # noqa: BLE001
             async with self:
-                self.action_busy = False
-                self.action_message = f"Import failed: {e}"
+                self._end_action(f"Import failed: {e}")
             return
         ok = getattr(result, "success", False)
         errs = "; ".join(getattr(result, "errors", []) or [])
         await self._refresh_local()
         await self._refresh_upload_ui()
         async with self:
-            self.action_busy = False
-            self.action_message = "Imported module." if ok else f"Import failed: {errs}"
+            self._end_action("Imported module." if ok else f"Import failed: {errs}")
 
     @rx.event
     async def upload_import(self, files: list[rx.UploadFile]):

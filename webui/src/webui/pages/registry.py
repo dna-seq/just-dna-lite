@@ -153,6 +153,7 @@ def _action_buttons() -> rx.Component:
                 " Get from catalog",
                 on_click=RegistryState.request_download,
                 disabled=RegistryState.action_busy,
+                type="button",
                 class_name="ui small primary button",
                 style={"flex": "1"},
             ),
@@ -179,10 +180,15 @@ def _action_buttons() -> rx.Component:
                     style={"flex": "1", "textAlign": "center"},
                 ),
                 rx.el.button(
-                    fomantic_icon("trash alternate", size=13),
+                    rx.cond(
+                        RegistryState.action_busy,
+                        rx.el.i("", class_name="spinner loading icon"),
+                        fomantic_icon("trash alternate", size=13),
+                    ),
                     " Uninstall",
                     on_click=RegistryState.request_uninstall,
                     disabled=RegistryState.action_busy,
+                    type="button",
                     class_name="ui small red button",
                     style={"flex": "1"},
                 ),
@@ -346,6 +352,7 @@ def _local_list_item(mod: rx.Var[dict]) -> rx.Component:
             "display": "flex", "alignItems": "center", "padding": "6px 8px",
             "borderRadius": "4px", "cursor": "pointer", "marginBottom": "2px",
         },
+        key=name,
     )
 
 
@@ -433,6 +440,8 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
     name = card["name"].to(str)
     latest = card["latest_version"].to(str)
     installed = card["installed"].to(bool)
+    local_key = card["local_key"].to(str)
+    this_busy = card["busy"].to(bool)
     return rx.el.div(
         # Header
         rx.el.div(
@@ -484,6 +493,7 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
             rx.el.button(
                 "Details",
                 on_click=lambda: RegistryState.select_catalog(namespace, name),
+                type="button",
                 class_name="ui tiny button",
                 style={"flex": "1"},
             ),
@@ -492,15 +502,27 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
                 rx.el.button(
                     "Installed",
                     disabled=True,
+                    type="button",
                     class_name="ui tiny button",
                     style={"flex": "1", "opacity": "0.6"},
                 ),
                 rx.el.button(
-                    fomantic_icon("download", size=12),
-                    " Get",
+                    rx.cond(
+                        this_busy,
+                        rx.el.i("", class_name="spinner loading icon"),
+                        fomantic_icon("download", size=12),
+                    ),
+                    rx.cond(this_busy, " Getting", " Get"),
                     on_click=lambda: RegistryState.quick_install(namespace, name, latest),
-                    disabled=RegistryState.action_busy,
-                    class_name="ui tiny primary button",
+                    disabled=this_busy,
+                    type="button",
+                    # Busy is a field on this card. A global busy_key compared
+                    # inside foreach made every Get look clicked.
+                    class_name=rx.cond(
+                        this_busy,
+                        "ui tiny loading primary button",
+                        "ui tiny primary button",
+                    ),
                     style={"flex": "1"},
                 ),
             ),
@@ -511,6 +533,7 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
             "backgroundColor": "#fff", "width": "260px", "boxSizing": "border-box",
             "boxShadow": "0 1px 3px rgba(0,0,0,0.06)",
         },
+        key=local_key,
     )
 
 
