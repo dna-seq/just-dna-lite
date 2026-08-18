@@ -17,17 +17,26 @@ from typing import Optional
 from huggingface_hub import HfApi, get_token
 from pydantic import BaseModel
 
-from just_dna_pipelines.module_config import LEAD_TABLES, MODULES_CONFIG
+from just_dna_compiler.compiler import ARTIFACT_PARQUETS, LEAD_PARQUETS
 
-# A module must carry one of the LEAD_TABLES families — that is exactly what discovery probes for.
-# The rest are additive: discovery ignores what it does not know, and shipping them keeps the
-# uploaded module a complete artifact.
-_LEAD_PARQUETS = tuple(f"{t}.parquet" for t in LEAD_TABLES)
-_SIDE_TABLES = (
-    "annotations.parquet", "studies.parquet",
-    "sources.parquet", "literature.parquet", "frequencies.parquet", "gene_metrics.parquet",
-)
-_ALLOW_PATTERNS = [*_LEAD_PARQUETS, *_SIDE_TABLES, "manifest.json", "logo.png", "logo.jpg"]
+from just_dna_pipelines.module_config import MODULES_CONFIG
+
+# A module must carry one of the lead families — that is exactly what discovery probes for. The rest
+# are additive: discovery ignores what it does not know, and shipping them keeps the uploaded module
+# a complete artifact.
+#
+# **Both tuples are imported from the compiler, and a hand-kept copy here is a publish-time data
+# loss, not an untidiness.** `ARTIFACT_PARQUETS` is the list `artifact.digest` is a Merkle root over,
+# so a name missing from the allowlist is a parquet the manifest *attests* and the upload never
+# sends: the published digest then cannot be reproduced from what arrived. Upstream measured exactly
+# this on its own hand-kept allowlist over sixteen reference modules — seven refused outright and
+# eight of the remaining nine published a manifest attesting files that were never uploaded, fifteen
+# of sixteen wrong, with `sources.parquet` in the dropped set every time it existed (so the module
+# arrived carrying no licence terms at all). Deriving it means a new table family reaches the
+# publisher in the same release that adds it; 0.6 added three (`gene_validity`,
+# `clinical_assertions`, `gwas_effects`) and this list named none of them.
+_LEAD_PARQUETS = LEAD_PARQUETS
+_ALLOW_PATTERNS = [*ARTIFACT_PARQUETS, "manifest.json", "logo.png", "logo.jpg"]
 
 # What a weights-led module is expected to carry. A missing side table here is worth stopping for —
 # it means an interrupted or partial compile — but only for the weights-led shape, since a

@@ -15,7 +15,7 @@ published ClinVar **parquet snapshot**, which changes five things:
    silently; ``MIN_REVIEW_STARS`` states the floor and the panel declaration records it.
 4. Grounding is **per variant**, from ClinVar's own literature links, instead of one blanket
    citation of the ClinVar resource paper for every row.
-5. ``sources.csv`` records ClinVar's terms, and ``module_spec.yaml`` carries a ``panel:`` block
+5. ``licensing.csv`` records ClinVar's terms, and ``module_spec.yaml`` carries a ``panel:`` block
    (``GenePanelSpec``) pinning the reference release and the significance predicate.
 
 **The one judgement this module makes.** ``draft_gene_panel`` deliberately leaves ``genotype`` as a
@@ -45,6 +45,7 @@ from just_dna_enricher.clinvar_draft import (
     multi_allelic_rsids,
 )
 from just_dna_enricher.locations import resolve_clinvar_reference
+from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
 from just_dna_pipelines.v1_port.sources import display_meta
@@ -391,7 +392,7 @@ def build_clinvar_module(
     """Draft, fill and record one ClinVar module into ``out_dir``.
 
     Leaves the directory holding ``module_spec.yaml`` + ``variants.csv`` + ``studies.csv`` +
-    ``sources.csv`` + a ``clinvar_panel.log`` provenance record. Resolution and compilation are the
+    ``licensing.csv`` + a ``clinvar_panel.log`` provenance record. Resolution and compilation are the
     caller's next two steps (``just-dna-enricher enrich --offline`` then ``compile``), kept separate
     so a rebuild does not re-resolve and a re-resolve does not re-draft.
     """
@@ -407,11 +408,26 @@ def build_clinvar_module(
     # additive, so the authored tables are cleared here rather than by it. The parquet artifacts and
     # the superseded raw-VCF route's log go too: leaving them would ship a mixture of two builds.
     for stale in (
-        "variants.csv", "studies.csv", "sources.csv", "resolution.csv",
+        "variants.csv", "studies.csv", "resolution.csv",
         "weights.parquet", "annotations.parquet", "studies.parquet", "manifest.json",
         "v1_port.log",
     ):
         (out_dir / stale).unlink(missing_ok=True)
+    # The licence sidecar is cleared through `layout`, not by name, because "the file to delete" now
+    # has four legal locations: format 0.6 renamed it `sources.csv` -> `licensing.csv` (RM51), reads
+    # both, and tolerates either under `derived/`.
+    #
+    # A literal `sources.csv` unlink is not equivalent, and the case it misses was measured rather
+    # than reasoned about. Seed a module with `derived/sources.csv` — a pre-0.6 build in a split tree
+    # — and rebuild: the literal unlink does not reach it, so the drafter's `sidecar_write_path` finds
+    # it as the existing copy and **merges into the deprecated spelling**, which the module then keeps
+    # for good. That is the spelling 1.0 stops reading, and every publish from such a directory
+    # carries a deprecation warning in its manifest. Clearing every candidate makes the rebuild write
+    # the preferred name instead. (Both spellings at once is a third state, and `resolve_sidecar`
+    # refuses it outright rather than picking a winner — two copies of a fact-hashed, hand-editable
+    # table are two claims.)
+    for stale_path in sidecar_candidates(out_dir, SOURCES_CSV):
+        stale_path.unlink(missing_ok=True)
 
     records = select_by_gene(
         snapshot, genes, clin_sig=PANEL_CLIN_SIG, min_review_stars=min_review_stars

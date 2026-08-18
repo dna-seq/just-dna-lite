@@ -405,6 +405,72 @@ def test_a_populated_0_5_axis_reaches_the_html():
         assert value in html, f"{axis}={value!r} never reached the rendered report"
 
 
+def test_an_expanded_locus_is_labelled_in_the_report():
+    """`locus_count > 1` is stated to the reader rather than silently rendered as a finding.
+
+    One authored row for an rsID that resolves onto N positions becomes N rows, at most one of which
+    is the variant the module is about. Restoration withholds these outright — an unobserved hom-ref
+    row at N loci fabricates N results — but a *called* row was really sequenced and really carries
+    that genotype, so it is labelled instead of discarded.
+    """
+    row = {"rsid": "rs1170991098", "gene": "SHOX", "genotype": ["A", "C"], "module": "m",
+           "weight": 0.5, "state": "risk", "locus_count": 2, "locus_index": 1}
+    variant = _build_variant(row, {})
+    assert variant["locus_count"] == 2
+    html = _render(other_modules=[_module_data([variant])])
+    assert "Position ambiguous" in html
+    assert "resolves to 2 positions" in html
+
+
+@pytest.mark.parametrize("locus_count", [None, 1], ids=["pre_0_6_absent", "not_expanded"])
+def test_an_unexpanded_locus_says_nothing(locus_count):
+    """`None` is every module we have published; `1` is the ordinary 0.6 row. Neither is a caveat.
+
+    `None` must not be coalesced to `1` and `1` must not read as an ambiguity — a row rendered with
+    this caveat when the position is not ambiguous undermines the one case where it is true.
+    """
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": 0.5, "state": "risk", "locus_count": locus_count}
+    variant = _build_variant(row, {})
+    html = _render(other_modules=[_module_data([variant])])
+    assert "Position ambiguous" not in html
+
+
+def test_a_declared_weighting_reaches_the_provenance_table():
+    """`manifest.weighting` (format 0.6, RM92) is shown verbatim beside the version and digest.
+
+    The report prints a per-module net weight, and `weight` is a bare float with no unit column — so
+    before 0.6 the artifact could not say what scale that number is on and a reader had no way to
+    interpret it. Free text, rendered as written, never parsed.
+    """
+    row = {
+        "name": "coronary", "display_name": "Coronary", "version": "2.1.0",
+        "digest": "sha256:abcdef0123456789", "digest_short": "abcdef012345",
+        "lead_table": "weights", "source_url": "hf://x",
+        "weighting": "scale: log odds ratio · note: not comparable with other modules",
+    }
+    html = _render(module_provenance=[row])
+    assert "What its weights mean" in html
+    assert "scale: log odds ratio" in html
+    assert "not comparable with other modules" in html
+
+
+def test_an_undeclared_weighting_renders_not_stated_rather_than_blank():
+    """Absent means the module has not said, which is **not** "these weights are comparable".
+
+    A blank cell reads as "nothing to report here"; every other tri-state column in this table says
+    *Not stated* for the same reason, and this one carries the same weight of meaning.
+    """
+    row = {
+        "name": "longevitymap", "display_name": "Longevity Map", "version": "",
+        "digest": "", "digest_short": "", "lead_table": "weights", "source_url": "",
+        "weighting": "",
+    }
+    html = _render(module_provenance=[row])
+    assert "What its weights mean" in html
+    assert "Not stated" in html
+
+
 def test_an_empty_axis_emits_no_row_rather_than_an_empty_one():
     """The converse. Absent means render nothing, never a fabricated default or a blank row."""
     row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",

@@ -293,8 +293,29 @@ def hom_ref_rows(lead_lf: pl.LazyFrame) -> Optional[pl.LazyFrame]:
     # they do not have — from a record the caller never emitted. The multi-locus variant_keys are
     # cancer 1,296 / cardio 540 / pathogenic 2,730, which match those hom-ref counts one for one.
     #
-    # The fan-out is a compiler/enricher question (`locus_index` names the ambiguity the join then
-    # ignores) and is not ours to fix here. Ambiguity withholds.
+    # Ambiguity withholds. Two tests do it, because they see different halves of the same fan-out
+    # and only one of them travels on an artifact we can already read.
+    #
+    # **`locus_count > 1` is the row-level predicate, and it is the complete one** (format 0.6,
+    # RM87). It is stamped by the compiler at the expansion itself: `1` on any row that was not
+    # expanded, `N` on every member of an `N`-way expansion. So it holds on a single row, with no
+    # grouping and no comparison against siblings — which is exactly what the `ref`-spelling test
+    # below cannot do.
+    #
+    # The `ref`-spelling test stays as the **pre-0.6 fallback**, because every module published on
+    # HuggingFace today, and every one in `data/interim/v1_port/`, was compiled before the column
+    # existed. It is partial by construction: it can only see an expansion whose members disagree
+    # about `ref` *at one position*, which is the ClinVar dup/del shape above. A **same-`ref`**
+    # expansion is invisible to it and is real — `--keep-par-twin` records a pseudoautosomal locus on
+    # X and on Y with identical alleles, and a paralogous rsID can name two positions carrying the
+    # same reference base. Measured on a compiled fixture of that shape: two rows, `ref="C"` on both,
+    # `locus_count=2` on both, and the grouped test finds one `ref` spelling per position and passes
+    # them through. Keep both tests until the last pre-0.6 artifact is gone.
+    #
+    # No `expanded_keys` gate is needed here, though it is needed by anything that *counts* rows: a
+    # module compiled with no `resolution.csv` reads `locus_count=1` when the honest answer is
+    # "nothing was checked", but those rows carry no coordinate at all and `placed` has already
+    # dropped them.
     ambiguous_sites = (
         placed.group_by("chrom", "start")
         .agg(pl.col("ref").n_unique().alias("_ref_spellings"))
@@ -302,7 +323,11 @@ def hom_ref_rows(lead_lf: pl.LazyFrame) -> Optional[pl.LazyFrame]:
         .select("chrom", "start")
     )
 
-    return placed.join(ambiguous_sites, on=["chrom", "start"], how="anti").filter(
+    candidates = placed.join(ambiguous_sites, on=["chrom", "start"], how="anti")
+    if "locus_count" in names:
+        candidates = candidates.filter(pl.col("locus_count").fill_null(1) <= 1)
+
+    return candidates.filter(
         (pl.col("genotype").list.len() > 0)
         & pl.col("genotype").list.eval(pl.element() == pl.element().first()).list.all()
         & (pl.col("genotype").list.first() == pl.col("ref"))

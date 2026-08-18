@@ -87,7 +87,7 @@ published ClinVar **parquet snapshot**. Five things change:
 4. **Per-variant grounding** from ClinVar's own literature links (up to 3 each), instead of one
    blanket citation of the ClinVar resource paper for every row. Variants ClinVar links no paper to
    still fall back to it.
-5. **`sources.csv`** records ClinVar's terms, and `module_spec.yaml` carries a `panel:` block
+5. **`licensing.csv`** (`sources.csv` before format 0.6) records ClinVar's terms, and `module_spec.yaml` carries a `panel:` block
    (`GenePanelSpec`) pinning `clinvar_file_date` and `source_sha256`.
 
 **The one judgement the port makes.** `draft_gene_panel` deliberately leaves `genotype` as a
@@ -131,7 +131,7 @@ The module is every clinical annotation at **evidence level 1A/1B/2A/2B** that i
 the upgrade. Conclusions are ClinPGx's own published sentences, transcribed rather than summarized.
 
 **It is not sellable, and says so.** ClinPGx is CC BY-SA 4.0 *plus* a contractual bar on sale, so
-`sources.csv` records `commercial_use=false` / `declared_use=non_commercial` and the compiler refuses
+`licensing.csv` records `commercial_use=false` / `declared_use=non_commercial` and the compiler refuses
 to build without that declaration.
 
 **It publishes to HuggingFace like any other module.** It is led by `pharm_variants.parquet` and has

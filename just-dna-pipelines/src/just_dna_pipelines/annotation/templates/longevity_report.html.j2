@@ -405,6 +405,16 @@ window.onscroll = function() {
             {{ variant_detail_row("Flags", v.flags) }}
             {{ variant_detail_row("Population", v.population) }}
             {{ variant_detail_row("p-value", v.p_value) }}
+            {# One authored row that resolved onto several positions (format 0.6 `locus_count`). At
+               most one of those positions is the variant the module meant, and the artifact does not
+               say which — so this is stated rather than hidden. Absent on a pre-0.6 artifact, and
+               `1` is the ordinary case; neither renders a row. #}
+            {% if v.locus_count and v.locus_count > 1 %}
+            <tr>
+                <td style="font-weight: normal;">Position ambiguous</td>
+                <td style="font-weight: normal;">This variant identifier resolves to {{ v.locus_count }} positions in the reference, and the module states one result for all of them. At most one of these positions is the variant the module is about; the data does not say which.</td>
+            </tr>
+            {% endif %}
             {% if v.studies %}
             <tr><td colspan="2">
             <table class="ui selectable celled teal table table variants">
@@ -687,6 +697,7 @@ window.onscroll = function() {
                 <th>Module</th>
                 <th>Version</th>
                 <th>Build</th>
+                <th>What its weights mean</th>
                 <th>Source</th>
             </tr>
         </thead>
@@ -698,6 +709,10 @@ window.onscroll = function() {
                    remote parquet has no manifest to read. Never render that as "unversioned". #}
                 <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
                 <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                {# The module's own words, verbatim and unparsed. Empty means it has not said, and
+                   that is not the same as "these weights are comparable" — a net weight from one
+                   module must never be added to one from another on the strength of a blank cell. #}
+                <td>{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
                 <td>{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
             </tr>
             {% endfor %}

@@ -19,6 +19,7 @@ from just_dna_compiler.compiler import compile_module, validate_spec
 from just_dna_enricher.clinvar import select_by_gene
 from just_dna_enricher.enrich import enrich
 from just_dna_enricher.locations import resolve_clinpgx_reference, resolve_clinvar_reference
+from just_dna_format.layout import SOURCES_CSV, resolve_sidecar, sidecar_candidates
 from just_dna_format.spec import PMID_PATTERN, StudyRow, VariantRow
 
 from just_dna_pipelines.module_compiler.models import ModuleSpecConfig
@@ -193,6 +194,25 @@ def hbb_module(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
+def _licence_sidecar(module_dir: Path) -> Path:
+    """The module's licence-terms sidecar, whichever of its two legal spellings it carries.
+
+    Format 0.6 renamed the file `sources.csv` -> `licensing.csv` (RM51), reads both, and warns that
+    the old one goes at 1.0 — so a test that names either spelling asserts the drafter's choice of
+    filename instead of the licence terms it recorded, and breaks on the release that flips it.
+    `layout.resolve_sidecar` is the same resolver the compiler and the publisher use, and it raises
+    rather than picking a winner if a module somehow carries both.
+
+    Note what did **not** get renamed: the compiled parquet is still `sources.parquet` and the
+    manifest key is still `manifest.sources`, both for the whole 0.x tail, because they are inside
+    `artifact.digest` or are published keys. The chain reads `licensing.csv` -> `sources.parquet` ->
+    `manifest.sources`; do not "finish" the rename on our side.
+    """
+    path = resolve_sidecar(module_dir, SOURCES_CSV)
+    assert path is not None, f"no licence sidecar in {module_dir}: {sorted(p.name for p in module_dir.iterdir())}"
+    return path
+
+
 @needs_clinvar
 @pytest.mark.integration
 class TestClinVarPanel:
@@ -311,7 +331,7 @@ class TestClinVarPanel:
         assert module["icon"] != "database"
 
     def test_sources_records_clinvar(self, hbb_module: Path) -> None:
-        sources = list(csv.DictReader((hbb_module / "sources.csv").open()))
+        sources = list(csv.DictReader(_licence_sidecar(hbb_module).open()))
         assert {s["source"] for s in sources} == {"clinvar"}
         assert all(s["license"] == "public-domain" for s in sources)
 
@@ -465,9 +485,48 @@ class TestPharmGkb:
             assert row["rsid"] and row["drug"] and row["annotation_id"]
             assert row["phenotype_category"], row
 
+    @pytest.mark.parametrize(
+        "seeded", ["sources.csv", "derived/sources.csv"], ids=["root", "derived"]
+    )
+    def test_a_rebuild_migrates_a_pre_0_6_licence_file_to_the_new_spelling(
+        self, tmp_path: Path, seeded: str
+    ) -> None:
+        """A rebuild must leave the *preferred* licence spelling, from either pre-0.6 starting point.
+
+        Format 0.6 renamed this sidecar `sources.csv` -> `licensing.csv` (RM51) and reads both, so
+        "which file does a rebuild leave" has four possible answers — two spellings, each at the root
+        or under `derived/`. The drafter's sweep used to name `sources.csv` literally.
+
+        **The `derived` case is the one that was broken, and it is why this is parametrized rather
+        than a single assertion.** A literal root unlink cannot reach `derived/sources.csv`, so the
+        drafter's `sidecar_write_path` found it as the existing copy and merged into it — leaving the
+        module on the deprecated spelling, the one format 1.0 stops reading, with a deprecation
+        warning in every manifest published from that directory. Measured on the pre-fix tree: seeded
+        `derived/sources.csv` rebuilt to `['derived/sources.csv']`, while the `root` case already
+        rebuilt to `['licensing.csv']` — so the `root` parameter is the control that shows the
+        difference is the layout and not the rename.
+
+        Exactly one copy either way: two at once is a `SidecarCollision` refusal, not a preference.
+        """
+        snapshot = _clinpgx_snapshot()
+        out = tmp_path / "pharmgkb"
+        (out / seeded).parent.mkdir(parents=True, exist_ok=True)
+        (out / seeded).write_text(
+            "source,layer,license\nclinpgx,annotation,CC-BY-SA-4.0\n", encoding="utf-8"
+        )
+        build_pharmgkb_module(out, snapshot=snapshot)
+
+        present = sorted(
+            path.relative_to(out).as_posix()
+            for path in sidecar_candidates(out, SOURCES_CSV)
+            if path.exists()
+        )
+        assert present == ["licensing.csv"], present
+        assert resolve_sidecar(out, SOURCES_CSV) == out / "licensing.csv"
+
     def test_licence_is_recorded_as_no_sale(self, built: Path) -> None:
         """ClinPGx forbids sale; the artifact has to say so or the compile gate has nothing to read."""
-        sources = list(csv.DictReader((built / "sources.csv").open()))
+        sources = list(csv.DictReader(_licence_sidecar(built).open()))
         clinpgx = [s for s in sources if s["source"] == "clinpgx"]
         assert clinpgx, sources
         assert all(s["commercial_use"] == "false" for s in clinpgx)

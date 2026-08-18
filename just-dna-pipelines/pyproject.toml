@@ -22,11 +22,16 @@ dependencies = [
     "fsspec>=2026.7.0",
     "google-genai>=1.75.0,<2.0",
     "huggingface-hub>=1.27.0",
-    # The 0.5 line closed the digest window: anything that moves a compiled module's
-    # artifact.digest is 1.0 from here, so 0.5.x is a stable target to sit on.
-    "just-dna-compiler>=0.5.4",
-    "just-dna-enricher>=0.5.4",
-    "just-dna-format>=0.5.4",
+    # 0.6.1, never 0.6.0: 0.6.0 shipped eight defects fixed the next day (upstream RM93-RM100),
+    # one of which (RM95) let a non-vocabulary `measure_kind` spelling into `content_signature` —
+    # the one identity that cannot be taken back, since it claims a global dedup slot.
+    #
+    # The enricher is one patch ahead of the other two and that is the correct state: 0.6.2 is
+    # enricher-only (RM101), giving every pass an unavailability subclass so "the source is down"
+    # and "your data is wrong" are separable by type rather than by reading `exc.__cause__`.
+    "just-dna-compiler>=0.6.1",
+    "just-dna-enricher>=0.6.2",
+    "just-dna-format>=0.6.1",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
     # mcp 2.0.0 removed both, so `from agno.tools.mcp import MCPTools` raises ImportError.

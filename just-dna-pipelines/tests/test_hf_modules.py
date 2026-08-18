@@ -13,10 +13,12 @@ import pytest
 from huggingface_hub import hf_hub_download
 
 from just_dna_format.integrity import build_artifact
-from just_dna_format.manifest import Display, Identity, ModuleManifest, write_manifest
+from just_dna_format.manifest import Display, Identity, ModuleManifest, Weighting, write_manifest
 
 from just_dna_pipelines.module_config import find_lead_table, has_lead_table
 from just_dna_pipelines.annotation.hf_modules import (
+    _attested_files,
+    _find_lead_table,
     ModuleInfo,
     ModuleTable,
     ModuleOutputMapping,
@@ -254,11 +256,108 @@ class TestAnnotationManifest:
         assert (entry.version, entry.digest, entry.source_url) == (None, None, None)
 
 
+class TestDiscoveryReadsTheAttestedFileList:
+    """A module's shape comes from `manifest.artifact.files`, not from what is in the directory.
+
+    just-dna-format INTEGRATION_0_6 § 2.8 — the one change that document asks a consumer to make
+    rather than making upstream, because no publisher-side fix can reach modules already published.
+    """
+
+    @staticmethod
+    def _module(root: Path, name: str, on_disk: list[str], attested: list[str]) -> Path:
+        """A published module directory: `on_disk` parquets, of which `attested` are in the manifest.
+
+        `on_disk != attested` is the shape `upload_folder` leaves behind, since it adds and replaces
+        but never removes.
+        """
+        module_dir = root / name
+        module_dir.mkdir(parents=True)
+        for table in on_disk:
+            pl.DataFrame({"rsid": ["rs1"]}).write_parquet(module_dir / table)
+        artifact = build_artifact(module_dir, attested)
+        write_manifest(
+            ModuleManifest(
+                identity=Identity(name=name, version="2.0.0"),
+                display=Display(title=name, description=f"{name} test", report_title=name),
+                artifact=artifact,
+            ),
+            module_dir / "manifest.json",
+        )
+        return module_dir
+
+    def test_a_fossil_lead_table_does_not_decide_the_module_kind(self):
+        """The concrete failure: a SNP-core module re-authored as a table-only PGx module.
+
+        `weights.parquet` from the previous release is still at the path, and the manifest does not
+        attest it. A probe for named files finds a SNP core — the old release's — so the module is
+        mis-*typed*. Nothing is mis-hashed and verification passes, which is why probing looks fine.
+
+        `LEAD_TABLES` puts `weights` first, so the probe would answer `weights` here; the attested
+        list answers `pharm_variants`, which is what the module now is.
+        """
+        import fsspec
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = self._module(
+                root,
+                "pgx",
+                on_disk=["weights.parquet", "pharm_variants.parquet"],
+                attested=["pharm_variants.parquet"],
+            )
+            fs = fsspec.filesystem("file")
+            base = str(module_dir)
+
+            attested = _attested_files(fs, base)
+            assert attested == frozenset({"pharm_variants.parquet"})
+            assert _find_lead_table(fs, base, attested) == "pharm_variants"
+            # The demonstration that this is a real difference and not a restatement: the same
+            # directory, probed, gives the wrong kind.
+            assert _find_lead_table(fs, base, None) == "weights"
+
+    def test_a_module_with_no_manifest_falls_back_to_probing(self):
+        """Every module on HuggingFace today predates the manifest, so this is the common path.
+
+        `None` rather than an empty set is what makes that safe: an empty set would read as "this
+        module contains nothing" and make all of them undiscoverable.
+        """
+        import fsspec
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = root / "coronary"
+            module_dir.mkdir()
+            pl.DataFrame({"rsid": ["rs1"]}).write_parquet(module_dir / "weights.parquet")
+            fs = fsspec.filesystem("file")
+
+            assert _attested_files(fs, str(module_dir)) is None
+            assert _find_lead_table(fs, str(module_dir), None) == "weights"
+
+    def test_an_unreadable_manifest_falls_back_instead_of_hiding_the_module(self):
+        """A corrupt manifest must not make a real module undiscoverable."""
+        import fsspec
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = root / "coronary"
+            module_dir.mkdir()
+            pl.DataFrame({"rsid": ["rs1"]}).write_parquet(module_dir / "weights.parquet")
+            (module_dir / "manifest.json").write_text("{not json", encoding="utf-8")
+            fs = fsspec.filesystem("file")
+
+            assert _attested_files(fs, str(module_dir)) is None
+            assert _find_lead_table(fs, str(module_dir), None) == "weights"
+
+
 class TestModuleProvenance:
     """Which module bytes produced a run — `read_module_provenance` and its lead-table predicate."""
 
     def _write_manifest(
-        self, module_dir: Path, lead: str, identity_version: str | None
+        self,
+        module_dir: Path,
+        lead: str,
+        identity_version: str | None,
+        weighting: "Weighting | None" = None,
     ) -> str:
         """Write a real `manifest.json` for the module dir; return its artifact digest."""
         artifact = build_artifact(module_dir, [f"{lead}.parquet"])
@@ -270,6 +369,7 @@ class TestModuleProvenance:
                 report_title=module_dir.name,
             ),
             artifact=artifact,
+            weighting=weighting,
         )
         write_manifest(manifest, module_dir / "manifest.json")
         return artifact.digest
@@ -323,9 +423,12 @@ class TestModuleProvenance:
                 lead_table="weights",
                 lead_url=f"file://{module_dir}/weights.parquet",
             )
-            version, digest = read_module_provenance(info)
+            version, digest, weighting = read_module_provenance(info)
             assert version == "2.1.0"  # spec fallback, manifest identity is null
             assert digest == expected_digest
+            # This manifest carries no `weighting` block, and `None` is the only honest answer:
+            # the module has not said what its weights mean, which is not "they are comparable".
+            assert weighting is None
 
             # A stamped identity wins over the spec.
             self._write_manifest(module_dir, "weights", "3.0.0")
@@ -339,8 +442,64 @@ class TestModuleProvenance:
             path="datasets/just-dna-seq/annotators/data/longevitymap",
             weights_url="hf://datasets/just-dna-seq/annotators/data/longevitymap/weights.parquet",
         )
-        assert read_module_provenance(remote) == (None, None)
+        assert read_module_provenance(remote) == (None, None, None)
         assert local_module_dir(remote) is None
+
+    def test_a_declared_weighting_block_is_rendered_verbatim(self):
+        """`manifest.weighting` (format 0.6, RM92) is the only thing that says what `weight` means.
+
+        `weight` is a bare float with no unit column, so before 0.6 the artifact could not state its
+        scale at all and a reader had no way to interpret the per-module net weight the report shows.
+        All three fields are free text on purpose, so they are joined and shown, never parsed.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = self._write_module(root, "coronary", "weights", "2.1.0")
+            self._write_manifest(
+                module_dir,
+                "weights",
+                "2.1.0",
+                weighting=Weighting(
+                    scale="log odds ratio",
+                    method="fixed-effect meta-analysis",
+                    note="not comparable with other modules",
+                ),
+            )
+            info = ModuleInfo(
+                name="coronary",
+                repo_id=str(root),
+                source_url=str(root),
+                path=str(module_dir),
+                lead_table="weights",
+                lead_url=f"file://{module_dir}/weights.parquet",
+            )
+            weighting = read_module_provenance(info)[2]
+            assert weighting == (
+                "scale: log odds ratio · method: fixed-effect meta-analysis · "
+                "note: not comparable with other modules"
+            )
+
+    def test_an_empty_weighting_block_establishes_nothing(self):
+        """A block whose every field is blank is not a statement, so it reads as absent.
+
+        Rendering it as present would put an empty "what its weights mean" cell in front of a reader
+        as though the module had answered the question.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_dir = self._write_module(root, "coronary", "weights", "2.1.0")
+            self._write_manifest(
+                module_dir, "weights", "2.1.0", weighting=Weighting(scale="  ", method=None)
+            )
+            info = ModuleInfo(
+                name="coronary",
+                repo_id=str(root),
+                source_url=str(root),
+                path=str(module_dir),
+                lead_table="weights",
+                lead_url=f"file://{module_dir}/weights.parquet",
+            )
+            assert read_module_provenance(info)[2] is None
 
 
 # ============================================================================

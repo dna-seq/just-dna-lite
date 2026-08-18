@@ -39,6 +39,7 @@ from just_dna_pipelines.module_config import (
     has_lead_table,
     spec_version,
     DefaultSample,
+    LEAD_TABLE_CSVS,
 )
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
@@ -51,7 +52,7 @@ from just_dna_pipelines.module_registry import (
 from just_dna_registry import RegistryClient, RegistryError
 from just_dna_registry.client import VersionMismatchError
 from just_dna_format.identity import is_valid_namespace
-from just_dna_compiler.compiler import _OUTPUT_FILES as _COMPILER_OUTPUT_FILES
+from just_dna_compiler.compiler import ARTIFACT_PARQUETS
 from just_dna_compiler.compiler import content_signature
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
@@ -5927,13 +5928,21 @@ def _registry_url() -> str:
 # sidecars `frequencies`/`gene_metrics`/`literature`/`sources`), so the digest computed here
 # ignored every one of them and could not equal the server's for any enriched module.
 # `build_artifact` skips absent files, so passing the full set is safe for a minimal module.
-_ARTIFACT_FILES: tuple = tuple(_COMPILER_OUTPUT_FILES)
+#
+# 0.6 made the constant public as `ARTIFACT_PARQUETS` (upstream S35 — the private name is exactly
+# what let a hand-kept copy in the publisher drop thirteen of sixteen names), and added three fact
+# tables to it. Import it; never re-list it here.
+_ARTIFACT_FILES: tuple = tuple(ARTIFACT_PARQUETS)
 
 
-#: Tables that can lead a module, newest-first — mirrors the order
-#: `scripts/registry_precheck.py` uses. The leading table's row count is what the server's
-#: enrichment limit counts.
-_LEAD_TABLES: tuple = ("variants.csv", "pharm_variants.csv", "diplotypes.csv", "pgs.csv")
+#: Authored tables that can lead a module, in priority order. The leading table's row count is what
+#: the server's enrichment limit counts.
+#:
+#: Imported rather than restated: the hand-kept copy named four of the ten families, so a module led
+#: by any of the other six (`heteroplasmy`, `copynumbers`, `repeat_alleles`, `haplotypes`,
+#: `allele_function`, `activity_phenotype`) counted **zero** authored rows and was therefore always
+#: routed to the enrichment half of `/check` however large it really was.
+_LEAD_TABLES: tuple = LEAD_TABLE_CSVS
 
 #: The server's ceiling on the enrichment half of `/check` (`REGISTRY_ENRICH_MAX_VARIANTS`).
 #: Past it the endpoint answers `422 too_many_variants`, so a bigger module goes to `/validate` —

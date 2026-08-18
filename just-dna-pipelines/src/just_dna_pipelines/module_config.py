@@ -502,6 +502,19 @@ LEAD_TABLES: tuple[str, ...] = (
 )
 
 
+#: The **authored** CSV that compiles into each lead table, in the same priority order.
+#:
+#: Derived rather than hand-listed, because the hand-listed copies covered four of the ten families
+#: — so a `heteroplasmy`- or `copynumbers`-led spec counted zero authored rows, and the registry's
+#: enrichment ceiling (which counts the leading table's rows) was applied against 0 instead of
+#: against the real height. `weights` is the only family whose CSV is not its own stem: the authored
+#: DSL spells it `variants.csv`, which is checked against the compiler's own `_TABLE_KINDS` in
+#: `tests/test_format_0_6.py` so a new family cannot arrive without either side noticing.
+LEAD_TABLE_CSVS: tuple[str, ...] = tuple(
+    "variants.csv" if table == "weights" else f"{table}.csv" for table in LEAD_TABLES
+)
+
+
 def find_lead_table(module_dir: Path) -> Optional[str]:
     """Return the table family leading a compiled module *directory*, or None if it is not one.
 

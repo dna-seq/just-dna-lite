@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
+from just_dna_pipelines.module_config import LEAD_TABLE_CSVS
 from just_dna_registry.client import RegistryClient, RegistryError
 
 DEFAULT_URL = "https://module-registry.just-dna.life"
@@ -55,7 +56,9 @@ RETRY_DELAYS = (30, 60, 120, 240)
 
 def _authored_row_count(module_dir: Path) -> int:
     """Rows in whichever table leads the module — what the enrichment limit counts."""
-    for table in ("variants.csv", "pharm_variants.csv", "diplotypes.csv", "pgs.csv"):
+    # Imported, not restated: the hand-kept copy named four of the ten families, so a module led by
+    # any other one counted zero rows and was always routed to the enrichment half of `/check`.
+    for table in LEAD_TABLE_CSVS:
         path = module_dir / table
         if path.exists():
             with path.open(encoding="utf-8") as handle:

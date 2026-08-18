@@ -18,7 +18,7 @@ significant studies, with 1A/1B additionally appearing in a prescribing guidelin
 table drew no such line, and drawing it is most of the upgrade.
 
 **Licensing is machine-readable and restrictive.** ClinPGx is CC BY-SA 4.0 *plus* a contractual bar
-on sale, so ``sources.csv`` records ``commercial_use=false`` and the compiler refuses to build
+on sale, so ``licensing.csv`` records ``commercial_use=false`` and the compiler refuses to build
 without that declaration. The module is therefore **not sellable**, and says so in the artifact.
 """
 
@@ -33,6 +33,7 @@ import yaml
 from just_dna_enricher.clinpgx import load_snapshot
 from just_dna_enricher.clinpgx_draft import ClinPgxDraftResult, draft_pharm_variants
 from just_dna_enricher.locations import resolve_clinpgx_reference
+from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
 from just_dna_pipelines.v1_port.sources import display_meta
@@ -175,7 +176,7 @@ def _module_spec_yaml(release: dict[str, object], row_count: int) -> str:
         f"# Built by `pipelines v1-port pharmgkb` from the ClinPGx snapshot "
         f"{release.get('dataset', '?')}\n"
         f"# ({row_count:,} rows, evidence level >= {MIN_EVIDENCE_LEVEL}). ClinPGx is CC BY-SA 4.0 "
-        f"and may not be sold — see sources.csv.\n"
+        f"and may not be sold — see licensing.csv.\n"
     )
     return header + yaml.safe_dump(spec, sort_keys=False, allow_unicode=True)
 
@@ -196,8 +197,13 @@ def build_pharmgkb_module(
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    for stale in ("pharm_variants.csv", "sources.csv", "resolution.csv"):
+    for stale in ("pharm_variants.csv", "resolution.csv"):
         (out_dir / stale).unlink(missing_ok=True)
+    # Cleared through `layout` rather than by name — see `clinvar_panel.build_clinvar_module` for the
+    # measured case a literal unlink misses: a `derived/sources.csv` it cannot reach becomes the copy
+    # the drafter merges into, so the module keeps the deprecated spelling permanently.
+    for stale_path in sidecar_candidates(out_dir, SOURCES_CSV):
+        stale_path.unlink(missing_ok=True)
 
     _records, release = load_snapshot(reference)
     (out_dir / "module_spec.yaml").write_text(_module_spec_yaml(release, 0), encoding="utf-8")

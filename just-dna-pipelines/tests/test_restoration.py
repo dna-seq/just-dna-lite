@@ -86,6 +86,30 @@ def _vcf(rows: list[dict]) -> pl.LazyFrame:
     ).lazy()
 
 
+def _lead_0_6(rows: list[dict]) -> pl.LazyFrame:
+    """A lead table as **format 0.6** compiles one: `_lead` plus the two stamped expansion columns.
+
+    Held apart from `_lead` rather than folded into it, because the two shapes are both live and each
+    exercises a different guard — every module we have published predates `locus_count`, so `_lead`
+    is the pre-0.6 artifact and its tests must keep running against the `ref`-spelling fallback.
+    """
+    return pl.DataFrame(
+        rows,
+        schema={
+            "rsid": pl.String,
+            "chrom": pl.String,
+            "start": pl.UInt32,
+            "ref": pl.String,
+            "genotype": pl.List(pl.String),
+            "module": pl.String,
+            "weight": pl.Float64,
+            "state": pl.String,
+            "locus_index": pl.UInt32,
+            "locus_count": pl.UInt32,
+        },
+    ).lazy()
+
+
 def _lead(rows: list[dict]) -> pl.LazyFrame:
     return pl.DataFrame(
         rows,
@@ -299,6 +323,57 @@ class TestHomRefRowSelection:
         ])
         got = hom_ref_rows(lead).collect()
         assert got["rsid"].to_list() == ["rs2"]
+
+    def test_a_same_ref_expansion_is_withheld_on_locus_count(self):
+        """The gap the `ref`-spelling guard cannot see, closed by format 0.6's RM87 column.
+
+        The row shape here is **measured, not invented**: `reference_examples/shox_par1` with its
+        `resolution.csv` twinned onto chrY (the `--keep-par-twin` shape) compiles under 0.6.1 to
+        exactly this — one rsID, two rows, `ref="C"` on both, `start` equal on both, `locus_count=2`
+        and `locus_index` 0 and 1.
+
+        At most one of the two loci is the variant the author meant, and nothing on either row says
+        which. Restoring both would state two results for one authored row, from a record the caller
+        never emitted.
+        """
+        lead = _lead_0_6([
+            {"rsid": "rs1170991098", "chrom": "X", "start": 641036, "ref": "C",
+             "genotype": ["C", "C"], "module": "shox", "weight": None, "state": "risk",
+             "locus_index": 0, "locus_count": 2},
+            {"rsid": "rs1170991098", "chrom": "Y", "start": 641036, "ref": "C",
+             "genotype": ["C", "C"], "module": "shox", "weight": None, "state": "risk",
+             "locus_index": 1, "locus_count": 2},
+        ])
+        assert hom_ref_rows(lead).collect().height == 0
+
+    def test_the_pre_0_6_ref_guard_alone_cannot_catch_that_shape(self):
+        """Why the new predicate was needed rather than the old one being sufficient.
+
+        Same two rows with the stamped columns absent — a pre-0.6 artifact, which is every module we
+        have published. The `ref`-spelling test groups by `(chrom, start)` and finds exactly one
+        spelling at each of the two positions, so both rows pass it. This is the demonstration that
+        the guard is partial, not an assertion that it is.
+        """
+        lead = _lead([
+            {"rsid": "rs1170991098", "chrom": "X", "start": 641036, "ref": "C",
+             "genotype": ["C", "C"], "module": "shox", "weight": None, "state": "risk"},
+            {"rsid": "rs1170991098", "chrom": "Y", "start": 641036, "ref": "C",
+             "genotype": ["C", "C"], "module": "shox", "weight": None, "state": "risk"},
+        ])
+        assert hom_ref_rows(lead).collect().height == 2
+
+    def test_a_non_expanded_0_6_row_still_restores(self):
+        """`locus_count` is `1` on a row resolution did not expand — the predicate is `> 1`.
+
+        Without this the new filter would be indistinguishable from switching restoration off on
+        every 0.6 artifact, which is the failure mode a `> 0` or a truthiness test would produce.
+        """
+        lead = _lead_0_6([
+            {"rsid": "rs4988235", "chrom": "2", "start": 135851076, "ref": "G",
+             "genotype": ["G", "G"], "module": "lactose_tolerance", "weight": 0.0,
+             "state": "neutral", "locus_index": 0, "locus_count": 1},
+        ])
+        assert hom_ref_rows(lead).collect()["rsid"].to_list() == ["rs4988235"]
 
     def test_a_lead_table_without_coordinates_is_excluded_by_schema(self):
         """The `pharm_variants` case: no `ref`, no coordinates, so the question cannot be asked.

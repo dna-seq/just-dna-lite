@@ -632,7 +632,7 @@ def annotate_vcf_with_all_modules(
             # Record which module bytes produced these rows. Without it a rendered report cannot be
             # tied to the module version behind it, and nothing can answer "which of my saved
             # results are stale" — the missing prerequisite under any later verification harness.
-            module_version, module_digest = read_module_provenance(info)
+            module_version, module_digest, module_weighting = read_module_provenance(info)
             module_output = ModuleOutputMapping(
                 module=module_name,
                 lead_table=info.lead_table,
@@ -641,6 +641,7 @@ def annotate_vcf_with_all_modules(
                 metadata_path=metadata_json_path,
                 version=module_version,
                 digest=module_digest,
+                weighting=module_weighting,
                 source_url=info.source_url or info.lead_url or None,
             )
             

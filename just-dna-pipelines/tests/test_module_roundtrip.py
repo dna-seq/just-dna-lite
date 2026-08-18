@@ -15,6 +15,12 @@ from typing import Dict, Optional, Set
 import polars as pl
 import pytest
 
+from just_dna_pipelines.annotation.report_logic import (
+    _GENOTYPE_KEY,
+    _annotations_keying,
+    _genotype_key_expr,
+    _join_annotations,
+)
 from just_dna_pipelines.module_compiler.compiler import (
     compile_module,
     reverse_module,
@@ -252,14 +258,24 @@ class TestRoundTripContent:
         assert expected <= got, f"{mod}: annotations lost rsid(s) {sorted(expected - got)[:20]}"
 
     @pytest.mark.parametrize("mod", MODULES)
-    def test_annotations_are_keyed_per_variant_and_conclusion(
+    def test_annotations_are_keyed_per_variant_genotype_and_conclusion(
         self, compiled_modules: Path, mod: str
     ) -> None:
-        """0.5's annotation identity is `(variant_key, conclusion)`, not the rsID.
+        """0.6's annotation identity is `(variant_key, genotype, conclusion, negatives)` (RM80).
 
-        Derived from the compiled weights, so it states the rule rather than a number: a variant
-        whose genotypes disagree about what they mean gets one annotation row per distinct
-        conclusion, instead of the single per-rsID row 0.3 collapsed them into.
+        `genotype` joined the key in 0.6, and it is the column that decides *which call* an
+        annotation applies to — a het "carrier" row and a hom "affected" row at one locus used to be
+        two rows a reader could only tell apart by reading the prose in `conclusion`. Under the 0.5
+        key those two collapsed onto the first, so the survivor named one genotype while silently
+        standing for both; measured here, `coronary` reports 81 annotation rows against the 77 the
+        0.5 key produced.
+
+        Derived from the compiled weights rather than asserted as a number, and the derivation is
+        the point: the expectation is built with `report_logic._genotype_key_expr` — the **production**
+        expression the report joins annotations with — so this test fails if that rebuild ever stops
+        agreeing with what the compiler writes. `weights.parquet` stores the genotype as a list of
+        alleles and `annotations.parquet` stores the authored cell, so something has to invert one
+        into the other, and this is what proves ours inverts it correctly.
         """
         comp_path = compiled_modules / mod / "annotations.parquet"
         if not comp_path.exists():
@@ -267,7 +283,34 @@ class TestRoundTripContent:
         comp = pl.read_parquet(comp_path)
         weights = pl.read_parquet(compiled_modules / mod / "weights.parquet")
         assert "variant_key" in comp.columns
-        assert comp.height == weights.select("variant_key", "conclusion").unique().height
+        assert "genotype" in comp.columns, "0.6 annotations must carry the genotype (RM80)"
+
+        key_cols = ["variant_key", _GENOTYPE_KEY, "conclusion", "negatives"]
+        rebuilt = weights.with_columns(_genotype_key_expr())
+        assert comp.height == rebuilt.select(key_cols).unique().height
+
+        # Not just the same count — the same keys. A count match can survive a rebuild that is wrong
+        # in a compensating way; a set match cannot.
+        assert set(
+            zip(comp["variant_key"].to_list(), comp["genotype"].to_list())
+        ) <= set(
+            zip(rebuilt["variant_key"].to_list(), rebuilt[_GENOTYPE_KEY].to_list())
+        ), f"{mod}: annotations carry a (variant_key, genotype) our rebuild does not produce"
+
+        # And *execute* the join the report actually performs, on this real 0.6 artifact. The two
+        # assertions above prove the keys agree; this proves the join built from them does not fan a
+        # poly-effect variant out into one report row per annotation, which is the defect the whole
+        # `_annotations_keying` mechanism exists to prevent (measured at coronary 81 -> 231, x2.85,
+        # when the join keyed on `rsid`). Height in == height out is the property; a left join on a
+        # unique right-hand key cannot add rows.
+        joined = _join_annotations(weights.lazy(), comp.lazy(), mod).collect()
+        assert joined.height == weights.height, (
+            f"{mod}: the annotations join changed the row count "
+            f"({weights.height} -> {joined.height})"
+        )
+        assert _annotations_keying(
+            weights.columns, comp.columns, weights.schema
+        ) == "genotype", f"{mod}: a 0.6 artifact must be keyed on genotype, not fall back"
 
     @pytest.mark.parametrize("mod", MODULES)
     def test_studies_row_count(

@@ -262,9 +262,22 @@ class TestStudyRow:
         row = StudyRow(chrom="10", start=94781859, ref="G", pmid="12345", conclusion="Test")
         assert row.variant_key == "10:94781859:G"
 
-    def test_study_no_id_rejected(self) -> None:
-        with pytest.raises(Exception, match="At least one identifier"):
-            StudyRow(pmid="12345", conclusion="Test")
+    def test_study_naming_no_variant_is_accepted_with_a_null_key(self) -> None:
+        """0.6 (upstream RM47) relaxed this; it used to raise "At least one identifier".
+
+        The old either-or rule was unsatisfiable for exactly the modules that most need a citation:
+        a `repeat_alleles.csv` / `copynumbers.csv` / `activity_phenotype.csv` row is keyed
+        `(gene, ...)` and names no variant, so an author grounding a threshold had to invent a bare
+        `chrom` the paper is not about.
+
+        The consequence we care about is the second assertion, not the first: `variant_key` is now
+        `None` on such a row rather than absent, so anything joining `studies.parquet` to a lead
+        table on `variant_key` meets a null key. `load_studies_for_variants` groups by `rsid` and
+        looks studies up per variant, so an unanchored row simply matches no variant — which is
+        what it means. Do not "repair" a null key into a string."""
+        row = StudyRow(pmid="12345", conclusion="Test")
+        assert row.variant_key is None
+        assert StudyRow.REQUIRED_ANY_OF == ()
 
     def test_empty_pmid_rejected(self) -> None:
         with pytest.raises(Exception, match="pmid"):

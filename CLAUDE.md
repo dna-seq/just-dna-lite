@@ -45,7 +45,7 @@ this before hunting for a version pin; **do not re-derive it by grepping every r
 | File | Package | Hard `==` pins? |
 |------|---------|-----------------|
 | `pyproject.toml` (root) | `just-dna-lite` | no — but has deliberate ceilings, see below |
-| `just-dna-pipelines/pyproject.toml` | `just-dna-pipelines` | none |
+| `just-dna-pipelines/pyproject.toml` | `just-dna-pipelines` | none (floors only: `just-dna-format>=0.6.1`, `just-dna-compiler>=0.6.1`, `just-dna-enricher>=0.6.2` — see the 0.6 note below) |
 | `webui/pyproject.toml` | `webui` | **yes — `reflex==X` (the only `==` pin in the whole workspace)** |
 | `../just-prs/pyproject.toml` | `just-prs-workspace` | none |
 | `../just-prs/just-prs/pyproject.toml` | `just-prs` | none |
@@ -72,6 +72,11 @@ All in the **root** `pyproject.toml`:
 - `google-genai>=1.71.0,<2.0` (also repeated in `webui/pyproject.toml`)
 - `requires-python = ">=3.13, <3.14"`
 - `agno` is pinned **by git rev**, not version, in root `[tool.uv.sources]`.
+
+- `just-dna-registry>=0.17.0` in the root, and it is **coupled to the format floor rather than
+  independent**: `version.contract_compatible` compares the installed `just-dna-format` version on
+  client and server and treats a `0.x` minor as breaking. Move the two together or a publish is refused
+  with no obvious cause. See the 0.6 note under *Shared Module Format & Compiler Libraries*.
 
 There are **no** `[tool.uv] constraint-dependencies` / `override-dependencies` anywhere.
 
@@ -237,9 +242,35 @@ old name, so check here first:
   and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
   which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
 
-**The 0.5 digest window is closed:** anything that moves a compiled module's `artifact.digest` — a
-new column, a requiredness or identity change — is a 1.0 in the format repo, so 0.5.x is a stable
-target. Note the three packages version independently (enricher can take a patch on its own).
+**We are on 0.6 (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2, adopted 2026-08-18), and the digest
+window is not what the 0.5 note said it was.** That note claimed any new column was a 1.0. Principle 3
+as amended says the opposite and is what actually governs: **a new optional or stamped column is
+additive and lands in a minor** — `content_signature` (the authored identity) does not move, and only a
+recompile's `artifact.digest` does, which Principle 4 already scopes to a fixed `compiler_version`.
+0.6 exercised exactly that: `weights.parquet` went 37 → 39 columns and `artifact.digest` moved on
+**every** module while `content_signature` moved on **none** (upstream measured 0/11 over the 0.5.4
+corpus, 0/16 over its own).
+
+So: **if you cache, gate on, or compare a stored `artifact.digest`, re-pin it at a version boundary.**
+If you key on `content_signature`, do nothing. What *is* reserved for 1.0 is removing a column,
+promoting one to required, retyping one, or changing what an identity key means — `state`'s removal and
+RM81's genotype unification are the two already scheduled.
+
+The three packages version independently, and 0.6 is the case that proves it: the enricher is one patch
+ahead (0.6.2, RM101) while format and compiler stay at 0.6.1. Take 0.6.1 over 0.6.0 — 0.6.0 shipped
+eight defects fixed the next day, one of which (RM95) let a non-vocabulary spelling into
+`content_signature`, the one identity that cannot be withdrawn.
+
+**Registry pins move with the format pin, not separately.** `just_dna_registry.version.contract_compatible`
+compares the *installed `just-dna-format` version* on client and server and treats a `0.x` minor as
+breaking, so a 0.5-format client and a 0.6-format server refuse each other. Registry `0.17.0` is the
+format-0.6 cut and floors at `just-dna-format>=0.6.1`. **The deployed server crossed with us: prod
+answers `registry 0.17.0 / format 0.6.1 / compiler 0.6.1` as of 2026-08-18, so the mismatch window is
+closed and `scripts/registry_precheck.py` rehearses against prod again.** While a window like that is
+open, every publish / download / check fails with a contract-mismatch `VersionMismatchError`, which
+`webui/state.py` surfaces at six call sites as a clear message rather than a crash — expected during
+the window, not a defect to work around. Check what is actually deployed before assuming either way:
+`curl -s $REGISTRY_URL/api/v1/version`.
 
 **From the 0.4.0 schema change:** compiled artifacts gained ~14 columns (`variant_key`,
 `effect_size`, `clin_sig`, `acmg_sf`, …), so freshly compiled modules no longer match the modules
@@ -272,6 +303,95 @@ question tracked in just-dna-format's ROADMAP.
 **Status (2026-08-09):** the tests are re-baselined and green, and all ten modules are rebuilt under
 0.5 in `data/interim/v1_port/`. What is left is **republishing**, which is the maintainer's call —
 see [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md).
+
+### What 0.6 changed on our side (adopted 2026-08-18)
+
+`just-dna-format/docs/INTEGRATION_0_6.md` is the upstream delta and § 3 is our own change list; our
+field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actually changed here:
+
+- **`locus_count > 1` is the predicate for "this row is an expansion member"** (RM87), and it replaced
+  our `ref`-spelling guard as the primary test in `restoration.hom_ref_rows`. An rsID resolving onto N
+  loci becomes N rows, at most one of which is the variant the author meant, and nothing else on the
+  row says so. The old guard **stays beside it as the pre-0.6 fallback** — every module we have
+  published predates the column — and it is partial by construction: it groups by `(chrom, start)` and
+  can only see members that disagree about `ref` at one position (the ClinVar dup/del shape). A
+  **same-`ref`** expansion is invisible to it and is real. Measured on a compiled fixture (`shox_par1`
+  with `resolution.csv` twinned onto chrY): two rows, `ref="C"` on both, `locus_count=2`, and the
+  grouped test passes both through. **`locus_count` defaults to `1`, so `> 1` is the test** — a
+  truthiness or `> 0` test would disable restoration on every 0.6 artifact. No `expanded_keys` gate is
+  needed in `hom_ref_rows` (a module compiled without resolution has null coordinates and `placed`
+  already dropped it), but anything that *counts or classifies* rows does need it: `locus_count=1` on
+  such a module means "nothing was checked", not "nothing expanded".
+
+  **Restoration withholds; the report labels — and the asymmetry is the point.** An unobserved
+  hom-ref row at N loci fabricates N results, so it is dropped. A *called* row was really sequenced
+  and really carries that genotype, so dropping it would discard an observation; it renders with a
+  "Position ambiguous" caveat naming N instead. The engine's `ref`-agreement filter already removes
+  the members whose reference allele contradicts the call, so what reaches the report is the
+  same-`ref` case, where every member matches equally well and the ambiguity is genuine. `None`
+  (pre-0.6) and `1` both render nothing — do not coalesce `None` to `1`.
+- **`just_dna_format.alleles.split_genotype` is the one genotype split.** `report_logic._genotype_alleles`
+  now delegates its string case to it. Ours split on `/` only, so a **phased** authored cell came back
+  as one allele — `"A|G"` → `["A|G"]` — and `_zygosity` then rendered nothing. Nothing we ship authors a
+  phased genotype, so no fixture from the corpus could have caught it; that is the argument for the
+  leaf. The engine's `_normalize_lead_genotype` stays a vectorized polars expression (it cannot make a
+  Python call per row over millions of VCF rows) and `tests/test_format_0_6.py` pins both against the
+  leaf over a cell list that deliberately includes `A|G` and `G|A`. **Neither sorts.** Sorting belongs
+  only in `_genotype_join_key`, which rebuilds the *authored* key.
+- **Discovery decides what a module contains from `manifest.artifact.files`** (INTEGRATION § 2.8 — the
+  one change upstream asks a consumer to make rather than making itself). `hf_modules._attested_files`
+  reads the manifest where the source publishes one; `_find_lead_table` consults that list, and
+  `_probe_module_at_path` uses it for the three side parquets. **Falls back to probing when there is no
+  manifest, which is every module on HuggingFace today**, and returns `None` rather than an empty set
+  for exactly that reason — an empty set would read as "this module contains nothing". Why it matters:
+  the publisher's `upload_folder` adds and replaces but **never removes**, so a module whose table set
+  *shrank* between releases leaves the previous release's parquet at the path, and a probe reads the
+  module as the wrong **kind** (a re-authored PGx module still looks like a SNP core). `logo` and
+  `metadata` keep probing — neither is in `ARTIFACT_PARQUETS`, so no manifest says anything about them.
+- **`ARTIFACT_PARQUETS` and `LEAD_PARQUETS` are public now (S35); import them, never re-list them.**
+  `_OUTPUT_FILES` is **gone** — that import was the one hard break in the upgrade. Two hand-kept lists
+  here were deleted rather than updated: the HuggingFace publisher's allowlist named six side tables
+  where 0.6 has nine (a module carrying any of the three new fact tables would have published a
+  manifest attesting parquets the upload never sent — the published digest then unreproducible, which
+  is precisely the defect that broke the upstream publisher on fifteen of sixteen modules), and two
+  copies of "which authored CSV leads a module" named four of the ten families, so a `heteroplasmy`- or
+  `copynumbers`-led module counted zero authored rows. `module_config.LEAD_TABLE_CSVS` is now the single
+  mapping (`weights` → `variants.csv` is the only irregular one) and `tests/test_format_0_6.py` asserts
+  set equality with the compiler both ways.
+- **The licence sidecar is `licensing.csv`, and you reach it through `just_dna_format.layout`.** Never
+  by name. `resolve_sidecar` / `sidecar_write_path` / `sidecar_candidates` implement write-what-you-read
+  over four legal locations (two spellings × root or `derived/`), and **both spellings present is a
+  refusal** (`SidecarCollision`), not a preference — two copies of a fact-hashed, hand-editable table
+  are two claims. Our drafters' stale-file sweep unlinked `sources.csv` literally, which is fine at the
+  root and wrong under `derived/`: the sweep cannot reach `derived/sources.csv`, so the next
+  `sidecar_write_path` finds it as the existing copy and merges into the **deprecated** spelling, which
+  the module then keeps for good. Measured both ways. **The rename stops at the file:**
+  `sources.parquet` and `manifest.sources` keep their names for the whole 0.x tail, so the chain reads
+  `licensing.csv` → `sources.parquet` → `manifest.sources`. Do not "finish" it.
+- **`manifest.weighting` (RM92) is what makes a weight interpretable, and the report now shows it.**
+  `weight` is a bare float with no unit column, so nothing in a pre-0.6 artifact could say what scale it
+  runs on. `read_module_provenance` returns it as a third value and the "Modules in this report" table
+  renders it verbatim beside the version and digest. **Absent is `None` and means the module has not
+  said — never that its weights are comparable to another module's.** We do not aggregate `weight`
+  across modules anywhere (`total_weight` is per module, summed over one module's categories); if you
+  ever want to, that block is the gate, and an absent block means *do not*.
+- **`StudyRow` may now name no variant at all** (RM47), so `StudyRow.variant_key` can be `None`. This is
+  **not** in the upstream integration note (it is S40's first item). `load_studies_for_variants` groups
+  by `rsid` and a null rsid matches nothing, which is the correct outcome for a citation grounding a bin
+  boundary rather than a variant. Do not repair a null key into a string, and do not join
+  `studies.parquet` on `variant_key` without handling the null.
+- **Nothing changed for the enricher exception contract (INTEGRATION § 8).** We hold no `except` around
+  any enricher pass, so there was no handler to reorder and none that had been silently dead. If you
+  ever add one, read that section first: the trap is two separate `except` arms with the parent type
+  first, which goes silently dead because the unavailability type is now a *subclass*. Order narrow-first.
+- **Trust badging needs nothing.** We read `trusted` from the registry rather than computing it, and
+  `_trust_word` already keeps it tri-state. Registry 0.17 reads RM44's counters (`resolution_subjects`
+  beside `fully_resolved`) and keeps the `UNJOINABLE_PHRASE` match for artifacts predating them.
+- **The ten modules in `data/interim/v1_port/` were deliberately NOT rebuilt or republished.** That is
+  the maintainer's call (see `docs/MODULE_RELEASE_0_5.md`), and leaving them as 0.5 artifacts keeps the
+  mixed-era read paths under live test rather than under fixture only — `_annotations_keying`'s three
+  generations, the pre-0.6 `ref` guard, and `UNJOINABLE_PHRASE` all still have a real artifact
+  exercising them.
 
 ### Contract facts (0.1.0 libs)
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
@@ -342,7 +462,7 @@ silent zero. And registry **0.11.3** reads the same warning to make `trusted` th
 ### The annotating engine's side of the contract (`hf_logic.py`)
 
 The engine projects **nothing** from a module's lead table — it reads five columns (`rsid`, `chrom`,
-`start`, `ref`, `genotype`) and left-joins the rest opaquely, so all 37 columns of a 0.5 artifact
+`start`, `ref`, `genotype`) and left-joins the rest opaquely, so all 39 columns of a 0.6 artifact
 already reach the output parquet. Anything missing from a report is missing *in the report*, not
 dropped here. Three rules it does enforce, each with a failure it exists to prevent:
 
@@ -361,8 +481,11 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
   (`AuthoredModel._validate_genotype`: "phase encodes which allele sits on which homolog"), so
   sorting folds `A|G` and `G|A` into one key and manufactures a match the module never stated. The
   first version of this function sorted, and no test in the corpus could have caught it — nothing we
-  ship carries a phased genotype. `report_logic._genotype_alleles` is the Python twin; keep the two
-  documented together.
+  ship carries a phased genotype. `report_logic._genotype_alleles` is the Python twin and now
+  **delegates to `just_dna_format.alleles.split_genotype`** (0.6, S30) rather than reimplementing the
+  rule — it had the mirror-image bug, splitting on `/` only so a phased cell read as one allele. This
+  expression cannot call the leaf (a Python call per row over millions of VCF rows), so the two are held
+  equivalent by `tests/test_format_0_6.py::TestOneGenotypeSplit` instead. Keep them documented together.
 - **The position join requires `ref` agreement where the module states one.** Genotype lists hold
   allele *strings*, so matching them constrains the alleles the sample carries — but the module's
   `ref` used to be dropped outright, so `G>A` matched a module's `GTGTCT>A` at the same locus. On one
@@ -412,7 +535,13 @@ under any later verification harness (the format tier's RM7). Three rules:
   Gen-I ports author `version: null`, so *Not stated* is currently the common case; that is the
   porting pipeline's gap, not the report's.
 
-**"Is this a module" is one predicate, `module_config.has_lead_table` / `find_lead_table`** — the
+**"Is this a module" is one predicate — but on a *remote* source 0.6 gave it a better input.**
+`hf_modules._find_lead_table` now takes the set `manifest.artifact.files` attests where the source
+publishes a manifest, and only probes when there is none (see the 0.6 section above: the publisher never
+removes, so a leftover parquet otherwise decides the module's *kind*). The local-filesystem twin below
+still probes, which is correct — a directory we compiled ourselves has no stale release in it.
+
+`module_config.has_lead_table` / `find_lead_table` are that local predicate — the
 local-filesystem twin of discovery's fsspec `_find_lead_table`, both keyed on `LEAD_TABLES`. Probing
 `weights.parquet` is not the test: a drug-response module carries `pharm_variants` and no weights, and
 testing for weights in `list_custom_modules`, `get_custom_module_specs` and the webui's
@@ -486,6 +615,11 @@ real parameter is `restoration_max_flank_bp`.
 - `hom_ref_rows` returns `None` for a lead table with no `ref`/coordinates, so `pharm_variants` is
   excluded **by schema rather than by name** — format 0.6's RM43 fill switches it on with no code
   change here.
+- **An expansion member is never restored** — `locus_count > 1` (0.6, RM87), with the older
+  `ref`-spelling anti-join kept beside it for pre-0.6 artifacts. This is where the 3,762 false findings
+  came from and where the fix belongs: the sample was never observed at the site, so restoring one
+  authored row at N loci fabricates N results rather than reporting an ambiguous one. See the 0.6
+  section above for why both tests are needed and what each one cannot see.
 
 The restored frame is built by pouring module values into `vcf_lf.limit(0)` and `hstack`-ing, so it
 carries the annotated schema by construction rather than by a hand-maintained copy that drifts the
@@ -515,17 +649,26 @@ rather than `DP` with an equality join on position (RM57's second half).
 
 ### The report's side of the contract (`report_logic.py` + `longevity_report.html.j2`)
 
-The engine projects nothing, so all 37 columns of a 0.5 artifact reach the user's parquet; the report
+The engine projects nothing, so all 39 columns of a 0.6 artifact reach the user's parquet; the report
 is where they were being lost (it read ~14 and rendered 11). Four rules now hold it to the contract.
 
 - **`annotations.parquet` is keyed per *annotation*, not per variant, so joining it on `rsid` fans a
   poly-effect variant out into one report row each** — measured coronary **81 → 231** (×2.85),
   lipidmetabolism ×2.73, vo2max ×2.15, inflating `total_variants` and every count derived from it.
   `_join_annotations` detects the key from the columns present (`_annotations_keying`) because three
-  artifact generations are live at once: 0.3 on HuggingFace (rsid only), 0.5 as we compile today
-  (`variant_key`, no genotype), 0.6 (`genotype`, per format **RM80**). Dedup-on-`variant_key` is used
-  **only** in the 0.5 era, where the artifact offers no finer key — the RM80 reply rejects it as the
-  general answer, since a genuine poly-effect variant is one locus with two real annotations.
+  artifact generations are live at once, and **all three still are**: 0.3 on HuggingFace (rsid only),
+  0.5 in `data/interim/v1_port/` (`variant_key`, no genotype), and 0.6 as we compile today
+  (`genotype`, per format **RM80**). Dedup-on-`variant_key` is used **only** in the 0.5 era, where the
+  artifact offers no finer key — the RM80 reply rejects it as the general answer, since a genuine
+  poly-effect variant is one locus with two real annotations.
+
+  The `genotype` branch was written before 0.6 shipped and is now **verified against a real artifact**:
+  `tests/test_module_roundtrip.py` compiles the four HF modules under 0.6 and asserts that
+  `_genotype_key_expr` — the production expression, which rebuilds the authored cell from the allele
+  list `weights.parquet` stores — reproduces every `(variant_key, genotype)` the compiler actually
+  wrote. Measured on `coronary`: 81 annotation rows under the 0.6 key against the 77 the 0.5 key
+  collapsed them to, and zero keys our rebuild fails to produce. That test is the fence: if the rebuild
+  ever stops agreeing with the compiler, the join silently matches a larger set.
 - **`_effective_clin_sig` is the exact counterpart of `_effective_direction`** — authored column
   first, else `derive.clin_sig_from_booleans`. COMPILER.md: the fallback "lives in Python and does
   not travel with the parquet", so a polars-side consumer applies it itself. Prefer the column and

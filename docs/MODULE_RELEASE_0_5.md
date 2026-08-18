@@ -1,5 +1,7 @@
 # Releasing the annotation modules on 0.5
 
+> **We are on format 0.6 since 2026-08-18** (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2). The runbook below still applies step for step; two things in it read differently. The licence sidecar is now written as **`licensing.csv`** (`sources.csv` is the deprecated spelling — still read, warned, removed at 1.0), and **every `artifact.digest` moved at the version boundary** while no `content_signature` did, so a digest that differs from a 0.5 record is the compiler version and not a content change. Republishing the ten modules remains the maintainer's call; they are still 0.5 artifacts on purpose. See CLAUDE.md § *What 0.6 changed on our side*.
+
 The build-and-publish runbook for the ten `just-dna-seq` modules, on `just-dna-format` 0.5.0 /
 `just-dna-compiler` 0.5.1 / `just-dna-enricher` 0.5.1. The registry is
 `https://module-registry.just-dna.life` (it answered to `module-marketplace.` until 2026-08-10).
@@ -87,7 +89,7 @@ built spec without `--offline`, which is a decision about time and API budget, n
 | cancer | 139,254 | 139,254 | 138,240 | — | 139,254/139,254 | `4e9e0dff` |
 | pathogenic | 617,001 | 617,001 | 622,507 | — | 617,001/617,001 | `8a291cad` |
 
-**Panel digests move on every rebuild, with or without a content change.** `sources.csv` carries a
+**Panel digests move on every rebuild, with or without a content change.** `licensing.csv` carries a
 `fetched_at` stamped when the row is drafted, and `sources.parquet` is one of the four files
 `artifact.digest` is a Merkle root over — isolated by editing only that field and recompiling. So
 treat the hashes above as identifying *these* builds, not the content: a rebuild from the same
@@ -387,7 +389,7 @@ into `--changelog`.
 > variants, 55 drugs, 33 genes; one row per (variant, drug, genotype, effect category), because a
 > single variant carries separate and sometimes opposed efficacy, toxicity and pharmacokinetic
 > findings. Conclusions are ClinPGx's own published sentences, transcribed rather than summarized.
-> ClinPGx is CC BY-SA 4.0 and forbids sale, so `sources.csv` records `commercial_use=false` /
+> ClinPGx is CC BY-SA 4.0 and forbids sale, so `licensing.csv` records `commercial_use=false` /
 > `declared_use=non_commercial` and the compiler refuses to build without that declaration.
 
 ### 3a. Registry (primary) — server-side recompile from the spec

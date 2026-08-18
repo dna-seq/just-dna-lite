@@ -12,6 +12,7 @@ from typing import Optional
 import jinja2
 import polars as pl
 from eliot import log_message, start_action
+from just_dna_format.alleles import split_genotype
 from just_dna_format.derive import clin_sig_from_booleans, direction_from_state
 
 from just_dna_pipelines.annotation.analytics import umami_script_tag
@@ -329,17 +330,29 @@ def _evidence_rank(level: str | None) -> int:
 
 
 def _genotype_alleles(genotype: list[str] | str | None) -> list[str]:
-    """Alleles of a genotype, from either representation.
+    """Alleles of a genotype, from either representation, in the order they were written.
 
     ``weights.parquet`` stores a genotype as a list of alleles; the 0.4 table families
     (``pharm_variants`` and friends) store the authored string, e.g. ``"G/G"``. Both reach the
     report, and treating the string as a sequence of characters silently produced ``G///G`` and a
     zygosity read off the separator.
+
+    **The string case delegates to ``just_dna_format.alleles.split_genotype``** — the format's single
+    definition of the split, made public in 0.6 precisely because consumers were re-deriving it from
+    prose and getting it wrong (S30: reimplemented twice, in opposite directions, with no failing run
+    either time to say which was right). Ours was wrong in a third way: it split on ``/`` only, so a
+    **phased** authored genotype came back as one allele — ``"A|G"`` → ``["A|G"]`` — and
+    ``_zygosity`` then read it as a single-allele row and rendered no zygosity at all. Nothing we
+    ship carries a phased genotype, so no test in the corpus could have caught it; that is exactly
+    the argument for calling the leaf instead of keeping a copy.
+
+    Never sorted, in either representation. Sorting belongs in ``_genotype_join_key``, which rebuilds
+    the *authored* key, and nowhere else.
     """
     if genotype is None:
         return []
     if isinstance(genotype, str):
-        return [a for a in genotype.split("/") if a]
+        return split_genotype(genotype)
     return list(genotype)
 
 
@@ -590,6 +603,25 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         # sequenced one carry different weight and the reader has to be able to see which is which.
         "restored": row.get(EVIDENCE_COLUMN) == EVIDENCE_RESTORED,
         "restored_flank_bp": row.get(FLANK_COLUMN),
+        # How many loci the authored key resolved onto (format 0.6, RM87 — `locus_count`, stamped by
+        # the compiler, `1` on a row that was not expanded). `> 1` means the module authored **one**
+        # row for an rsID that resolves to several positions, so the compiler paired that genotype
+        # with every one of them and **at most one of the resulting rows is the variant the author
+        # meant** — nothing on the row says which.
+        #
+        # Restoration withholds these outright (`restoration.hom_ref_rows`), because an unobserved
+        # hom-ref row at N loci fabricates N results. A *called* row is different: the sample really
+        # was sequenced there and really carries that genotype, so withholding would discard an
+        # observation. It is labelled instead. The `ref`-agreement filter in the engine already drops
+        # the members whose reference allele contradicts the call, which is most of them; what
+        # survives to here is the same-`ref` case (a pseudoautosomal locus on X and Y, a paralogous
+        # rsID over two positions with the same reference base), where every member matches equally
+        # well and the ambiguity is real rather than resolvable.
+        #
+        # `None` on a pre-0.6 artifact, which is every module we have published — the template then
+        # renders nothing, exactly as for an absent authored axis. Do not coalesce it to 1.
+        "locus_count": row.get("locus_count"),
+        "locus_index": row.get("locus_index"),
         "drug": row.get("drug", "") or "",
         "evidence_level": row.get("evidence_level", "") or "",
         "phenotype_category": row.get("phenotype_category", "") or "",
@@ -1012,6 +1044,10 @@ def build_module_provenance(
                 "digest_short": digest.split(":")[-1][:12],
                 "lead_table": (output.lead_table if output else None)
                 or (info.lead_table if info is not None else "weights"),
+                # What the module says its `weight` column means (format 0.6, RM92), verbatim and
+                # unparsed. Empty means the module has not said — which the template must render as
+                # *Not stated*, never as an assurance that the weights mean anything in particular.
+                "weighting": (output.weighting if output else None) or "",
                 "source_url": (output.source_url if output else None)
                 or (info.source_url if info is not None else "")
                 or "",

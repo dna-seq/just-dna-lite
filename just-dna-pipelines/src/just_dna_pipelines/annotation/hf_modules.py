@@ -13,7 +13,7 @@ from typing import Optional
 
 import polars as pl
 from eliot import log_message
-from just_dna_format.manifest import read_manifest
+from just_dna_format.manifest import ModuleManifest, read_manifest
 from pydantic import BaseModel, model_validator
 
 from just_dna_pipelines.annotation.module_cache import (
@@ -106,10 +106,70 @@ def _build_url(protocol: str, path: str) -> str:
     return f"{protocol}://{path}"
 
 
-def _find_lead_table(fs: "AbstractFileSystem", base_path: str) -> Optional[str]:
-    """Return the name of the table family leading this directory, or None if it is not a module."""
+#: The manifest, when a source publishes one, is the authority on what the module *contains*.
+_MANIFEST_NAME: str = "manifest.json"
+
+
+def _attested_files(fs: "AbstractFileSystem", base_path: str) -> Optional[frozenset[str]]:
+    """The parquet basenames `manifest.json` attests, or `None` when the source publishes no manifest.
+
+    **This is the list `artifact.digest` is computed over, so it is what the module *is*** — and the
+    difference from listing the directory is not cosmetic (just-dna-format INTEGRATION_0_6 § 2.8, the
+    one change that document asks a consumer to make rather than making upstream).
+
+    The publisher's `upload_folder` **adds and replaces but never removes**. So a module whose table
+    set *shrank* between releases — a SNP-core module re-authored as a table-only PGx module — leaves
+    the previous release's `weights.parquet` sitting at the path beside a manifest that does not
+    attest it. A probe for named files still finds a SNP core: the old release's. Nothing is
+    mis-hashed and verification would pass; the module is mis-**typed**, and on the discovery path,
+    which fetches no manifest, a fossil is indistinguishable from a live table. Reading the attested
+    list closes that for every module including the ones already published, which no publisher-side
+    fix can reach.
+
+    `None` (rather than an empty set) is what keeps this safe to adopt now: every module on
+    HuggingFace today was published under 0.3 and carries no manifest at all, so the caller falls
+    back to probing. An empty set would read as "this module contains nothing".
+
+    Cost is one `fs.exists` plus, at most, one small read per module directory.
+    """
+    manifest_path = f"{base_path}/{_MANIFEST_NAME}"
+    if not fs.exists(manifest_path):
+        return None
+    try:
+        raw = fs.cat_file(manifest_path)
+        manifest = ModuleManifest.model_validate_json(raw)
+    except Exception as exc:
+        # A manifest we cannot read must not make a real module undiscoverable — fall back to
+        # probing, which is what every pre-0.6 module gets anyway, and say so rather than silently
+        # degrading.
+        log_message(
+            message_type="warning",
+            action="unreadable_remote_manifest",
+            path=manifest_path,
+            reason=str(exc),
+        )
+        return None
+    return frozenset(
+        Path(entry.name).name for entry in (manifest.artifact.files if manifest.artifact else [])
+    )
+
+
+def _find_lead_table(
+    fs: "AbstractFileSystem", base_path: str, attested: Optional[frozenset[str]] = None
+) -> Optional[str]:
+    """Return the name of the table family leading this directory, or None if it is not a module.
+
+    When the module publishes a manifest, the answer comes from `artifact.files` — see
+    `_attested_files` for why a leftover parquet from an earlier release would otherwise decide the
+    module's *kind*. Otherwise it probes, which is the pre-0.6 path.
+    """
     for table in LEAD_TABLES:
-        if fs.exists(f"{base_path}/{table}.parquet"):
+        name = f"{table}.parquet"
+        if attested is not None:
+            if name in attested:
+                return table
+            continue
+        if fs.exists(f"{base_path}/{name}"):
             return table
     return None
 
@@ -126,11 +186,22 @@ def _probe_module_at_path(
     Probe a directory for module files (weights.parquet, a 0.4 lead table, etc.).
 
     Returns ModuleInfo if any table in LEAD_TABLES exists, None otherwise.
+
+    **Which tables the module has is decided by `manifest.artifact.files` where a manifest exists**,
+    and by probing where it does not (every module published under 0.3, which is all of ours today).
+    See `_attested_files`: the publisher never removes a file, so a directory can hold a union of two
+    releases and a probe would read a previous release's table as a live one.
     """
-    lead_table = _find_lead_table(fs, base_path)
+    attested = _attested_files(fs, base_path)
+    lead_table = _find_lead_table(fs, base_path, attested)
     if lead_table is None:
         return None
     lead_path = f"{base_path}/{lead_table}.parquet"
+
+    def _has(name: str) -> bool:
+        if attested is not None:
+            return name in attested
+        return fs.exists(f"{base_path}/{name}")
 
     annotations_path = f"{base_path}/annotations.parquet"
     studies_path = f"{base_path}/studies.parquet"
@@ -162,9 +233,12 @@ def _probe_module_at_path(
         lead_table=lead_table,
         lead_url=lead_url,
         weights_url=lead_url if lead_table == "weights" else None,
-        annotations_url=_build_url(protocol, annotations_path) if fs.exists(annotations_path) else None,
-        studies_url=_build_url(protocol, studies_path) if fs.exists(studies_path) else None,
-        sources_url=_build_url(protocol, sources_path) if fs.exists(sources_path) else None,
+        # These three are parquets inside `artifact.digest`, so `_has` consults the attested list.
+        # `logo`/`metadata` below are deliberately left probing: neither is in `ARTIFACT_PARQUETS`,
+        # so a manifest says nothing about them and asking it would drop the logo off every module.
+        annotations_url=_build_url(protocol, annotations_path) if _has("annotations.parquet") else None,
+        studies_url=_build_url(protocol, studies_path) if _has("studies.parquet") else None,
+        sources_url=_build_url(protocol, sources_path) if _has("sources.parquet") else None,
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
     )
@@ -184,13 +258,18 @@ def _discover_hf_source(source: Source) -> dict[str, ModuleInfo]:
     kind = source.kind
 
     if kind == "module" or (kind is None and not fs.exists(base_path)):
-        # Single module: check for a lead table at data root or repo root
+        # Single module: check for a lead table at data root or repo root.
+        #
+        # `_probe_module_at_path` is the whole test, rather than `_find_lead_table` first and then a
+        # probe. It used to be both, and the duplicate decided *which candidate to stop at*: the probe
+        # answers from `manifest.artifact.files` where a manifest exists, so a directory holding only
+        # an unattested leftover parquet satisfied the outer check, returned no ModuleInfo, and
+        # `break` then skipped the candidate that would have worked.
         for candidate_path in (base_path, f"datasets/{repo_id}"):
-            if _find_lead_table(fs, candidate_path) is not None:
-                name = source.name or repo_id.split("/")[-1]
-                info = _probe_module_at_path(fs, candidate_path, "hf", name, source.url, repo_id)
-                if info:
-                    module_infos[name] = info
+            name = source.name or repo_id.split("/")[-1]
+            info = _probe_module_at_path(fs, candidate_path, "hf", name, source.url, repo_id)
+            if info:
+                module_infos[name] = info
                 break
         return module_infos
 
@@ -239,13 +318,15 @@ def _discover_fsspec_source(source: Source) -> dict[str, ModuleInfo]:
             module_infos[name] = info
         return module_infos
 
-    # Auto-detect: check for a lead table at root (single module)
-    if kind is None and _find_lead_table(fs, base_path) is not None:
+    # Auto-detect: is the root itself a single module? The probe is the test (see the HF branch
+    # above) — asking `_find_lead_table` first would let an unattested leftover parquet at the root
+    # return "yes, a module" and then return nothing, skipping the collection scan below.
+    if kind is None:
         name = source.name or base_path.split("/")[-1] if base_path else "unknown"
         info = _probe_module_at_path(fs, base_path, protocol, name, source.url, source.url)
         if info:
             module_infos[name] = info
-        return module_infos
+            return module_infos
 
     # Collection: scan subfolders
     _VERSION_RE = re.compile(r"^v(\d+)$")
@@ -550,10 +631,33 @@ def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
     return path
 
 
+def _weighting_summary(manifest: "ModuleManifest") -> Optional[str]:
+    """The module's `weighting` block as one line of its author's own words, or `None`.
+
+    All three fields are free text on purpose (a closed vocabulary would have had to be guessed at),
+    so they are rendered verbatim and never parsed. `None` when the block is absent **or** when every
+    field in it is empty: an empty block establishes nothing, and rendering it as a present statement
+    would be worse than rendering nothing.
+    """
+    block = getattr(manifest, "weighting", None)
+    if block is None:
+        return None
+    parts = [
+        f"{label}: {value.strip()}"
+        for label, value in (
+            ("scale", block.scale),
+            ("method", block.method),
+            ("note", block.note),
+        )
+        if value and value.strip()
+    ]
+    return " · ".join(parts) or None
+
+
 def read_module_provenance(
     info: Optional[ModuleInfo],
-) -> tuple[Optional[str], Optional[str]]:
-    """``(version, artifact digest)`` for the module's bytes, as far as the source states them.
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """``(version, artifact digest, weighting)`` for the module, as far as the source states them.
 
     `None` means *not established*, never "unversioned" or "unverified": only an acquisition path
     that puts `manifest.json` on disk can answer at all, and HF discovery is not one of them.
@@ -561,14 +665,22 @@ def read_module_provenance(
     The digest is the value the module **claims** — read from its manifest, not recomputed. Nothing
     in this repo calls `just_dna_format.integrity.verify_manifest`, so recording it ties a report to
     a stated identity, not to a checked one. Do not present it to a reader as verification.
+
+    `weighting` is the module's own statement of what its authored `weight` column *means* — scale,
+    method, free-text note (format 0.6, RM92). It exists because `weight` is a bare float with no
+    unit column, so nothing in a pre-0.6 artifact could say what scale it runs on; the report shows a
+    per-module net weight, and a reader cannot interpret that number without it. **Absent is
+    `None`, and `None` means the module has not said — never that its weights are comparable to
+    anything else's.**
     """
     module_dir = local_module_dir(info)
     if module_dir is None:
-        return (None, None)
+        return (None, None, None)
 
     manifest_path = module_dir / "manifest.json"
     version: Optional[str] = None
     digest: Optional[str] = None
+    weighting: Optional[str] = None
     if manifest_path.exists():
         try:
             manifest = read_manifest(manifest_path)
@@ -582,13 +694,14 @@ def read_module_provenance(
         else:
             version = manifest.identity.version or None
             digest = manifest.artifact.digest or None
+            weighting = _weighting_summary(manifest)
 
     # The compiler leaves `identity.version` null — the registry stamps identity at publish time —
     # so a locally-compiled module's version lives only in the authored spec.
     if version is None:
         version = spec_version(module_dir) or None
 
-    return (version, digest)
+    return (version, digest, weighting)
 
 
 class ModuleOutputMapping(BaseModel):
@@ -608,6 +721,9 @@ class ModuleOutputMapping(BaseModel):
     version: Optional[str] = None
     digest: Optional[str] = None
     source_url: Optional[str] = None
+    # What the module says its `weight` column means (format 0.6, RM92), verbatim. `None` means the
+    # module has not said, which a reader must not take as "these weights are comparable".
+    weighting: Optional[str] = None
 
 
 class AnnotationManifest(BaseModel):
