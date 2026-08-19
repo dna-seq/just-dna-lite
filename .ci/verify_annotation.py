@@ -28,10 +28,13 @@ def main() -> None:
     assert manifest.exists(), "No manifest.json found"
     print("OK: manifest.json present")
 
-    reports = list((SAMPLE_DIR / "reports").glob("longevity_report_*.html"))
-    assert len(reports) >= 1, "No longevity_report_*.html found"
-    assert reports[-1].stat().st_size > 0, "Empty HTML report"
-    print(f"OK: report {reports[-1].name}")
+    # The report stem is derived from the selected module (report_logic.report_filename_stem),
+    # so match any HTML in reports/ rather than a single hardcoded name.
+    reports = list((SAMPLE_DIR / "reports").glob("*.html"))
+    assert len(reports) >= 1, "No HTML report found in reports/"
+    latest = max(reports, key=lambda path: path.stat().st_mtime)
+    assert latest.stat().st_size > 0, "Empty HTML report"
+    print(f"OK: report {latest.name}")
 
 
 if __name__ == "__main__":

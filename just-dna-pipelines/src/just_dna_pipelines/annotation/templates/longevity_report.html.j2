@@ -353,6 +353,7 @@ table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
 }
 .cell-wrap { overflow-wrap: anywhere; }
 .weight-cell { font-variant-numeric: tabular-nums; }
+.ai-icon-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ai-explain-column { min-width: 156px; }
 .ai-explain-links {
     display: flex;
@@ -463,7 +464,9 @@ table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
 </style>
 
 <script>
-const TABLE_PREVIEW_ROWS = 10;
+/* Kept in step with the Jinja side: `preview_row_limit` decides which rows ship
+   pre-collapsed and what the toolbar first says; this decides what the toggle does. */
+const TABLE_PREVIEW_ROWS = {{ preview_row_limit }};
 
 function setVariantDetails(button, expanded) {
     const summaryRow = button.closest("tr");
@@ -525,13 +528,13 @@ window.addEventListener("scroll", function() {
 {% macro table_controls(tbody_id, row_count) %}
 <div class="table-toolbar">
     <span class="table-status" id="{{ tbody_id }}Status">
-        {% if row_count > 10 %}
-        Showing first <strong>10</strong> of {{ row_count }} rows
+        {% if row_count > preview_row_limit %}
+        Showing first <strong>{{ preview_row_limit }}</strong> of {{ row_count }} rows
         {% else %}
         Showing all <strong>{{ row_count }}</strong> row{% if row_count != 1 %}s{% endif %}
         {% endif %}
     </span>
-    {% if row_count > 10 %}
+    {% if row_count > preview_row_limit %}
     <button
         type="button"
         class="table-toggle"
@@ -547,27 +550,46 @@ window.addEventListener("scroll", function() {
 {% if value %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endif %}
 {% endmacro %}
 
-{% macro ai_assistant_icon(provider) %}
-<svg role="img" viewBox="{% if provider == 'grok' %}0 0 512 512{% else %}0 0 24 24{% endif %}" aria-hidden="true">
-    {% if provider == "chatgpt" %}
-    <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365 2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
-    {% elif provider == "claude" %}
-    <path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/>
-    {% elif provider == "perplexity" %}
-    <path d="M22.3977 7.0896h-2.3106V.0676l-7.5094 6.3542V.1577h-1.1554v6.1966L4.4904 0v7.0896H1.6023v10.3976h2.8882V24l6.932-6.3591v6.2005h1.1554v-6.0469l6.9318 6.1807v-6.4879h2.8882V7.0896zm-3.4657-4.531v4.531h-5.355l5.355-4.531zm-13.2862.0676 4.8691 4.4634H5.6458V2.6262zM2.7576 16.332V8.245h7.8476l-6.1149 6.1147v1.9723H2.7576zm2.8882 5.0404v-3.8852h.0001v-2.6488l5.7763-5.7764v7.0111l-5.7764 5.2993zm12.7086.0248-5.7766-5.1509V9.0618l5.7766 5.7766v6.5588zm2.8882-5.0652h-1.733v-1.9723L13.3948 8.245h7.8478v8.087z"/>
-    {% else %}
-    <path d="M210.484 312.759L343.465 210.383C349.984 205.364 359.302 207.322 362.408 215.117C378.758 256.231 371.454 305.64 338.925 339.563C306.397 373.487 261.137 380.927 219.768 363.983L174.577 385.803C239.394 432.008 318.104 420.581 367.289 369.251C406.303 328.564 418.386 273.104 407.088 223.091L407.19 223.198C390.807 149.726 411.218 120.359 453.03 60.3072C454.02 58.8833 455.01 57.4595 456 56L400.978 113.382V113.204L210.45 312.794"/>
-    <path d="M183.042 337.641C136.519 291.294 144.54 219.567 184.236 178.203C213.59 147.59 261.683 135.096 303.666 153.464L348.755 131.75C340.632 125.627 330.221 119.042 318.275 114.414C264.277 91.2407 199.63 102.774 155.735 148.516C113.513 192.549 100.236 260.254 123.036 318.027C140.069 361.206 112.148 391.748 84.0229 422.575C74.0561 433.503 64.0553 444.431 56 456L183.007 337.677"/>
-    {% endif %}
-</svg>
+{# One <symbol> per assistant is emitted once by `ai_assistant_icon_defs`; every row then
+   costs a short <use> reference instead of a repeated path. Inlining the paths per row cost
+   about 5 kB a variant - 1 MB of a 206-variant report - for four identical copies of the
+   same four glyphs. #}
+{% macro ai_assistant_icon_defs() %}
+<svg class="ai-icon-defs" aria-hidden="true" focusable="false"><defs>
+    <symbol id="ai-icon-chatgpt" viewBox="0 0 24 24"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365 2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></symbol>
+    <symbol id="ai-icon-claude" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></symbol>
+    <symbol id="ai-icon-perplexity" viewBox="0 0 24 24"><path d="M22.3977 7.0896h-2.3106V.0676l-7.5094 6.3542V.1577h-1.1554v6.1966L4.4904 0v7.0896H1.6023v10.3976h2.8882V24l6.932-6.3591v6.2005h1.1554v-6.0469l6.9318 6.1807v-6.4879h2.8882V7.0896zm-3.4657-4.531v4.531h-5.355l5.355-4.531zm-13.2862.0676 4.8691 4.4634H5.6458V2.6262zM2.7576 16.332V8.245h7.8476l-6.1149 6.1147v1.9723H2.7576zm2.8882 5.0404v-3.8852h.0001v-2.6488l5.7763-5.7764v7.0111l-5.7764 5.2993zm12.7086.0248-5.7766-5.1509V9.0618l5.7766 5.7766v6.5588zm2.8882-5.0652h-1.733v-1.9723L13.3948 8.245h7.8478v8.087z"/></symbol>
+    <symbol id="ai-icon-grok" viewBox="0 0 512 512"><path d="M210.484 312.759L343.465 210.383C349.984 205.364 359.302 207.322 362.408 215.117C378.758 256.231 371.454 305.64 338.925 339.563C306.397 373.487 261.137 380.927 219.768 363.983L174.577 385.803C239.394 432.008 318.104 420.581 367.289 369.251C406.303 328.564 418.386 273.104 407.088 223.091L407.19 223.198C390.807 149.726 411.218 120.359 453.03 60.3072C454.02 58.8833 455.01 57.4595 456 56L400.978 113.382V113.204L210.45 312.794"/><path d="M183.042 337.641C136.519 291.294 144.54 219.567 184.236 178.203C213.59 147.59 261.683 135.096 303.666 153.464L348.755 131.75C340.632 125.627 330.221 119.042 318.275 114.414C264.277 91.2407 199.63 102.774 155.735 148.516C113.513 192.549 100.236 260.254 123.036 318.027C140.069 361.206 112.148 391.748 84.0229 422.575C74.0561 433.503 64.0553 444.431 56 456L183.007 337.677"/></symbol>
+</defs></svg>
 {% endmacro %}
 
+{% macro ai_assistant_icon(provider) %}<svg aria-hidden="true" focusable="false"><use href="#ai-icon-{{ provider }}"></use></svg>{% endmacro %}
+
+{#
+  One rendering for a variant table, shared by the pathway-category path, the per-module path and
+  the per-drug path. Those were near-identical copies once and had already drifted; every field
+  added below would otherwise be three edits.
+
+  Four constraints the inline JS above imposes on anything changed here:
+    * `setVariantDetails` takes the detail row as the *immediate next sibling* of the summary row
+      — no wrapper element between them.
+    * `directPreviewRows` counts only direct `<tbody>` children carrying `data-preview-row`, so a
+      row that participates in the row preview needs that attribute and the detail row must not
+      have it.
+    * The initial `preview-overflow` class and the JS `TABLE_PREVIEW_ROWS` must agree; both read
+      `preview_row_limit`, which comes from `report_logic.TABLE_PREVIEW_ROWS`.
+    * `colspan` on the detail cell must equal the number of <th> in the header (9).
+
+  Every detail row is guarded by `{% if %}`: a column our modules leave empty renders nothing at
+  all rather than an empty row, and a module that starts populating one renders it with no
+  further work.
+#}
 {% macro variant_rows(variants, tbody_id, gene_href_base) %}
 <tbody id="{{ tbody_id }}">
     {% for v in variants %}
     {% set detail_id = tbody_id ~ "Detail" ~ loop.index %}
     {% set study_tbody_id = tbody_id ~ "Study" ~ loop.index %}
-    <tr class="variant-summary{% if loop.index > 10 %} preview-overflow{% endif %}" data-preview-row>
+    <tr class="variant-summary{% if loop.index > preview_row_limit %} preview-overflow{% endif %}" data-preview-row>
         <td class="detail-column">
             <button
                 type="button"
@@ -659,7 +681,7 @@ window.addEventListener("scroll", function() {
                         </thead>
                         <tbody id="{{ study_tbody_id }}">
                             {% for s in v.studies %}
-                            <tr data-preview-row{% if loop.index > 10 %} class="preview-overflow"{% endif %}>
+                            <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
                                 <td><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
                                 <td>{{ s.population }}</td>
                                 <td>{{ s.study_design }}</td>
@@ -703,6 +725,7 @@ window.addEventListener("scroll", function() {
 </div>
 {% endmacro %}
 
+{{ ai_assistant_icon_defs() }}
 <div class="top-rule"></div>
 <header class="report-header">
     <div class="header-inner">
@@ -731,9 +754,16 @@ window.addEventListener("scroll", function() {
                 provenance and linked evidence when interpreting a finding.
             </p>
             <p>
-                Tables show ten rows initially for a compact overview. Use <strong>Open all</strong>
-                to inspect the full table and <strong>Close</strong> to return to the first ten.
+                Tables show {{ preview_row_limit }} rows initially for a compact overview. Use
+                <strong>Open all</strong> to inspect the full table and <strong>Close</strong> to
+                return to the first {{ preview_row_limit }}.
                 Open the <strong>+</strong> control beside a variant for its detailed evidence.
+            </p>
+            <p>
+                The buttons in the <strong>AI explain</strong> column open an external assistant with
+                a prompt about that one row already filled in. That prompt contains your genotype at
+                that position, so it leaves this file and goes to whichever assistant you pick. It is
+                sent only when you click a button; opening this report sends nothing anywhere.
             </p>
         </div>
         <aside class="scientific-note">
@@ -890,7 +920,7 @@ window.addEventListener("scroll", function() {
                     <thead><tr><th>Module</th><th>Version</th><th>Build</th><th>What its weights mean</th><th>Source</th></tr></thead>
                     <tbody id="moduleProvenanceTBody">
                         {% for m in module_provenance %}
-                        <tr data-preview-row{% if loop.index > 10 %} class="preview-overflow"{% endif %}>
+                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
                             <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
                             <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
                             <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
@@ -924,7 +954,7 @@ window.addEventListener("scroll", function() {
                     <thead><tr><th>Source</th><th>Used by</th><th>Licence</th><th>Attribution</th><th>Terms</th></tr></thead>
                     <tbody id="creditsTBody">
                         {% for c in credits %}
-                        <tr data-preview-row{% if loop.index > 10 %} class="preview-overflow"{% endif %}>
+                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
                             <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
                             <td>{{ c.modules | join(", ") }}</td>
                             <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>

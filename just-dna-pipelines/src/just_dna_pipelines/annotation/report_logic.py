@@ -39,6 +39,9 @@ from just_dna_pipelines.module_config import (
 )
 
 ANNOTATION_REPORT_COLUMNS: tuple[str, ...] = ("gene", "category", "phenotype")
+# How many rows a report table shows before the reader opens the rest. The template reads this
+# for both the pre-collapsed markup and the inline JS constant, so the two cannot drift apart.
+TABLE_PREVIEW_ROWS: int = 10
 GENERIC_REPORT_TITLE = "Genomic Annotation Report"
 AI_EXPLAIN_ASSISTANTS: tuple[tuple[str, str], ...] = (
     ("ChatGPT", "https://chatgpt.com/?q="),
@@ -1263,6 +1266,7 @@ def generate_longevity_report(
         html = template.render(
             report_title=report_title_for_modules(available_modules),
             report_description=report_description_for_modules(available_modules),
+            preview_row_limit=TABLE_PREVIEW_ROWS,
             user_name=user_name,
             sample_name=sample_name,
             longevity=longevity_data,
