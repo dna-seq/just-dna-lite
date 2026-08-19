@@ -230,7 +230,7 @@ class OutputPreviewState(LazyFrameGridMixin):
     output_preview_label: str = ""
 
     def view_output_file(self, file_path: str):
-        """Generator — called directly from on_click, no bridge needed."""
+        """Generator dispatched after UploadState selects the output card."""
         self.output_preview_expanded = True
         yield
         lf, descriptions = scan_file(Path(file_path))
@@ -246,7 +246,7 @@ lazyframe_grid(OutputPreviewState, ...)   # Output grid inside teal Outputs segm
 
 **Key points:**
 - Each `LazyFrameGridMixin` subclass gets its own cache (keyed by `type(self).__name__`)
-- The output grid's `on_click` calls `OutputPreviewState.view_output_file` **directly** — no bridge through `UploadState`
+- The output card's `on_click` calls `UploadState.preview_output_file`, which moves the active-card highlight before dispatching `OutputPreviewState.view_output_file`
 - The output grid is hidden until the user clicks the eye icon; dismissed with a close (X) button
 - Generator event handlers must use `yield` and `yield from self.set_lazyframe(...)` to propagate loading state
 

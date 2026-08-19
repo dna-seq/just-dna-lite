@@ -341,12 +341,17 @@ def test_clin_sig_is_derived_when_only_the_legacy_booleans_are_present():
 
 # ==================================================== render-if-present: the axes our corpus lacks
 
+import urllib.parse
+
 import jinja2
 
 from just_dna_pipelines.annotation.report_logic import (
     _AUTHORED_AXES,
+    TABLE_PREVIEW_ROWS,
     build_module_report_data,
     build_pharmacogenomics_report_data,
+    report_filename_stem,
+    report_title_for_modules,
 )
 
 TEMPLATE_DIR = (
@@ -360,6 +365,11 @@ def _render(**context) -> str:
         loader=jinja2.FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True
     )
     ctx = {
+        "report_title": "Synthetic Report",
+        "report_description": "Synthetic report description.",
+        # Read from the module rather than restated, so the preview cut-off has one definition
+        # across the Python side, the pre-collapsed markup, and the inline JS constant.
+        "preview_row_limit": TABLE_PREVIEW_ROWS,
         "user_name": "t", "sample_name": "s", "longevity": None,
         "other_modules": [], "pgx_modules": [], "credits": [],
         "module_provenance": [],
@@ -376,6 +386,103 @@ def _module_data(variants: list[dict]) -> dict:
         "summary": {"total_variants": len(variants), "total_positive": 0,
                     "total_negative": 0, "total_weight": 0.0},
     }
+
+
+def test_report_identity_uses_the_curated_single_module_name():
+    assert report_title_for_modules(["longevitymap"]) == "Longevity Variants"
+    assert report_filename_stem(["longevitymap"]) == "longevity_variants"
+    assert report_title_for_modules(["coronary"]) == "Coronary Artery Disease"
+    assert report_filename_stem(["coronary"]) == "coronary_artery"
+
+
+def test_multi_module_report_identity_is_neutral():
+    modules = ["longevitymap", "coronary"]
+    assert report_title_for_modules(modules) == "Genomic Annotation Report"
+    assert report_filename_stem(modules) == "report"
+
+
+def test_variant_tables_show_ten_rows_and_offer_open_all_at_the_bottom():
+    variants = []
+    for index in range(TABLE_PREVIEW_ROWS + 2):
+        row = {
+            "rsid": f"rs{index}",
+            "gene": "GENE",
+            "genotype": ["A", "T"],
+            "module": "synthetic",
+            "weight": 0.5,
+            "state": "risk",
+        }
+        variants.append(_build_variant(row, {}))
+
+    html = _render(other_modules=[_module_data(variants)])
+
+    row_count = TABLE_PREVIEW_ROWS + 2
+    assert (
+        f"Showing first <strong>{TABLE_PREVIEW_ROWS}</strong> of {row_count} rows" in html
+    )
+    assert html.count('class="variant-summary preview-overflow"') == 2
+    assert ">Open all</button>" in html
+    assert "toggleTableRows" in html
+    table_start = html.index('<table class="ui variants">')
+    table_end = html.index("</table>", table_start)
+    toolbar = html.index('<div class="table-toolbar">', table_end)
+    assert toolbar > table_end
+
+
+def test_each_rsid_row_links_four_ai_assistants_with_variant_context():
+    row = {
+        "rsid": "rs429358",
+        "gene": "APOE",
+        "genotype": ["C", "T"],
+        "module": "synthetic",
+        "weight": -0.8,
+        "state": "risk",
+        "conclusion": "Associated with altered lipid transport.",
+    }
+    variant = _build_variant(row, {"rs429358": [{"pmid": "123456"}]})
+
+    assert [link["provider"] for link in variant["ai_explain_links"]] == [
+        "chatgpt",
+        "claude",
+        "perplexity",
+        "grok",
+    ]
+    decoded_prompts = [
+        urllib.parse.unquote(link["url"].split("q=", maxsplit=1)[1])
+        for link in variant["ai_explain_links"]
+    ]
+    assert len(set(decoded_prompts)) == 1
+    prompt = decoded_prompts[0]
+    assert "RSID: rs429358" in prompt
+    assert "Gene: APOE" in prompt
+    assert "My genotype: C/T" in prompt
+    assert "Supporting PubMed IDs: 123456" in prompt
+    assert "do not diagnose or recommend treatment" in prompt
+
+    html = _render(other_modules=[_module_data([variant])])
+    assert "<th>AI explain</th>" in html
+    assert html.count('class="ai-explain-link ') == 4
+    for provider in ("ChatGPT", "Claude", "Perplexity", "Grok"):
+        assert f"Ask {provider} to explain rs429358" in html
+    assert 'viewBox="0 0 512 512"' in html
+    # The glyphs are defined once and referenced per row. Inlining the paths in every row cost
+    # ~5 kB a variant (1 MB on a 206-variant report) for four copies of the same four icons.
+    assert html.count("M210.484 312.759L343.465 210.383") == 1
+    assert html.count('<use href="#ai-icon-') == 4
+    assert "M14.234 10.162 22.977 0" not in html
+    assert 'colspan="9"' in html
+
+
+def test_ai_explain_cell_has_no_external_links_without_an_rsid():
+    variant = _build_variant(
+        {"rsid": "", "gene": "GENE", "genotype": ["A", "T"], "weight": 0.2},
+        {},
+    )
+
+    assert variant["ai_explain_links"] == []
+    html = _render(other_modules=[_module_data([variant])])
+    assert "<th>AI explain</th>" in html
+    assert 'class="ai-explain-link ' not in html
 
 
 def test_a_populated_0_5_axis_reaches_the_html():

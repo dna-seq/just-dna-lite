@@ -6,6 +6,8 @@ enriches them with annotations and studies data from HuggingFace,
 and renders HTML reports using Jinja2 templates.
 """
 
+import re
+import urllib.parse
 from pathlib import Path
 from typing import Optional
 
@@ -17,23 +19,74 @@ from just_dna_format.derive import clin_sig_from_booleans, direction_from_state
 
 from just_dna_pipelines.annotation.analytics import umami_script_tag
 from just_dna_pipelines.annotation.hf_modules import (
+    DISCOVERED_MODULES,
     AnnotationManifest,
     ModuleInfo,
     ModuleOutputMapping,
     ModuleTable,
-    scan_module_table,
     discover_hf_modules,
-    DISCOVERED_MODULES,
+    scan_module_table,
 )
 from just_dna_pipelines.annotation.restoration import (
     EVIDENCE_COLUMN,
     EVIDENCE_RESTORED,
     FLANK_COLUMN,
 )
-from just_dna_pipelines.module_config import build_display_names_dict
-
+from just_dna_pipelines.module_config import (
+    build_display_names_dict,
+    get_module_description,
+    get_module_display_name,
+)
 
 ANNOTATION_REPORT_COLUMNS: tuple[str, ...] = ("gene", "category", "phenotype")
+# How many rows a report table shows before the reader opens the rest. The template reads this
+# for both the pre-collapsed markup and the inline JS constant, so the two cannot drift apart.
+TABLE_PREVIEW_ROWS: int = 10
+GENERIC_REPORT_TITLE = "Genomic Annotation Report"
+AI_EXPLAIN_ASSISTANTS: tuple[tuple[str, str], ...] = (
+    ("ChatGPT", "https://chatgpt.com/?q="),
+    ("Claude", "https://claude.ai/new?q="),
+    ("Perplexity", "https://www.perplexity.ai/search?q="),
+    ("Grok", "https://grok.com/?q="),
+)
+
+
+def report_title_for_modules(module_names: list[str]) -> str:
+    """Return a report-level title that does not imply an unrelated module.
+
+    A single-module run can use that module's curated ``report_title``. A run
+    containing several modules has no honest single-module title, so it uses a
+    concise generic heading and keeps the full names on the module sections.
+    """
+    if len(module_names) == 1:
+        return get_module_display_name(module_names[0])
+    return GENERIC_REPORT_TITLE
+
+
+def report_description_for_modules(module_names: list[str]) -> str:
+    """Return the curated module description for a single-module report."""
+    if len(module_names) == 1:
+        return get_module_description(module_names[0])
+    return (
+        "A structured summary of variants matched by the selected annotation "
+        "modules, with supporting evidence and module provenance."
+    )
+
+
+def report_filename_stem(module_names: list[str]) -> str:
+    """Build a short, filesystem-safe stem from a single module's report title.
+
+    At most two words are used so generated filenames stay easy to scan. Runs
+    containing multiple modules deliberately use the neutral ``report`` stem.
+    """
+    if len(module_names) != 1:
+        return "report"
+
+    module_name = module_names[0]
+    title_words = re.findall(r"[A-Za-z0-9]+", get_module_display_name(module_name))
+    fallback_words = re.findall(r"[A-Za-z0-9]+", module_name)
+    words = title_words or fallback_words
+    return "_".join(word.lower() for word in words[:2]) or "report"
 
 
 def _log_missing_module_table(module_name: str, table: ModuleTable, reason: str) -> None:
@@ -557,6 +610,76 @@ def _restored_count(variant_groups) -> int:
     )
 
 
+def _build_variant_ai_prompt(variant: dict[str, object]) -> str:
+    """Build the cautious, evidence-oriented prompt shared by external assistants."""
+    fields = (
+        ("RSID", variant.get("rsid")),
+        ("Gene", variant.get("gene")),
+        ("My genotype", variant.get("genotype_str")),
+        ("Reference allele", variant.get("ref")),
+        ("Module alternate alleles", variant.get("alt")),
+        ("Zygosity", variant.get("zygosity")),
+        ("Direction", variant.get("direction")),
+        ("Module weight", variant.get("weight")),
+        ("Module conclusion", variant.get("conclusion")),
+        ("ClinVar interpretation", variant.get("clin_sig_label")),
+        ("Drug", variant.get("drug")),
+        ("Drug response", variant.get("response")),
+        ("Evidence level", variant.get("evidence_level")),
+        ("Population", variant.get("population")),
+        ("Effect size", variant.get("effect_size")),
+        ("Effect measure", variant.get("effect_measure")),
+        ("p-value", variant.get("p_value")),
+    )
+    facts = [f"- {label}: {value}" for label, value in fields if value not in (None, "")]
+    rsid = str(variant.get("rsid", ""))
+    studies = variant.get("studies")
+    if isinstance(studies, list):
+        pmids = [
+            str(study.get("pmid"))
+            for study in studies
+            if isinstance(study, dict) and study.get("pmid")
+        ]
+        if pmids:
+            facts.append(f"- Supporting PubMed IDs: {', '.join(pmids)}")
+
+    return "\n".join(
+        (
+            (
+                "Explain this genomic annotation in plain, cautious language for research and "
+                "informational use. Explain what the genotype may mean, but do not diagnose or "
+                "recommend treatment. Distinguish association from causation, discuss uncertainty "
+                "and population relevance, and explain that a module weight is not an absolute "
+                "clinical risk."
+            ),
+            "",
+            "Annotation:",
+            *facts,
+            f"- dbSNP: https://www.ncbi.nlm.nih.gov/snp/{rsid}",
+            "",
+            (
+                "Check current reliable sources, cite direct links, and say clearly when evidence "
+                "is limited, conflicting, or not clinically actionable."
+            ),
+        )
+    )
+
+
+def _build_variant_ai_links(variant: dict[str, object]) -> list[dict[str, str]]:
+    """Return prompt-prefill links matching the four assistants used by PRS analysis."""
+    if not variant.get("rsid"):
+        return []
+    encoded_prompt = urllib.parse.quote(_build_variant_ai_prompt(variant), safe="")
+    return [
+        {
+            "provider": provider.lower(),
+            "label": f"Ask {provider} to explain {variant['rsid']}",
+            "url": f"{base_url}{encoded_prompt}",
+        }
+        for provider, base_url in AI_EXPLAIN_ASSISTANTS
+    ]
+
+
 def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) -> dict:
     """The view model for one annotated variant, shared by every report shape.
 
@@ -634,6 +757,7 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
     for axis in _AUTHORED_AXES:
         value = row.get(axis)
         variant[axis] = "" if value is None else value
+    variant["ai_explain_links"] = _build_variant_ai_links(variant)
     return variant
 
 
@@ -1100,9 +1224,7 @@ def build_module_provenance(
         rows.append(
             {
                 "name": name,
-                "display_name": MODULE_DISPLAY_NAMES.get(
-                    name, name.replace("_", " ").title()
-                ),
+                "display_name": get_module_display_name(name),
                 "version": (output.version if output else None) or "",
                 "digest": digest,
                 # Merkle roots are 64 hex characters and the leading ones identify a build well
@@ -1130,7 +1252,7 @@ def generate_longevity_report(
     sample_name: str = "",
 ) -> Path:
     """
-    Generate a full longevity HTML report from annotated parquet files.
+    Generate a full HTML annotation report from annotated parquet files.
 
     Reads all available module parquet files from the modules directory,
     builds report data structures, and renders the Jinja2 template.
@@ -1174,9 +1296,7 @@ def generate_longevity_report(
             lead_table = lead_tables.get(mod_name) or (
                 info.lead_table if info is not None else "weights"
             )
-            display_name = MODULE_DISPLAY_NAMES.get(
-                mod_name, mod_name.replace("_", " ").title()
-            )
+            display_name = get_module_display_name(mod_name)
 
             # Route on the lead table, not the module name. A hardcoded `== "longevitymap"` meant
             # the next 0.4 family needed another branch; the engine now records `lead_table` on
@@ -1210,6 +1330,9 @@ def generate_longevity_report(
         template = env.get_template("longevity_report.html.j2")
 
         html = template.render(
+            report_title=report_title_for_modules(available_modules),
+            report_description=report_description_for_modules(available_modules),
+            preview_row_limit=TABLE_PREVIEW_ROWS,
             user_name=user_name,
             sample_name=sample_name,
             longevity=longevity_data,

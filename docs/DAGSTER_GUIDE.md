@@ -115,8 +115,13 @@ Report assets depend on annotation outputs and produce self-contained HTML repor
 
 **Output:**
 ```
-data/output/users/{user}/{sample}/reports/longevity_report.html
+data/output/users/{user}/{sample}/reports/{stem}_{timestamp}.html
 ```
+
+`{stem}` comes from `report_logic.report_filename_stem`: a two-word slug of the module's curated
+`report_title` for a single-module run (`longevity_variants_20260818_221532.html`), or the neutral
+`report` when several modules are in the run. Never glob for a fixed report name — list `*.html`
+and take the newest by mtime.
 
 ### 4. VCF Normalization (user_vcf_normalized)
 

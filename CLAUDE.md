@@ -700,11 +700,31 @@ the derivative-work obligation; Ensembl at layer `resolution` is recorded withou
 Permission booleans stay **tri-state**: `None` means the terms could not be established, which the
 footer renders as "Not stated" and never as permission.
 
-The two variant tables were near-duplicate copies that had already drifted; they are now one Jinja
-macro (`variant_rows` / `variant_table_head`). Three constraints the inline JS imposes on it: the
-detail row must be the **immediate next sibling** (no wrapper), `collapseExpandAll` picks expandable
-rows by `children.length > 3` (so the summary row keeps >3 cells and the detail row stays a single
-`colspan` cell), and that `colspan` must equal the header's `<th>` count.
+The variant tables were near-duplicate copies that had already drifted; they are now one Jinja macro
+(`variant_rows` / `variant_table`), shared by the pathway path, the per-module path and the per-drug
+path. Four constraints the inline JS imposes on it: the detail row must be the **immediate next
+sibling** (no wrapper); `directPreviewRows` selects preview rows by the **`data-preview-row`
+attribute** on a direct `<tbody>` child (the old `children.length > 3` heuristic is gone, so cell
+counts no longer matter, but the attribute does — and the detail row must not carry it); the initial
+`preview-overflow` class and the JS `TABLE_PREVIEW_ROWS` must agree, which is why both read
+`preview_row_limit` from `report_logic.TABLE_PREVIEW_ROWS` rather than a literal; and the detail
+cell's `colspan` must equal the header's `<th>` count (9).
+
+**The report's identity is derived, not fixed.** A single-module run takes that module's curated
+`report_title` for the heading and a two-word, lower-cased slug of it for the filename
+(`report_title_for_modules` / `report_filename_stem`); a multi-module run has no honest single title,
+so it uses `Genomic Annotation Report` and the stem `report`. The old `longevity_report_*.html` name
+is therefore gone — **anything globbing reports must match `*.html` and pick by mtime**, not by name
+(`.ci/verify_annotation.py`, `cli_annotate`, and the webui's `report_files` sort all do).
+
+**Each rsID row carries four prompt-prefill links** (ChatGPT, Claude, Perplexity, Grok — the same set
+`prs-ui` uses), built by `_build_variant_ai_links` and rendered only when the row has an rsID. The
+prompt embeds the row's own facts and the variant's PMIDs, so **clicking one sends that variant's
+genotype to a third party**; it is per-click and never automatic, and nothing is sent by opening the
+report. The links are the report's largest single cost — measured on a real 206-variant run, 1.0 MB
+of the 2.1 MB file is those four URLs, since the same ~1.2 kB prompt is encoded once per assistant
+per row. The icons are *not* part of that: they are one `<symbol>` set referenced by `<use>`, which
+is worth keeping — inlining the paths per row added another 1.0 MB for four copies of four glyphs.
 
 ### Building and releasing the modules
 

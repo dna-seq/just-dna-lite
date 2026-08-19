@@ -9,23 +9,26 @@ from datetime import datetime
 from pathlib import Path
 
 from dagster import (
-    asset,
     AssetExecutionContext,
     AssetIn,
-    Output,
     MetadataValue,
+    Output,
+    asset,
 )
 
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.configs import ReportConfig
-from just_dna_pipelines.annotation.report_logic import generate_longevity_report
+from just_dna_pipelines.annotation.report_logic import (
+    generate_longevity_report,
+    report_filename_stem,
+)
 from just_dna_pipelines.annotation.resources import get_user_output_dir
 from just_dna_pipelines.runtime import resource_tracker
 
 
 @asset(
-    description="Longevity HTML report generated from annotated module parquets. "
-                "Produces a self-contained HTML file with variant tables grouped by longevity pathway.",
+    description="HTML report generated from annotated module parquets. "
+                "Produces a self-contained report with module-specific variant tables.",
     compute_kind="report",
     group_name="user_reports",
     partitions_def=user_vcf_partitions,
@@ -37,7 +40,7 @@ from just_dna_pipelines.runtime import resource_tracker
         "partition_type": "user",
         "output_format": "html",
         "storage": "output",
-        "report_type": "longevity",
+        "report_type": "annotation",
     },
 )
 def user_longevity_report(
@@ -46,22 +49,22 @@ def user_longevity_report(
     config: ReportConfig,
 ) -> Output[Path]:
     """
-    Generate a longevity HTML report from annotated module parquets.
+    Generate an HTML report from annotated module parquets.
 
     This asset depends on `user_hf_module_annotations` which produces
     per-module parquet files. The report:
     1. Reads each module's weights parquet
     2. Enriches with annotations (gene, category) and studies from HuggingFace
-    3. Groups longevitymap variants by longevity pathway category
+    3. Uses each module's curated display metadata
     4. Renders a self-contained HTML report with expandable variant details
 
     Output:
-        data/output/users/{partition_key}/reports/longevity_report_{timestamp}.html
+        data/output/users/{partition_key}/reports/{module_or_report}_{timestamp}.html
     """
     logger = context.log
     partition_key = context.partition_key
 
-    logger.info(f"Generating longevity report for partition: {partition_key}")
+    logger.info(f"Generating annotation report for partition: {partition_key}")
     logger.info(f"Module annotations directory: {user_hf_module_annotations}")
 
     # Parse partition key for user/sample names
@@ -86,13 +89,14 @@ def user_longevity_report(
         output_path = Path(config.output_path)
     else:
         output_dir = get_user_output_dir() / partition_key / "reports"
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = output_dir / f"longevity_report_{ts}.html"
+        ts = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+        filename_stem = report_filename_stem(config.modules or [])
+        output_path = output_dir / f"{filename_stem}_{ts}.html"
 
     # Get selected modules
     module_names = config.modules if config.modules else None
 
-    with resource_tracker("Generate Longevity Report", context=context):
+    with resource_tracker("Generate Annotation Report", context=context):
         report_path = generate_longevity_report(
             modules_dir=modules_dir,
             output_path=output_path,

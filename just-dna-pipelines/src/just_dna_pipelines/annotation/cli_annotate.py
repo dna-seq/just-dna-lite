@@ -355,18 +355,15 @@ def annotate(
     sample_out = get_user_output_dir() / partition_key
     modules_dir = sample_out / "modules"
     reports_dir = sample_out / "reports"
-    report_files = (
-        sorted(reports_dir.glob("longevity_report_*.html"))
-        if reports_dir.exists()
-        else []
-    )
+    report_files = sorted(reports_dir.glob("*.html")) if reports_dir.exists() else []
 
     console.print(f"\n[bold green]Annotation complete[/bold green] (run_id={result.run_id})")
     console.print(f"  Modules: {modules_dir}")
     if report_files:
-        console.print(f"  Report:  {report_files[-1]}")
+        latest_report = max(report_files, key=lambda path: path.stat().st_mtime)
+        console.print(f"  Report:  {latest_report}")
     else:
-        console.print(f"  Reports: {reports_dir} (no longevity_report_*.html found yet)")
+        console.print(f"  Reports: {reports_dir} (no HTML report found yet)")
 
     _report_module_outcomes(modules_dir / "manifest.json")
     console.print()

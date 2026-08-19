@@ -4,329 +4,520 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Longevity Report{% if user_name %} — {{ user_name }}{% endif %}</title>
+    {% set document_title = report_title | default("Genomic Annotation Report", true) %}
+    <title>{{ document_title }}{% if sample_name %} — {{ sample_name }}{% endif %}</title>
 <style>
-/* ========== General ========== */
-* { box-sizing: border-box; scroll-behavior: smooth; }
-a { color: #87cec3; text-decoration: none; }
-a:hover { color: #92e0d3; }
+:root {
+    --blue: #2185d0;
+    --blue-dark: #1667a8;
+    --teal: #00b5ad;
+    --teal-dark: #007f79;
+    --purple: #6435c9;
+    --green: #218c4a;
+    --red: #b83232;
+    --amber: #9a6b00;
+    --ink: #1f2933;
+    --muted: #5d6b7a;
+    --line: #d9e2ec;
+    --line-strong: #b8c7d6;
+    --paper: #ffffff;
+    --canvas: #f5f7fa;
+    --soft-blue: #eef6fd;
+    --soft-teal: #edf9f8;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
-    background-image: linear-gradient(to left bottom, rgb(249, 246, 240), #f8f6ec, #f6f6e8, #f2f7e6, #edf8e4, #e5f9e8, #dff9ec, #d9f9f2, #d8f7fb, #def5ff, #e7f1ff, #f0eefd);
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    color: rgb(66, 92, 88);
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 0; padding: 0;
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
 }
-h1, h2 { text-align: center; font-size: 2.5vw; font-weight: 500; }
-h2 { margin-top: 4vw; margin-bottom: 20px; color: rgb(57, 145, 123); }
-
-/* ========== Intro ========== */
-.intro {
-    width: 60%; text-align: center;
-    margin-left: auto; margin-right: auto;
-    line-height: 3; font-size: 1vw;
-}
-.intro p { color: rgb(84, 85, 110); line-height: 2em; font-size: 1.3em; font-weight: 400; }
-.intro a { word-wrap: break-word; }
-.intro ul { padding-left: 0; margin-left: auto; margin-right: auto; font-weight: 500; margin-top: 40px; list-style-type: none; margin-bottom: 120px; }
-.li1 { font-weight: 400; font-size: 1.3vw; }
-.first { margin-top: 3vw; color: #269292; font-size: 3vw; }
-.attention { margin-top: 4vw; margin-bottom: 4vw; margin-left: auto; margin-right: auto; width: 65%; padding: 0.8vw 1.7vw; font-size: 0.8vw; border: rgb(122, 189, 183) solid 5px; border-radius: 30px; background-color: white; box-shadow: 0px 5px 5px 0px #4a887c; }
-.attention strong { color: rgb(71, 155, 148); font-size: 1.25vw; }
-.attention p { color: #3a6e65; }
-
-/* ========== Tables ========== */
-table.ui {
-    transition: max-height 0.5s ease-in;
-    border-radius: 0.28571429rem;
-    font-size: 0.8vw;
-    background: white;
-    width: 85%;
-    margin-right: auto; margin-left: auto;
-    padding: 0.78571429em;
-    text-align: left;
-    border-collapse: collapse;
-    vertical-align: middle;
-    border: 1px solid rgba(34,36,38,.15);
-    line-height: 1.4285em;
-}
-table.ui th {
-    background: #f9fafb;
-    color: rgba(0,0,0,.87);
-    padding: 0.92857143em 0.78571429em;
-    vertical-align: inherit;
-    font-weight: 700;
-    text-transform: none;
-    border-bottom: 1px solid rgba(34,36,38,.1);
-    border-right: 1px solid rgba(34,36,38,.1);
-}
-table.ui.selectable.celled.teal.table tr:hover { background-color: #eef1f5; }
-table.ui td {
-    border-bottom: 1px solid rgba(34,36,38,.1);
-    border-top: none;
-    border-left: 1px solid rgba(34,36,38,.1);
-    padding: 10px;
-}
-table.ui td:first-child { border-left: none; }
-.ui.selectable.celled.teal.table.table.variants {
-    margin-top: 0px;
-    box-shadow: 0 1px 3px 1px rgba(118, 49, 40, 0.3);
-    margin-bottom: 80px;
-    border-top: 0.4em solid rgb(101, 189, 162);
-}
-.ui.padded.table { width: 100%; }
-th, td { padding: 2px; }
-
-/* ========== Buttons ========== */
-div.ui.tiny.circular.compact.positive.button {
-    border-radius: 10em; background-color: #86caf7; color: #fff;
-    padding: 0.58928571em 1.125em; cursor: pointer; display: inline-block;
-    min-height: 1em; outline: 0; border: none; vertical-align: baseline;
-    margin: 0 0.25em 0 0; font-weight: 700; line-height: 1em;
-    font-style: normal; text-align: center;
-}
-div.ui.tiny.circular.compact.negative.button {
-    border-radius: 10em; background-color: #a6f069; color: #fff;
-    padding: 0.58928571em 1.125em; cursor: pointer; display: inline-block;
-    min-height: 1em; outline: 0; border: none; vertical-align: baseline;
-    margin: 0 0.25em 0 0; font-weight: 700; line-height: 1em;
-    font-style: normal; text-align: center;
+a { color: var(--blue-dark); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--purple); }
+button { font: inherit; }
+code {
+    padding: 0.12rem 0.32rem;
+    border-radius: 4px;
+    background: #eef1f4;
+    color: #334e68;
+    font-size: 0.85em;
 }
 
-/* ========== Accordions ========== */
-.accordion0 {
-    position: relative;
-    border: rgb(101, 189, 162) solid 6px;
-    border-bottom: none;
-    width: 50%; margin-left: 25%; margin-right: 25%;
-    text-align: left; padding-left: 2vw;
-    height: 4vw; font-size: 1.5vw;
-    background-color: rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
-    margin-top: 0.7vw;
-    color: rgb(81, 139, 122);
-    cursor: pointer;
+.top-rule {
+    height: 6px;
+    background: linear-gradient(90deg, var(--blue), var(--teal) 52%, var(--purple));
 }
-.accordion:hover { background-color: rgba(255, 255, 255, 0.2); }
-.section-heading {
-    width: 85%; margin-left: 7.5%; margin-right: 7.5%;
-    text-align: center;
-    padding-top: 1.2vw; padding-bottom: 1.2vw;
-    border: rgb(101, 189, 162, 0.5) solid 6px;
-    background-color: rgba(255, 255, 255, 0.5);
-    font-size: 1.7vw; border-radius: 15px 15px 0 0;
-    margin-top: 2vw;
-    color: rgb(47, 116, 106);
-    border-bottom: none;
+.report-header {
+    border-bottom: 1px solid var(--line);
+    background:
+        linear-gradient(115deg, rgba(33, 133, 208, 0.08), transparent 48%),
+        var(--paper);
+}
+.header-inner,
+.report-main {
+    width: min(1180px, calc(100% - 40px));
+    margin: 0 auto;
+}
+.header-inner { padding: 3.2rem 0 2.6rem; }
+.eyebrow {
+    margin: 0 0 0.7rem;
+    color: var(--teal-dark);
+    font-size: 0.76rem;
+    font-weight: 750;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+h1 {
+    max-width: 900px;
+    margin: 0;
+    color: #102a43;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(2.15rem, 5vw, 4.2rem);
     font-weight: 500;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+.report-description {
+    max-width: 780px;
+    margin: 1rem 0 0;
+    color: var(--muted);
+    font-size: 1.08rem;
+}
+.subject-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 1.5rem;
+    margin-top: 1.5rem;
+    color: #334e68;
+    font-size: 0.88rem;
+}
+.subject-line strong {
+    margin-right: 0.35rem;
+    color: #102a43;
+    font-weight: 700;
 }
 
-/* ========== Panels ========== */
-.board { width: 50%; margin-top: 40px; padding-top: 10px; color: rgb(84, 85, 110); margin-right: auto; margin-left: auto; font-size: 1.1vw; }
-.board p { line-height: 1.7; font-weight: 400; }
-.panel {
-    padding: 1.5vw 2.5vw;
-    display: none;
-    border: rgb(66, 92, 88) solid 3px;
-    border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;
-    border-top: none;
-    background-color: white;
-    margin-top: 0px;
+.report-main { padding: 2.5rem 0 5rem; }
+.intro-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 0.42fr);
+    gap: 1.5rem;
+    align-items: start;
 }
-.variants.panel { border: rgb(101, 189, 162) 6px solid; border-top: none; }
-.content { margin-left: auto; margin-right: auto; overflow-x: auto; transition: max-height 0.5s ease-in; display: none; }
-.hidden { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-in; }
-.panel, .content { max-height: 0; overflow: hidden; transition-property: max-height, width; transition-duration: 0.2s, 0.5s; }
-.basic-panel {
-    background-color: rgba(255, 255, 255, 0.2);
-    margin-left: auto; margin-right: auto;
-    width: 85%;
-    border-right: rgb(101, 189, 162, 0.5) solid 6px;
-    border-left: rgb(101, 189, 162, 0.5) solid 6px;
-    border-bottom: rgb(101, 189, 162, 0.5) solid 6px;
-    border-bottom-left-radius: 3%; border-bottom-right-radius: 3%;
-    padding-bottom: 1vw;
+.paper-card,
+.scientific-note,
+.module-panel,
+.table-shell {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
 }
-.accordion-result, .accordion-result.active { transition-property: width, margin-left, margin-right; transition-duration: 0.2s; }
+.paper-card { padding: 1.35rem 1.5rem; }
+.paper-card p:first-child { margin-top: 0; }
+.paper-card p:last-child { margin-bottom: 0; }
+.scientific-note {
+    padding: 1.2rem 1.35rem;
+    border-left: 4px solid var(--purple);
+    color: #3f4f60;
+    background: #fbfaff;
+    font-size: 0.9rem;
+}
+.scientific-note strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: #3e277a;
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.contents {
+    margin: 1.5rem 0 0;
+    padding: 1.1rem 1.35rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper);
+}
+.contents-title {
+    margin: 0 0 0.65rem;
+    color: #334e68;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.contents ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
 
-/* ========== Arrow ========== */
-.accordion0 div.arrow-indicator {
-    border-top: rgba(61, 128, 119, 0.7) solid 0.3vw;
-    border-right: rgba(61, 128, 119, 0.7) solid 0.3vw;
-    border-radius: 5px;
-    height: 1vw; width: 1vw;
-    margin-right: 1vw;
-    display: inline-block;
-    transform: rotate(45deg);
-    transition: transform 0.5s;
+.report-section { margin-top: 4rem; scroll-margin-top: 1rem; }
+.section-kicker {
+    margin: 0 0 0.3rem;
+    color: var(--teal-dark);
+    font-size: 0.76rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
-.accordion0.active div.arrow-indicator { transform: rotate(135deg); }
+h2 {
+    margin: 0 0 1.15rem;
+    color: #102a43;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(1.7rem, 3vw, 2.5rem);
+    font-weight: 500;
+    line-height: 1.2;
+}
+.section-intro {
+    max-width: 900px;
+    margin: 0 0 1.4rem;
+    color: var(--muted);
+}
 
-/* ========== Summary Card ========== */
 .summary-card {
-    display: flex; gap: 1.5rem; justify-content: center;
-    flex-wrap: wrap; margin: 2rem auto 3rem; max-width: 800px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    gap: 0.75rem;
+    margin: 1.4rem 0 2rem;
 }
 .stat-box {
-    background: white; border-radius: 12px;
-    padding: 1.2rem 2rem; text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08); min-width: 150px;
+    min-height: 100px;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--blue);
+    border-radius: 8px;
+    background: var(--paper);
 }
-.stat-box .number { font-size: 2rem; font-weight: 700; }
-.stat-box .label { font-size: 0.85rem; color: #777; margin-top: 0.3rem; }
-.stat-positive .number { color: #2e8b57; }
-.stat-negative .number { color: #c0392b; }
-.stat-total .number { color: #269292; }
-.stat-weight .number { color: #5a7a72; }
+.stat-box .number {
+    color: #102a43;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.9rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+.stat-box .label {
+    margin-top: 0.45rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.stat-positive { border-top-color: var(--green); }
+.stat-positive .number { color: var(--green); }
+.stat-negative { border-top-color: var(--red); }
+.stat-negative .number { color: var(--red); }
+.stat-weight { border-top-color: var(--purple); }
+.stat-inferred { border-top-color: #d9a200; background: #fffaf0; }
 
-/* An inferred genotype must never look like a sequenced one. Muted rather than alarming: it is a
-   real result with a real caveat, not a warning. */
+.module-panel {
+    margin: 1.25rem 0;
+    overflow: hidden;
+}
+.module-panel-heading {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(90deg, var(--soft-blue), var(--soft-teal));
+}
+.module-panel-heading h3 {
+    margin: 0;
+    color: #173f5f;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.22rem;
+    font-weight: 600;
+}
+.module-panel-body { padding: 1.15rem 1.25rem 1.25rem; }
+.pathway-description {
+    max-width: 980px;
+    margin: 0 0 1rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+.empty-panel { opacity: 0.72; }
+.empty-message {
+    margin: 0.75rem 0 0;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.table-shell {
+    margin-top: 1rem;
+    overflow: hidden;
+    border-color: var(--line-strong);
+}
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 52px;
+    padding: 0.72rem 0.9rem;
+    border-top: 1px solid var(--line);
+    background: #f8fafc;
+}
+.table-status {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+.table-status strong { color: #334e68; }
+.table-toggle {
+    flex: 0 0 auto;
+    min-width: 92px;
+    padding: 0.43rem 0.8rem;
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--blue-dark);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.table-toggle:hover {
+    background: var(--blue);
+    color: white;
+}
+.table-scroll { overflow-x: auto; }
+table.ui {
+    width: 100%;
+    border: 0;
+    border-collapse: collapse;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 0.84rem;
+    line-height: 1.42;
+}
+table.ui th,
+table.ui td {
+    padding: 0.68rem 0.75rem;
+    border-right: 1px solid #e7edf3;
+    border-bottom: 1px solid #e1e8ef;
+    text-align: left;
+    vertical-align: top;
+}
+table.ui th:last-child,
+table.ui td:last-child { border-right: 0; }
+table.ui thead th {
+    background: #eaf2f8;
+    color: #243b53;
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+table.ui tbody tr:nth-child(4n + 3).variant-summary,
+table.ui > tbody > tr:nth-child(even):not(.variant-detail) { background: #fafcfe; }
+table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
+.preview-overflow { display: none !important; }
+.detail-column { width: 58px; text-align: center !important; }
+.detail-toggle {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid #9fb3c8;
+    border-radius: 50%;
+    background: white;
+    color: var(--blue-dark);
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 22px;
+}
+.detail-toggle:hover,
+.detail-toggle[aria-expanded="true"] {
+    border-color: var(--teal-dark);
+    background: var(--teal-dark);
+    color: white;
+}
+.variant-detail[hidden] { display: none; }
+.variant-detail > td {
+    padding: 0 !important;
+    background: #f8fbfd;
+}
+.detail-table th {
+    width: 190px;
+    background: #f0f5f9 !important;
+    color: #334e68 !important;
+    text-transform: none !important;
+}
+.detail-table td { background: white; }
+.nested-table-shell {
+    margin: 0.75rem;
+    border-color: var(--line);
+}
+.cell-wrap { overflow-wrap: anywhere; }
+.weight-cell { font-variant-numeric: tabular-nums; }
+.ai-icon-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ai-explain-column { min-width: 156px; }
+.ai-explain-links {
+    display: flex;
+    gap: 0.38rem;
+    align-items: center;
+    justify-content: center;
+}
+.ai-explain-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    color: white;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(16, 42, 67, 0.18);
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.ai-explain-link:hover {
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 7px rgba(16, 42, 67, 0.24);
+}
+.ai-explain-link:focus-visible {
+    outline: 3px solid rgba(33, 133, 208, 0.35);
+    outline-offset: 2px;
+}
+.ai-explain-link svg { width: 16px; height: 16px; fill: currentColor; }
+.ai-explain-link.chatgpt { background: #10a37f; }
+.ai-explain-link.claude { background: #da7756; }
+.ai-explain-link.perplexity { background: #21808d; }
+.ai-explain-link.grok { background: #1d1d1f; }
+
 .restored-badge {
     display: inline-block;
-    padding: 0.05rem 0.45rem;
-    border-radius: 0.6rem;
+    padding: 0.05rem 0.4rem;
     border: 1px dashed #b58105;
+    border-radius: 999px;
     background: rgba(251, 189, 8, 0.14);
-    color: #7d5700;
-    font-size: 0.72em;
-    font-weight: 600;
+    color: #765200;
+    font-size: 0.7em;
+    font-weight: 700;
     letter-spacing: 0.03em;
     vertical-align: middle;
     white-space: nowrap;
 }
+.metadata-card { padding: 1.2rem; }
+.metadata-card > p { margin-top: 0; color: var(--muted); }
+.metadata-card .table-shell { margin-bottom: 0; }
+.no-results {
+    padding: 1.2rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    color: var(--muted);
+    background: var(--paper);
+}
 
-/* ========== Module section ========== */
-.module-section { margin: 0.5rem auto; width: 85%; }
-.module-section .board { width: 100%; }
-
-/* ========== Back to top ========== */
 #toTop {
-    z-index: 100; height: 70px; width: 70px;
-    background-color: #308499; border-radius: 50%;
-    position: fixed; right: 2.35%; bottom: 10%;
-    display: none; box-shadow: 3px 3px 15px rgba(30, 77, 88, 0.7);
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 20;
+    display: none;
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 50%;
+    background: #173f5f;
+    color: white;
+    box-shadow: 0 4px 14px rgba(16, 42, 67, 0.22);
     cursor: pointer;
+    font-size: 1.05rem;
 }
-#toTop:hover { background-color: #56C3BD; }
-.arrow-nav { position: absolute; bottom: 10%; z-index: 10; }
-.bodypart { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 16px solid white; right: 20px; top: 20%; }
-.line-nav { right: 31px; bottom: 18px; background: white; width: 8px; height: 33px; }
+#toTop:hover { background: var(--blue); }
 
-/* ========== Clickable rows ========== */
-.clickable { cursor: pointer; }
-.clickable:hover { background-color: #eef1f5; }
-
-/* ========== Responsive ========== */
-@media only screen and (max-width: 1400px) {
-    .intro { width: 75%; font-size: 1.4vw; }
-    .first { font-size: 4.5vw; }
-    .attention p { font-size: 1.6vw; }
-    .attention { margin-top: 7vw; margin-bottom: 7vw; width: 90%; }
-    .attention strong { font-size: 1.8vw; }
-    h2 { line-height: 5vw; font-size: 4vw; }
-    .li1 { font-size: 2.2vw; }
-    .accordion0, .section-heading { width: 80%; margin-left: 10%; margin-right: 10%; height: 8vw; font-size: 2.5vw; }
-    .section-heading { height: auto; padding: 2vw; }
-    .panel { width: 80%; margin-left: 10%; margin-right: 10%; font-size: 1.7vw; padding: 2.5vw 3.5vw; }
-    .basic-panel { width: 80%; }
-    .accordion0 div.arrow-indicator { height: 2vw; width: 2vw; border-top-width: 0.6vw; border-right-width: 0.6vw; margin-right: 2vw; }
-    table.ui { font-size: 1.3vw; }
-    h2 { margin-top: 18vw; }
+@media (max-width: 760px) {
+    .header-inner,
+    .report-main { width: min(100% - 24px, 1180px); }
+    .header-inner { padding: 2.4rem 0 2rem; }
+    .report-main { padding-top: 1.5rem; }
+    .intro-grid { grid-template-columns: 1fr; }
+    .report-section { margin-top: 3rem; }
+    .module-panel-body { padding: 0.9rem; }
+    .table-toolbar { align-items: flex-start; }
+    table.ui { min-width: 760px; font-size: 0.78rem; }
+    .detail-table { min-width: 560px !important; }
 }
-@media only screen and (max-width: 600px) {
-    .intro { width: 90%; font-size: 3.1vw; }
-    .attention p { font-size: 3.1vw; }
-    .attention strong { font-size: 4vw; }
-    .attention { padding: 3vw 4vw; }
-    .basic-panel { width: 100%; }
-    .accordion0, .section-heading { height: 12vw; font-size: 4vw; width: 95%; margin-left: 2.5%; margin-right: 2.5%; }
-    .section-heading { height: auto; padding: 3vw; }
-    .panel { margin-left: 2.5%; margin-right: 2.5%; width: 95%; font-size: 3vw; }
-    .accordion0 div.arrow-indicator { height: 3.5vw; width: 3.5vw; border-top-width: 1vw; border-right-width: 1vw; margin-right: 2vw; margin-left: 1vw; }
-    .basic-panel { width: 95%; }
-    .first { font-size: 8vw; }
-    .li1 { font-size: 4.8vw; }
-    .attention { margin-top: 10vw; margin-bottom: 10vw; width: 90%; border-width: 2px; border-radius: 13px; }
-    h1 { line-height: 9vw; font-size: 6vw; }
-    h2 { line-height: 8vw; font-size: 7vw; margin-top: 20vw; }
-    table.ui td, table.ui th { padding: 2px; font-size: 1.5vw; line-height: 2.3vw; }
+
+@media print {
+    body { background: white; font-size: 10pt; }
+    .top-rule { print-color-adjust: exact; }
+    .header-inner,
+    .report-main { width: 100%; }
+    .report-header { break-after: avoid; }
+    .paper-card,
+    .scientific-note,
+    .module-panel,
+    .table-shell,
+    .stat-box { break-inside: avoid; box-shadow: none; }
+    .preview-overflow { display: table-row !important; }
+    .table-toggle,
+    #toTop,
+    .detail-column { display: none !important; }
+    .table-scroll { overflow: visible; }
+    table.ui { font-size: 8pt; }
 }
 </style>
 
 <script>
-/* Expand a variant detail row (inside a table) */
-function expand(obj) {
-    var tdEl = obj.children[0];
-    var el = obj.nextSibling;
-    if (el.nodeName == "#text") el = el.nextSibling;
-    var parent = el.parentElement;
-    parent = parent.parentElement.parentElement;
-    el.style.display = "";
-    el.style.maxHeight = el.scrollHeight + "px";
-    parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) + el.scrollHeight + "px";
-    tdEl.innerHTML = '<div class="ui tiny circular compact negative button">-</div>';
+/* Kept in step with the Jinja side: `preview_row_limit` decides which rows ship
+   pre-collapsed and what the toolbar first says; this decides what the toggle does. */
+const TABLE_PREVIEW_ROWS = {{ preview_row_limit }};
+
+function setVariantDetails(button, expanded) {
+    const summaryRow = button.closest("tr");
+    const detailRow = summaryRow ? summaryRow.nextElementSibling : null;
+    if (!detailRow || !detailRow.classList.contains("variant-detail")) return;
+    detailRow.hidden = !expanded;
+    button.setAttribute("aria-expanded", expanded ? "true" : "false");
+    button.textContent = expanded ? "−" : "+";
+    button.title = expanded ? "Close variant details" : "Open variant details";
 }
 
-/* Collapse a variant detail row */
-function collapse(obj) {
-    var tdEl = obj.children[0];
-    var el = obj.nextSibling;
-    if (el.nodeName == "#text") el = el.nextSibling;
-    var parent = el.parentElement;
-    parent = parent.parentElement.parentElement;
-    parent.style.maxHeight = Number(parent.style.maxHeight.slice(0, -2)) - el.scrollHeight + "px";
-    el.style.maxHeight = '0';
-    setTimeout(function() { el.style.display = "none"; }, 150);
-    tdEl.innerHTML = '<div class="ui tiny circular compact positive button">+</div>';
+function toggleVariantDetails(event, button) {
+    event.stopPropagation();
+    setVariantDetails(button, button.getAttribute("aria-expanded") !== "true");
 }
 
-/* Toggle a variant detail row on click */
-function doOnClick(obj) {
-    var el = obj.nextSibling;
-    if (el.nodeName == "#text") el = el.nextSibling;
-    if (el.style.display == "none") expand(obj);
-    else collapse(obj);
+function directPreviewRows(tbody) {
+    return Array.from(tbody.children).filter(function(row) {
+        return row.hasAttribute("data-preview-row");
+    });
 }
 
-/* Expand/collapse all variant details in a table body */
-function collapseExpandAll(obj, id) {
-    var el = document.getElementById(id);
-    if (obj.innerHTML.indexOf("positive") !== -1) {
-        for (var i = 0; i < el.children.length; i++)
-            if (el.children[i].children && el.children[i].children.length > 3)
-                expand(el.children[i]);
-        obj.innerHTML = '<div class="ui tiny circular compact negative button">-</div>';
-    } else {
-        for (var i = 0; i < el.children.length; i++)
-            if (el.children[i].children && el.children[i].children.length > 3)
-                collapse(el.children[i]);
-        obj.innerHTML = '<div class="ui tiny circular compact positive button">+</div>';
+function toggleTableRows(button, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    const openAll = button.getAttribute("aria-expanded") !== "true";
+    const rows = directPreviewRows(tbody);
+    rows.forEach(function(row, index) {
+        row.classList.toggle("preview-overflow", !openAll && index >= TABLE_PREVIEW_ROWS);
+        if (!openAll && index >= TABLE_PREVIEW_ROWS && row.classList.contains("variant-summary")) {
+            const detailButton = row.querySelector(".detail-toggle");
+            if (detailButton) setVariantDetails(detailButton, false);
+        }
+    });
+
+    button.setAttribute("aria-expanded", openAll ? "true" : "false");
+    button.textContent = openAll ? "Close" : "Open all";
+    const status = document.getElementById(tbodyId + "Status");
+    if (status) {
+        status.innerHTML = openAll
+            ? "Showing all <strong>" + rows.length + "</strong> rows"
+            : "Showing first <strong>" + Math.min(TABLE_PREVIEW_ROWS, rows.length)
+                + "</strong> of " + rows.length + " rows";
     }
 }
 
-/* Toggle a sub-accordion (Description / Results buttons) */
-function toggleAccordion(btn) {
-    btn.classList.toggle('active');
-    var panel = btn.nextElementSibling;
-    if (btn.classList.contains('active')) {
-        panel.style.display = 'block';
-        panel.style.maxHeight = panel.scrollHeight + 'px';
-    } else {
-        panel.style.maxHeight = '0';
-        setTimeout(function() { panel.style.display = 'none'; }, 200);
-    }
-}
-
-/* Back to top button */
-window.onscroll = function() {
-    var btn = document.getElementById("toTop");
-    if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
-        btn.style.display = "block";
-    } else {
-        btn.style.display = "none";
-    }
-};
+window.addEventListener("scroll", function() {
+    const button = document.getElementById("toTop");
+    if (button) button.style.display = window.scrollY > 300 ? "block" : "none";
+});
 </script>
 {% if umami_script_tag %}
     {{ umami_script_tag | safe }}
@@ -334,42 +525,107 @@ window.onscroll = function() {
 </head>
 
 <body>
-{#
-  One rendering for a variant table, shared by the pathway-category path and the per-module path.
-  Those two were near-identical copies differing only in the tbody id and the gene link base, and
-  they had already drifted; every field added below would otherwise have been two edits.
+{% macro table_controls(tbody_id, row_count) %}
+<div class="table-toolbar">
+    <span class="table-status" id="{{ tbody_id }}Status">
+        {% if row_count > preview_row_limit %}
+        Showing first <strong>{{ preview_row_limit }}</strong> of {{ row_count }} rows
+        {% else %}
+        Showing all <strong>{{ row_count }}</strong> row{% if row_count != 1 %}s{% endif %}
+        {% endif %}
+    </span>
+    {% if row_count > preview_row_limit %}
+    <button
+        type="button"
+        class="table-toggle"
+        aria-controls="{{ tbody_id }}"
+        aria-expanded="false"
+        onclick="toggleTableRows(this, '{{ tbody_id }}')"
+    >Open all</button>
+    {% endif %}
+</div>
+{% endmacro %}
 
-  Three constraints the inline JS above imposes on anything changed here:
-    * `expand`/`collapse` take the detail row as the *immediate next sibling* — no wrapper element.
-    * `collapseExpandAll` picks expandable rows by `children.length > 3`, so the summary row must
-      keep more than three cells and the detail row must stay a single colspan cell.
-    * `colspan` on the detail cell must equal the number of <th> in the header (8).
-
-  Every row below is guarded by `{% if %}`: a column our modules leave empty renders nothing at all
-  rather than an empty row, and a module that starts populating one renders it with no further work.
-#}
 {% macro variant_detail_row(label, value) %}
 {% if value %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endif %}
 {% endmacro %}
 
+{# One <symbol> per assistant is emitted once by `ai_assistant_icon_defs`; every row then
+   costs a short <use> reference instead of a repeated path. Inlining the paths per row cost
+   about 5 kB a variant - 1 MB of a 206-variant report - for four identical copies of the
+   same four glyphs. #}
+{% macro ai_assistant_icon_defs() %}
+<svg class="ai-icon-defs" aria-hidden="true" focusable="false"><defs>
+    <symbol id="ai-icon-chatgpt" viewBox="0 0 24 24"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365 2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></symbol>
+    <symbol id="ai-icon-claude" viewBox="0 0 24 24"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></symbol>
+    <symbol id="ai-icon-perplexity" viewBox="0 0 24 24"><path d="M22.3977 7.0896h-2.3106V.0676l-7.5094 6.3542V.1577h-1.1554v6.1966L4.4904 0v7.0896H1.6023v10.3976h2.8882V24l6.932-6.3591v6.2005h1.1554v-6.0469l6.9318 6.1807v-6.4879h2.8882V7.0896zm-3.4657-4.531v4.531h-5.355l5.355-4.531zm-13.2862.0676 4.8691 4.4634H5.6458V2.6262zM2.7576 16.332V8.245h7.8476l-6.1149 6.1147v1.9723H2.7576zm2.8882 5.0404v-3.8852h.0001v-2.6488l5.7763-5.7764v7.0111l-5.7764 5.2993zm12.7086.0248-5.7766-5.1509V9.0618l5.7766 5.7766v6.5588zm2.8882-5.0652h-1.733v-1.9723L13.3948 8.245h7.8478v8.087z"/></symbol>
+    <symbol id="ai-icon-grok" viewBox="0 0 512 512"><path d="M210.484 312.759L343.465 210.383C349.984 205.364 359.302 207.322 362.408 215.117C378.758 256.231 371.454 305.64 338.925 339.563C306.397 373.487 261.137 380.927 219.768 363.983L174.577 385.803C239.394 432.008 318.104 420.581 367.289 369.251C406.303 328.564 418.386 273.104 407.088 223.091L407.19 223.198C390.807 149.726 411.218 120.359 453.03 60.3072C454.02 58.8833 455.01 57.4595 456 56L400.978 113.382V113.204L210.45 312.794"/><path d="M183.042 337.641C136.519 291.294 144.54 219.567 184.236 178.203C213.59 147.59 261.683 135.096 303.666 153.464L348.755 131.75C340.632 125.627 330.221 119.042 318.275 114.414C264.277 91.2407 199.63 102.774 155.735 148.516C113.513 192.549 100.236 260.254 123.036 318.027C140.069 361.206 112.148 391.748 84.0229 422.575C74.0561 433.503 64.0553 444.431 56 456L183.007 337.677"/></symbol>
+</defs></svg>
+{% endmacro %}
+
+{% macro ai_assistant_icon(provider) %}<svg aria-hidden="true" focusable="false"><use href="#ai-icon-{{ provider }}"></use></svg>{% endmacro %}
+
+{#
+  One rendering for a variant table, shared by the pathway-category path, the per-module path and
+  the per-drug path. Those were near-identical copies once and had already drifted; every field
+  added below would otherwise be three edits.
+
+  Four constraints the inline JS above imposes on anything changed here:
+    * `setVariantDetails` takes the detail row as the *immediate next sibling* of the summary row
+      — no wrapper element between them.
+    * `directPreviewRows` counts only direct `<tbody>` children carrying `data-preview-row`, so a
+      row that participates in the row preview needs that attribute and the detail row must not
+      have it.
+    * The initial `preview-overflow` class and the JS `TABLE_PREVIEW_ROWS` must agree; both read
+      `preview_row_limit`, which comes from `report_logic.TABLE_PREVIEW_ROWS`.
+    * `colspan` on the detail cell must equal the number of <th> in the header (9).
+
+  Every detail row is guarded by `{% if %}`: a column our modules leave empty renders nothing at
+  all rather than an empty row, and a module that starts populating one renders it with no
+  further work.
+#}
 {% macro variant_rows(variants, tbody_id, gene_href_base) %}
 <tbody id="{{ tbody_id }}">
     {% for v in variants %}
-    <tr class="clickable" onclick="doOnClick(this)">
-        <td><div class="ui tiny circular compact positive button">+</div></td>
+    {% set detail_id = tbody_id ~ "Detail" ~ loop.index %}
+    {% set study_tbody_id = tbody_id ~ "Study" ~ loop.index %}
+    <tr class="variant-summary{% if loop.index > preview_row_limit %} preview-overflow{% endif %}" data-preview-row>
+        <td class="detail-column">
+            <button
+                type="button"
+                class="detail-toggle"
+                aria-controls="{{ detail_id }}"
+                aria-expanded="false"
+                title="Open variant details"
+                onclick="toggleVariantDetails(event, this)"
+            >+</button>
+        </td>
         <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
         <td>{% if v.gene %}<a href="{{ gene_href_base }}{{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
         <td>{{ v.genotype_str }}{% if v.restored %} <span class="restored-badge" title="Inferred from the absence of a variant call at this position, not directly observed.">inferred</span>{% endif %}</td>
         <td>{{ v.ref }}</td>
-        {# The module's candidate alleles, which is not the allele this person carries — the two used
-           to share a column heading and a `/` separator with "Your genotype", so a two-allele cell
-           read as a genotype. Labelled for what it is instead. #}
         <td>{{ v.alt }}</td>
         <td>{{ v.zygosity }}</td>
-        <td style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+        <td class="weight-cell" style="background-color:{{ v.weight_color }}">{{ v.weight }}</td>
+        <td class="ai-explain-column">
+            {% if v.ai_explain_links %}
+            <div class="ai-explain-links">
+                {% for link in v.ai_explain_links %}
+                <a
+                    class="ai-explain-link {{ link.provider }}"
+                    href="{{ link.url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="{{ link.label }}"
+                    title="{{ link.label }}"
+                >{{ ai_assistant_icon(link.provider) }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </td>
     </tr>
-    <tr class="hidden" style="display:none;"><td colspan="8">
-        <table class="ui padded table">
+    <tr class="variant-detail" id="{{ detail_id }}" hidden><td colspan="9">
+        <table class="ui detail-table">
         <tbody>
             {% if v.restored %}
             <tr><th>Genotype source</th><td><span class="restored-badge">inferred</span>
@@ -381,12 +637,8 @@ window.onscroll = function() {
             {% endif %}
             {{ variant_detail_row("Conclusion", v.conclusion) }}
             {{ variant_detail_row("Method", v.method) }}
-            {# The 0.3 axis, already derived from `state` when the column is empty. Format 1.0
-               removes `state`, so the raw column is deliberately not rendered. #}
             {{ variant_detail_row("Direction", v.direction | capitalize) }}
             {{ variant_detail_row("Priority", v.priority) }}
-            {# clin_sig, not the legacy boolean: the booleans cannot express `likely_pathogenic`
-               and rendering them collapsed that tier into plain "Pathogenic". #}
             {% if v.clin_sig_label %}
             <tr><th>ClinVar</th><td>{{ v.clin_sig_label }}</td></tr>
             {% elif v.clinvar %}
@@ -406,37 +658,41 @@ window.onscroll = function() {
             {{ variant_detail_row("Population", v.population) }}
             {{ variant_detail_row("p-value", v.p_value) }}
             {# One authored row that resolved onto several positions (format 0.6 `locus_count`). At
-               most one of those positions is the variant the module meant, and the artifact does not
-               say which — so this is stated rather than hidden. Absent on a pre-0.6 artifact, and
-               `1` is the ordinary case; neither renders a row. #}
+               most one position is the variant the module meant, but the artifact cannot identify
+               which one. Pre-0.6 artifacts omit this field and an ordinary 0.6 row has a value of 1. #}
             {% if v.locus_count and v.locus_count > 1 %}
             <tr>
-                <td style="font-weight: normal;">Position ambiguous</td>
-                <td style="font-weight: normal;">This variant identifier resolves to {{ v.locus_count }} positions in the reference, and the module states one result for all of them. At most one of these positions is the variant the module is about; the data does not say which.</td>
+                <th>Position ambiguous</th>
+                <td>This variant identifier resolves to {{ v.locus_count }} positions in the reference, and the module states one result for all of them. At most one of these positions is the variant the module is about; the data does not say which.</td>
             </tr>
             {% endif %}
             {% if v.studies %}
-            <tr><td colspan="2">
-            <table class="ui selectable celled teal table table variants">
-                <thead>
-                    <tr>
-                        <th>Pubmed ID</th>
-                        <th>Population</th>
-                        <th>Study design</th>
-                        <th>Conclusions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in v.studies %}
-                    <tr>
-                        <td style="font-weight: normal;"><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
-                        <td style="font-weight: normal;">{{ s.population }}</td>
-                        <td style="font-weight: normal;">{{ s.study_design }}</td>
-                        <td style="font-weight: normal;">{{ s.conclusion }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <tr><th>Supporting studies</th><td>
+                <div class="table-shell nested-table-shell">
+                    <div class="table-scroll">
+                    <table class="ui">
+                        <thead>
+                            <tr>
+                                <th>PubMed ID</th>
+                                <th>Population</th>
+                                <th>Study design</th>
+                                <th>Conclusions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="{{ study_tbody_id }}">
+                            {% for s in v.studies %}
+                            <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                                <td><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
+                                <td>{{ s.population }}</td>
+                                <td>{{ s.study_design }}</td>
+                                <td>{{ s.conclusion }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {{ table_controls(study_tbody_id, v.studies | length) }}
+                </div>
             </td></tr>
             {% endif %}
         </tbody></table>
@@ -445,320 +701,280 @@ window.onscroll = function() {
 </tbody>
 {% endmacro %}
 
-{% macro variant_table_head(toggle_target) %}
-<thead>
-    <tr>
-        <th class="clickable title" onclick="collapseExpandAll(this, '{{ toggle_target }}')"><div class="ui tiny circular compact positive button">+</div></th>
-        <th>RSID</th>
-        <th>Gene</th>
-        <th>Your genotype</th>
-        <th>Ref allele</th>
-        <th>Module alt alleles</th>
-        <th>Zygosity</th>
-        <th>Weight</th>
-    </tr>
-</thead>
+{% macro variant_table(variants, tbody_id, gene_href_base) %}
+<div class="table-shell">
+    <div class="table-scroll">
+        <table class="ui variants">
+            <thead>
+                <tr>
+                    <th class="detail-column">Details</th>
+                    <th>RSID</th>
+                    <th>Gene</th>
+                    <th>Your genotype</th>
+                    <th>Ref allele</th>
+                    <th>Module alt alleles</th>
+                    <th>Zygosity</th>
+                    <th>Weight</th>
+                    <th>AI explain</th>
+                </tr>
+            </thead>
+            {{ variant_rows(variants, tbody_id, gene_href_base) }}
+        </table>
+    </div>
+    {{ table_controls(tbody_id, variants | length) }}
+</div>
 {% endmacro %}
 
-<div id="toTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
-    <section class="line-nav arrow-nav"></section>
-    <section class="bodypart arrow-nav"></section>
-</div>
-
-<h1 class="first" align="center">Longevity Report</h1>
-<br>
-
-<div class="intro">
-    {% if user_name or sample_name %}
-    <p style="font-size: 1.5em; color: #269292;">
-        {% if user_name %}{{ user_name }}{% endif %}
-        {% if sample_name %} &mdash; {{ sample_name }}{% endif %}
-    </p>
-    {% endif %}
-
-    <p>This report provides data about your longevity genetics. Longevity and healthy lifespan are among the most complex phenotypes, with heritability of age at death in adulthood being approximately 25%. So, the other 75% is highly dependent on lifestyle.</p>
-
-    <p>This report is based on your genome data cross-referenced against available genetic databases. Annotation modules used:
-        <a href="https://huggingface.co/datasets/just-dna-seq/annotators">just-dna-seq/annotators</a> (LongevityMap and other modules).
-    </p>
-
-    <div class="attention">
-        <p><strong>Attention!</strong> The information provided is for informational purposes only. Its clinical implementation is possible only after consulting your healthcare practitioner. All drugs, vitamins and lifestyle changes may be prescribed only by your healthcare practitioner, based on clinical blood test results, family history, etc.</p>
-    </div>
-
-    <p>The report consists of:</p>
-    <ul>
-        {% if longevity %}
-        <li><a href="#variants" class="li1">Longevity variants</a></li>
+{{ ai_assistant_icon_defs() }}
+<div class="top-rule"></div>
+<header class="report-header">
+    <div class="header-inner">
+        <p class="eyebrow">Just DNA · Genomic annotation</p>
+        <h1>{{ document_title }}</h1>
+        <p class="report-description">
+            {{ report_description | default("A structured summary of matched genomic annotations and their supporting evidence.", true) }}
+        </p>
+        {% if user_name or sample_name %}
+        <div class="subject-line">
+            {% if sample_name %}<span><strong>Sample</strong>{{ sample_name }}</span>{% endif %}
+            {% if user_name %}<span><strong>User</strong>{{ user_name }}</span>{% endif %}
+        </div>
         {% endif %}
-        {% for mod in other_modules %}
-        <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
-        {% endfor %}
-        {% for mod in pgx_modules %}
-        <li><a href="#module-{{ mod.module_name }}" class="li1">{{ mod.display_name }}</a></li>
-        {% endfor %}
-        {% if module_provenance %}
-        <li><a href="#modules" class="li1">Modules in this report</a></li>
-        {% endif %}
-        {% if credits %}
-        <li><a href="#credits" class="li1">Data sources and licences</a></li>
-        {% endif %}
-    </ul>
-</div>
-
-{# ===== LONGEVITY VARIANTS SECTION ===== #}
-{% if longevity %}
-<h2 id="variants">Longevity variants</h2>
-
-<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
-    <p>This report estimates how many significant longevity variations you have. The data is obtained mainly by studying centenarians' genomes.</p>
-    <p>The longevity variants report is based on variants from <a href="https://genomics.senescence.info/longevity/">LongevityMap</a> and other data sources which are scored and prioritized according to multiple criteria.</p>
-    <p>In the table you can see how many significant variants were found in your genome. Positively longevity-associated variants are marked with green, negatively associated with red.</p>
-    <p>We have analyzed genes that affect different longevity pathways in your genome and divided them into {{ longevity.categories | length }} distinct groups, so you can see which of them "work well" and which do not.</p>
-</div>
-
-{# Summary stats #}
-<div class="summary-card">
-    <div class="stat-box stat-total">
-        <div class="number">{{ longevity.summary.total_variants }}</div>
-        <div class="label">Total variants</div>
     </div>
-    <div class="stat-box stat-positive">
-        <div class="number">{{ longevity.summary.total_positive }}</div>
-        <div class="label">Positive</div>
-    </div>
-    <div class="stat-box stat-negative">
-        <div class="number">{{ longevity.summary.total_negative }}</div>
-        <div class="label">Negative</div>
-    </div>
-    <div class="stat-box stat-weight">
-        <div class="number">{{ longevity.summary.total_weight }}</div>
-        <div class="label">Net weight</div>
-    </div>
-    {% if longevity.summary.total_restored %}
-    <div class="stat-box" style="background: rgba(251, 189, 8, 0.14); border-color: #b58105;">
-        <div class="number">{{ longevity.summary.total_restored }}</div>
-        <div class="label">Inferred</div>
-    </div>
-    {% endif %}
-</div>
+</header>
 
-{# Pathway categories with variants #}
-{% for cat_key, cat in longevity.categories.items() %}
-{% if cat.total_count > 0 %}
-<div class="section-heading">{{ cat.title }}</div>
-<div class="basic-panel" id="pathway-{{ cat_key }}">
+<button id="toTop" type="button" title="Back to top" aria-label="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
-    <button class="accordion accordion0 active" style="border-radius: 10px 10px 0px 0px;" onclick="toggleAccordion(this)">
-        <div class="arrow-indicator"></div> Description
-    </button>
-    <div class="board variants panel panel-description" style="display: block; max-height: 2000px;">
-        <p>{{ cat.description }}</p>
+<main class="report-main">
+    <div class="intro-grid">
+        <div class="paper-card">
+            <p>
+                This report cross-references the supplied genome data with the selected annotation
+                modules. Each result is a matched annotation, not a diagnosis; use the module
+                provenance and linked evidence when interpreting a finding.
+            </p>
+            <p>
+                Tables show {{ preview_row_limit }} rows initially for a compact overview. Use
+                <strong>Open all</strong> to inspect the full table and <strong>Close</strong> to
+                return to the first {{ preview_row_limit }}.
+                Open the <strong>+</strong> control beside a variant for its detailed evidence.
+            </p>
+            <p>
+                The buttons in the <strong>AI explain</strong> column open an external assistant with
+                a prompt about that one row already filled in. That prompt contains your genotype at
+                that position, so it leaves this file and goes to whichever assistant you pick. It is
+                sent only when you click a button; opening this report sends nothing anywhere.
+            </p>
+        </div>
+        <aside class="scientific-note">
+            <strong>Interpretation notice</strong>
+            This information is for research and informational use. Clinical decisions, medicines,
+            supplements, and lifestyle changes require review by a qualified healthcare professional
+            together with validated testing, medical history, and other clinical evidence.
+        </aside>
     </div>
 
-    <button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
-        <div class="arrow-indicator"></div> Results
-    </button>
-    <div class="content content-variants">
-        <table class="ui selectable celled teal table table variants">
-            {{ variant_table_head(cat_key ~ 'TBody') }}
-            {{ variant_rows(cat.variants, cat_key ~ 'TBody', 'https://genomics.senescence.info/longevity/gene.php?id=') }}
-        </table>
-    </div>
-
-    <div style="height: 4vw;"></div>
-</div>
-{% endif %}
-{% endfor %}
-
-{# Pathway categories with no variants #}
-{% for cat_key, cat in longevity.categories.items() %}
-{% if cat.total_count == 0 %}
-<div class="section-heading" style="opacity: 0.6;">{{ cat.title }} (0 variants)</div>
-<div class="basic-panel" style="opacity: 0.6;">
-    <div class="board" style="width: 80%; margin: 0 auto; padding: 1vw 2vw;">
-        <p>{{ cat.description }}</p>
-        <p><em>No annotated variants found for this pathway in your genome.</em></p>
-    </div>
-</div>
-{% endif %}
-{% endfor %}
-
-{% endif %}
-
-{# ===== OTHER MODULES ===== #}
-{% for mod in other_modules %}
-<h2 id="module-{{ mod.module_name }}">{{ mod.display_name }}</h2>
-
-{% if mod.variants %}
-<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
-    <p>This section shows your genetic variants annotated with the <strong>{{ mod.display_name }}</strong> module. {{ mod.summary.total_variants }} variants were found, {{ mod.summary.total_positive }} with positive weight and {{ mod.summary.total_negative }} with negative weight.</p>
-</div>
-
-<div class="summary-card">
-    <div class="stat-box stat-total">
-        <div class="number">{{ mod.summary.total_variants }}</div>
-        <div class="label">Total variants</div>
-    </div>
-    <div class="stat-box stat-positive">
-        <div class="number">{{ mod.summary.total_positive }}</div>
-        <div class="label">Positive</div>
-    </div>
-    <div class="stat-box stat-negative">
-        <div class="number">{{ mod.summary.total_negative }}</div>
-        <div class="label">Negative</div>
-    </div>
-    <div class="stat-box stat-weight">
-        <div class="number">{{ mod.summary.total_weight }}</div>
-        <div class="label">Net weight</div>
-    </div>
-    {% if mod.summary.total_restored %}
-    <div class="stat-box" style="background: rgba(251, 189, 8, 0.14); border-color: #b58105;">
-        <div class="number">{{ mod.summary.total_restored }}</div>
-        <div class="label">Inferred</div>
-    </div>
-    {% endif %}
-</div>
-
-<button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
-    <div class="arrow-indicator"></div> Results
-</button>
-<div class="content content-variants module-section">
-    <table class="ui selectable celled teal table table variants">
-        {{ variant_table_head(mod.module_name ~ 'TBody') }}
-        {{ variant_rows(mod.variants, mod.module_name ~ 'TBody', 'https://www.ncbi.nlm.nih.gov/gene/?term=') }}
-    </table>
-</div>
-
-{% else %}
-<p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
-{% endif %}
-{% endfor %}
-
-{# ===== PHARMACOGENOMICS (pharm_variants-led modules) ===== #}
-{% for mod in pgx_modules %}
-<h2 id="module-{{ mod.module_name }}">{{ mod.display_name }}</h2>
-
-{% if mod.drugs %}
-<div class="board" style="width: 60%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
-    <p>This section groups your variants by the <strong>drug</strong> they affect, because that is the unit a prescriber acts on. A pharmacogenomics module states no effect weights, so entries are ranked by evidence level rather than by weight.</p>
-    <p><strong>Evidence levels</strong> follow ClinPGx: <strong>1A</strong> is a variant with a published prescribing guideline, <strong>1B</strong> a strong association, <strong>2A/2B</strong> moderate, <strong>3</strong> and <strong>4</strong> preliminary or single-report.</p>
-</div>
-
-<div class="summary-card">
-    <div class="stat-box stat-total">
-        <div class="number">{{ mod.summary.total_variants }}</div>
-        <div class="label">Variants matched</div>
-    </div>
-    <div class="stat-box stat-total">
-        <div class="number">{{ mod.summary.total_drugs }}</div>
-        <div class="label">Drugs affected</div>
-    </div>
-    <div class="stat-box stat-negative">
-        <div class="number">{{ mod.summary.guideline_count }}</div>
-        <div class="label">Guideline-level (1A/1B)</div>
-    </div>
-</div>
-
-{% for d in mod.drugs %}
-<div class="section-heading">{{ d.drug | capitalize }}{% if d.best_evidence %} &mdash; evidence {{ d.best_evidence }}{% endif %}</div>
-<div class="basic-panel" id="drug-{{ mod.module_name }}-{{ loop.index }}">
-    {% if d.genes %}
-    <div class="board" style="width: 80%; margin: 0 auto; padding: 1vw 2vw;">
-        <p>Genes involved: {% for g in d.genes %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ g }}">{{ g }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
-    </div>
-    {% endif %}
-    <button class="accordion accordion0 accordion-result" onclick="toggleAccordion(this)">
-        <div class="arrow-indicator"></div> {{ d.total_count }} variant{% if d.total_count != 1 %}s{% endif %}
-    </button>
-    <div class="content content-variants module-section">
-        <table class="ui selectable celled teal table table variants">
-            {{ variant_table_head(mod.module_name ~ loop.index ~ 'TBody') }}
-            {{ variant_rows(d.variants, mod.module_name ~ loop.index ~ 'TBody', 'https://www.ncbi.nlm.nih.gov/gene/?term=') }}
-        </table>
-    </div>
-    <div style="height: 4vw;"></div>
-</div>
-{% endfor %}
-
-{% else %}
-<p style="text-align:center; color:#888; font-size: 1.2vw;">No annotated variants found for this module.</p>
-{% endif %}
-{% endfor %}
-
-{# ===== MODULES IN THIS REPORT ===== #}
-{% if module_provenance %}
-<h2 id="modules">Modules in this report</h2>
-<div class="board" style="width: 75%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
-    <p>Annotation modules are curated databases that are revised over time, so these are the versions this report was built from. A later run against an updated module can reach a different conclusion from the same genome.</p>
-    <table class="ui celled teal table">
-        <thead>
-            <tr>
-                <th>Module</th>
-                <th>Version</th>
-                <th>Build</th>
-                <th>What its weights mean</th>
-                <th>Source</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in module_provenance %}
-            <tr>
-                <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
-                {# Empty means the acquisition path never stated it — a module read straight from a
-                   remote parquet has no manifest to read. Never render that as "unversioned". #}
-                <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
-                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
-                {# The module's own words, verbatim and unparsed. Empty means it has not said, and
-                   that is not the same as "these weights are comparable" — a net weight from one
-                   module must never be added to one from another on the strength of a blank cell. #}
-                <td>{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
-                <td>{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
-            </tr>
+    <nav class="contents" aria-label="Report contents">
+        <p class="contents-title">Report contents</p>
+        <ul>
+            {% if longevity %}
+            <li><a href="#variants">Longevity variants</a></li>
+            {% endif %}
+            {% for mod in other_modules %}
+            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
-
-{# ===== CREDITS ===== #}
-{% if credits %}
-<h2 id="credits">Data sources and licences</h2>
-<div class="board" style="width: 75%; margin: 1rem auto; padding: 1vw 2vw; background: rgba(255,255,255,0.5); border-radius: 12px; border: rgb(101, 189, 162, 0.3) solid 3px;">
-    <p>This report redistributes curated content from the databases below. Only sources that contribute annotation content are listed; references consulted solely to place a variant's coordinates carry no such terms.</p>
-    <table class="ui celled teal table">
-        <thead>
-            <tr>
-                <th>Source</th>
-                <th>Used by</th>
-                <th>Licence</th>
-                <th>Attribution</th>
-                <th>Terms</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for c in credits %}
-            <tr>
-                <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
-                <td>{{ c.modules | join(', ') }}</td>
-                <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>
-                <td>{{ c.attribution }}{% if c.notice %}<br><small>{{ c.notice }}</small>{% endif %}</td>
-                <td>
-                    {# Tri-state: `None` means the terms could not be established, which is not the
-                       same as permitted. Only an explicit `false` is reported as a restriction. #}
-                    {% if c.share_alike is sameas true %}<div>Share-alike required</div>{% endif %}
-                    {% if c.commercial_use is sameas false %}<div>Non-commercial use only</div>{% endif %}
-                    {% if c.redistribution is sameas false %}<div>Redistribution restricted</div>{% endif %}
-                    {% if c.share_alike is none and c.commercial_use is none and c.redistribution is none %}<div><em>Not stated</em></div>{% endif %}
-                </td>
-            </tr>
+            {% for mod in pgx_modules %}
+            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
+            {% if module_provenance %}
+            <li><a href="#modules">Modules and versions</a></li>
+            {% endif %}
+            {% if credits %}
+            <li><a href="#credits">Sources and licences</a></li>
+            {% endif %}
+        </ul>
+    </nav>
 
-<div style="height: 80px;"></div>
+    {% if longevity %}
+    <section class="report-section" id="variants">
+        <p class="section-kicker">Module results</p>
+        <h2>{{ module_display_names.get("longevitymap", "Longevity Variants") }}</h2>
+        <p class="section-intro">
+            Longevity is a complex phenotype influenced by genetics, environment, and lifestyle.
+            These findings are matched to longevity-associated variants and grouped by biological
+            pathway. Green-weighted cells indicate positive associations and red-weighted cells
+            indicate negative associations in the source module.
+        </p>
 
+        <div class="summary-card">
+            <div class="stat-box"><div class="number">{{ longevity.summary.total_variants }}</div><div class="label">Total variants</div></div>
+            <div class="stat-box stat-positive"><div class="number">{{ longevity.summary.total_positive }}</div><div class="label">Positive</div></div>
+            <div class="stat-box stat-negative"><div class="number">{{ longevity.summary.total_negative }}</div><div class="label">Negative</div></div>
+            <div class="stat-box stat-weight"><div class="number">{{ longevity.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% if longevity.summary.total_restored %}
+            <div class="stat-box stat-inferred"><div class="number">{{ longevity.summary.total_restored }}</div><div class="label">Inferred</div></div>
+            {% endif %}
+        </div>
+
+        {% for cat_key, cat in longevity.categories.items() %}
+        {% if cat.total_count > 0 %}
+        <article class="module-panel" id="pathway-{{ cat_key }}">
+            <div class="module-panel-heading"><h3>{{ cat.title }}</h3></div>
+            <div class="module-panel-body">
+                <p class="pathway-description">{{ cat.description }}</p>
+                {{ variant_table(cat.variants, cat_key ~ "TBody", "https://genomics.senescence.info/longevity/gene.php?id=") }}
+            </div>
+        </article>
+        {% endif %}
+        {% endfor %}
+
+        {% for cat_key, cat in longevity.categories.items() %}
+        {% if cat.total_count == 0 %}
+        <article class="module-panel empty-panel">
+            <div class="module-panel-heading"><h3>{{ cat.title }} · 0 variants</h3></div>
+            <div class="module-panel-body">
+                <p class="pathway-description">{{ cat.description }}</p>
+                <p class="empty-message">No annotated variants were found for this pathway.</p>
+            </div>
+        </article>
+        {% endif %}
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% for mod in other_modules %}
+    <section class="report-section" id="module-{{ mod.module_name }}">
+        <p class="section-kicker">Module results</p>
+        <h2>{{ mod.display_name }}</h2>
+        {% if mod.variants %}
+        <p class="section-intro">
+            The <strong>{{ mod.display_name }}</strong> module matched {{ mod.summary.total_variants }}
+            variant{% if mod.summary.total_variants != 1 %}s{% endif %}. Expand a row to inspect the
+            conclusion, evidence, and any additional authored fields.
+        </p>
+        <div class="summary-card">
+            <div class="stat-box"><div class="number">{{ mod.summary.total_variants }}</div><div class="label">Total variants</div></div>
+            <div class="stat-box stat-positive"><div class="number">{{ mod.summary.total_positive }}</div><div class="label">Positive</div></div>
+            <div class="stat-box stat-negative"><div class="number">{{ mod.summary.total_negative }}</div><div class="label">Negative</div></div>
+            <div class="stat-box stat-weight"><div class="number">{{ mod.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% if mod.summary.total_restored %}
+            <div class="stat-box stat-inferred"><div class="number">{{ mod.summary.total_restored }}</div><div class="label">Inferred</div></div>
+            {% endif %}
+        </div>
+        {{ variant_table(mod.variants, mod.module_name ~ "TBody", "https://www.ncbi.nlm.nih.gov/gene/?term=") }}
+        {% else %}
+        <p class="no-results">No annotated variants were found for this module.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    {% for mod in pgx_modules %}
+    <section class="report-section" id="module-{{ mod.module_name }}">
+        <p class="section-kicker">Pharmacogenomics</p>
+        <h2>{{ mod.display_name }}</h2>
+        {% if mod.drugs %}
+        <p class="section-intro">
+            Results are grouped by drug and ranked by ClinPGx evidence level. Level 1A indicates a
+            published prescribing guideline; 1B is a strong association; 2A and 2B are moderate;
+            levels 3 and 4 are preliminary or single-report evidence.
+        </p>
+        <div class="summary-card">
+            <div class="stat-box"><div class="number">{{ mod.summary.total_variants }}</div><div class="label">Variants matched</div></div>
+            <div class="stat-box"><div class="number">{{ mod.summary.total_drugs }}</div><div class="label">Drugs affected</div></div>
+            <div class="stat-box stat-negative"><div class="number">{{ mod.summary.guideline_count }}</div><div class="label">Guideline-level</div></div>
+        </div>
+
+        {% for d in mod.drugs %}
+        <article class="module-panel" id="drug-{{ mod.module_name }}-{{ loop.index }}">
+            <div class="module-panel-heading">
+                <h3>{{ d.drug | capitalize }}{% if d.best_evidence %} · evidence {{ d.best_evidence }}{% endif %}</h3>
+            </div>
+            <div class="module-panel-body">
+                {% if d.genes %}
+                <p class="pathway-description">Genes:
+                    {% for g in d.genes %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ g }}">{{ g }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+                </p>
+                {% endif %}
+                {{ variant_table(d.variants, mod.module_name ~ loop.index ~ "TBody", "https://www.ncbi.nlm.nih.gov/gene/?term=") }}
+            </div>
+        </article>
+        {% endfor %}
+        {% else %}
+        <p class="no-results">No annotated variants were found for this module.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    {% if module_provenance %}
+    <section class="report-section" id="modules">
+        <p class="section-kicker">Reproducibility</p>
+        <h2>Modules in this report</h2>
+        <div class="paper-card metadata-card">
+            <p>
+                Annotation modules are revised over time. These identifiers record which module
+                builds contributed to this report so that results can be compared across runs.
+            </p>
+            <div class="table-shell">
+                <div class="table-scroll">
+                <table class="ui">
+                    <thead><tr><th>Module</th><th>Version</th><th>Build</th><th>What its weights mean</th><th>Source</th></tr></thead>
+                    <tbody id="moduleProvenanceTBody">
+                        {% for m in module_provenance %}
+                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                            <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                            <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
+                            <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                            {# The module's own explanation, kept verbatim. An absent value must not
+                               imply that weights from different modules are comparable. #}
+                            <td class="cell-wrap">{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+                            <td class="cell-wrap">{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {{ table_controls("moduleProvenanceTBody", module_provenance | length) }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if credits %}
+    <section class="report-section" id="credits">
+        <p class="section-kicker">Provenance</p>
+        <h2>Data sources and licences</h2>
+        <div class="paper-card metadata-card">
+            <p>
+                These sources contribute annotation content included in the report. Resolution-only
+                references are excluded because their terms do not apply to the redistributed content.
+            </p>
+            <div class="table-shell">
+                <div class="table-scroll">
+                <table class="ui">
+                    <thead><tr><th>Source</th><th>Used by</th><th>Licence</th><th>Attribution</th><th>Terms</th></tr></thead>
+                    <tbody id="creditsTBody">
+                        {% for c in credits %}
+                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                            <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
+                            <td>{{ c.modules | join(", ") }}</td>
+                            <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>
+                            <td>{{ c.attribution }}{% if c.notice %}<br><small>{{ c.notice }}</small>{% endif %}</td>
+                            <td>
+                                {% if c.share_alike is sameas true %}<div>Share-alike required</div>{% endif %}
+                                {% if c.commercial_use is sameas false %}<div>Non-commercial use only</div>{% endif %}
+                                {% if c.redistribution is sameas false %}<div>Redistribution restricted</div>{% endif %}
+                                {% if c.share_alike is none and c.commercial_use is none and c.redistribution is none %}<div><em>Not stated</em></div>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {{ table_controls("creditsTBody", credits | length) }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</main>
 </body>
 </html>

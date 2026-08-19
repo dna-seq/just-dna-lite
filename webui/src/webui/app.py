@@ -301,7 +301,7 @@ async def view_report_file(user_id: str, sample_name: str, filename: str) -> Res
     Serve an HTML report file for viewing in the browser.
     
     Path: /api/report/{user_id}/{sample_name}/{filename}
-    Example: /api/report/anonymous/antku_small/longevity_report.html
+    Example: /api/report/anonymous/antku_small/report_20260818_221532.html
     """
     # Validate inputs to prevent path traversal
     if ".." in user_id or ".." in sample_name or ".." in filename:
