@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-pipelines"
-version = "0.2.4"
+version = "0.2.5"
 description = "Genomic Database Management and Annotation Tool"
 readme = "README.md"
 authors = [
@@ -40,8 +40,17 @@ dependencies = [
     # coordinates then returned via expansion wearing the surviving record's clin_sig and condition.
     # 0.6.3 groups over the whole event instead. `clinvar_panel._identity_collapse_note` predates the
     # fix and now reports nothing on a 0.6.3 build — keep it as the regression guard, not a workaround.
+    #
+    # 0.6.4 (S45) is about *remediating* that collapse, and it is why a rebuild here is safe. Drafting
+    # appends and never mutates, so re-running the fixed drafter over an existing spec adds the
+    # coordinate-keyed rows BESIDE the collapsed rsid-only row rather than replacing it — leaving a
+    # module worse-formed than either the old one or a fresh one, and undetectably so from inside
+    # (a coordinate-identity row carries no `rsid`, so the obvious predicate finds 0 of 31 upstream).
+    # `_superseded_rsid_rows` now names them. We are not exposed: `build_clinvar_module` unlinks
+    # variants.csv / studies.csv / resolution.csv and the parquets before drafting, so our rebuild is
+    # a fresh draft rather than a re-draft. Keep that clearing — it is what makes this floor liveable.
     "just-dna-compiler>=0.6.1",
-    "just-dna-enricher>=0.6.3",
+    "just-dna-enricher>=0.6.4",
     "just-dna-format>=0.6.1",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;

@@ -1901,7 +1901,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-enricher"
-version = "0.6.3"
+version = "0.6.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "duckdb" },
@@ -1915,9 +1915,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/12/9f59cf69cf41f0369a6240ac7cd5ed2213753182ba1460c013ded31a19bb/just_dna_enricher-0.6.3.tar.gz", hash = "sha256:529e743a5bb089d4d997eb015cc471474cb0cfa18aeb8693ce3d7d3ca98d4260", size = 342391, upload-time = "2026-08-18T22:46:40.369Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/5b/8d5c91bc1ade30ea8f2089a131eec64c044742525727699fc2799a824001/just_dna_enricher-0.6.4.tar.gz", hash = "sha256:a0ba627fdf9935d037cf01f360b73e8510d01508e81e5bd558e4116ba3fbaeac", size = 343390, upload-time = "2026-08-19T00:00:22.193Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/5f/efe87c17654237518114736718b98438fe149893d150afa3ba2ef4e85234/just_dna_enricher-0.6.3-py3-none-any.whl", hash = "sha256:4a008a7be95d8e3a707bf61b662fd26f9aca955e3c6ceb0c6799fdec70574870", size = 383343, upload-time = "2026-08-18T22:46:41.695Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/57/d7e66eb49ec0c79a18c6619940cc87b255c4e2b9d35c35917239671908db/just_dna_enricher-0.6.4-py3-none-any.whl", hash = "sha256:cd10a4f8c08269254c3e6ed3a20af559db68a3dfb48efa34744460834b6e0a7a", size = 384387, upload-time = "2026-08-19T00:00:20.7Z" },
 ]
 
 [[package]]
@@ -1935,7 +1935,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.3.19"
+version = "0.3.20"
 source = { editable = "." }
 dependencies = [
     { name = "dagster-dg-cli" },
@@ -1962,7 +1962,7 @@ requires-dist = [
     { name = "grpcio", specifier = "<1.82" },
     { name = "grpcio-health-checking", specifier = "<1.82" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "just-dna-registry", specifier = ">=0.18.1" },
+    { name = "just-dna-registry", specifier = ">=0.18.2" },
     { name = "just-prs", specifier = ">=0.9.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.27.1" },
@@ -1978,7 +1978,7 @@ dev = [
 
 [[package]]
 name = "just-dna-pipelines"
-version = "0.2.4"
+version = "0.2.5"
 source = { editable = "just-dna-pipelines" }
 dependencies = [
     { name = "agno" },
@@ -2036,7 +2036,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.75.0,<2.0" },
     { name = "huggingface-hub", specifier = ">=1.27.0" },
     { name = "just-dna-compiler", specifier = ">=0.6.1" },
-    { name = "just-dna-enricher", specifier = ">=0.6.3" },
+    { name = "just-dna-enricher", specifier = ">=0.6.4" },
     { name = "just-dna-format", specifier = ">=0.6.1" },
     { name = "mcp", specifier = ">=1.29.0,<2.0" },
     { name = "numpy", specifier = ">=2.5.2" },
@@ -2069,7 +2069,7 @@ dev = [
 
 [[package]]
 name = "just-dna-registry"
-version = "0.18.1"
+version = "0.18.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2077,9 +2077,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/74/73eb7713a38abcad79e27aabe653e0df42025629d08053366bef40663152/just_dna_registry-0.18.1.tar.gz", hash = "sha256:47aba63017354a3db3969a6e219a5327ae3a75ba45e3c74f8986eac45c60a0cf", size = 208934, upload-time = "2026-08-18T23:16:14.616Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/a0/8e0d3643ab27ce38b1c03737d76e193f2aba7c58808b657c566b86635821/just_dna_registry-0.18.2.tar.gz", hash = "sha256:778afe0c1346fb35607b1963b8ab983bd907306249396c3453282d77513f6702", size = 211910, upload-time = "2026-08-19T00:27:57.294Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/38/f0cafe69aa93c1bbc37557e8f9e5e38f674af67da8525eebf253d9ab953e/just_dna_registry-0.18.1-py3-none-any.whl", hash = "sha256:fce398903c1ea48b1f748c5da05fc7f5a1c8e7e05af3ac48299ff1255e48eb22", size = 233712, upload-time = "2026-08-18T23:16:16.084Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/cd/82a52df2fe81c5e3e7baadcaa636e57502f5453fe9352ff195013ecc6683/just_dna_registry-0.18.2-py3-none-any.whl", hash = "sha256:8b8414425f5e01f27155a5fe893dcbf9cf258f8079ef8b47e367df366fbadc37", size = 234586, upload-time = "2026-08-19T00:27:55.768Z" },
 ]
 
 [[package]]
@@ -4318,7 +4318,7 @@ wheels = [
 
 [[package]]
 name = "webui"
-version = "0.2.9"
+version = "0.2.10"
 source = { editable = "webui" }
 dependencies = [
     { name = "fastapi" },

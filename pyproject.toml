@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-lite"
-version = "0.3.19"
+version = "0.3.20"
 description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
@@ -21,15 +21,15 @@ dependencies = [
   # 0.17.0 is the format-0.6 cut. `version.contract_compatible` treats a 0.x minor as breaking, so
   # this floor and the `just-dna-format` one move together: a 0.5-format client is refused by a
   # 0.6-format server and vice versa. The client *surface* did not move in 0.17.
-  # 0.18.1 is the marketplace client rebuilt on the 0.6.3 tier. It keeps `just-dna-format>=0.6.1`, so
+  # 0.18.1/0.18.2 are the marketplace client rebuilt on the 0.6.3/0.6.4 tier. It keeps `just-dna-format>=0.6.1`, so
   # the *format* floor does not move with it this time — only the enricher does, and only for the
   # registry's `server` extra, which we do not install. Every client symbol we use is unchanged
   # (`RegistryClient`, `RegistryError`, `VersionMismatchError`, `generate_install_id`,
   # `validate_install_id`, `client_cli.app`, `version.contract_compatible`) — checked, not assumed.
-  # Prod answers `registry 0.18.1 / format 0.6.1 / compiler 0.6.1`, so client and server agree and
+  # Prod answers `registry 0.18.2 / format 0.6.1 / compiler 0.6.1`, so client and server agree and
   # there is no contract-mismatch window. Verify before assuming either way:
   #   curl -s $REGISTRY_URL/api/v1/version
-  "just-dna-registry>=0.18.1",
+  "just-dna-registry>=0.18.2",
   # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
   # but dagster still caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
   # the gencode and dagster fails to import (VersionError in health_pb2). Dagster 1.13.13
