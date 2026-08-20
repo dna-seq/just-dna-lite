@@ -295,6 +295,25 @@ async def download_agent_run_log(spec_name: str, version_dir: str, log_name: str
     )
 
 
+def _resolve_report_file(user_id: str, sample_name: str, filename: str) -> Path:
+    """Return a report HTML path after rejecting traversal and non-HTML names."""
+    if ".." in user_id or ".." in sample_name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid path components")
+
+    if not filename.endswith(".html"):
+        raise HTTPException(status_code=400, detail="Only HTML report files are allowed")
+
+    file_path = get_user_output_dir() / user_id / sample_name / "reports" / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename} (looked at {file_path})")
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=400, detail=f"Path is not a file: {file_path}")
+
+    return file_path
+
+
 @api.get("/api/report/{user_id}/{sample_name}/{filename}", response_model=None)
 async def view_report_file(user_id: str, sample_name: str, filename: str) -> Response:
     """
@@ -303,22 +322,8 @@ async def view_report_file(user_id: str, sample_name: str, filename: str) -> Res
     Path: /api/report/{user_id}/{sample_name}/{filename}
     Example: /api/report/anonymous/antku_small/report_20260818_221532.html
     """
-    # Validate inputs to prevent path traversal
-    if ".." in user_id or ".." in sample_name or ".." in filename:
-        raise HTTPException(status_code=400, detail="Invalid path components")
-    
-    # Only allow HTML files
-    if not filename.endswith(".html"):
-        raise HTTPException(status_code=400, detail="Only HTML files can be viewed")
-    
-    file_path = get_user_output_dir() / user_id / sample_name / "reports" / filename
-    
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"Report not found: {filename} (looked at {file_path})")
-    
-    if not file_path.is_file():
-        raise HTTPException(status_code=400, detail=f"Path is not a file: {file_path}")
-    
+    file_path = _resolve_report_file(user_id, sample_name, filename)
+
     html = file_path.read_text(encoding="utf-8")
     tracked_html = inject_umami_tracker(html)
     if tracked_html == html:
@@ -327,6 +332,25 @@ async def view_report_file(user_id: str, sample_name: str, filename: str) -> Res
             media_type="text/html",
         )
     return HTMLResponse(content=tracked_html)
+
+
+@api.get("/api/download-report/{user_id}/{sample_name}/{filename}")
+async def download_report_file(user_id: str, sample_name: str, filename: str) -> FileResponse:
+    """Download an HTML report as an attachment.
+
+    The view route returns ``text/html`` for the browser. A ``download``
+    attribute on that cross-origin URL is ignored, so this route sets
+    ``Content-Disposition: attachment`` the same way parquet downloads do.
+
+    Path: /api/download-report/{user_id}/{sample_name}/{filename}
+    Example: /api/download-report/anonymous/antku_small/report_20260818_221532.html
+    """
+    file_path = _resolve_report_file(user_id, sample_name, filename)
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/octet-stream",
+    )
 
 
 @api.get("/api/module-logo/{module_name}")

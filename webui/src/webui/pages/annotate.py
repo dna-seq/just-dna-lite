@@ -1692,6 +1692,12 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
         + file_info["sample_name"].to(str) + "/"
         + file_info["name"].to(str)
     )
+    download_url = (
+        UploadState.backend_api_url + "/api/download-report/"
+        + UploadState.safe_user_id + "/"
+        + file_info["sample_name"].to(str) + "/"
+        + file_info["name"].to(str)
+    )
 
     return rx.el.div(
         rx.el.div(
@@ -1734,11 +1740,13 @@ def report_file_card(file_info: rx.Var[dict]) -> rx.Component:
                 class_name="ui pink button",
                 style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "6px", "flexShrink": "0"},
             ),
-            # Download button
+            # Download button — attachment route, not the view URL. The HTML
+            # ``download`` attribute is ignored on a cross-origin /api/report link.
             rx.el.a(
                 fomantic_icon("download", size=15),
-                href=view_url,
+                href=download_url,
                 download=file_info["name"].to(str),
+                title="Download HTML report",
                 class_name="ui icon button",
                 style={"marginLeft": "8px", "flexShrink": "0"},
             ),
