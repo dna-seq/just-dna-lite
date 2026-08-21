@@ -8,7 +8,7 @@ Sources are configured in modules.yaml (see module_config.py).
 
 import re
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Optional
 
 import polars as pl
@@ -113,11 +113,28 @@ def _get_fsspec_filesystem(protocol: str, url: str) -> "AbstractFileSystem":
 
 
 def _build_url(protocol: str, path: str) -> str:
-    """Build a full URL from protocol and path."""
+    """Build a full URL from protocol and path.
+
+    **A local path is returned bare, never as a `file:` URI.** `f"file://{path}"` is only
+    accidentally correct: on POSIX the path opens with `/`, so the result is `file:///data/…` —
+    three slashes, an empty authority. On Windows it opens with a drive letter, so the result is
+    `file://C:/Users/…` and `C:` is parsed as the URI *hostname*, which the object_store crate
+    behind `pl.scan_parquet` rejects outright::
+
+        failed to create CloudLocation: unsupported: non-empty hostname for 'file:' URI: 'C:'
+
+    That made every locally-registered module (a registry install or a local compile — the
+    registered-modules dir is a bare absolute path in `modules.yaml`) unannotatable on Windows,
+    while discovery still found and listed it, so the run went green with the module silently
+    missing from the report. Polars reads a native path on both platforms, and the rest of this
+    repo already assumes a local module's URL is bare — see `local_module_dir`.
+    """
     if protocol == "hf":
         return f"hf://{path}"
     if protocol in ("http", "https"):
         return path  # Already a full URL
+    if protocol == "file":
+        return path  # Native path: `file://` + a drive letter is not a valid URI
     return f"{protocol}://{path}"
 
 
@@ -708,6 +725,38 @@ def validate_modules(module_names: list[str]) -> list[str]:
                 valid.append(discovered)
                 break
     return valid
+
+
+def local_module_path(url: str) -> Optional[Path]:
+    """The filesystem path a module URL names, or ``None`` when it names a remote one.
+
+    The one predicate for "are these bytes on this machine", so that a caller does not have to
+    guess at prefixes. A local module's URL is a bare absolute path (`_build_url` returns the path
+    unchanged for the `file` protocol), and `startswith("/")` — the test three call sites used to
+    apply — answers *False* for every Windows path, so a locally-installed module was rendered as
+    a HuggingFace one there and its logo was never served. A legacy `file://` URL is still
+    accepted: an artifact written before the fix may carry one.
+    """
+    if not url:
+        return None
+    if "://" in url and not url.startswith("file://"):
+        return None  # hf://, http(s)://, s3://, github://, …
+    raw = url[len("file://"):] if url.startswith("file://") else url
+    if not raw:
+        return None
+    # Absolute in *either* grammar, so the answer does not change with the interpreter's platform:
+    # `Path("C:/Users/…").is_absolute()` is False on POSIX and True on Windows, and a test that can
+    # only run on one of them is no fence at all. There is no false positive to trade away — a
+    # relative path is relative in both grammars — and the URL was produced by fsspec on the same
+    # machine that is now asking, so the native reading is the one that matters in production.
+    if not (PurePosixPath(raw).is_absolute() or PureWindowsPath(raw).is_absolute()):
+        return None
+    return Path(raw)
+
+
+def is_local_module_url(url: str) -> bool:
+    """Whether the URL names a module on this filesystem. See `local_module_path`."""
+    return local_module_path(url) is not None
 
 
 def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:

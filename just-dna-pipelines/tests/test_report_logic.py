@@ -372,7 +372,7 @@ def _render(**context) -> str:
         "preview_row_limit": TABLE_PREVIEW_ROWS,
         "user_name": "t", "sample_name": "s", "longevity": None,
         "other_modules": [], "pgx_modules": [], "credits": [],
-        "module_provenance": [],
+        "module_provenance": [], "module_exclusions": [],
         "module_display_names": {}, "umami_script_tag": "",
     }
     ctx.update(context)
@@ -795,6 +795,8 @@ from just_dna_pipelines.annotation.hf_modules import (
 )
 from just_dna_pipelines.annotation.report_logic import (
     _module_outputs_from_manifest,
+    _read_annotation_manifest,
+    build_module_exclusions,
     build_module_provenance,
 )
 
@@ -867,3 +869,53 @@ def test_a_run_with_no_manifest_still_reports_its_modules(tmp_path):
     assert rows[0]["lead_table"] == "pharm_variants"
     assert rows[0]["source_url"] == "/registered/pharmgkb"
     assert rows[0]["version"] == ""
+
+
+# ============================================================================
+# Modules that were selected and produced nothing
+# ============================================================================
+
+
+def test_a_module_that_failed_is_named_in_the_report_with_its_reason(tmp_path):
+    """A failed module must not leave the report silent.
+
+    The engine catches per module so one failure cannot cost the others, and the run therefore
+    reports success. That is the right behaviour and it is also why the report is the only place a
+    reader could ever learn a selected module contributed nothing — a report that renders only what
+    succeeded reads as "this module found nothing in you" rather than "this module was never read".
+    The reason is the engine's own, verbatim: on Windows this was the malformed `file:` URI.
+    """
+    manifest = AnnotationManifest(
+        user_name="u", sample_name="s", source_vcf="/x.vcf", output_dir=str(tmp_path),
+        modules=[ModuleOutputMapping(module="coronary", lead_table="weights")],
+        failed_modules={
+            "antonkulaga__cognitive_intelligence": (
+                "ComputeError: failed to create CloudLocation: unsupported: non-empty hostname "
+                "for 'file:' URI: 'C:'"
+            )
+        },
+        skipped_modules={"pgs_module": "UnsupportedLeadTable: pgs carries no per-variant key"},
+    )
+    (tmp_path / "manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+    rows = build_module_exclusions(_read_annotation_manifest(tmp_path))
+    assert {r["name"] for r in rows} == {"antonkulaga__cognitive_intelligence", "pgs_module"}
+    kinds = {r["name"]: r["kind"] for r in rows}
+    assert kinds["antonkulaga__cognitive_intelligence"] == "failed"
+    assert kinds["pgs_module"] == "skipped"
+
+    html = _render(module_exclusions=rows)
+    assert "Modules not read in this run" in html
+    assert "antonkulaga__cognitive_intelligence" in html
+    assert "non-empty hostname" in html          # the reason reaches the reader, not just the log
+    assert "pgs_module" in html
+
+
+def test_a_clean_run_renders_no_exclusions_section(tmp_path):
+    """The converse: the section must not appear when every selected module was read."""
+    _write_run_manifest(
+        tmp_path, ModuleOutputMapping(module="coronary", lead_table="weights")
+    )
+    assert build_module_exclusions(_read_annotation_manifest(tmp_path)) == []
+    assert build_module_exclusions(None) == []
+    assert "Modules not read in this run" not in _render()

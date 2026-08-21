@@ -555,10 +555,31 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
   (`rs123;rs456`), and the authored side names exactly one variant per row, so the split is the
   consumer's job (just-dna-format RM64). `_vcf_rsid_join_keys` explodes into `_rsid_join_key`, which
   is dropped after the join so the output keeps the record's ID verbatim.
+- **A local module's URL is a bare path, never a `file:` URI** (`hf_modules._build_url`). Building
+  one by concatenation is only accidentally correct: a POSIX path opens with `/`, so `file://` + it
+  is `file:///data/…` with an empty authority, while a Windows path opens with a drive letter, so
+  `file://C:/Users/…` parses `C:` as the **hostname** and polars refuses it before touching the disk
+  (`failed to create CloudLocation: unsupported: non-empty hostname for 'file:' URI: 'C:'`). Every
+  registry install and local compile was therefore unannotatable on Windows while still being
+  discovered and listed, so the run went green with the module missing from the report. Polars reads
+  a native path on both platforms. Ask **`local_module_path` / `is_local_module_url`** whether bytes
+  are on this machine — `startswith("/")` is False for every Windows path, which is how three call
+  sites (the two logo surfaces and the source list) came to treat a local module as a remote one.
+  A legacy `file://` URL still resolves, since artifacts written before the fix carry one.
+  Tests: `just-dna-pipelines/tests/test_local_module_urls.py`, which pins the Windows case on any
+  platform because every function involved is pure string/path work.
 
 `AnnotationManifest` records `output_dir`, per-module `lead_table`, and `skipped_modules` /
 `failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
 there when every module was skipped.
+
+**Both are rendered — the report's "Modules not read in this run" section.** The engine catches per
+module so one failure cannot cost the others, which means the run reports success and the report is
+the only place a reader can learn that a module they selected contributed nothing; rendering only
+what succeeded made that silence read as *this module found nothing in you*. `build_module_exclusions`
+(`report_logic.py`) keeps the two kinds apart because they mean different things: **skipped** is
+about the module (no per-variant key — retrying changes nothing), **failed** is about this run (an
+unreadable path, a schema clash) and is usually actionable. The engine's reason travels verbatim.
 
 **A run also records which module *bytes* produced it** — `ModuleOutputMapping.version` / `digest` /
 `source_url`, filled by `read_module_provenance` (`hf_modules.py`) and rendered as the report's

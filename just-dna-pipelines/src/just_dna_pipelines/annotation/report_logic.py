@@ -1199,8 +1199,8 @@ def build_report_credits(
 MODULE_DISPLAY_NAMES: dict[str, str] = build_display_names_dict(DISCOVERED_MODULES)
 
 
-def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
-    """Read the run's ``manifest.json`` → one ``ModuleOutputMapping`` per annotated module.
+def _read_annotation_manifest(modules_dir: Path) -> Optional[AnnotationManifest]:
+    """The run's ``manifest.json``, or ``None`` when there is none or it cannot be read.
 
     Parsed through ``AnnotationManifest`` rather than as raw JSON on purpose: manifests written
     before the engine learned about lead tables carry no ``lead_table`` key at all, and the model's
@@ -1213,10 +1213,10 @@ def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMa
     """
     manifest_path = modules_dir / "manifest.json"
     if not manifest_path.exists():
-        return {}
+        return None
 
     try:
-        manifest = AnnotationManifest.model_validate_json(
+        return AnnotationManifest.model_validate_json(
             manifest_path.read_text(encoding="utf-8")
         )
     except (ValueError, OSError) as exc:
@@ -1226,9 +1226,52 @@ def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMa
             path=str(manifest_path),
             reason=str(exc),
         )
-        return {}
+        return None
 
-    return {m.module: m for m in manifest.modules}
+
+def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
+    """One ``ModuleOutputMapping`` per annotated module, keyed by module name."""
+    manifest = _read_annotation_manifest(modules_dir)
+    return {m.module: m for m in manifest.modules} if manifest else {}
+
+
+def build_module_exclusions(manifest: Optional[AnnotationManifest]) -> list[dict]:
+    """One row per module the run was asked for and did not annotate, with the engine's reason.
+
+    The engine records these on the manifest (`skipped_modules` / `failed_modules`) and both CLIs
+    print them, but the HTML report used to render only what succeeded — so a selected module that
+    failed left no trace a reader could see. The run itself still succeeds by design (one module's
+    failure must not cost the others), which makes the report the only place a reader would ever
+    find out, and its silence read as "this module found nothing" rather than "this module was
+    never read".
+
+    The two kinds are held apart because they mean different things. *Skipped* is a statement about
+    the module — its lead table carries no per-variant key, so there is nothing to join and no
+    amount of retrying changes that. *Failed* is a statement about this run — an unreadable path, a
+    schema clash — and is usually worth acting on.
+    """
+    if manifest is None:
+        return []
+    rows: list[dict] = []
+    for name, reason in sorted(manifest.skipped_modules.items()):
+        rows.append(
+            {
+                "name": name,
+                "display_name": get_module_display_name(name),
+                "kind": "skipped",
+                "reason": reason,
+            }
+        )
+    for name, reason in sorted(manifest.failed_modules.items()):
+        rows.append(
+            {
+                "name": name,
+                "display_name": get_module_display_name(name),
+                "kind": "failed",
+                "reason": reason,
+            }
+        )
+    return rows
 
 
 def build_module_provenance(
@@ -1302,7 +1345,9 @@ def generate_longevity_report(
     with start_action(action_type="generate_longevity_report", modules_dir=str(modules_dir)):
         # Discover module infos
         module_infos = discover_hf_modules()
-        module_outputs = _module_outputs_from_manifest(modules_dir)
+        manifest = _read_annotation_manifest(modules_dir)
+        module_outputs = {m.module: m for m in manifest.modules} if manifest else {}
+        module_exclusions = build_module_exclusions(manifest)
         lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
 
         # Find available parquet files
@@ -1372,6 +1417,7 @@ def generate_longevity_report(
             pgx_modules=pgx_modules_data,
             credits=credits,
             module_provenance=module_provenance,
+            module_exclusions=module_exclusions,
             module_display_names=MODULE_DISPLAY_NAMES,
             umami_script_tag=umami_script_tag(),
         )

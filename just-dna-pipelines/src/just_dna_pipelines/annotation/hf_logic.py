@@ -9,6 +9,7 @@ Modules are identified by string names (e.g., "longevitymap") rather than
 enums, enabling dynamic discovery of new modules from the HF repository.
 """
 
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +23,7 @@ from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.annotation.hf_modules import (
     MODULE_INFOS,
     ModuleTable,
+    local_module_path,
     ModuleOutputMapping,
     AnnotationManifest,
     scan_module_table,
@@ -539,9 +541,23 @@ def annotate_vcf_with_module_weights(
 
 
 def download_file(url: str, output_path: Path) -> Path:
-    """Download a file from a URL or HuggingFace."""
+    """Download a file from a URL or HuggingFace, or copy it when it is already on this disk.
+
+    The local branch is not a Windows fix — it closes a gap on every platform. A locally
+    registered module (a registry install or a local compile) states a filesystem path for its
+    logo and metadata, and with only the `hf://` and http(s) branches below such a URL fell
+    through to `requests.get`, which has no adapter for a path and none for `file://` either. The
+    caller catches and warns, so every local module quietly lost its logo and its metadata.
+    """
     import requests
-    
+
+    # Already on this filesystem: copy rather than fetch.
+    local_source = local_module_path(url)
+    if local_source is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(local_source, output_path)
+        return output_path
+
     # hf:// protocol handling
     if url.startswith("hf://"):
         from huggingface_hub import hf_hub_download, get_token
@@ -566,7 +582,6 @@ def download_file(url: str, output_path: Path) -> Path:
             repo_type="dataset",
             token=token,
         )
-        import shutil
         output_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(downloaded_path, output_path)
         return output_path

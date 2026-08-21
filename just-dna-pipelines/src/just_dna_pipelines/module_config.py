@@ -360,7 +360,13 @@ def _default_config_path() -> Optional[Path]:
 
 
 def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Remove repo-local generated/interim sources in env-backed runtimes."""
+    """Remove repo-local generated/interim sources in env-backed runtimes.
+
+    "Is this a local path" is `Path(url).is_absolute()`, never `startswith("/")`: the latter is
+    False for every Windows path, so a checkout with `JUST_DNA_PIPELINES_OUTPUT_DIR` pointed
+    elsewhere went on scanning the repo's own `data/` there as well. Evaluated natively on purpose —
+    the path belongs to the machine doing the asking.
+    """
     if not os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR"):
         return raw
 
@@ -372,7 +378,7 @@ def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
     filtered_sources = []
     for source in raw.get("sources", []):
         url = source.get("url") if isinstance(source, dict) else source
-        if isinstance(url, str) and url.startswith("/"):
+        if isinstance(url, str) and "://" not in url and Path(url).is_absolute():
             source_path = Path(url).expanduser().resolve()
             if source_path == project_data or project_data in source_path.parents:
                 continue

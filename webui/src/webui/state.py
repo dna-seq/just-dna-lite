@@ -26,7 +26,12 @@ from just_dna_pipelines.agents.module_creator import read_spec_meta
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
-from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
+from just_dna_pipelines.annotation.hf_modules import (
+    DISCOVERED_MODULES,
+    MODULE_INFOS,
+    HF_DEFAULT_REPOS,
+    is_local_module_url,
+)
 from just_dna_pipelines.annotation.resources import (
     get_user_output_dir, get_user_input_dir, get_generated_modules_dir,
     download_vcf_from_zenodo, ensure_vcf_in_user_input_dir,
@@ -541,7 +546,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             if info is None:
                 continue
             repo_id = info.repo_id
-            is_local = info.source_url.startswith("/") or info.source_url.startswith("file://")
+            is_local = is_local_module_url(info.source_url)
             if repo_id not in repos:
                 if is_local:
                     url = info.source_url
@@ -2777,7 +2782,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 if info.logo_url.startswith("hf://"):
                     hf_path = info.logo_url.replace("hf://", "")
                     browsable_logo_url = f"https://huggingface.co/{hf_path.replace(info.repo_id, info.repo_id + '/resolve/main', 1)}"
-                elif info.logo_url.startswith("file://") or info.logo_url.startswith("/"):
+                elif is_local_module_url(info.logo_url):
                     browsable_logo_url = f"{self.backend_api_url}/api/module-logo/{module_name}"
             result.append({
                 "name": module_name,

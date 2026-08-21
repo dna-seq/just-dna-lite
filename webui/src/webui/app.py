@@ -359,17 +359,19 @@ async def serve_module_logo(module_name: str) -> FileResponse:
     if ".." in module_name or "/" in module_name:
         raise HTTPException(status_code=400, detail="Invalid module name")
 
-    from just_dna_pipelines.annotation.hf_modules import MODULE_INFOS
+    from just_dna_pipelines.annotation.hf_modules import MODULE_INFOS, local_module_path
 
     info = MODULE_INFOS.get(module_name)
     if not info or not info.logo_url:
         raise HTTPException(status_code=404, detail=f"No logo for module: {module_name}")
 
-    logo_path_str = info.logo_url
-    if logo_path_str.startswith("file://"):
-        logo_path_str = logo_path_str[len("file://"):]
+    logo_path = local_module_path(info.logo_url)
+    if logo_path is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Logo for {module_name} is not on this filesystem: {info.logo_url}",
+        )
 
-    logo_path = Path(logo_path_str)
     if not logo_path.is_file():
         raise HTTPException(status_code=404, detail=f"Logo file not found: {module_name} (looked at {logo_path})")
 
