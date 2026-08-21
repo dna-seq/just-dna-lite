@@ -105,7 +105,7 @@ def prepare_vcf_rsid_only(
 
 
 class UnsupportedLeadTable(Exception):
-    """A module's lead table carries no key this engine can join a VCF on.
+    """A module and VCF share no variant key this engine can join on.
 
     Raised rather than returned so the per-module loop can tell "this family is not annotatable
     yet" apart from "this module is broken", and skip it without failing the whole run.
@@ -226,10 +226,10 @@ def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
     today and the format keeps adding them, so a name-keyed switch would need editing every
     release while a schema-keyed check absorbs new families for free.
 
-    - `position` — `chrom`/`start` exist *and* hold at least one value. A table typed with
-      coordinates but null throughout (any rsid-authored 0.4 table, since the compiler applies
-      `resolution.csv` to `weights.parquet` alone) is not positionally joinable, and treating it
-      as if it were annotates nothing instead of erroring.
+    - `position` — `chrom`/`start` exist *and* hold at least one value. A legacy table typed with
+      coordinates but null throughout is not positionally joinable, and treating it as if it were
+      annotates nothing instead of erroring. Compiler 0.6+ fills resolved coordinates onto every
+      variant-led table family; this fallback remains for older and unresolved artifacts.
     - `rsid` — no usable coordinates, but `rsid` + `genotype` are there.
     - `unsupported` — neither. `diplotypes`, `pgs`, `allele_function` and the binning families
       carry no per-variant key at all; the caller skips them with the reason recorded rather than
@@ -237,7 +237,11 @@ def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
     """
     schema = set(lead_lf.collect_schema().names())
     if {"chrom", "start"}.issubset(schema) and bool(
-        lead_lf.select(pl.col("chrom").is_not_null().any()).collect().item()
+        lead_lf.select(
+            (pl.col("chrom").is_not_null() & pl.col("start").is_not_null()).any()
+        )
+        .collect()
+        .item()
     ):
         return "position", "lead table carries coordinates"
     if {"rsid", "genotype"}.issubset(schema):
@@ -294,9 +298,8 @@ def annotate_vcf_with_module_weights(
         weights_lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
         weights_lf = _normalize_lead_genotype(weights_lf)
 
-        # A position join needs coordinates, and the 0.4 table families are materialized verbatim
-        # from their authored CSV — the compiler applies resolution.csv to weights.parquet only. So a
-        # pharm_variants-led module reaches us with chrom/start null on every row and would join to
+        # A position join needs coordinates. Legacy variant-led artifacts may have chrom/start null
+        # on every row even when their authored resolution.csv knew the locus; those would join to
         # nothing at all. Fall back to rsid rather than silently annotating zero variants, and stop
         # outright when there is nothing to fall back on.
         strategy, reason = _lead_join_strategy(weights_lf)
@@ -315,18 +318,23 @@ def annotate_vcf_with_module_weights(
             # Join on rsid + genotype (requires VCF to have rsids)
             #
             # A VCF whose ID column is empty throughout — DeepVariant output among others — matches
-            # such a module on nothing at all. That is a property of the input, not a failure, but
-            # it must not read as "this module found nothing in you".
+            # such a module on nothing at all. That is an *unassessable pairing*, not a biological
+            # zero: the same variant may be present at its coordinate while the VCF simply omits its
+            # dbSNP identifier. Stop before writing an empty parquet so the manifest/report can say
+            # why this module was not evaluated instead of claiming that it found no variants.
             if not _vcf_has_rsids(vcf_lf):
+                reason = (
+                    "the module exposes only rsid + genotype join keys, but this VCF carries no "
+                    "rsIDs. Recompile the module with coordinate resolution (just-dna-compiler "
+                    ">=0.6) or use an ID-populated VCF"
+                )
                 action.log(
                     message_type="info",
                     step="vcf_has_no_rsids",
                     module=module_name,
-                    reason=(
-                        "this VCF carries no rsIDs, and the module can only be joined on rsid + "
-                        "genotype, so no variant can match"
-                    ),
+                    reason=reason,
                 )
+                raise UnsupportedLeadTable(f"{module_name}: {reason}")
 
             # Key on each identifier the record carries, not on the raw ID cell (RM64).
             vcf_keyed = _vcf_rsid_join_keys(vcf_lf)

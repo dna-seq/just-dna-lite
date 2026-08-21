@@ -1167,8 +1167,8 @@ def build_report_credits(
 MODULE_DISPLAY_NAMES: dict[str, str] = build_display_names_dict(DISCOVERED_MODULES)
 
 
-def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
-    """Read the run's ``manifest.json`` → one ``ModuleOutputMapping`` per annotated module.
+def _annotation_manifest(modules_dir: Path) -> AnnotationManifest | None:
+    """Read the run's annotation manifest, or ``None`` when it is absent/unreadable.
 
     Parsed through ``AnnotationManifest`` rather than as raw JSON on purpose: manifests written
     before the engine learned about lead tables carry no ``lead_table`` key at all, and the model's
@@ -1181,10 +1181,10 @@ def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMa
     """
     manifest_path = modules_dir / "manifest.json"
     if not manifest_path.exists():
-        return {}
+        return None
 
     try:
-        manifest = AnnotationManifest.model_validate_json(
+        return AnnotationManifest.model_validate_json(
             manifest_path.read_text(encoding="utf-8")
         )
     except (ValueError, OSError) as exc:
@@ -1194,9 +1194,54 @@ def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMa
             path=str(manifest_path),
             reason=str(exc),
         )
+        return None
+
+
+def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
+    """Read the run's ``manifest.json`` → one output mapping per annotated module."""
+    manifest = _annotation_manifest(modules_dir)
+    if manifest is None:
         return {}
 
     return {m.module: m for m in manifest.modules}
+
+
+def _unavailable_modules(
+    manifest: AnnotationManifest | None,
+    module_names: list[str] | None,
+) -> list[dict[str, str]]:
+    """Modules the run could not assess, with the reason preserved for the report.
+
+    A skipped rsID-only module on an ID-less VCF is not a zero-result module. Failed modules have the
+    same reporting requirement: the annotation loop intentionally isolates one module's failure, so
+    the downstream report must not turn that isolation into silence.
+    """
+    if manifest is None:
+        return []
+
+    outcomes = {
+        name: {"status": "Not assessed", "reason": reason}
+        for name, reason in manifest.skipped_modules.items()
+    }
+    outcomes.update(
+        {
+            name: {"status": "Annotation failed", "reason": reason}
+            for name, reason in manifest.failed_modules.items()
+        }
+    )
+    ordered_names = module_names or [
+        *manifest.skipped_modules.keys(),
+        *manifest.failed_modules.keys(),
+    ]
+    return [
+        {
+            "module_name": name,
+            "display_name": get_module_display_name(name),
+            **outcomes[name],
+        }
+        for name in ordered_names
+        if name in outcomes
+    ]
 
 
 def build_module_provenance(
@@ -1270,20 +1315,42 @@ def generate_longevity_report(
     with start_action(action_type="generate_longevity_report", modules_dir=str(modules_dir)):
         # Discover module infos
         module_infos = discover_hf_modules()
-        module_outputs = _module_outputs_from_manifest(modules_dir)
+        run_manifest = _annotation_manifest(modules_dir)
+        module_outputs = (
+            {m.module: m for m in run_manifest.modules}
+            if run_manifest is not None
+            else {}
+        )
         lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
+        unavailable_modules = _unavailable_modules(run_manifest, module_names)
 
         # Find available parquet files
         available_modules: list[str] = []
         if module_names:
             for name in module_names:
                 parquet_path = modules_dir / f"{name}_weights.parquet"
-                if parquet_path.exists():
+                # When a manifest exists it is the authority for *this run*. A parquet left by an
+                # earlier run must not override a current skipped/failed outcome and leak stale rows
+                # into the report.
+                produced_this_run = run_manifest is None or name in module_outputs
+                if produced_this_run and parquet_path.exists():
                     available_modules.append(name)
+        elif run_manifest is not None:
+            available_modules = [
+                name
+                for name in module_outputs
+                if (modules_dir / f"{name}_weights.parquet").exists()
+            ]
         else:
             for parquet_file in sorted(modules_dir.glob("*_weights.parquet")):
                 mod_name = parquet_file.stem.replace("_weights", "")
                 available_modules.append(mod_name)
+
+        reported_modules = list(available_modules)
+        for outcome in unavailable_modules:
+            name = outcome["module_name"]
+            if name not in reported_modules:
+                reported_modules.append(name)
 
         # Build report data for each module
         longevity_data: Optional[dict] = None
@@ -1330,14 +1397,15 @@ def generate_longevity_report(
         template = env.get_template("longevity_report.html.j2")
 
         html = template.render(
-            report_title=report_title_for_modules(available_modules),
-            report_description=report_description_for_modules(available_modules),
+            report_title=report_title_for_modules(reported_modules),
+            report_description=report_description_for_modules(reported_modules),
             preview_row_limit=TABLE_PREVIEW_ROWS,
             user_name=user_name,
             sample_name=sample_name,
             longevity=longevity_data,
             other_modules=other_modules_data,
             pgx_modules=pgx_modules_data,
+            unavailable_modules=unavailable_modules,
             credits=credits,
             module_provenance=module_provenance,
             module_display_names=MODULE_DISPLAY_NAMES,

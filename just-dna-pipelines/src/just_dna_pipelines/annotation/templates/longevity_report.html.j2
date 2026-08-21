@@ -786,6 +786,9 @@ window.addEventListener("scroll", function() {
             {% for mod in pgx_modules %}
             <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
+            {% for mod in unavailable_modules %}
+            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }} · {{ mod.status | lower }}</a></li>
+            {% endfor %}
             {% if module_provenance %}
             <li><a href="#modules">Modules and versions</a></li>
             {% endif %}
@@ -902,6 +905,18 @@ window.addEventListener("scroll", function() {
         {% else %}
         <p class="no-results">No annotated variants were found for this module.</p>
         {% endif %}
+    </section>
+    {% endfor %}
+
+    {% for mod in unavailable_modules %}
+    <section class="report-section" id="module-{{ mod.module_name }}">
+        <p class="section-kicker">Module outcome</p>
+        <h2>{{ mod.display_name }}</h2>
+        <aside class="scientific-note">
+            <strong>{{ mod.status }}</strong>
+            <p>{{ mod.reason }}</p>
+            <p>No biological conclusion can be drawn from this module for this run.</p>
+        </aside>
     </section>
     {% endfor %}
 

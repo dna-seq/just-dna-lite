@@ -37,6 +37,7 @@ from just_dna_pipelines.annotation.hf_modules import (
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.hf_logic import (
+    UnsupportedLeadTable,
     annotate_vcf_with_module_weights,
     prepare_vcf_for_module_annotation,
 )
@@ -1066,6 +1067,57 @@ class TestPharmVariantsAnnotation:
         assert n == 2
         assert set(result["rsid"].unique()) == {"rs1"}
         assert set(result["drug"].drop_nulls().to_list()) == {"atorvastatin"}
+
+    def test_resolved_table_matches_an_idless_vcf_by_position(self, tmp_path: Path):
+        """Compiler 0.6 fills coordinates onto table-led rows, avoiding an rsID-only false zero."""
+        lead = tmp_path / "pharm_variants.parquet"
+        pl.DataFrame({
+            "module": ["pgx"],
+            "rsid": ["rs41423247"],
+            "chrom": ["5"],
+            "start": [143399010],
+            "ref": ["G"],
+            "genotype": ["C/C"],
+            "drug": ["glucocorticoids"],
+            "conclusion": ["response association"],
+        }).write_parquet(lead)
+        info = ModuleInfo(
+            name="pgx", repo_id="local", path=str(tmp_path),
+            lead_table="pharm_variants", lead_url=str(lead),
+        )
+        vcf = pl.DataFrame({
+            "chrom": ["5"], "start": [143399010], "rsid": [""],
+            "ref": ["G"], "alt": ["C"], "genotype": [["C", "C"]],
+        }).lazy()
+
+        out, matched, _ = annotate_vcf_with_module_weights(
+            vcf, "pgx", tmp_path / "annotated.parquet", module_info=info
+        )
+
+        assert matched == 1
+        assert pl.read_parquet(out)["drug"].to_list() == ["glucocorticoids"]
+
+    def test_unresolved_table_is_unassessable_on_an_idless_vcf(self, tmp_path: Path):
+        """Missing IDs are missing join keys, not evidence that the genome has no module variants."""
+        lead = tmp_path / "pharm_variants.parquet"
+        pl.DataFrame({
+            "module": ["pgx"], "rsid": ["rs41423247"],
+            "chrom": [None], "start": [None], "genotype": ["C/C"],
+        }, schema_overrides={"chrom": pl.String, "start": pl.Int64}).write_parquet(lead)
+        info = ModuleInfo(
+            name="pgx", repo_id="local", path=str(tmp_path),
+            lead_table="pharm_variants", lead_url=str(lead),
+        )
+        vcf = pl.DataFrame({
+            "chrom": ["5"], "start": [143399010], "rsid": [""],
+            "ref": ["G"], "alt": ["C"], "genotype": [["C", "C"]],
+        }).lazy()
+
+        with pytest.raises(UnsupportedLeadTable, match="VCF carries no rsIDs"):
+            annotate_vcf_with_module_weights(
+                vcf, "pgx", tmp_path / "annotated.parquet", module_info=info
+            )
+        assert not (tmp_path / "annotated.parquet").exists()
 
     def test_a_module_with_no_joinable_key_is_skipped_not_fatal(self, tmp_path):
         """A diplotypes-led module must not take the run down; it used to raise ColumnNotFound."""
