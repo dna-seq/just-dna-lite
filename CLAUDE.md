@@ -211,6 +211,10 @@ this repo into two published libraries. **Do not re-vendor or fork them here.**
   - `identity` — name/namespace rules, SemVer `Version`, `canonical_id`, legacy `vN → N.0.0`
 - **`just-dna-compiler`** (`just_dna_compiler`, adds polars/duckdb): `validate_spec`,
   `compile_module` (emits `manifest.json` with input/artifact hashes + digest), `reverse_module`.
+  **Import these from `just_dna_compiler.compiler`, not from the package root** — as of 0.6.6
+  `just_dna_compiler/__init__.py` exports nothing at all (`dir(just_dna_compiler)` is empty), so
+  `from just_dna_compiler import validate_spec` raises `ImportError`. The other submodules are
+  `cli`, `draft`, `hints`, `models`, `resolution`, `scaffold`.
 - **`just-dna-enricher`** (`just_dna_enricher`, added in the 0.5 line): the network/reference tier —
   Ensembl/ClinVar/gnomAD/PGx enrichment, and the Ensembl `resolver` (`EnsemblReferenceError`,
   `resolve_variants`). Still **inject-only**: it never downloads a reference.
@@ -241,6 +245,9 @@ old name, so check here first:
   **`just_dna_enricher.resolver`** (same `resolve_variants(variants, ensembl_cache=...)` signature
   and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
   which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
+
+*(Installed as of 2026-08-21: format / compiler / enricher all at **0.6.6**, registry **0.18.2**. The
+0.6 reasoning below is unchanged by those patches; only the pinned numbers moved.)*
 
 **We are on 0.6 (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2, adopted 2026-08-18), and the digest
 window is not what the 0.5 note said it was.** That note claimed any new column was a 1.0. Principle 3
