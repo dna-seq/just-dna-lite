@@ -92,6 +92,41 @@ def validate_module_spec(spec_dir: Path) -> ValidationResult:
     return validate_spec(Path(spec_dir))
 
 
+#: Spec-directory files carried into the compiled output so a module can be loaded
+#: back into the editing slot. Parquets are excluded — ``compile_module`` writes them.
+SPEC_COPY_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".jpg", ".jpeg", ".log", ".json"}
+
+#: Names the compiler owns in the output directory. These are never copied over from
+#: the spec directory, whatever their suffix.
+#:
+#: ``manifest.json`` is the whole reason this set exists. ``compile_module`` has just
+#: written the manifest describing the bytes it produced, and a spec directory very
+#: often carries a *previous* one — ``registry publish`` stamps one there, and every
+#: module in ``data/interim/v1_port/`` ships one. Copying that over the fresh manifest
+#: leaves the registered module stating the wrong ``artifact.digest``, the wrong
+#: ``compiled_at`` and the wrong module name, and that is precisely the file
+#: ``read_module_provenance`` reads to fill the report's "Modules in this report"
+#: table — so the report would attribute the run to bytes it never read, with full
+#: confidence. Reproduced end to end in ``docs/MODULE_DOGFOODING.md`` § D24.
+COMPILER_OWNED_OUTPUTS = {"manifest.json"}
+
+
+def copy_spec_files(spec_dir: Path, output_dir: Path) -> List[str]:
+    """Copy authored spec files alongside the compiled artifact.
+
+    Returns the names copied, so a caller (or a test) can see what travelled.
+    """
+    copied: List[str] = []
+    for f in sorted(spec_dir.iterdir()):
+        if not f.is_file() or f.suffix.lower() not in SPEC_COPY_SUFFIXES:
+            continue
+        if f.name.lower() in COMPILER_OWNED_OUTPUTS:
+            continue
+        shutil.copy2(f, output_dir / f.name)
+        copied.append(f.name)
+    return copied
+
+
 def register_custom_module(
     spec_dir: Path,
     resolve_with_ensembl: bool = True,
@@ -153,14 +188,7 @@ def register_custom_module(
     if not result.success:
         return result
 
-    # Copy source spec files alongside compiled parquets so the module can be
-    # loaded back into the editing slot for further editing.
-    # Exclude parquets
-    # (already written by compile_module).
-    _SPEC_SUFFIXES = {".yaml", ".csv", ".md", ".png", ".jpg", ".jpeg", ".log", ".json"}
-    for f in spec_dir.iterdir():
-        if f.is_file() and f.suffix.lower() in _SPEC_SUFFIXES:
-            shutil.copy2(f, output_dir / f.name)
+    copy_spec_files(spec_dir, output_dir)
 
     config_path = get_config_path()
     config = read_config_for_update(config_path) or ModulesConfig()

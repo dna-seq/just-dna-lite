@@ -697,11 +697,20 @@ the module version behind it. It would state the wrong digest with full confiden
 **And every one of the ten v1-port modules has a `manifest.json` sitting in its spec directory**, so
 this fires on all of them.
 
-**Fix belongs in this repo:** drop `.json` from `_SPEC_SUFFIXES`, or skip `manifest.json` by name in
-that loop. Filed here rather than fixed in this pass because the pass is a survey; it is the one
-finding on this list that is ours to close.
+**Fixed in this pass** — the one finding on this list that is ours to close. The copy loop is now
+`module_registry.copy_spec_files`, which skips the names in `COMPILER_OWNED_OUTPUTS`
+(`manifest.json`, case-insensitively) and copies everything else exactly as before, `provenance.json`
+included. Re-running the reproduction above now yields `sha256:8e995f2a…` / `2026-08-21T17:50:06Z` —
+the compile that actually ran — with the stale manifest left untouched in the spec directory, which
+is the author's file and not ours to delete.
 
-*The test registration was unregistered and the directory removed.*
+Pinned by `just-dna-pipelines/tests/test_spec_file_copy.py` (5 tests, no compiler, no network, no
+fixture module). Per the repo's own rule about bug-catching claims, the old loop was re-created
+verbatim and run against the same assertion: it writes `sha256:stale` into the output and the test
+fails, so the test does catch the bug rather than merely describing it.
+
+*The test registrations were unregistered and their directories removed; `modules.yaml`'s working
+copy was checked afterwards and holds exactly the two module entries that pre-dated this session.*
 
 ---
 ## D25 — nine of the twenty skills are shadowed by a command that never loads them
