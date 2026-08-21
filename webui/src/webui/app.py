@@ -239,7 +239,12 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
         raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}/v{v} (looked at {spec_dir})")
 
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(
+        buf,
+        "w",
+        zipfile.ZIP_DEFLATED,
+        strict_timestamps=False,
+    ) as zf:
         for f in sorted(spec_dir.iterdir()):
             if f.is_file() and f.suffix != ".parquet":
                 zf.write(f, f.name)
@@ -264,7 +269,12 @@ async def download_module_zip(module_name: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail=f"Module not found: {module_name} (looked at {module_dir})")
 
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(
+        buf,
+        "w",
+        zipfile.ZIP_DEFLATED,
+        strict_timestamps=False,
+    ) as zf:
         for f in sorted(module_dir.rglob("*")):
             if f.is_file() and f.suffix != ".parquet":
                 zf.write(f, f.relative_to(module_dir).as_posix())
