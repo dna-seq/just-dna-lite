@@ -112,25 +112,29 @@ LOGO_NAMES = ("logo.png", "logo.jpg", "logo.jpeg")
 _BUNDLED_LOGO_DIR = Path(__file__).parent / "data" / "logos"
 
 
-def fetch_logo(module: V1Module, dest_dir: Path) -> Optional[Path]:
-    """Place the module's logo (``logo.png``) into ``dest_dir``.
+def fetch_logo(repo: str, name: str, dest_dir: Path) -> Optional[Path]:
+    """Place the Gen-I repo's logo (``logo.png``) into ``dest_dir``.
+
+    Takes the repo and module name rather than a ``V1Module`` because not every ported module has
+    one: pharmgkb is drafted from a ClinPGx snapshot and never goes through the adapter machinery,
+    but it still carries ``dna-seq/just_drugs``'s logo.
 
     Prefers the source repo's root ``logo.{png,jpg,jpeg}``; falls back to a bundled
     ``data/logos/<name>.png`` for modules whose repo ships no logo. Returns the local path, or
     ``None`` if none exists. The logo is optional metadata, so failures never break a port.
     """
     try:
-        fs = fsspec.filesystem("github", org=_GITHUB_ORG, repo=module.repo)
-        for name in LOGO_NAMES:
-            if fs.exists(name):
+        fs = fsspec.filesystem("github", org=_GITHUB_ORG, repo=repo)
+        for logo_name in LOGO_NAMES:
+            if fs.exists(logo_name):
                 dest_dir.mkdir(parents=True, exist_ok=True)
-                dest = dest_dir / name
-                fs.get(name, str(dest))
+                dest = dest_dir / logo_name
+                fs.get(logo_name, str(dest))
                 return dest
     except Exception:
         pass  # network/repo issue — try the bundled fallback below
 
-    bundled = _BUNDLED_LOGO_DIR / f"{module.name}.png"
+    bundled = _BUNDLED_LOGO_DIR / f"{name}.png"
     if bundled.exists():
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / "logo.png"

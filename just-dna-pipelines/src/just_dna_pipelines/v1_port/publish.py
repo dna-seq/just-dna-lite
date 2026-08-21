@@ -18,6 +18,7 @@ from huggingface_hub import HfApi, get_token
 from pydantic import BaseModel
 
 from just_dna_compiler.compiler import ARTIFACT_PARQUETS, LEAD_PARQUETS
+from just_dna_format.manifest import README_CANDIDATES
 
 from just_dna_pipelines.module_config import MODULES_CONFIG
 
@@ -36,7 +37,18 @@ from just_dna_pipelines.module_config import MODULES_CONFIG
 # publisher in the same release that adds it; 0.6 added three (`gene_validity`,
 # `clinical_assertions`, `gwas_effects`) and this list named none of them.
 _LEAD_PARQUETS = LEAD_PARQUETS
-_ALLOW_PATTERNS = [*ARTIFACT_PARQUETS, "manifest.json", "logo.png", "logo.jpg"]
+# The readme travels with the module for the same reason the parquets do: `manifest.readme` attests
+# it by name and sha256, so omitting it published a manifest naming a file the repo did not have —
+# and `verify_manifest(check_readme=True)` passed anyway, because absent is not a failure there.
+# Take the spellings from the format rather than restating them, exactly as the parquets are taken
+# from `ARTIFACT_PARQUETS`; `just_dna_enricher.upload` reads the same constant.
+_ALLOW_PATTERNS = [
+    *ARTIFACT_PARQUETS,
+    *README_CANDIDATES,
+    "manifest.json",
+    "logo.png",
+    "logo.jpg",
+]
 
 # What a weights-led module is expected to carry. A missing side table here is worth stopping for —
 # it means an interrupted or partial compile — but only for the weights-led shape, since a

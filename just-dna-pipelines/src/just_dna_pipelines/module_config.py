@@ -31,13 +31,15 @@ Override with kind: "module" or kind: "collection".
 import hashlib
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
 import polars as pl
 import yaml
+from eliot import log_message
 from just_dna_format.identity import is_valid_version, version_from_legacy
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ValidationError, model_validator
 
 
 # Default values for modules not listed in the YAML
@@ -180,6 +182,42 @@ class EnsemblSource(BaseModel):
     repo_id: str = "just-dna-seq/ensembl_variations"
 
 
+#: Where the public registry lives. The client, the CLI and ``scripts/registry_precheck.py`` all
+#: read ``$REGISTRY_URL``; this is only the fallback when nothing configures a store list.
+DEFAULT_REGISTRY_URL: str = "https://module-registry.just-dna.life"
+
+
+class RegistryStore(BaseModel):
+    """A module registry server ("store") the Catalog can browse, install from and publish to.
+
+    Configured under ``registries:`` in modules.yaml. Two are shipped: the public registry, and
+    the ``polygon`` testing ground (``module-polygon.just-dna.life``), which answers
+    ``"mode": "test"`` on ``/api/v1/version`` and exists so a namespace claim or a publish can be
+    rehearsed without touching the public catalog.
+
+    ``token_env`` names the environment variable holding *this server's* bearer token, and it is
+    per store rather than one global name on purpose: an account token is minted by one server and
+    is meaningless to another. Writing a test server's token into ``REGISTRY_TOKEN`` has broken
+    publishing here before, and it does not surface as anything auth-shaped — the public server
+    answers ``403 insufficient_capability``, which reads as a namespace-permissions bug.
+    """
+    key: str                      # stable slug used in URLs, identity slots and env names
+    label: str                    # what the store selector shows
+    url: str
+    mode: str = "prod"            # "prod" | "test" — mirrors /api/v1/version's `mode`
+    description: str = ""
+    token_env: str = ""           # "" = never mirror this store's token into the environment
+
+    @property
+    def base_url(self) -> str:
+        """URL with any trailing slash removed (what ``RegistryClient`` wants)."""
+        return self.url.rstrip("/")
+
+    @property
+    def is_test(self) -> bool:
+        return self.mode == "test"
+
+
 class DefaultSample(BaseModel):
     """A pre-configured public genome sample for immutable mode."""
     zenodo_url: str
@@ -220,6 +258,14 @@ class ModulesConfig(BaseModel):
     quality_filters: QualityFilters = QualityFilters()
     ensembl_source: EnsemblSource = EnsemblSource()
     immutable_mode: ImmutableModeConfig = ImmutableModeConfig()
+    registries: list[RegistryStore] = [
+        RegistryStore(
+            key="prod",
+            label="Just-DNA Registry",
+            url=DEFAULT_REGISTRY_URL,
+            token_env="REGISTRY_TOKEN",
+        )
+    ]
 
     @model_validator(mode="before")
     @classmethod
@@ -340,8 +386,9 @@ def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
 def _merge_config(default: Dict[str, Any], working: Dict[str, Any]) -> Dict[str, Any]:
     """Layer the mutable working copy over the shipped defaults.
 
-    ``module_metadata`` and ``sources`` are the two keys a runtime mutates (register/unregister), so
-    they are **merged** rather than replaced: a working copy that names one custom module must not
+    ``module_metadata``, ``sources`` and ``registries`` are merged rather than replaced. The first
+    two are what a runtime mutates (register/unregister); ``registries`` is merged so a working copy
+    seeded before a store existed still sees it. Merging means: a working copy that names one custom module must not
     delete the display metadata of the ten shipped ones. Every other key is taken from the working
     copy when it is present, since those are settings the deployment has deliberately overridden.
 
@@ -363,17 +410,67 @@ def _merge_config(default: Dict[str, Any], working: Dict[str, Any]) -> Dict[str,
                 url = entry.get("url") if isinstance(entry, dict) else entry
                 by_url[str(url)] = entry
             merged[key] = list(by_url.values())
+        elif key == "registries" and isinstance(value, list):
+            # Merged by ``key`` for the same reason ``sources`` is merged by url: a working copy
+            # written before a store was shipped must not delete it, and one that overrides a
+            # store (a self-hosted URL, say) must not lose the other shipped ones.
+            by_key: Dict[str, Any] = {}
+            for entry in list(merged.get("registries") or []) + value:
+                if isinstance(entry, dict):
+                    by_key[str(entry.get("key") or entry.get("url"))] = entry
+            merged[key] = list(by_key.values())
         else:
             merged[key] = value
     return merged
 
 
 def _read_yaml(path: Path) -> Optional[Dict[str, Any]]:
+    """Read a YAML mapping, raising on a malformed file.
+
+    Used for the *shipped* default only. That file is git-tracked, so a parse failure is a build
+    error and must stay loud — see ``_load_config``.
+    """
     if not path.exists():
         return None
     with open(path) as f:
         raw = yaml.safe_load(f)
     return raw if isinstance(raw, dict) else None
+
+
+def _read_yaml_tolerant(path: Path) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Read a YAML mapping, returning the parse failure as text instead of raising.
+
+    The counterpart of ``_read_yaml``, used for the *working copy* only. That file is gitignored
+    and mutated at runtime by register/unregister, so it is the one input that can be broken on a
+    deployment and nowhere else. Returns ``(mapping, None)`` on success and ``(None, reason)`` on
+    a failure the caller is expected to recover from; ``(None, None)`` means simply absent or empty.
+    """
+    if not path.exists():
+        return None, None
+    try:
+        with open(path) as f:
+            raw = yaml.safe_load(f)
+    except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
+        return None, str(exc)
+    if raw is None:
+        return None, None
+    if not isinstance(raw, dict):
+        return None, f"expected a YAML mapping at the top level, found {type(raw).__name__}"
+    return raw, None
+
+
+def _warn_unusable_working_copy(action: str, path: Path, message: str) -> None:
+    """Report a working copy we could not use, on both the structured and the visible channel.
+
+    Eliot alone is not enough here. This runs at import inside the Dagster code server, where an
+    eliot message reaches a log the operator has no reason to open, while the symptom they *do*
+    see is a bare ``Error loading repository location definitions.py`` with no traceback attached.
+    A ``UserWarning`` is not filtered by default and lands in the code server's own output beside
+    that line. Staying silent is not an option either: a config that quietly degrades to the
+    shipped defaults leaves the broken file in place forever.
+    """
+    log_message(message_type="warning", action=action, path=str(path), message=message)
+    warnings.warn(message)
 
 
 def _load_config() -> ModulesConfig:
@@ -383,15 +480,49 @@ def _load_config() -> ModulesConfig:
     2. Working copy at ``data/interim/modules.yaml`` (mutable, gitignored) — merged over them
 
     Returns bare defaults if neither exists.
+
+    **A broken working copy is recovered from; a broken default is not**, and the asymmetry is the
+    point. This function runs at module scope (``MODULES_CONFIG``) and every Dagster asset module
+    imports it transitively, so whatever it raises comes out as ``Error loading repository location
+    definitions.py`` — a warning that carries no traceback, with the real stack only in the code
+    server's stdout. The working copy is gitignored and rewritten at runtime by register/unregister,
+    so a half-written or hand-edited file there is a runtime accident: ignore it, keep the shipped
+    catalog, and say so loudly. The default is git-tracked, so a bad one is a build error, and
+    recovering would hand back an empty ``ModulesConfig()`` — zero sources, zero modules discovered,
+    and an app that looks healthy while annotating nothing.
+
+    Validation runs on the *merged* mapping, so a working copy that is well-formed YAML but breaks
+    the schema (``quality_filters.min_depth: "ten"``) is caught here too. Falling through re-validates
+    the defaults alone, which either succeeds or raises the default's own error rather than the
+    working copy's.
     """
     default_path = _default_config_path()
     raw: Dict[str, Any] = (_read_yaml(default_path) if default_path else None) or {}
 
     working = _working_config_path()
     if working is not None:
-        working_raw = _read_yaml(working)
-        if working_raw is not None:
-            raw = _merge_config(raw, working_raw)
+        working_raw, unreadable = _read_yaml_tolerant(working)
+        if unreadable is not None:
+            _warn_unusable_working_copy(
+                "load_modules_config",
+                working,
+                f"Ignoring the modules.yaml working copy at {working}: {unreadable}. "
+                "Falling back to the shipped defaults — any custom modules registered in that "
+                "file are not loaded. Fix or delete it to restore them.",
+            )
+        elif working_raw is not None:
+            merged = _drop_project_runtime_sources(_merge_config(raw, working_raw))
+            try:
+                return ModulesConfig.model_validate(merged)
+            except ValidationError as exc:
+                _warn_unusable_working_copy(
+                    "load_modules_config",
+                    working,
+                    f"Ignoring the modules.yaml working copy at {working}: merged with the "
+                    f"shipped defaults it does not validate — {exc}. Falling back to the shipped "
+                    "defaults — any custom modules registered in that file are not loaded. "
+                    "Fix or delete it to restore them.",
+                )
 
     if not raw:
         return ModulesConfig()
@@ -411,20 +542,78 @@ def get_config_path() -> Path:
     return Path(__file__).parent / "modules.yaml"
 
 
+def read_config_for_update(path: Optional[Path] = None) -> Optional[ModulesConfig]:
+    """Read the working copy as the base for a mutation, or ``None`` when it is unusable.
+
+    The mutating callers (``register_custom_module`` / ``unregister_custom_module`` in
+    ``module_registry``) read the working copy **alone** rather than merged over the defaults,
+    because ``save_config`` then patches ``sources`` / ``module_metadata`` and writes the result
+    back — handing them the merged mapping would bake every shipped default into the working copy.
+    That is why this is not ``_load_config``.
+
+    Returning ``None`` rather than a fallback keeps each caller's own behaviour for an absent file
+    (two of the three want bare defaults, one wants a full load). An unusable file is reported and
+    treated as absent, so the mutation goes on to ``save_config``, which moves the broken bytes
+    aside and re-seeds — the write repairs the file instead of crashing on it. Without this the
+    guard in ``_load_config`` would only move the crash from import time to the next register.
+    """
+    target = path or get_config_path()
+    raw, unreadable = _read_yaml_tolerant(target)
+    if unreadable is not None:
+        _warn_unusable_working_copy(
+            "read_modules_config_for_update",
+            target,
+            f"The modules.yaml working copy at {target} could not be parsed: {unreadable}. "
+            "Treating it as absent for this update; it will be moved aside and re-seeded on write.",
+        )
+        return None
+    if raw is None:
+        return None
+    try:
+        return ModulesConfig.model_validate(raw)
+    except ValidationError as exc:
+        _warn_unusable_working_copy(
+            "read_modules_config_for_update",
+            target,
+            f"The modules.yaml working copy at {target} does not validate — {exc}. "
+            "Treating it as absent for this update; it will be moved aside and re-seeded on write.",
+        )
+        return None
+
+
 def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
     """Persist a ModulesConfig to the working copy using a merge strategy.
 
     On first write the repo default is copied as the seed so that
     quality_filters, ensembl_source, etc. are preserved.  Only the
     ``sources`` and ``module_metadata`` keys are patched.
+
+    An existing working copy we cannot parse is **moved aside, not overwritten**, and the write
+    re-seeds from the shipped default as if this were the first one. ``_load_config`` already
+    disregards such a file, so without this the crash would simply move here and register/unregister
+    would stay broken for good. The broken bytes are the only record of whatever registrations the
+    file held, so they are kept next to it rather than destroyed.
     """
     target = path or get_config_path()
 
     raw: Dict[str, Any] = {}
-    if target.exists():
-        with open(target) as f:
-            raw = yaml.safe_load(f) or {}
-    else:
+    usable = target.exists()
+    if usable:
+        existing, unreadable = _read_yaml_tolerant(target)
+        if unreadable is not None:
+            corrupt = target.with_name(target.name + ".corrupt")
+            target.replace(corrupt)
+            _warn_unusable_working_copy(
+                "save_modules_config",
+                target,
+                f"The modules.yaml working copy at {target} could not be parsed: {unreadable}. "
+                f"Moved it to {corrupt} and re-seeded this write from the shipped defaults.",
+            )
+            usable = False
+        else:
+            raw = existing or {}
+
+    if not usable:
         default = _default_config_path()
         if default is not None and default.exists():
             with open(default) as f:
@@ -488,6 +677,51 @@ def get_immutable_config() -> ImmutableModeConfig:
 #
 # Lives here rather than in `annotation.hf_modules` because importing that module runs discovery
 # (and therefore network I/O) at import time, and the publisher must not pay for that.
+def get_registry_stores() -> list[RegistryStore]:
+    """Every registry server the app can offer, never empty.
+
+    ``$REGISTRY_URL`` is honoured even when it names a server the YAML does not list: a
+    self-hosted or forked deployment points the bundled client, the CLI and
+    ``scripts/registry_precheck.py`` at it, and the UI must not quietly browse a different server
+    than every command line in the same checkout. Such a server joins the list as its own store
+    rather than replacing the configured ones, so the test ground stays one click away.
+    """
+    stores = list(MODULES_CONFIG.registries) or list(ModulesConfig().registries)
+    env_url = (os.getenv("REGISTRY_URL") or "").rstrip("/")
+    if env_url and not any(store.base_url == env_url for store in stores):
+        host = env_url.split("://")[-1].split("/")[0]
+        stores.insert(0, RegistryStore(
+            key="env", label=host, url=env_url,
+            description="Configured by $REGISTRY_URL.", token_env="REGISTRY_TOKEN",
+        ))
+    return stores
+
+
+def get_registry_store(key: str) -> Optional[RegistryStore]:
+    """The store with this ``key``, or ``None`` when nothing configures it."""
+    for store in get_registry_stores():
+        if store.key == key:
+            return store
+    return None
+
+
+def default_registry_store() -> RegistryStore:
+    """The store to open on: whichever one ``$REGISTRY_URL`` names, else the first configured.
+
+    ``REGISTRY_URL`` stays authoritative because the bundled client, the CLI and
+    ``scripts/registry_precheck.py`` all read it — a deployment that points those at one server
+    must not silently open the UI on another. Call after ``load_env()``; before it, the variable
+    from ``.env`` is not visible yet and the first configured store is used.
+    """
+    stores = get_registry_stores()
+    env_url = (os.getenv("REGISTRY_URL") or "").rstrip("/")
+    if env_url:
+        for store in stores:
+            if store.base_url == env_url:
+                return store
+    return stores[0]
+
+
 LEAD_TABLES: tuple[str, ...] = (
     "weights",
     "pharm_variants",

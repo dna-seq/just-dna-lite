@@ -26,6 +26,24 @@ immutable_mode:
     species: "Homo sapiens"
     reference_genome: "GRCh38"
     license: "CC-BY-4.0"
+# Module registry servers the Catalog can browse, install from and publish to.
+# `prod` is the public registry; `polygon` is the testing ground, which answers "mode": "test"
+# on /api/v1/version and exists so a namespace claim or a publish can be rehearsed without
+# touching the public catalog. `token_env` is per store because an account token is minted by one
+# server and means nothing to another — never point two stores at the same variable.
+registries:
+- key: prod
+  label: Just-DNA Registry
+  url: https://module-registry.just-dna.life
+  mode: prod
+  token_env: REGISTRY_TOKEN
+  description: The public catalog. Published modules are visible to everyone.
+- key: polygon
+  label: Polygon (test)
+  url: https://module-polygon.just-dna.life
+  mode: test
+  token_env: REGISTRY_TOKEN_POLYGON
+  description: Testing ground. Publish here to rehearse; nothing here is public or permanent.
 ensembl_source:
   repo_id: just-dna-seq/ensembl_variations
 sources:

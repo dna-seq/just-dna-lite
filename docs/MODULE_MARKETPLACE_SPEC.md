@@ -502,8 +502,13 @@ across the current catalog.
   (`hf_modules.py`) that calls `GET /modules` + per-version manifest instead of walking a
   filesystem; register the marketplace as one entry in `ModulesConfig.sources`
   (`module_config.py`). Existing sources untouched.
-- **Install:** reuse the existing `register_custom_module` write-and-refresh path — installed
-  modules are immediately editable / annotatable / exportable with no new code path.
+- **Install:** wire the extracted directory into discovery without recompiling it. As built,
+  `RegistryState._do_install` calls `register_downloaded_module`, **not** `register_custom_module`
+  as this line said until 2026-08-21 — and the code is right: `register_custom_module` compiles,
+  which would replace the server-compiled artifact with a local one whose `artifact.digest` no
+  longer matches the catalog's. Installed modules are immediately editable / annotatable /
+  exportable. The same function is reachable from the CLI as
+  `pipelines module register-compiled <dir>`.
 - **Catalog page:** a new page under `webui/src/webui/pages/` — card grid + search/filter +
   detail drawer, reusing the existing `module_metadata_list` computed var (`state.py`) shape
   and the `/api/module-logo/{name}` endpoint. Register via `app.add_page`; add a topbar nav

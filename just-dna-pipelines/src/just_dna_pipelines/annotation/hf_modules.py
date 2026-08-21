@@ -62,6 +62,21 @@ class ModuleInfo(BaseModel):
     sources_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
+    # What the source's own `manifest.json` states about these bytes, when it publishes one.
+    #
+    # Discovery already fetches and validates that manifest — `_attested_files` needs
+    # `artifact.files` to decide which tables the module really has — and used to discard the rest
+    # of it three lines later. `read_module_provenance` then answered `(None, None, None)` for
+    # every remotely-discovered module, so a report rendered *Not stated* for data we had held in
+    # memory and thrown away. Keeping these three costs nothing beyond the read already paid for.
+    #
+    # **All three stay tri-state.** `None` means the source did not state it — a module published
+    # under 0.3 carries no manifest at all — and never "unversioned", "unverified" or "these
+    # weights are comparable to another module's". A local install still answers from the manifest
+    # on disk, which is the richer path; these are the remote fallback.
+    manifest_version: Optional[str] = None
+    manifest_digest: Optional[str] = None
+    manifest_weighting: Optional[str] = None
 
     @model_validator(mode="after")
     def _default_lead_to_weights(self) -> "ModuleInfo":
@@ -110,6 +125,48 @@ def _build_url(protocol: str, path: str) -> str:
 _MANIFEST_NAME: str = "manifest.json"
 
 
+def _remote_manifest(fs: "AbstractFileSystem", base_path: str) -> Optional["ModuleManifest"]:
+    """The source's validated `manifest.json`, or `None` when it publishes none / an unreadable one.
+
+    Split out of `_attested_files` so the whole manifest survives the read. Discovery has always
+    paid for this fetch and parse — `artifact.files` is what decides the module's *kind* — and then
+    kept one field. Everything else it states about the module (`identity.version`,
+    `artifact.digest`, the `weighting` block) was fetched and dropped, which is why every
+    HF-discovered module reported no provenance at all.
+
+    A manifest we cannot read must not make a real module undiscoverable, so a failure falls back
+    to probing — the path every pre-0.6 module takes anyway — and says so rather than degrading
+    silently.
+    """
+    manifest_path = f"{base_path}/{_MANIFEST_NAME}"
+    if not fs.exists(manifest_path):
+        return None
+    try:
+        raw = fs.cat_file(manifest_path)
+        return ModuleManifest.model_validate_json(raw)
+    except Exception as exc:
+        log_message(
+            message_type="warning",
+            action="unreadable_remote_manifest",
+            path=manifest_path,
+            reason=str(exc),
+        )
+        return None
+
+
+def _attested_names(manifest: Optional["ModuleManifest"]) -> Optional[frozenset[str]]:
+    """The parquet basenames a manifest attests, or `None` when there is no manifest.
+
+    `None` rather than an empty set, for the reason `_attested_files` gives: an empty set would read
+    as "this module contains nothing", and every module on HuggingFace today has no manifest.
+    """
+    if manifest is None:
+        return None
+    return frozenset(
+        Path(entry.name).name for entry in (manifest.artifact.files if manifest.artifact else [])
+    )
+
+
 def _attested_files(fs: "AbstractFileSystem", base_path: str) -> Optional[frozenset[str]]:
     """The parquet basenames `manifest.json` attests, or `None` when the source publishes no manifest.
 
@@ -131,27 +188,12 @@ def _attested_files(fs: "AbstractFileSystem", base_path: str) -> Optional[frozen
     back to probing. An empty set would read as "this module contains nothing".
 
     Cost is one `fs.exists` plus, at most, one small read per module directory.
+
+    Kept as the named predicate for callers that want only the file list; `_remote_manifest` is the
+    one that reads, and `_probe_module_at_path` goes through it so the rest of the manifest is not
+    discarded.
     """
-    manifest_path = f"{base_path}/{_MANIFEST_NAME}"
-    if not fs.exists(manifest_path):
-        return None
-    try:
-        raw = fs.cat_file(manifest_path)
-        manifest = ModuleManifest.model_validate_json(raw)
-    except Exception as exc:
-        # A manifest we cannot read must not make a real module undiscoverable — fall back to
-        # probing, which is what every pre-0.6 module gets anyway, and say so rather than silently
-        # degrading.
-        log_message(
-            message_type="warning",
-            action="unreadable_remote_manifest",
-            path=manifest_path,
-            reason=str(exc),
-        )
-        return None
-    return frozenset(
-        Path(entry.name).name for entry in (manifest.artifact.files if manifest.artifact else [])
-    )
+    return _attested_names(_remote_manifest(fs, base_path))
 
 
 def _find_lead_table(
@@ -174,6 +216,34 @@ def _find_lead_table(
     return None
 
 
+# Defined here rather than beside `read_module_provenance`, its other caller: discovery runs at
+# import time (`MODULE_INFOS = discover_hf_modules()` below) and `_probe_module_at_path` calls
+# this, so a definition further down the file is not yet bound. The symptom is not an ImportError
+# — `discover_modules_from_source` catches it — but every source failing with
+# "name '_weighting_summary' is not defined" and discovery returning nothing.
+def _weighting_summary(manifest: "ModuleManifest") -> Optional[str]:
+    """The module's `weighting` block as one line of its author's own words, or `None`.
+
+    All three fields are free text on purpose (a closed vocabulary would have had to be guessed at),
+    so they are rendered verbatim and never parsed. `None` when the block is absent **or** when every
+    field in it is empty: an empty block establishes nothing, and rendering it as a present statement
+    would be worse than rendering nothing.
+    """
+    block = getattr(manifest, "weighting", None)
+    if block is None:
+        return None
+    parts = [
+        f"{label}: {value.strip()}"
+        for label, value in (
+            ("scale", block.scale),
+            ("method", block.method),
+            ("note", block.note),
+        )
+        if value and value.strip()
+    ]
+    return " · ".join(parts) or None
+
+
 def _probe_module_at_path(
     fs: "AbstractFileSystem",
     base_path: str,
@@ -192,7 +262,8 @@ def _probe_module_at_path(
     See `_attested_files`: the publisher never removes a file, so a directory can hold a union of two
     releases and a probe would read a previous release's table as a live one.
     """
-    attested = _attested_files(fs, base_path)
+    manifest = _remote_manifest(fs, base_path)
+    attested = _attested_names(manifest)
     lead_table = _find_lead_table(fs, base_path, attested)
     if lead_table is None:
         return None
@@ -241,6 +312,10 @@ def _probe_module_at_path(
         sources_url=_build_url(protocol, sources_path) if _has("sources.parquet") else None,
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
+        # Stated, not checked: the digest is what the module *claims*, exactly as on the local path.
+        manifest_version=(manifest.identity.version or None) if manifest else None,
+        manifest_digest=(manifest.artifact.digest or None) if manifest and manifest.artifact else None,
+        manifest_weighting=_weighting_summary(manifest) if manifest else None,
     )
 
 
@@ -396,6 +471,26 @@ def discover_all_modules() -> dict[str, ModuleInfo]:
         for name, info in discovered.items():
             if name not in all_modules:
                 all_modules[name] = info
+                continue
+            # Earlier-source-wins is the rule, but it was silent, and the shipped `modules.yaml`
+            # lists the HuggingFace collection first while `_ensure_local_source` appends. So a
+            # module you register locally under a name already published — ten of those names are
+            # present by default — is shadowed by the remote one and annotates with somebody else's
+            # bytes, with nothing anywhere saying so. Reported by just-module-creator, 2026-08-20.
+            shadowed = all_modules[name]
+            if shadowed.lead_url == info.lead_url:
+                continue
+            log_message(
+                message_type="warning",
+                action="module_name_collision",
+                module=name,
+                using=shadowed.lead_url,
+                shadowed=info.lead_url,
+                reason=(
+                    "two sources supply a module with this name; the earlier source wins. Rename "
+                    "the local module if you meant to use it instead of the published one."
+                ),
+            )
 
     log_message(
         message_type="info",
@@ -631,36 +726,21 @@ def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
     return path
 
 
-def _weighting_summary(manifest: "ModuleManifest") -> Optional[str]:
-    """The module's `weighting` block as one line of its author's own words, or `None`.
-
-    All three fields are free text on purpose (a closed vocabulary would have had to be guessed at),
-    so they are rendered verbatim and never parsed. `None` when the block is absent **or** when every
-    field in it is empty: an empty block establishes nothing, and rendering it as a present statement
-    would be worse than rendering nothing.
-    """
-    block = getattr(manifest, "weighting", None)
-    if block is None:
-        return None
-    parts = [
-        f"{label}: {value.strip()}"
-        for label, value in (
-            ("scale", block.scale),
-            ("method", block.method),
-            ("note", block.note),
-        )
-        if value and value.strip()
-    ]
-    return " · ".join(parts) or None
-
-
 def read_module_provenance(
     info: Optional[ModuleInfo],
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """``(version, artifact digest, weighting)`` for the module, as far as the source states them.
 
-    `None` means *not established*, never "unversioned" or "unverified": only an acquisition path
-    that puts `manifest.json` on disk can answer at all, and HF discovery is not one of them.
+    `None` means *not established*, never "unversioned" or "unverified".
+
+    Two sources answer, in order. A local install or a local compile puts `manifest.json` on disk
+    and is the richer path — it can also fall back to the authored spec for a version the compiler
+    left null. A remote source answers from whatever its published manifest stated at discovery
+    time, which `ModuleInfo` now carries: discovery already fetched and validated that manifest to
+    decide the module's kind, and used to drop everything but the file list, so a remotely
+    discovered module reported *Not stated* for facts we had already read. A module published
+    before manifests existed — every one of ours on HuggingFace today — still answers `None` to all
+    three, which is the honest answer rather than a degraded one.
 
     The digest is the value the module **claims** — read from its manifest, not recomputed. Nothing
     in this repo calls `just_dna_format.integrity.verify_manifest`, so recording it ties a report to
@@ -675,7 +755,11 @@ def read_module_provenance(
     """
     module_dir = local_module_dir(info)
     if module_dir is None:
-        return (None, None, None)
+        # No manifest on disk. Fall back to what the remote source's own manifest stated, which is
+        # `None` on all three for a source that publishes none.
+        if info is None:
+            return (None, None, None)
+        return (info.manifest_version, info.manifest_digest, info.manifest_weighting)
 
     manifest_path = module_dir / "manifest.json"
     version: Optional[str] = None
@@ -700,6 +784,13 @@ def read_module_provenance(
     # so a locally-compiled module's version lives only in the authored spec.
     if version is None:
         version = spec_version(module_dir) or None
+
+    # A local manifest that is silent on a field must not lose what discovery already read from the
+    # source. Never the reverse: an on-disk manifest describes the bytes we actually annotated with.
+    if info is not None:
+        version = version or info.manifest_version
+        digest = digest or info.manifest_digest
+        weighting = weighting or info.manifest_weighting
 
     return (version, digest, weighting)
 

@@ -103,7 +103,7 @@ def build_clinvar_modules(
         )
         # The Gen-I repo's logo, carried into the module the way the variant-backed ports do.
         if name in REGISTRY:
-            fetch_logo(REGISTRY[name], build.output_dir)
+            fetch_logo(REGISTRY[name].repo, name, build.output_dir)
         results.append(_finish(build, reference, do_enrich=do_enrich, do_compile=do_compile,
                                console=console))
     return results

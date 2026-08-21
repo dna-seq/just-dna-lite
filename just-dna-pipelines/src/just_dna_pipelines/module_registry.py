@@ -35,8 +35,10 @@ from just_dna_pipelines.module_config import (
     ModuleMetadata,
     ModulesConfig,
     Source,
+    _load_config,
     get_config_path,
     has_lead_table,
+    read_config_for_update,
     save_config,
 )
 
@@ -161,9 +163,7 @@ def register_custom_module(
             shutil.copy2(f, output_dir / f.name)
 
     config_path = get_config_path()
-    config = ModulesConfig.model_validate(
-        yaml.safe_load(config_path.read_text()) or {}
-    ) if config_path.exists() else ModulesConfig()
+    config = read_config_for_update(config_path) or ModulesConfig()
 
     config = _ensure_local_source(config)
 
@@ -212,13 +212,7 @@ def unregister_custom_module(module_name: str) -> bool:
         cleaned_anything = True
 
     config_path = get_config_path()
-    if config_path.exists():
-        config = ModulesConfig.model_validate(
-            yaml.safe_load(config_path.read_text()) or {}
-        )
-    else:
-        from just_dna_pipelines.module_config import _load_config
-        config = _load_config()
+    config = read_config_for_update(config_path) or _load_config()
 
     if module_name in config.module_metadata:
         config.module_metadata.pop(module_name)
@@ -268,9 +262,7 @@ def register_downloaded_module(module_dir: Path) -> str:
     module_name = module_dir.name
 
     config_path = get_config_path()
-    config = ModulesConfig.model_validate(
-        yaml.safe_load(config_path.read_text()) or {}
-    ) if config_path.exists() else ModulesConfig()
+    config = read_config_for_update(config_path) or ModulesConfig()
 
     config = _ensure_local_source(config)
 

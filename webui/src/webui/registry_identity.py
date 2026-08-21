@@ -8,6 +8,12 @@ without re-grinding the PoW. Pure backend: no UI wiring here.
 Stored as JSON next to the working modules config (``data/interim/registry_identity.json``,
 gitignored). The install-id is machine-local and non-secret; the token, once present, is a
 bearer credential and must not be exposed to the frontend.
+
+**The profile is per store, the install-id is not.** An account, its token and its namespaces are
+minted by one registry server and mean nothing to another, so each store keyed in ``registries:``
+gets its own slot under ``stores``. The proof-of-work install-id identifies this *machine* and is
+shared. A file written before stores existed is a flat profile; it is migrated into the default
+store's slot on first read (see ``_migrated``).
 """
 from __future__ import annotations
 
@@ -18,7 +24,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from just_dna_registry import generate_install_id, validate_install_id
-from just_dna_pipelines.module_config import get_config_path
+from just_dna_pipelines.module_config import default_registry_store, get_config_path
 
 _DIFFICULTY: int = 20
 
@@ -63,16 +69,58 @@ def identity_path() -> Path:
     return get_config_path().parent / "registry_identity.json"
 
 
+#: Profile fields that belong to one registry server rather than to this machine.
+_PROFILE_KEYS: tuple[str, ...] = (
+    "token", "account", "namespaces", "display_name", "email", "avatar_local",
+)
+
+
+def _migrated(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a stored identity to the per-store shape, moving a flat profile into a slot.
+
+    A pre-store file holds one profile at the top level, and that profile was necessarily minted
+    against whatever ``REGISTRY_URL`` pointed at, i.e. the default store. Dropping the flat keys
+    afterwards is deliberate: leaving them would give a second, ambiguous copy of a bearer token
+    that no store owns.
+    """
+    out = {k: v for k, v in data.items() if k not in _PROFILE_KEYS}
+    stores = out.get("stores")
+    out["stores"] = dict(stores) if isinstance(stores, dict) else {}
+    flat = {k: data[k] for k in _PROFILE_KEYS if data.get(k)}
+    # Keyed on the slot being absent rather than on `stores` being empty: a half-migrated file
+    # (another store already saved, the flat profile not yet moved) would otherwise have its flat
+    # token dropped instead of migrated.
+    default_key = default_registry_store().key
+    if flat and default_key not in out["stores"]:
+        out["stores"][default_key] = flat
+    return out
+
+
 def load_identity() -> Dict[str, Any]:
-    """Read the persisted identity, or an empty dict if absent/corrupt."""
+    """Read the persisted identity (per-store shape), or an empty dict if absent/corrupt."""
     path = identity_path()
     if not path.exists():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
     except Exception:  # noqa: BLE001 - corrupt file degrades to "no identity yet"
         return {}
+    return _migrated(data) if isinstance(data, dict) else {}
+
+
+def load_store_identity(store_key: str) -> Dict[str, Any]:
+    """The account profile held for one registry server ({} when that store has none yet)."""
+    slot = load_identity().get("stores", {}).get(store_key)
+    return dict(slot) if isinstance(slot, dict) else {}
+
+
+def save_store_identity(store_key: str, profile: Dict[str, Any]) -> None:
+    """Replace one store's profile slot, leaving the install-id and other stores untouched."""
+    data = load_identity()
+    stores = dict(data.get("stores") or {})
+    stores[store_key] = profile
+    data["stores"] = stores
+    save_identity(data)
 
 
 def save_identity(data: Dict[str, Any]) -> None:

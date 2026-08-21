@@ -3,7 +3,11 @@ Module Registry page — browse the remote catalog, install/uninstall modules,
 and inspect the local registry cross-referenced against the catalog.
 
 Left panel:  fixed selected-module details card (status-aware controls) + narrow local list.
-Right panel: two tabs — Catalog (download+register) and Publication (deferred stub).
+Right panel: a store selector over two tabs — Catalog (download+register) and Publication.
+
+The store selector sits above the tabs rather than inside the Catalog toolbar because it governs
+both: the account, its namespaces and where a publish lands all belong to the selected server, so
+a control buried among the search filters would read as if it only narrowed browsing.
 """
 from __future__ import annotations
 
@@ -11,6 +15,8 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
+from just_dna_pipelines.module_config import get_registry_stores
+
 from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.state import RegistryState
 
@@ -409,6 +415,72 @@ _TAB_STYLE: dict = {
     "cursor": "pointer", "display": "flex", "alignItems": "center", "gap": "8px",
     "fontSize": "1rem", "fontWeight": "600", "padding": "12px 18px",
 }
+
+
+def _store_selector() -> rx.Component:
+    """Which registry server this page talks to.
+
+    Options are emitted at compile time from ``registries:`` in modules.yaml — the set does not
+    change while the app runs, and a static list keeps the selector present when the network is
+    not. The test badge reads the store's configured ``mode`` for the same reason: a badge that
+    depends on ``/api/v1/version`` is missing exactly when the server is slow to answer.
+    """
+    stores = get_registry_stores()
+    picker: rx.Component
+    if len(stores) > 1:
+        picker = rx.el.select(
+            *[rx.el.option(store.label, value=store.key) for store in stores],
+            value=RegistryState.store_key,
+            on_change=RegistryState.set_store,
+            style={"padding": "5px 8px", "border": "1px solid #ddd", "borderRadius": "6px",
+                   "fontSize": "0.85rem", "fontWeight": "600", "minWidth": "180px"},
+        )
+    else:
+        picker = rx.el.span(
+            RegistryState.store_label,
+            style={"fontSize": "0.85rem", "fontWeight": "600"},
+        )
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("server", size=14, color="#888"),
+            rx.el.label(
+                "Store",
+                style={"fontSize": "0.78rem", "color": "#888", "fontWeight": "600", "margin": "0 8px"},
+            ),
+            picker,
+            rx.cond(
+                RegistryState.store_is_test,
+                rx.el.span("TEST", class_name="ui mini orange label", style={"marginLeft": "8px"}),
+                rx.fragment(),
+            ),
+            rx.el.span(
+                RegistryState.store_url,
+                style={"fontSize": "0.75rem", "color": "#aaa", "marginLeft": "10px",
+                       "fontFamily": "monospace", "overflow": "hidden", "textOverflow": "ellipsis",
+                       "whiteSpace": "nowrap"},
+            ),
+            style={"display": "flex", "alignItems": "center", "flexWrap": "wrap"},
+        ),
+        rx.cond(
+            RegistryState.store_is_test,
+            rx.el.div(
+                fomantic_icon("info circle", size=14, color="#f2711c"),
+                rx.el.span(
+                    " You are browsing a test registry. Modules published here are for rehearsal "
+                    "— they are not public, and nothing here is guaranteed to survive.",
+                    style={"marginLeft": "6px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "marginTop": "8px",
+                       "fontSize": "0.8rem", "color": "#8a5340", "backgroundColor": "#fff8f0",
+                       "border": "1px solid #f5d9be", "borderRadius": "6px", "padding": "7px 10px"},
+            ),
+            rx.el.div(
+                RegistryState.store_description,
+                style={"fontSize": "0.78rem", "color": "#999", "marginTop": "5px"},
+            ),
+        ),
+        style={"marginBottom": "10px"},
+    )
 
 
 def _tab_menu() -> rx.Component:
@@ -1212,6 +1284,7 @@ def _incompatible_banner() -> rx.Component:
 
 def registry_right_panel() -> rx.Component:
     return rx.el.div(
+        _store_selector(),
         _incompatible_banner(),
         _tab_menu(),
         rx.el.div(

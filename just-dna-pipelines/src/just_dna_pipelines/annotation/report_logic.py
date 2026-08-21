@@ -414,6 +414,38 @@ def _genotype_str(genotype: list[str] | str | None) -> str:
     return "/".join(_genotype_alleles(genotype))
 
 
+def _alt_alleles(alts: list[str] | str | None) -> list[str]:
+    """The module's alternate alleles, whichever way its lead table spells them.
+
+    **`alts` is not one dtype across the format, and assuming it is rendered nonsense.**
+    `weights.parquet` stores `List(Utf8)`; `pharm_variants.parquet` and its 0.4 siblings are
+    materialized verbatim from the authored CSV and keep a comma-joined `String` — measured `'A,C'`.
+    A bare `"/".join(...)` over the string case iterates *characters*, so `'A,C'` rendered as
+    **`'A/,/C'`**, both as "Module alternate alleles" in the report and inside the AI-prefill prompt
+    the reader can send to a third party.
+
+    It was unreachable before format 0.6, which is why no test caught it: the column did not exist
+    on a 0.4 table, so `row.get("alts", [])` returned `[]` and rendered empty. Our own shipped
+    `pharmgkb` is still a 0.5 artifact with no `alts` column at all, so this is latent here and goes
+    live the moment that module is recompiled. Reported by just-module-creator, 2026-08-20.
+
+    The asymmetry is not a compiler defect to wait out: retyping `alts` to `List(Utf8)` removes a
+    column type, which Principle 3 reserves for 1.0. Splitting here is the answer for the whole 0.x
+    line. Separators accepted are `,` (the authored spelling) and `|` (polars-bio's multi-allelic
+    ALT separator, so a VCF-side value passed in reads correctly too).
+    """
+    if alts is None:
+        return []
+    if isinstance(alts, str):
+        return [a for a in re.split(r"[,|]", alts) if a]
+    return [str(a) for a in alts if a]
+
+
+def _alt_str(alts: list[str] | str | None) -> str:
+    """The module's alternate alleles as one display string, e.g. ``A/C``."""
+    return "/".join(_alt_alleles(alts))
+
+
 def _genotype_join_key(genotype: list[str] | str | None, phased: Optional[bool]) -> str:
     """Rebuild the **authored** genotype string from a weights row, for keying against a 0.6
     ``annotations.parquet``.
@@ -706,7 +738,7 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         "gene": row.get("gene", "") or "",
         "genotype_str": _genotype_str(genotype),
         "ref": row.get("ref", "") or "",
-        "alt": "/".join(row.get("alts", []) or []),
+        "alt": _alt_str(row.get("alts")),
         "zygosity": _zygosity(genotype),
         "weight": weight,
         "weight_color": _variant_color(weight, state, direction),

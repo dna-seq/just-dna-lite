@@ -467,9 +467,10 @@ directory's own basename either way.
 Expect **7 files** for the six curated modules (`weights`, `annotations`, `studies`, `sources`,
 `literature`.parquet + `manifest.json` + `logo.png`), **6** for the three panels, which have no
 `literature.parquet` because their grounding is per-variant ClinVar citations rather than a literature
-pass, and **3** for `pharmgkb` (`pharm_variants` + `sources`.parquet + `manifest.json`) — it is led by
-a 0.4 table and has neither annotations nor studies. A module printing fewer than its shape calls for
-is missing an artifact; rebuild it rather than publishing a partial one.
+pass, and **4** for `pharmgkb` (`pharm_variants` + `sources`.parquet + `manifest.json` + `logo.png`) — it
+is led by a 0.4 table and has neither annotations nor studies. Its logo comes from `dna-seq/just_drugs`,
+the Generation-I repo it supersedes; nothing else in that repo is read. A module printing fewer than
+its shape calls for is missing an artifact; rebuild it rather than publishing a partial one.
 
 **Step 2 — publish.** Sequential on purpose: each is its own commit, and a failure halfway leaves the
 earlier ones intact and re-runnable (`upload_folder` overwrites by path).
