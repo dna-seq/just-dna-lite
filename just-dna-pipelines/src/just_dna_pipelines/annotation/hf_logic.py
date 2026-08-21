@@ -9,6 +9,7 @@ Modules are identified by string names (e.g., "longevitymap") rather than
 enums, enabling dynamic discovery of new modules from the HF repository.
 """
 
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +23,7 @@ from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.annotation.hf_modules import (
     MODULE_INFOS,
     ModuleTable,
+    local_module_path,
     ModuleOutputMapping,
     AnnotationManifest,
     scan_module_table,
@@ -219,6 +221,57 @@ def _vcf_has_rsids(vcf_lf: pl.LazyFrame) -> bool:
     )
 
 
+def _unmatchable_phased_rows(lead_lf: pl.LazyFrame) -> tuple[int, int]:
+    """`(phased rows, phased rows that can never match)` in a lead table, before normalization.
+
+    **Call this on the raw table**: `_normalize_lead_genotype` folds `|` into `/`, so by the time a
+    genotype is in the VCF's representation there is nothing left to detect.
+
+    Why the second number exists. The VCF side sorts a genotype unconditionally
+    (`io._compute_genotype_expr`) and the module side deliberately does not — sorting there would
+    fold `A|G` and `G|A` into one key and manufacture a match the module never stated. Both rules
+    are right on their own and their consequence is that an authored genotype held in *homolog*
+    order rather than sorted order matches nothing, in either ordering, with no error. A curator
+    who correctly recorded phase gets the same result as one who authored a nonexistent variant.
+
+    So we do not sort, and we do not drop the row either — a phased genotype that happens to be in
+    sorted order does match, and its phase is simply ignored by a join that has none to compare
+    against. What we refuse to do is stay quiet: the caller logs both counts, which is the "refuse
+    loudly" half of the choice just-module-creator put to us on 2026-08-20.
+
+    Two shapes carry phase. A 0.4 family keeps the authored string, where `|` is the marker; a
+    weights-led module has already been split to `List(Utf8)` at compile time and states phase in
+    its own `phased` column. Neither is present on every module, so both are optional and a table
+    with no phase information at all returns `(0, 0)`.
+    """
+    schema = lead_lf.collect_schema()
+    names = schema.names()
+    if "genotype" not in names:
+        return (0, 0)
+
+    if schema["genotype"] == pl.String:
+        alleles = pl.col("genotype").str.split("|")
+        is_phased = pl.col("genotype").str.contains(r"\|", literal=False)
+    elif "phased" in names:
+        alleles = pl.col("genotype")
+        is_phased = pl.col("phased").fill_null(False)
+    else:
+        return (0, 0)
+
+    # Compare as joined strings rather than as lists: list equality is not uniformly supported
+    # across polars versions and this reads the same either way.
+    unsorted = alleles.list.join(",") != alleles.list.sort().list.join(",")
+    counts = (
+        lead_lf.select(
+            is_phased.sum().alias("phased"),
+            (is_phased & unsorted).sum().alias("unmatchable"),
+        )
+        .collect()
+        .row(0)
+    )
+    return (int(counts[0] or 0), int(counts[1] or 0))
+
+
 def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
     """How a module's lead table can be joined to a VCF, and why — `(strategy, reason)`.
 
@@ -226,17 +279,36 @@ def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
     today and the format keeps adding them, so a name-keyed switch would need editing every
     release while a schema-keyed check absorbs new families for free.
 
-    - `position` — `chrom`/`start` exist *and* hold at least one value. A legacy table typed with
-      coordinates but null throughout is not positionally joinable, and treating it as if it were
-      annotates nothing instead of erroring. Compiler 0.6+ fills resolved coordinates onto every
-      variant-led table family; this fallback remains for older and unresolved artifacts.
+    - `position` — `chrom`/`start`/`genotype` all exist *and* at least one row carries both
+      coordinates. A table typed with coordinates but null throughout is not positionally
+      joinable, and treating it as if it were annotates nothing instead of erroring. Both halves
+      are tested because a partially filled table — `chrom` placed, `start` still null — joins to
+      nothing just as surely as an empty one.
     - `rsid` — no usable coordinates, but `rsid` + `genotype` are there.
     - `unsupported` — neither. `diplotypes`, `pgs`, `allele_function` and the binning families
       carry no per-variant key at all; the caller skips them with the reason recorded rather than
       dying on a `ColumnNotFoundError`.
+
+    **Every strategy names the columns its join actually reads, `genotype` included.** Testing
+    only `{chrom, start}` for `position` was not a smaller version of the same check: a
+    `haplotypes`-led module carries coordinates and states one `allele` per row rather than a
+    diploid `genotype`, so it was classified `position` and then died at collect time on a
+    `ColumnNotFoundError` — an unhandled crash instead of the recorded skip a module we cannot
+    join is supposed to get. Reproduced on a compiled `apoe_epsilon`. Reported by
+    just-module-creator, 2026-08-20.
+
+    **On coordinates and the 0.4 families.** This probes *values*, not family names, which is why
+    it needed no change when format 0.6 landed RM43: since then the compiler joins
+    `resolution.csv` onto `pharm_variants` / `haplotypes` / `heteroplasmy` as well as
+    `weights.parquet`, so a 0.6-compiled PGx module carries real coordinates and gets the position
+    join, while every module published before that carries `chrom` null throughout and correctly
+    falls back to rsid. Measured on the shipped 0.5 `pharmgkb`: 0 of 1482 rows placed. The manifest
+    publishes `positional_rows` / `positional_rows_placed` to state the same thing without opening
+    the parquet; we do not read them here because the value probe already answers it for artifacts
+    of every generation, including the ones with no manifest at all.
     """
     schema = set(lead_lf.collect_schema().names())
-    if {"chrom", "start"}.issubset(schema) and bool(
+    if {"chrom", "start", "genotype"}.issubset(schema) and bool(
         lead_lf.select(
             (pl.col("chrom").is_not_null() & pl.col("start").is_not_null()).any()
         )
@@ -246,7 +318,7 @@ def _lead_join_strategy(lead_lf: pl.LazyFrame) -> tuple[str, str]:
         return "position", "lead table carries coordinates"
     if {"rsid", "genotype"}.issubset(schema):
         return "rsid", "lead table carries no coordinates; joining on rsid + genotype instead"
-    missing = sorted({"rsid", "genotype"} - schema)
+    missing = sorted(({"rsid", "genotype"} - schema) or ({"chrom", "start", "genotype"} - schema))
     return "unsupported", (
         "lead table has no populated coordinates and no rsid + genotype to fall back on "
         f"(missing: {', '.join(missing)})"
@@ -296,12 +368,34 @@ def annotate_vcf_with_module_weights(
         # Load the module's lead table (lazy) — weights for most modules, pharm_variants for a
         # pharmacogenomics one — and put its genotype in the VCF's representation before any join.
         weights_lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
+
+        # Before normalization, while `|` is still there to see: an authored genotype in homolog
+        # order cannot match a VCF genotype the reader sorted, and would otherwise report as an
+        # ordinary miss. Say so rather than letting a curated row vanish quietly.
+        phased_rows, unmatchable_phased = _unmatchable_phased_rows(weights_lf)
+        if unmatchable_phased:
+            action.log(
+                message_type="warning",
+                step="phased_rows_cannot_match",
+                module=module_name,
+                num_phased=phased_rows,
+                num_unmatchable=unmatchable_phased,
+                reason=(
+                    "the module states these genotypes in homolog order and the VCF side is "
+                    "sorted, so they can match in neither ordering; sorting the module side "
+                    "would instead manufacture matches it never stated"
+                ),
+            )
+
         weights_lf = _normalize_lead_genotype(weights_lf)
 
-        # A position join needs coordinates. Legacy variant-led artifacts may have chrom/start null
-        # on every row even when their authored resolution.csv knew the locus; those would join to
-        # nothing at all. Fall back to rsid rather than silently annotating zero variants, and stop
-        # outright when there is nothing to fall back on.
+        # A position join needs coordinates, and whether a 0.4-family table has them depends on
+        # when it was compiled: before format 0.6 the compiler applied resolution.csv to
+        # weights.parquet alone, so a pharm_variants-led module reached us with chrom/start null on
+        # every row; since 0.6 (RM43) it fills them from the same table and such a module qualifies
+        # for the position join. `_lead_join_strategy` probes the values rather than the family
+        # name, so both generations are classified correctly. Fall back to rsid rather than
+        # silently annotating zero variants, and stop outright when there is nothing to fall back on.
         strategy, reason = _lead_join_strategy(weights_lf)
         if strategy == "unsupported":
             raise UnsupportedLeadTable(f"{module_name}: {reason}")
@@ -458,9 +552,23 @@ def annotate_vcf_with_module_weights(
 
 
 def download_file(url: str, output_path: Path) -> Path:
-    """Download a file from a URL or HuggingFace."""
+    """Download a file from a URL or HuggingFace, or copy it when it is already on this disk.
+
+    The local branch is not a Windows fix — it closes a gap on every platform. A locally
+    registered module (a registry install or a local compile) states a filesystem path for its
+    logo and metadata, and with only the `hf://` and http(s) branches below such a URL fell
+    through to `requests.get`, which has no adapter for a path and none for `file://` either. The
+    caller catches and warns, so every local module quietly lost its logo and its metadata.
+    """
     import requests
-    
+
+    # Already on this filesystem: copy rather than fetch.
+    local_source = local_module_path(url)
+    if local_source is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(local_source, output_path)
+        return output_path
+
     # hf:// protocol handling
     if url.startswith("hf://"):
         from huggingface_hub import hf_hub_download, get_token
@@ -485,7 +593,6 @@ def download_file(url: str, output_path: Path) -> Path:
             repo_type="dataset",
             token=token,
         )
-        import shutil
         output_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(downloaded_path, output_path)
         return output_path

@@ -9,9 +9,14 @@ or by registering individual commands.
 from pathlib import Path
 from typing import Optional
 
+import shutil
+
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from just_dna_pipelines.module_config import LEAD_TABLES, find_lead_table, has_lead_table
+from just_dna_pipelines.module_registry import CUSTOM_MODULES_DIR, register_downloaded_module
 
 app = typer.Typer(
     name="module",
@@ -191,6 +196,66 @@ def module_register(
             f"[bold red]\u2717 Registration failed with {len(result.errors)} error(s)[/bold red]\n"
         )
         raise typer.Exit(1)
+
+
+@app.command("register-compiled")
+def module_register_compiled(
+    module_dir: Path = typer.Argument(
+        ...,
+        help="Path to an ALREADY-COMPILED module directory (contains a lead parquet + manifest.json).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    name: Optional[str] = typer.Option(
+        None,
+        "--name",
+        help="Register under this name instead of the directory's own name.",
+    ),
+) -> None:
+    """Register an already-compiled module for local annotation, WITHOUT recompiling it.
+
+    Use this to try a module against your own VCF before publishing it anywhere. `register` is the
+    other command and it is not the same one: it takes a *spec* directory and compiles it, which
+    produces a fresh `artifact.digest` — so what you annotate with is not the artifact you built and
+    meant to test. This command copies the compiled bytes as they are.
+
+    Registering verifies nothing. Nothing in this repo calls `verify_manifest`, so a clean
+    annotation run says the module joined to your genome, not that the module is correct.
+    """
+    source = Path(module_dir).resolve()
+    module_name = name or source.name
+
+    if not has_lead_table(source):
+        console.print(
+            f"[bold red]\u2717 {source} has no lead table[/bold red]\n"
+            f"  Expected one of: {', '.join(f'{t}.parquet' for t in LEAD_TABLES)}\n"
+            "  If you have a spec directory rather than a compiled module, use "
+            "[bold]pipelines module register[/bold].\n"
+        )
+        raise typer.Exit(1)
+
+    target = CUSTOM_MODULES_DIR / module_name
+    # Copy only when it is not already the registered copy — re-registering in place must not
+    # delete the directory it is about to read.
+    if target.resolve() != source:
+        if target.exists():
+            shutil.rmtree(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source, target)
+
+    registered = register_downloaded_module(target)
+
+    lead = find_lead_table(target)
+    console.print(f"\n[bold green]\u2713 Registered '{registered}'[/bold green]")
+    console.print(f"  Lead table: {lead}")
+    console.print(f"  Location:   {target}")
+    if not (target / "manifest.json").exists():
+        console.print(
+            "  [yellow]No manifest.json — version, digest and weighting will render as "
+            "'Not stated' in a report.[/yellow]"
+        )
+    console.print()
 
 
 @app.command("unregister")

@@ -20,11 +20,13 @@ from rich.console import Console
 
 from just_dna_pipelines.v1_port.pharmgkb import (
     DECLARED_USE,
+    GEN1_REPO,
     MIN_EVIDENCE_LEVEL,
     MODULE_NAME,
     PharmGkbBuild,
     build_pharmgkb_module,
 )
+from just_dna_pipelines.v1_port.sources import fetch_logo
 
 DEFAULT_OUT_ROOT = Path("data/interim/v1_port")
 
@@ -67,6 +69,12 @@ def build_and_compile_pharmgkb(
         declared_use=declared_use,
     )
     result = PharmGkbResult(build=build, warnings=list(build.warnings))
+
+    # The Gen-I repo's logo, carried into the module the way the variant-backed ports do. Optional
+    # metadata and out-of-digest, so a fetch failure never breaks the build.
+    logo = fetch_logo(GEN1_REPO, MODULE_NAME, out_dir)
+    if logo is not None:
+        result.warnings.append(f"shipped source logo {logo.name}")
 
     validation = validate_spec(out_dir)
     result.valid = validation.valid

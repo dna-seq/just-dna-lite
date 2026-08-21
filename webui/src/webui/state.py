@@ -26,7 +26,12 @@ from just_dna_pipelines.agents.module_creator import read_spec_meta
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
-from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES, MODULE_INFOS, HF_DEFAULT_REPOS
+from just_dna_pipelines.annotation.hf_modules import (
+    DISCOVERED_MODULES,
+    MODULE_INFOS,
+    HF_DEFAULT_REPOS,
+    is_local_module_url,
+)
 from just_dna_pipelines.annotation.resources import (
     get_user_output_dir, get_user_input_dir, get_generated_modules_dir,
     download_vcf_from_zenodo, ensure_vcf_in_user_input_dir,
@@ -40,6 +45,9 @@ from just_dna_pipelines.module_config import (
     spec_version,
     DefaultSample,
     LEAD_TABLE_CSVS,
+    RegistryStore,
+    default_registry_store,
+    get_registry_store,
 )
 from just_dna_pipelines.module_registry import (
     CUSTOM_MODULES_DIR,
@@ -61,7 +69,7 @@ from webui.dagster_env import get_dagster_instance
 from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
 from webui.registry_identity import (
-    ensure_install_id, load_identity, save_identity, derive_handle, set_env_var,
+    ensure_install_id, load_store_identity, save_store_identity, derive_handle, set_env_var,
 )
 
 # Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
@@ -538,7 +546,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             if info is None:
                 continue
             repo_id = info.repo_id
-            is_local = info.source_url.startswith("/") or info.source_url.startswith("file://")
+            is_local = is_local_module_url(info.source_url)
             if repo_id not in repos:
                 if is_local:
                     url = info.source_url
@@ -2774,7 +2782,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 if info.logo_url.startswith("hf://"):
                     hf_path = info.logo_url.replace("hf://", "")
                     browsable_logo_url = f"https://huggingface.co/{hf_path.replace(info.repo_id, info.repo_id + '/resolve/main', 1)}"
-                elif info.logo_url.startswith("file://") or info.logo_url.startswith("/"):
+                elif is_local_module_url(info.logo_url):
                     browsable_logo_url = f"{self.backend_api_url}/api/module-logo/{module_name}"
             result.append({
                 "name": module_name,
@@ -5989,9 +5997,13 @@ class AgentState(rx.State):
 # REGISTRY STATE
 # ============================================================================
 
-def _registry_url() -> str:
-    """Base URL of the module registry server (env-overridable)."""
-    return os.getenv("REGISTRY_URL", "https://module-marketplace.just-dna.life").rstrip("/")
+def _resolve_store(key: str) -> RegistryStore:
+    """The store this key names, falling back to the default one.
+
+    Selection arrives from the client, so an unknown key is a possibility rather than a bug —
+    it resolves to the default store instead of raising.
+    """
+    return get_registry_store(key) or default_registry_store()
 
 
 # Compiled artifact files the digest is computed over. Taken from the compiler rather than
@@ -6186,6 +6198,13 @@ class RegistryState(rx.State):
     # --- Right-pane tab ---
     registry_active_tab: str = "catalog"
 
+    # --- Store (which registry server we are talking to) ---
+    # Empty until `load_registry` resolves the default, so a page that never loaded cannot pin a
+    # stale key. Selection is per session and deliberately not persisted: the store decides where
+    # a publish lands, and a sticky "polygon" from last week is exactly the setting a user would
+    # not think to check.
+    store_key: str = ""
+
     # --- Catalog (Catalog tab) ---
     query: str = ""
     sort: str = "name"
@@ -6355,8 +6374,35 @@ class RegistryState(rx.State):
     def can_next(self) -> bool:
         return self.page * self.per_page < self.total
 
+    # ------------------------------------------------------------------ store
+
+    def _current_store(self) -> RegistryStore:
+        """The selected registry server (backend-only; not a Var)."""
+        return _resolve_store(self.store_key)
+
+    @rx.var
+    def store_label(self) -> str:
+        return self._current_store().label
+
+    @rx.var
+    def store_url(self) -> str:
+        return self._current_store().base_url
+
+    @rx.var
+    def store_description(self) -> str:
+        return self._current_store().description
+
+    @rx.var
+    def store_is_test(self) -> bool:
+        """Whether the selected server is a test ground — badged, never inferred by the reader.
+
+        Mirrors ``mode`` from ``/api/v1/version``, taken from the configured store rather than
+        fetched: a badge that depends on a network call is absent exactly when the server is slow.
+        """
+        return self._current_store().is_test
+
     def _client_args(self):
-        return _registry_url(), (self.token or None)
+        return self._current_store().base_url, (self.token or None)
 
     def _begin_action(self, message: str, busy_key: str = "") -> None:
         """Mark an install/uninstall in progress. Call inside ``async with self``."""
@@ -6527,22 +6573,30 @@ class RegistryState(rx.State):
             self.catalog_loading = False
 
     async def _ensure_identity(self) -> None:
-        """Load (or mint + persist) the publishing install-id. Backend groundwork only."""
+        """Load (or mint + persist) the publishing identity for the *selected* store.
+
+        The profile is per server: an account, its token and its namespaces are minted by one
+        registry and mean nothing to another, so switching stores loads a different slot rather
+        than carrying the old account across. The install-id is machine-local and shared.
+        """
+        async with self:
+            store = self._current_store()
         loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, load_identity)
-        install_id = data.get("install_id", "")
+        data = await loop.run_in_executor(None, load_store_identity, store.key)
+        # The slot is the only source. `$REGISTRY_TOKEN` is deliberately *not* read as a
+        # fallback: it is the CLI's publishing credential, so honouring it would sign the UI in
+        # as that account with no user action — and `_refresh_account` persists whatever it finds,
+        # which would leave a second copy of the token shadowing `.env` on every later read.
         token = data.get("token", "")
         account = data.get("account", "")
         namespaces = data.get("namespaces", []) or []
         display_name = data.get("display_name", "")
         email = data.get("email", "")
         avatar_local = data.get("avatar_local", "")
-        if not install_id:
-            install_id = await loop.run_in_executor(None, ensure_install_id)  # ~1s proof-of-work
+        install_id = await loop.run_in_executor(None, ensure_install_id)  # ~1s proof-of-work
         async with self:
             self.install_id = install_id
-            if token:
-                self.token = token
+            self.token = token
             self.account = account
             self.namespaces = namespaces
             self.display_name = display_name
@@ -6552,20 +6606,82 @@ class RegistryState(rx.State):
                 self.publish_namespace = namespaces[0]
 
     def _persist_identity(self) -> None:
-        """Write the current identity+profile back to the JSON store (call inside a sync context)."""
-        save_identity({
-            "install_id": self.install_id, "token": self.token, "account": self.account,
+        """Write the profile back to the selected store's slot (call inside a sync context)."""
+        save_store_identity(self._current_store().key, {
+            "token": self.token, "account": self.account,
             "namespaces": list(self.namespaces), "display_name": self.display_name,
             "email": self.email, "avatar_local": self.avatar_local,
         })
 
     @rx.event(background=True)
     async def load_registry(self):
+        async with self:
+            if not self.store_key:
+                self.store_key = default_registry_store().key
         await self._ensure_identity()
         await self._refresh_local()
         await self._do_search()
         if self.token:
             await self._refresh_account()
+
+    @rx.event(background=True)
+    async def set_store(self, key: str):
+        """Point the whole page at another registry server.
+
+        Everything on screen belongs to one server — the catalog, the selected module's versions,
+        the account and its namespaces, and the publish rehearsal — so all of it is cleared before
+        the same load sequence runs again. Reusing ``load_registry`` rather than writing a second
+        loader is deliberate: a parallel path is how one of these panes ends up showing the
+        previous server's answer.
+        """
+        store = _resolve_store(key)
+        async with self:
+            if store.key == self.store_key:
+                return
+            self.store_key = store.key
+            self._reset_for_store_switch()
+        yield RegistryState.load_registry
+
+    def _reset_for_store_switch(self) -> None:
+        """Drop every var that belongs to the previous server. Call inside ``async with self``."""
+        # Catalog
+        self.cards = []
+        self.total = 0
+        self.page = 1
+        self.namespace_options = []
+        self.namespace_filter = ""
+        self.catalog_error = ""
+        self.server_incompatible = False
+        # Selection (a version list from one server does not describe another's module)
+        self.selected_name = ""
+        self.selected_catalog_name = ""
+        self.selected_namespace = ""
+        self.selected_versions = []
+        self.selected_version = ""
+        self._remote_versions = []
+        self._remote_digests = {}
+        self._remote_trust = {}
+        self.detail_error = ""
+        self.pending_action = {}
+        self.action_message = ""
+        # Account + publication
+        self.token = ""
+        self.account = ""
+        self.namespaces = []
+        self.roles = []
+        self.account_stats = {}
+        self.profile_message = ""
+        self.publish_namespace = ""
+        self.new_namespace = ""
+        self.ns_available = ""
+        self.publish_state = ""
+        self.publish_version = ""
+        self.published_digest = ""
+        self.publish_message = ""
+        self.precheck_endpoint = ""
+        self.precheck_verdict = ""
+        self.precheck_message = ""
+        self.precheck_findings = []
 
     @rx.event(background=True)
     async def search(self):
@@ -7160,9 +7276,14 @@ class RegistryState(rx.State):
                 self.account = reg.get("account", "")
                 self.namespaces = reg.get("namespaces", []) or []
                 token = self.token
+                # Mirror the token under *this store's* variable, never a shared one. A test
+                # server's token in `REGISTRY_TOKEN` has broken publishing here before, and it
+                # does not surface as anything auth-shaped: the public server answers
+                # `403 insufficient_capability`, which reads as a namespace-permissions bug.
+                token_env = self._current_store().token_env
                 self._persist_identity()
-            if token:
-                await loop.run_in_executor(None, set_env_var, "REGISTRY_TOKEN", token)
+            if token and token_env:
+                await loop.run_in_executor(None, set_env_var, token_env, token)
 
         # 2. Claim the namespace.
         def _claim():

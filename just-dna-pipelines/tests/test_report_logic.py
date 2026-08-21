@@ -371,8 +371,8 @@ def _render(**context) -> str:
         # across the Python side, the pre-collapsed markup, and the inline JS constant.
         "preview_row_limit": TABLE_PREVIEW_ROWS,
         "user_name": "t", "sample_name": "s", "longevity": None,
-        "other_modules": [], "pgx_modules": [], "unavailable_modules": [], "credits": [],
-        "module_provenance": [],
+        "other_modules": [], "pgx_modules": [], "credits": [],
+        "module_provenance": [], "module_exclusions": [],
         "module_display_names": {}, "umami_script_tag": "",
     }
     ctx.update(context)
@@ -795,6 +795,8 @@ from just_dna_pipelines.annotation.hf_modules import (
 )
 from just_dna_pipelines.annotation.report_logic import (
     _module_outputs_from_manifest,
+    _read_annotation_manifest,
+    build_module_exclusions,
     build_module_provenance,
     generate_longevity_report,
 )
@@ -870,8 +872,15 @@ def test_a_run_with_no_manifest_still_reports_its_modules(tmp_path):
     assert rows[0]["version"] == ""
 
 
-def test_a_skipped_module_is_reported_as_unassessable_not_as_zero(tmp_path, monkeypatch):
-    """A stale parquet must not hide the current run's explicit skipped outcome."""
+def test_a_stale_parquet_cannot_hide_this_runs_skipped_outcome(tmp_path, monkeypatch):
+    """A module skipped *this* run must not be re-rendered from a parquet an earlier run left.
+
+    The output directory is reused across runs, so `{module}_weights.parquet` outliving the run that
+    wrote it is ordinary. Deciding what to render by globbing the directory therefore reports last
+    week's rows under this week's heading, and — worse here — hides the skip that is the only honest
+    thing this run has to say about the module. The manifest is the authority for one run; the
+    directory is only its history.
+    """
     reason = (
         "pgx: the module exposes only rsid + genotype join keys, but this VCF carries no rsIDs"
     )
@@ -884,8 +893,8 @@ def test_a_skipped_module_is_reported_as_unassessable_not_as_zero(tmp_path, monk
         skipped_modules={"pgx": reason},
     )
     (tmp_path / "manifest.json").write_text(manifest.model_dump_json(indent=2))
-    # This file represents an older run. The current manifest, not directory history, decides what
-    # the report may render; its deliberately incomplete schema would crash if it were loaded.
+    # The leftover. Its deliberately incomplete schema would raise if the report ever loaded it, so
+    # this asserts the guard rather than merely that the rows went unrendered.
     pl.DataFrame({"stale": [True]}).write_parquet(tmp_path / "pgx_weights.parquet")
 
     monkeypatch.setattr(
@@ -900,7 +909,8 @@ def test_a_skipped_module_is_reported_as_unassessable_not_as_zero(tmp_path, monk
     )
     html = report.read_text(encoding="utf-8")
 
-    assert "Not assessed" in html
+    assert "Modules not read in this run" in html
     assert reason in html
-    assert "No biological conclusion can be drawn" in html
     assert "No annotated variants were found for this module" not in html
+
+

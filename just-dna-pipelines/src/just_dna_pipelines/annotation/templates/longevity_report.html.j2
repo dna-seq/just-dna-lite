@@ -412,6 +412,19 @@ table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
     background: var(--paper);
 }
 
+.exclusion-badge {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.exclusion-badge.failed { border: 1px solid #a02c2c; background: rgba(219, 40, 40, 0.12); color: #912d2b; }
+.exclusion-badge.skipped { border: 1px solid var(--line-strong); background: var(--paper); color: var(--muted); }
+
 #toTop {
     position: fixed;
     right: 24px;
@@ -786,11 +799,11 @@ window.addEventListener("scroll", function() {
             {% for mod in pgx_modules %}
             <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
-            {% for mod in unavailable_modules %}
-            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }} · {{ mod.status | lower }}</a></li>
-            {% endfor %}
             {% if module_provenance %}
             <li><a href="#modules">Modules and versions</a></li>
+            {% endif %}
+            {% if module_exclusions %}
+            <li><a href="#modules-not-read">Modules not read</a></li>
             {% endif %}
             {% if credits %}
             <li><a href="#credits">Sources and licences</a></li>
@@ -908,18 +921,6 @@ window.addEventListener("scroll", function() {
     </section>
     {% endfor %}
 
-    {% for mod in unavailable_modules %}
-    <section class="report-section" id="module-{{ mod.module_name }}">
-        <p class="section-kicker">Module outcome</p>
-        <h2>{{ mod.display_name }}</h2>
-        <aside class="scientific-note">
-            <strong>{{ mod.status }}</strong>
-            <p>{{ mod.reason }}</p>
-            <p>No biological conclusion can be drawn from this module for this run.</p>
-        </aside>
-    </section>
-    {% endfor %}
-
     {% if module_provenance %}
     <section class="report-section" id="modules">
         <p class="section-kicker">Reproducibility</p>
@@ -949,6 +950,45 @@ window.addEventListener("scroll", function() {
                 </table>
                 </div>
                 {{ table_controls("moduleProvenanceTBody", module_provenance | length) }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# Modules that were selected and produced nothing. The run succeeds even when a module fails
+       — one module's failure must not cost the others — so without this the report's silence
+       about a module reads as "it found nothing" rather than "it was never read". #}
+    {% if module_exclusions %}
+    <section class="report-section" id="modules-not-read">
+        <p class="section-kicker">Coverage</p>
+        <h2>Modules not read in this run</h2>
+        <div class="paper-card metadata-card">
+            <p>
+                These modules were selected but contributed no results. Their absence from the
+                sections above is not a finding about this sample: nothing was matched against them.
+            </p>
+            <div class="table-shell">
+                <div class="table-scroll">
+                <table class="ui">
+                    <thead><tr><th>Module</th><th>Outcome</th><th>Reason</th></tr></thead>
+                    <tbody id="moduleExclusionsTBody">
+                        {% for m in module_exclusions %}
+                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                            <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                            <td>
+                                {% if m.kind == "failed" %}
+                                <span class="exclusion-badge failed" title="An error while reading or joining this module. Usually worth acting on.">failed</span>
+                                {% else %}
+                                <span class="exclusion-badge skipped" title="Nothing could be matched against this sample: the module carries no per-variant key, or none this sample&#39;s VCF also carries.">skipped</span>
+                                {% endif %}
+                            </td>
+                            <td class="cell-wrap"><small>{{ m.reason }}</small></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                {{ table_controls("moduleExclusionsTBody", module_exclusions | length) }}
             </div>
         </div>
     </section>

@@ -414,6 +414,38 @@ def _genotype_str(genotype: list[str] | str | None) -> str:
     return "/".join(_genotype_alleles(genotype))
 
 
+def _alt_alleles(alts: list[str] | str | None) -> list[str]:
+    """The module's alternate alleles, whichever way its lead table spells them.
+
+    **`alts` is not one dtype across the format, and assuming it is rendered nonsense.**
+    `weights.parquet` stores `List(Utf8)`; `pharm_variants.parquet` and its 0.4 siblings are
+    materialized verbatim from the authored CSV and keep a comma-joined `String` — measured `'A,C'`.
+    A bare `"/".join(...)` over the string case iterates *characters*, so `'A,C'` rendered as
+    **`'A/,/C'`**, both as "Module alternate alleles" in the report and inside the AI-prefill prompt
+    the reader can send to a third party.
+
+    It was unreachable before format 0.6, which is why no test caught it: the column did not exist
+    on a 0.4 table, so `row.get("alts", [])` returned `[]` and rendered empty. Our own shipped
+    `pharmgkb` is still a 0.5 artifact with no `alts` column at all, so this is latent here and goes
+    live the moment that module is recompiled. Reported by just-module-creator, 2026-08-20.
+
+    The asymmetry is not a compiler defect to wait out: retyping `alts` to `List(Utf8)` removes a
+    column type, which Principle 3 reserves for 1.0. Splitting here is the answer for the whole 0.x
+    line. Separators accepted are `,` (the authored spelling) and `|` (polars-bio's multi-allelic
+    ALT separator, so a VCF-side value passed in reads correctly too).
+    """
+    if alts is None:
+        return []
+    if isinstance(alts, str):
+        return [a for a in re.split(r"[,|]", alts) if a]
+    return [str(a) for a in alts if a]
+
+
+def _alt_str(alts: list[str] | str | None) -> str:
+    """The module's alternate alleles as one display string, e.g. ``A/C``."""
+    return "/".join(_alt_alleles(alts))
+
+
 def _genotype_join_key(genotype: list[str] | str | None, phased: Optional[bool]) -> str:
     """Rebuild the **authored** genotype string from a weights row, for keying against a 0.6
     ``annotations.parquet``.
@@ -706,7 +738,7 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         "gene": row.get("gene", "") or "",
         "genotype_str": _genotype_str(genotype),
         "ref": row.get("ref", "") or "",
-        "alt": "/".join(row.get("alts", []) or []),
+        "alt": _alt_str(row.get("alts")),
         "zygosity": _zygosity(genotype),
         "weight": weight,
         "weight_color": _variant_color(weight, state, direction),
@@ -1167,8 +1199,8 @@ def build_report_credits(
 MODULE_DISPLAY_NAMES: dict[str, str] = build_display_names_dict(DISCOVERED_MODULES)
 
 
-def _annotation_manifest(modules_dir: Path) -> AnnotationManifest | None:
-    """Read the run's annotation manifest, or ``None`` when it is absent/unreadable.
+def _read_annotation_manifest(modules_dir: Path) -> Optional[AnnotationManifest]:
+    """The run's ``manifest.json``, or ``None`` when there is none or it cannot be read.
 
     Parsed through ``AnnotationManifest`` rather than as raw JSON on purpose: manifests written
     before the engine learned about lead tables carry no ``lead_table`` key at all, and the model's
@@ -1198,50 +1230,48 @@ def _annotation_manifest(modules_dir: Path) -> AnnotationManifest | None:
 
 
 def _module_outputs_from_manifest(modules_dir: Path) -> dict[str, ModuleOutputMapping]:
-    """Read the run's ``manifest.json`` → one output mapping per annotated module."""
-    manifest = _annotation_manifest(modules_dir)
-    if manifest is None:
-        return {}
-
-    return {m.module: m for m in manifest.modules}
+    """One ``ModuleOutputMapping`` per annotated module, keyed by module name."""
+    manifest = _read_annotation_manifest(modules_dir)
+    return {m.module: m for m in manifest.modules} if manifest else {}
 
 
-def _unavailable_modules(
-    manifest: AnnotationManifest | None,
-    module_names: list[str] | None,
-) -> list[dict[str, str]]:
-    """Modules the run could not assess, with the reason preserved for the report.
+def build_module_exclusions(manifest: Optional[AnnotationManifest]) -> list[dict]:
+    """One row per module the run was asked for and did not annotate, with the engine's reason.
 
-    A skipped rsID-only module on an ID-less VCF is not a zero-result module. Failed modules have the
-    same reporting requirement: the annotation loop intentionally isolates one module's failure, so
-    the downstream report must not turn that isolation into silence.
+    The engine records these on the manifest (`skipped_modules` / `failed_modules`) and both CLIs
+    print them, but the HTML report used to render only what succeeded — so a selected module that
+    failed left no trace a reader could see. The run itself still succeeds by design (one module's
+    failure must not cost the others), which makes the report the only place a reader would ever
+    find out, and its silence read as "this module found nothing" rather than "this module was
+    never read".
+
+    The two kinds are held apart because they mean different things. *Skipped* is a statement about
+    the module — its lead table carries no per-variant key, so there is nothing to join and no
+    amount of retrying changes that. *Failed* is a statement about this run — an unreadable path, a
+    schema clash — and is usually worth acting on.
     """
     if manifest is None:
         return []
-
-    outcomes = {
-        name: {"status": "Not assessed", "reason": reason}
-        for name, reason in manifest.skipped_modules.items()
-    }
-    outcomes.update(
-        {
-            name: {"status": "Annotation failed", "reason": reason}
-            for name, reason in manifest.failed_modules.items()
-        }
-    )
-    ordered_names = module_names or [
-        *manifest.skipped_modules.keys(),
-        *manifest.failed_modules.keys(),
-    ]
-    return [
-        {
-            "module_name": name,
-            "display_name": get_module_display_name(name),
-            **outcomes[name],
-        }
-        for name in ordered_names
-        if name in outcomes
-    ]
+    rows: list[dict] = []
+    for name, reason in sorted(manifest.skipped_modules.items()):
+        rows.append(
+            {
+                "name": name,
+                "display_name": get_module_display_name(name),
+                "kind": "skipped",
+                "reason": reason,
+            }
+        )
+    for name, reason in sorted(manifest.failed_modules.items()):
+        rows.append(
+            {
+                "name": name,
+                "display_name": get_module_display_name(name),
+                "kind": "failed",
+                "reason": reason,
+            }
+        )
+    return rows
 
 
 def build_module_provenance(
@@ -1315,14 +1345,10 @@ def generate_longevity_report(
     with start_action(action_type="generate_longevity_report", modules_dir=str(modules_dir)):
         # Discover module infos
         module_infos = discover_hf_modules()
-        run_manifest = _annotation_manifest(modules_dir)
-        module_outputs = (
-            {m.module: m for m in run_manifest.modules}
-            if run_manifest is not None
-            else {}
-        )
+        manifest = _read_annotation_manifest(modules_dir)
+        module_outputs = {m.module: m for m in manifest.modules} if manifest else {}
+        module_exclusions = build_module_exclusions(manifest)
         lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
-        unavailable_modules = _unavailable_modules(run_manifest, module_names)
 
         # Find available parquet files
         available_modules: list[str] = []
@@ -1332,10 +1358,10 @@ def generate_longevity_report(
                 # When a manifest exists it is the authority for *this run*. A parquet left by an
                 # earlier run must not override a current skipped/failed outcome and leak stale rows
                 # into the report.
-                produced_this_run = run_manifest is None or name in module_outputs
+                produced_this_run = manifest is None or name in module_outputs
                 if produced_this_run and parquet_path.exists():
                     available_modules.append(name)
-        elif run_manifest is not None:
+        elif manifest is not None:
             available_modules = [
                 name
                 for name in module_outputs
@@ -1346,11 +1372,13 @@ def generate_longevity_report(
                 mod_name = parquet_file.stem.replace("_weights", "")
                 available_modules.append(mod_name)
 
+        # A module the run could not read is still a module this report is about: it gets a row in
+        # "Modules not read", and a single-module run that was skipped must not fall back to the
+        # generic multi-module heading as though nothing had been selected.
         reported_modules = list(available_modules)
-        for outcome in unavailable_modules:
-            name = outcome["module_name"]
-            if name not in reported_modules:
-                reported_modules.append(name)
+        for excluded in module_exclusions:
+            if excluded["name"] not in reported_modules:
+                reported_modules.append(excluded["name"])
 
         # Build report data for each module
         longevity_data: Optional[dict] = None
@@ -1405,9 +1433,9 @@ def generate_longevity_report(
             longevity=longevity_data,
             other_modules=other_modules_data,
             pgx_modules=pgx_modules_data,
-            unavailable_modules=unavailable_modules,
             credits=credits,
             module_provenance=module_provenance,
+            module_exclusions=module_exclusions,
             module_display_names=MODULE_DISPLAY_NAMES,
             umami_script_tag=umami_script_tag(),
         )

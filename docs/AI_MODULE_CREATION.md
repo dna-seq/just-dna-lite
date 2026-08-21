@@ -225,11 +225,27 @@ uv run pipelines module list-custom
 uv run pipelines module compile data/module_specs/my_panel/ -o data/output/modules/my_panel/
 ```
 
+### `register` vs `register-compiled`
+
+`register` takes a **spec** directory and compiles it. `register-compiled` takes an
+**already-compiled** module directory and wires it into discovery without recompiling:
+
+```bash
+uv run pipelines module register-compiled path/to/compiled_module/ [--name NAME]
+```
+
+Use the second one to try a module against your own VCF before publishing it. Recompiling produces
+a fresh `artifact.digest`, so `register` would have you annotate with an artifact other than the one
+you built and meant to test. Neither command verifies anything — see
+[MODULE_MARKETPLACE_SPEC.md](MODULE_MARKETPLACE_SPEC.md) on verify-then-install, which is specified
+and not implemented.
+
 ### What happens on `register`
 
 1. Validates the spec (Pydantic models, CSV rows, cross-row checks)
-2. Compiles to parquet in `data/output/modules/<module_name>/`
-3. Ensures a local collection source for `data/output/modules/` exists in `modules.yaml`
+2. Compiles to parquet in `get_registered_modules_dir()` — `data/interim/registered_modules/<module_name>/`
+   (this doc said `data/output/modules/` until 2026-08-21; the code has never written there)
+3. Ensures a local collection source for that directory exists in `modules.yaml`
 4. Adds display metadata (title, description, icon, color) from `module_spec.yaml` to `modules.yaml`
 5. Refreshes in-memory module discovery (`MODULE_INFOS`, `DISCOVERED_MODULES`)
 6. Module is immediately selectable in the web UI and CLI without restart

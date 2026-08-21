@@ -40,6 +40,10 @@ from just_dna_pipelines.v1_port.sources import display_meta
 
 MODULE_NAME = "pharmgkb"
 
+#: The Gen-I repo this module supersedes. It ships no curated data we read (the rows come
+#: from the ClinPGx snapshot), but it does ship the logo the ported module carries.
+GEN1_REPO = "just_drugs"
+
 #: Evidence floor. ClinPGx grades 1A > 1B > 2A > 2B > 3 > 4; this keeps the four replicated tiers.
 MIN_EVIDENCE_LEVEL = "2B"
 

@@ -89,7 +89,7 @@ def port_module(
 
     # Ship the source repo's logo alongside the artifacts — auto-discovered by hf_modules and
     # uploaded by both publish paths. Optional: modules without a source logo (e.g. vo2max) skip it.
-    logo = fetch_logo(module, out_dir)
+    logo = fetch_logo(module.repo, module.name, out_dir)
     if logo is not None:
         warnings.append(f"shipped source logo {logo.name}")
 

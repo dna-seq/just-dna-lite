@@ -342,12 +342,43 @@ field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actu
   one change upstream asks a consumer to make rather than making itself). `hf_modules._attested_files`
   reads the manifest where the source publishes one; `_find_lead_table` consults that list, and
   `_probe_module_at_path` uses it for the three side parquets. **Falls back to probing when there is no
-  manifest, which is every module on HuggingFace today**, and returns `None` rather than an empty set
-  for exactly that reason — an empty set would read as "this module contains nothing". Why it matters:
+  manifest**, and returns `None` rather than an empty set for exactly that reason — an empty set would
+  read as "this module contains nothing". *(That fallback used to be the only live path: this file
+  said "which is every module on HuggingFace today". Measured 2026-08-21 — **all ten modules in
+  `just-dna-seq/annotators` now publish a `manifest.json`**, so attestation is the normal path and
+  probing is the exception. Keep the fallback: a source we have not seen may still publish none.)* Why it matters:
   the publisher's `upload_folder` adds and replaces but **never removes**, so a module whose table set
   *shrank* between releases leaves the previous release's parquet at the path, and a probe reads the
   module as the wrong **kind** (a re-authored PGx module still looks like a SNP core). `logo` and
   `metadata` keep probing — neither is in `ARTIFACT_PARQUETS`, so no manifest says anything about them.
+
+  **A *partial* manifest is strictly worse than no manifest, and the two surfaces disagree about it.**
+  Attestation wins where a manifest is readable, so one whose `artifact.files` omits the lead parquet
+  makes the module **invisible** to discovery — while `list-custom`, which probes the filesystem
+  through `module_config.has_lead_table`, still lists it, and neither says why. No manifest at all
+  falls back to probing and works. Reported by just-module-creator, 2026-08-21.
+
+  **Discovery reads the whole manifest, not just the file list.** `_remote_manifest` returns it and
+  `_attested_names` projects the file set out (`_attested_files` is now a delegation kept for callers
+  that want only the names). `_probe_module_at_path` also keeps `identity.version`, `artifact.digest`
+  and the `weighting` block on `ModuleInfo` as `manifest_version` / `manifest_digest` /
+  `manifest_weighting`, which is what `read_module_provenance` falls back to when there is no local
+  `manifest.json`. Before that, every HF-discovered module rendered *Not stated* for data the same
+  function had already fetched and thrown away. All three stay tri-state, and a local manifest still
+  wins wherever it speaks. **This is not a latent fix — measured on the live source, all ten HF
+  modules state an `artifact.digest` and none of them has a local directory, so before it every
+  remotely-discovered module rendered *Not stated* in the report's "Modules in this report" table
+  and now every one states its digest.** `identity.version` and `weighting` are still absent on all
+  ten (the HF publisher does not stamp identity, and none authors a weighting block), so those stay
+  *Not stated* — correctly.
+
+  **Anything discovery calls must be defined above `MODULE_INFOS = discover_hf_modules()`**, which
+  runs at import. `discover_modules_from_source` catches per-source failures and logs them, so a
+  `NameError` from a helper defined later in the file does not raise — it makes **every** source fail
+  and discovery return nothing, with the reason only in the eliot log. That is why
+  `_weighting_summary` sits beside `_probe_module_at_path` rather than beside
+  `read_module_provenance`, and why `tests/test_consumer_handoff.py` probes a real directory over
+  `LocalFileSystem`: the tests that caught it all needed the network.
 - **`ARTIFACT_PARQUETS` and `LEAD_PARQUETS` are public now (S35); import them, never re-list them.**
   `_OUTPUT_FILES` is **gone** — that import was the one hard break in the upgrade. Two hand-kept lists
   here were deleted rather than updated: the HuggingFace publisher's allowlist named six side tables
@@ -443,21 +474,38 @@ on `EnrichmentResult.clin_sig_not_checked`, so an empty conflict list is no long
 
 All five are filed upstream in `/data/sources/just-dna-format/docs/ROADMAP.md`.
 
-**Resolution is scoped to `variants.csv`, so a 0.4-family table joins by rsID only.** The compiler
-materializes `pharm_variants` / `haplotypes` / `heteroplasmy` verbatim from their authored CSV and
-applies `resolution.csv` to `weights.parquet` alone — so an rsid-authored PGx module compiles clean,
-validates, publishes, and carries a null `chrom`/`start` on every row. Compiler **0.5.3** makes this
-visible rather than silent (`_check_positional_joinability`, a warning in both plain and `--strict`,
-naming how many rows are unplaced *and* how many `resolution.csv` could place); it does **not** fill
-them. Materializing the coordinate breaks Principle 7 — `reverse_module` would read it back as
-authored — so the fix waits on RM43 and a `0.4`-family equivalent of `VariantRow.authored_ident`.
+**Resolution WAS scoped to `variants.csv`; RM43 shipped in 0.6 and this repo's docs did not notice
+until 2026-08-21.** Through 0.5 the compiler materialized `pharm_variants` / `haplotypes` /
+`heteroplasmy` verbatim from their authored CSV and applied `resolution.csv` to `weights.parquet`
+alone, so an rsid-authored PGx module compiled clean, validated, published, and carried a null
+`chrom`/`start` on every row; compiler 0.5.3 made that visible with `_check_positional_joinability`
+rather than filling it. **Since format 0.6 the compiler joins `resolution.csv` onto those three
+families too**, and `manifest.compilation.positional_rows` / `positional_rows_placed` state how many
+rows it placed (`None` means *not counted*, never `0`). So a 0.6-compiled PGx module qualifies for
+the position join, and the previous sentence in this file — "the fix waits on RM43" — was stale from
+0.6 onward. Reported by just-module-creator, 2026-08-20; verified against the installed compiler
+0.6.1 (`compiler.py:499`).
+
+**Both generations are live, so classify by value and never by family name.** The shipped
+`pharmgkb` in `data/interim/v1_port/` is a 0.5 artifact: measured **0 of 1482 rows placed**, `chrom`
+null throughout. `_lead_join_strategy` probes the values, so it routes that module to rsid and a
+recompiled one to position with no code change — which is why no `positional_rows` gate belongs in
+`hf_logic`. That branch has never run on this family; recompiling `pharmgkb` under 0.6 is what would
+exercise it.
 
 Two consequences live here. `hf_logic.annotate_vcf_with_module_weights` detects the null-coordinate
 case and downgrades a position join to **rsid + genotype**, because the alternative is annotating
-nothing at all; a VCF with no rsIDs in `ID` (DeepVariant output among them) therefore matches such a
-module on nothing, and the engine now says so (`step="vcf_has_no_rsids"`) rather than reporting a
-silent zero. And registry **0.11.3** reads the same warning to make `trusted` three-valued, so
-`pharmgkb` publishes as `trusted: false` — correct, not a defect to work around.
+nothing at all. A VCF with no rsIDs in `ID` (DeepVariant output among them) then matches such a
+module on nothing — and that pairing is **unassessable, not a zero**: the sample may well carry the
+variant at its coordinate while the callset simply omits the dbSNP identifier. So the engine raises
+`UnsupportedLeadTable` (logging `step="vcf_has_no_rsids"`) *before* writing a parquet, rather than
+sinking an empty one. The module lands in `manifest.skipped_modules` and the report renders it under
+**Modules not read in this run** with the reason, which is the only place a reader would otherwise
+have learned anything: a run whose every other module succeeded reports success, and an absent
+section reads as "this module found nothing in you". Note the second cause this gives a *skip* —
+until now a skip meant the module carried no per-variant key, and now it can also mean the sample
+carries none the module can use. And registry **0.11.3** reads the same warning to make `trusted`
+three-valued, so `pharmgkb` publishes as `trusted: false` — correct, not a defect to work around.
 
 ### The annotating engine's side of the contract (`hf_logic.py`)
 
@@ -481,7 +529,12 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
   (`AuthoredModel._validate_genotype`: "phase encodes which allele sits on which homolog"), so
   sorting folds `A|G` and `G|A` into one key and manufactures a match the module never stated. The
   first version of this function sorted, and no test in the corpus could have caught it — nothing we
-  ship carries a phased genotype. `report_logic._genotype_alleles` is the Python twin and now
+  ship carries a phased genotype. **The rule this leaves standing, and the one it costs:** the VCF
+  side *does* sort, unconditionally (`io._compute_genotype_expr`), so an authored genotype held in
+  homolog order rather than sorted order matches in neither ordering, silently. Not sorting here is
+  still right — sorting would manufacture matches — so the answer is to say so, which
+  `_unmatchable_phased_rows` does before normalization strips the `|` that reveals it
+  (`step="phased_rows_cannot_match"`). Raised by just-module-creator, 2026-08-20. `report_logic._genotype_alleles` is the Python twin and now
   **delegates to `just_dna_format.alleles.split_genotype`** (0.6, S30) rather than reimplementing the
   rule — it had the mirror-image bug, splitting on `/` only so a phased cell read as one allele. This
   expression cannot call the leaf (a Python call per row over millions of VCF rows), so the two are held
@@ -509,10 +562,31 @@ dropped here. Three rules it does enforce, each with a failure it exists to prev
   (`rs123;rs456`), and the authored side names exactly one variant per row, so the split is the
   consumer's job (just-dna-format RM64). `_vcf_rsid_join_keys` explodes into `_rsid_join_key`, which
   is dropped after the join so the output keeps the record's ID verbatim.
+- **A local module's URL is a bare path, never a `file:` URI** (`hf_modules._build_url`). Building
+  one by concatenation is only accidentally correct: a POSIX path opens with `/`, so `file://` + it
+  is `file:///data/…` with an empty authority, while a Windows path opens with a drive letter, so
+  `file://C:/Users/…` parses `C:` as the **hostname** and polars refuses it before touching the disk
+  (`failed to create CloudLocation: unsupported: non-empty hostname for 'file:' URI: 'C:'`). Every
+  registry install and local compile was therefore unannotatable on Windows while still being
+  discovered and listed, so the run went green with the module missing from the report. Polars reads
+  a native path on both platforms. Ask **`local_module_path` / `is_local_module_url`** whether bytes
+  are on this machine — `startswith("/")` is False for every Windows path, which is how three call
+  sites (the two logo surfaces and the source list) came to treat a local module as a remote one.
+  A legacy `file://` URL still resolves, since artifacts written before the fix carry one.
+  Tests: `just-dna-pipelines/tests/test_local_module_urls.py`, which pins the Windows case on any
+  platform because every function involved is pure string/path work.
 
 `AnnotationManifest` records `output_dir`, per-module `lead_table`, and `skipped_modules` /
 `failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
 there when every module was skipped.
+
+**Both are rendered — the report's "Modules not read in this run" section.** The engine catches per
+module so one failure cannot cost the others, which means the run reports success and the report is
+the only place a reader can learn that a module they selected contributed nothing; rendering only
+what succeeded made that silence read as *this module found nothing in you*. `build_module_exclusions`
+(`report_logic.py`) keeps the two kinds apart because they mean different things: **skipped** is
+about the module (no per-variant key — retrying changes nothing), **failed** is about this run (an
+unreadable path, a schema clash) and is usually actionable. The engine's reason travels verbatim.
 
 **A run also records which module *bytes* produced it** — `ModuleOutputMapping.version` / `digest` /
 `source_url`, filled by `read_module_provenance` (`hf_modules.py`) and rendered as the report's
@@ -752,6 +826,34 @@ naming one custom module, **every built-in module silently lost its display meta
 and in every spec a port wrote. Keep the merge; `save_config` patches only those two keys for the
 same reason.
 
+**A broken working copy is recovered from; a broken *default* is not, and the asymmetry is the
+point.** `_load_config()` runs at module scope (`MODULES_CONFIG`) and every Dagster asset module
+imports it transitively, so anything it raises surfaces as `Error loading repository location
+definitions.py` — a warning that carries **no traceback**, with the real stack only in the code
+server's stdout. Both halves of the file used to be read with a bare `yaml.safe_load` and validated
+unguarded, so malformed YAML (`ScannerError`) or a well-formed file that breaks the schema
+(`quality_filters.min_depth: "ten"` → pydantic `ValidationError`) took the whole pipeline down. The
+working copy is gitignored and rewritten at runtime by register/unregister, so a bad one is a
+runtime accident: `_read_yaml_tolerant` returns the reason instead of raising, the load falls back
+to the shipped defaults, and `_warn_unusable_working_copy` reports it on **both** channels — eliot
+for structure and a `UserWarning` for visibility, because an eliot message lands in a log nobody
+opens while the symptom the operator sees is that bare location error. The repo-root default keeps
+the raising `_read_yaml`: it is git-tracked, so a bad one is a build error, and recovering would
+hand back an empty `ModulesConfig()` — zero sources, zero modules discovered, an app that looks
+healthy while annotating nothing. `save_config` has the same guard on the read side and **moves an
+unparseable working copy to `modules.yaml.corrupt` rather than overwriting it** — those bytes are the only record of whatever
+registrations it held (a second corruption overwrites that backup — one deterministic name,
+deliberately). **`module_registry` reads the same file and needed the same guard**: `register_custom_module`,
+`unregister_custom_module` and `register_compiled_module` each read the working copy *alone* (not
+merged — `save_config` writes the result straight back, so the merged mapping would bake every
+shipped default into the copy), and all three used a bare `safe_load` + `model_validate`. They now
+go through `module_config.read_config_for_update`, which returns `None` for "absent or unusable" so
+each keeps its own fallback and the write repairs the file. Guarding `_load_config` alone would only
+have moved the crash from import time to the next register. Tests: `just-dna-pipelines/tests/test_modules_yaml_recovery.py`, which
+derives its baseline by running the loader with no working copy rather than reading `modules.yaml`,
+since `_drop_project_runtime_sources` strips the two repo-local absolute sources whenever
+`JUST_DNA_PIPELINES_OUTPUT_DIR` is set — which another test module's `load_env()` does session-wide.
+
 ### Working agreement: propose shared changes via the format repo's docs (don't manage that repo)
 
 When you find something that belongs in the shared schema/compiler (a bug, a missing field, a
@@ -767,6 +869,57 @@ owners pick it up as needed:
 Writing the note is the whole job on that side — do not follow it up with commits or PRs there.
 
 ---
+
+## Module Registry Stores (`registries:` in modules.yaml)
+
+The Catalog talks to **one registry server at a time**, chosen in the store selector above the
+Browse/Publication tabs. Two are shipped:
+
+| key | URL | `/api/v1/version` `mode` | token variable |
+|-----|-----|--------------------------|----------------|
+| `prod` | `https://module-registry.just-dna.life` | `prod` | `REGISTRY_TOKEN` |
+| `polygon` | `https://module-polygon.just-dna.life` | `test` | `REGISTRY_TOKEN_POLYGON` |
+
+`polygon` is the testing ground (the workshop runbook in `docs/workshops/crabs-2026.md` sends
+participants there to rehearse a claim + publish). Both currently answer registry 0.18.2 /
+format 0.6.1 / compiler 0.6.1, so the contract guard is satisfied on either.
+
+- **`RegistryStore` in `module_config.py` is the model; `modules.yaml` is the list.** Never hardcode
+  a registry URL in Python or in a component — use `get_registry_stores()` / `get_registry_store()`
+  / `default_registry_store()`. Adding a self-hosted server is one YAML entry.
+- **`$REGISTRY_URL` still decides which store opens**, because the bundled client, `pipelines
+  registry`, `registry_org_cli` and `scripts/registry_precheck.py` all read it — a checkout wired
+  to one server must not browse another. A URL that matches no configured store joins the list as
+  its own store (key `env`) rather than replacing them, so the test ground stays one click away.
+- **`registries` is merged over the defaults by `key`**, like `sources` is by url. `save_config`
+  seeds the working copy from the repo default, so without the merge a working copy written today
+  would pin today's store list forever and a store added later would be invisible.
+- **The account is per server, and so is its token.** `registry_identity.json` holds one slot per
+  store under `stores` plus a shared machine-local `install_id`; a flat pre-store file migrates
+  into the default store's slot on first read and its top-level profile keys are dropped (two
+  copies of a bearer token that no store owns is worse than none). `RegistryState._client_args()`
+  is the single choke point every `RegistryClient` call goes through, and
+  `_reset_for_store_switch()` clears catalog, selection, account and publish/precheck vars before
+  the switch reloads — a leftover account from the previous server is the failure this prevents.
+- **Never mirror a token into a shared variable.** `set_env_var` writes to the *selected store's*
+  `token_env`. A test server's token in `REGISTRY_TOKEN` breaks publishing in a way that does not
+  read as auth at all: the public server answers `403 insufficient_capability`, which looks like a
+  namespace-permissions bug. (`REGISTRY_TOKEN_SANDBOX` is unrelated — it is the `sandbox`
+  *namespace on prod*, not polygon's key.)
+- **And never read one back.** `_ensure_identity` takes the token from the store's slot only —
+  `$REGISTRY_TOKEN` is the CLI's publishing credential, so honouring it would sign the UI in as
+  that account with no user action, and `_refresh_account` persists whatever it finds, leaving a
+  second copy that shadows `.env` on every later read. Mirroring out is one-way on purpose.
+- **Known limitation: an install is not keyed by store.** A downloaded module lands at
+  `CUSTOM_MODULES_DIR/{namespace}__{name}` whichever server it came from, so the same
+  namespace/name from prod and from polygon overwrite each other. Left as is — namespaces are
+  claimed per server and a real collision needs the same handle on both.
+- **Store selection is per session, not persisted.** The store decides where a publish lands, and a
+  sticky "polygon" from last week is exactly the setting nobody thinks to check. It defaults to
+  `$REGISTRY_URL`'s store on every page load.
+
+Tests: `tests/test_registry_stores.py` (config parse, working-copy merge, `$REGISTRY_URL`
+resolution, identity migration, `_client_args` routing, switch reset). All network-free.
 
 ## Immutable (Public Demo) Mode
 

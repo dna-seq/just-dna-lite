@@ -239,7 +239,12 @@ async def download_agent_spec_zip(spec_name: str, v: int = 0) -> StreamingRespon
         raise HTTPException(status_code=404, detail=f"Spec not found: {spec_name}/v{v} (looked at {spec_dir})")
 
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(
+        buf,
+        "w",
+        zipfile.ZIP_DEFLATED,
+        strict_timestamps=False,
+    ) as zf:
         for f in sorted(spec_dir.iterdir()):
             if f.is_file() and f.suffix != ".parquet":
                 zf.write(f, f.name)
@@ -264,7 +269,12 @@ async def download_module_zip(module_name: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail=f"Module not found: {module_name} (looked at {module_dir})")
 
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(
+        buf,
+        "w",
+        zipfile.ZIP_DEFLATED,
+        strict_timestamps=False,
+    ) as zf:
         for f in sorted(module_dir.rglob("*")):
             if f.is_file() and f.suffix != ".parquet":
                 zf.write(f, f.relative_to(module_dir).as_posix())
@@ -359,17 +369,19 @@ async def serve_module_logo(module_name: str) -> FileResponse:
     if ".." in module_name or "/" in module_name:
         raise HTTPException(status_code=400, detail="Invalid module name")
 
-    from just_dna_pipelines.annotation.hf_modules import MODULE_INFOS
+    from just_dna_pipelines.annotation.hf_modules import MODULE_INFOS, local_module_path
 
     info = MODULE_INFOS.get(module_name)
     if not info or not info.logo_url:
         raise HTTPException(status_code=404, detail=f"No logo for module: {module_name}")
 
-    logo_path_str = info.logo_url
-    if logo_path_str.startswith("file://"):
-        logo_path_str = logo_path_str[len("file://"):]
+    logo_path = local_module_path(info.logo_url)
+    if logo_path is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Logo for {module_name} is not on this filesystem: {info.logo_url}",
+        )
 
-    logo_path = Path(logo_path_str)
     if not logo_path.is_file():
         raise HTTPException(status_code=404, detail=f"Logo file not found: {module_name} (looked at {logo_path})")
 
