@@ -1,15 +1,15 @@
 # just-dna-lite Workshop — RoBioinfo 2026
 
 **Proposed for:** [RoBioinfo 2026](https://rsbi.ro/evenimente/robioinfo2026/), Timișoara, Romania, 13–15 May 2026  
-**Repository:** [github.com/dna-seq/just-dna-lite](https://github.com/dna-seq/just-dna-lite)  
-**Instructors:** Anton Kulaga (core developer, Institute of Biochemistry of the Romanian Academy — IBAR) and Livia Zaharia (HEALES — Healthy Life Extension Society)  
+**Repository:** [anonymous.4open.science/r/just-dna-lite](https://anonymous.4open.science/r/just-dna-lite)  
+**Instructors:** Anonymous Author (core developer, Anonymous Institution 2 — Anonymous Institution 2) and Anonymous Contributor F (HEALES — Healthy Life Extension Society)  
 **Format:** Hands-on workshop — **offline (in-person)** · adaptable for online/hybrid  
 **Duration:** 2 hours (120 minutes, including a 15-minute break). The first 15 minutes are an optional introduction — experienced participants can skip it, making the hands-on portion 105 minutes.  
 **Audience:** Bioinformaticians, computational biologists, wetlab researchers, longevity researchers, and biology students. For those with solid biology background but less exposure to genome file formats or quantitative genetics, the optional 15-minute introduction covers VCF structure and interpretation basics. No prior command-line experience is required — the web UI is the primary interface.  
 **Platforms:** Linux · macOS · Windows · Windows (WSL) — requires Python 3.13+ and [uv](https://github.com/astral-sh/uv)  
 **What to bring:** Own laptop with the software pre-installed (see [Setup Instructions](#setup-instructions)). The Ensembl cache (~14 GB) must be downloaded before the workshop — instructors will have USB sticks as a fallback.  
 **Internet:** Required during the session for the AI Module Creator (LLM API calls) and PGS Catalog queries. Annotation against pre-cached modules and Ensembl works offline.  
-**Demo genome:** Anton Kulaga's public genome on [Zenodo record 18370498](https://zenodo.org/records/18370498); Livia Zaharia's genome available as a second sample. Participants can also bring their own genomes as VCF files, however they must be hg38 and be full genomes or exomes.
+**Demo genome:** Anonymous Author's public genome on [Zenodo record 18370498](https://zenodo.org/records/18370498); Anonymous Contributor F's genome available as a second sample. Participants can also bring their own genomes as VCF files, however they must be hg38 and be full genomes or exomes.
 
 ---
 
@@ -42,13 +42,13 @@
 
 ## Workshop Description
 
-A hands-on session where participants annotate a real whole-genome file using [just-dna-lite](https://github.com/dna-seq/just-dna-lite), an open-source genome annotation tool that runs locally through a web interface. Whole-genome sequencing produces a VCF (Variant Call Format) file — a large table listing every position where the sample's DNA differs from the reference genome. In the workshop, participants take that file and work through the full annotation flow: upload a VCF, normalize it, run built-in annotation modules (with a focus on longevity), inspect flagged variants against Ensembl and ClinVar, compute a polygenic risk score from the PGS Catalog, and build a new annotation module from a published paper using the AI Module Creator — an LLM-based agent that reads a GWAS or pharmacogenomics article, extracts variants and effect directions, and produces a ready-to-use module. All outputs are exported as Parquet for downstream analysis. Everything runs on the participant's own machine.
+A hands-on session where participants annotate a real whole-genome file using [just-dna-lite](https://anonymous.4open.science/r/just-dna-lite), an open-source genome annotation tool that runs locally through a web interface. Whole-genome sequencing produces a VCF (Variant Call Format) file — a large table listing every position where the sample's DNA differs from the reference genome. In the workshop, participants take that file and work through the full annotation flow: upload a VCF, normalize it, run built-in annotation modules (with a focus on longevity), inspect flagged variants against Ensembl and ClinVar, compute a polygenic risk score from the PGS Catalog, and build a new annotation module from a published paper using the AI Module Creator — an LLM-based agent that reads a GWAS or pharmacogenomics article, extracts variants and effect directions, and produces a ready-to-use module. All outputs are exported as Parquet for downstream analysis. Everything runs on the participant's own machine.
 
 Each participant leaves with a working local installation, the annotated outputs, and practical experience with interpreting these results — including their limitations, particularly in the longevity space where effect sizes are small and replication is still catching up. The scope is research-oriented; the workshop does not cover clinical interpretation or diagnostic workflows.
 
 The workshop is useful across several participant profiles:
 
-- **People who have their own genome data** — whether from consumer whole-genome sequencing, a research study like ROGEN, or a collaborator — and want to actually explore and annotate it themselves
+- **People who have their own genome data** — whether from consumer whole-genome sequencing, a research study like Anonymous Consortium, or a collaborator — and want to actually explore and annotate it themselves
 - **Genomics and longevity researchers** who want a practical local workflow for variant annotation and polygenic scoring on their data
 - **Wetlab biologists, biochemists, and other adjacent scientists** who want hands-on familiarity with VCF files, variant annotation, and what polygenic scores look like in practice
 - **AI/ML researchers** interested in how LLM agents are applied in bioinformatics — the AI Module Creator segment is a concrete example of automated literature extraction and structured data generation
@@ -78,8 +78,8 @@ By the end of this workshop, participants will be able to:
 
 | Minutes | Segment | What happens |
 |---------|---------|--------------|
-| *OPTIONAL −15 – 0* | ***Intro to Genomics, Longevity, and Interpretation*** | *Anton presents: what a VCF file actually contains, why one genome produces millions of rows, how `just-dna-lite` converts it to Parquet for filtering and export. Brief orientation on longevity genetics (small effects, heterogeneous cohorts, survival bias) and on what heritability and PRS scores do and do not tell you. Meanwhile, Livia circulates to help participants who have setup or prerequisite issues (missing Ensembl cache, `.env` problems, install errors) so they are unblocked before the hands-on session starts. Full outline in [Optional 15 min](#optional-15-min-introduction-to-genomics-longevity-and-interpretation).* |
-| **min 0 – 10** | **Setup + VCF Upload** | Install check, upload Anton's (or Livia's) public VCF, watch the normalization job run. During upload, give a concise orientation to the file fields participants will actually use in the interface: chromosome/position, reference vs alternate allele, genotype, depth/quality, and why the app converts VCF to Parquet for filtering and export. |
+| *OPTIONAL −15 – 0* | ***Intro to Genomics, Longevity, and Interpretation*** | *Author A presents: what a VCF file actually contains, why one genome produces millions of rows, how `just-dna-lite` converts it to Parquet for filtering and export. Brief orientation on longevity genetics (small effects, heterogeneous cohorts, survival bias) and on what heritability and PRS scores do and do not tell you. Meanwhile, Contributor F circulates to help participants who have setup or prerequisite issues (missing Ensembl cache, `.env` problems, install errors) so they are unblocked before the hands-on session starts. Full outline in [Optional 15 min](#optional-15-min-introduction-to-genomics-longevity-and-interpretation).* |
+| **min 0 – 10** | **Setup + VCF Upload** | Install check, upload Author A's (or Contributor F's) public VCF, watch the normalization job run. During upload, give a concise orientation to the file fields participants will actually use in the interface: chromosome/position, reference vs alternate allele, genotype, depth/quality, and why the app converts VCF to Parquet for filtering and export. |
 | **min 10 – 30** | **Built-in Modules + Report** | Run all five built-in modules (`longevitymap`, `coronary`, `lipidmetabolism`, `superhuman`, `vo2max`). Open the generated PDF report. Start with the longevity module to anchor the workshop in the host lab's research context, then compare how different modules present protective, risk, and performance-associated variants. Trace one reported hit back to the underlying Parquet row and source study. |
 | **min 30 – 45** | **Ensembl Variant Annotation** | Enable the Ensembl annotation job. Sort and filter the annotated table by `clinical_significance` to surface pathogenic or likely-pathogenic calls. Discuss penetrance vs. flagging: how many variants does a typical healthy genome carry that are labelled "pathogenic" in ClinVar? Compare the demo genome against 1000G background counts. |
 | **min 45 – 60** | **Break** | Coffee break (in-person) or Q&A break (online). Instructors circulate to help participants who hit setup issues, fell behind, or want to discuss results from the first half. Remaining participants can revisit their outputs or start browsing papers for the AI Module Creator segment. |
@@ -148,7 +148,7 @@ genome_build: GRCh38
 Install [uv](https://github.com/astral-sh/uv), then:
 
 ```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
+git clone https://anonymous.4open.science/r/just-dna-lite.git
 cd just-dna-lite
 uv sync
 uv run start
@@ -174,7 +174,7 @@ To use the AI Module Creator, copy `.env.template` to `.env` and add a free Gemi
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
+git clone https://anonymous.4open.science/r/just-dna-lite.git
 cd just-dna-lite
 uv sync
 ```
@@ -212,11 +212,11 @@ uv run pipelines ensembl-setup --cache-dir /mnt/shared/just-dna-cache
 
 **USB stick distribution (offline workshops only):** Copy the completed `~/.cache/just-dna-pipelines/ensembl_variations/` folder onto FAT32/exFAT USB sticks (~14 GB each). After copying, verify integrity with `uv run pipelines verify-ensembl`. This fallback is **not** available for online workshops.
 
-### 3. Demo VCF — Anton Kulaga's public genome (~2–4 GB)
+### 3. Demo VCF — Anonymous Author's public genome (~2–4 GB)
 
 ```bash
-curl -L -o anton_kulaga.vcf \
-    "https://zenodo.org/records/18370498/files/antonkulaga.vcf?download=1"
+curl -L -o author_A.vcf \
+    "https://zenodo.org/records/18370498/files/author-A.vcf?download=1"
 ```
 
 Share via USB or a local HTTP server so participants don't all download simultaneously.
@@ -279,11 +279,11 @@ For advanced participants or if time allows:
 
 ## Instructor Notes
 
-- **Instructor split during optional intro:** Anton leads the presentation; Livia walks the room helping anyone with setup problems (missing Ensembl cache, broken `.env`, install errors). This way no one is blocked when the hands-on session starts at min 0 and the intro time is not wasted for participants who already have everything working.
+- **Instructor split during optional intro:** Author A leads the presentation; Contributor F walks the room helping anyone with setup problems (missing Ensembl cache, broken `.env`, install errors). This way no one is blocked when the hands-on session starts at min 0 and the intro time is not wasted for participants who already have everything working.
 
 - **Disclaimer first:** spend 2–3 minutes on what the numbers mean before participants see their first "pathogenic" flag. Key points: high heritability ≠ high penetrance; PRS is a rank, not a probability; most GWAS hits are tagging SNPs, not causal variants. Full explainer in [docs/SCIENCE_LITERACY.md](SCIENCE_LITERACY.md).
 
-- **Demo genomes:** Anton Kulaga's VCF from Zenodo is the primary shared sample so all participants see the same output during the walkthrough. Livia Zaharia's genome is available as a second demo sample (link to be provided before the conference). Participants can switch to their own VCF during hands-on time.
+- **Demo genomes:** Anonymous Author's VCF from Zenodo is the primary shared sample so all participants see the same output during the walkthrough. Anonymous Contributor F's genome is available as a second demo sample (link to be provided before the conference). Participants can switch to their own VCF during hands-on time.
 
 - **Article selection for AI Creator:** prepare a curated set of 3–5 open-access GWAS or pharmacogenomics papers with supplementary variant tables, all using GRCh38. Distribute as PDFs at the start of the workshop so participants who did not bring their own are not blocked. Aim for papers published after 2019 with 10–200 lead SNPs.
 

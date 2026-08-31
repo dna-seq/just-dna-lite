@@ -4,7 +4,7 @@ version = "0.2.5"
 description = "Genomic Database Management and Annotation Tool"
 readme = "README.md"
 authors = [
-    { name = "antonkulaga", email = "antonkulaga@gmail.com" }
+    { name = "author-A", email = "anonymous@example.org" }
 ]
 requires-python = ">=3.13"
 dependencies = [

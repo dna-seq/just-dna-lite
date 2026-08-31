@@ -4,7 +4,7 @@ This document maps every Generation-I (Gen I) Just-DNA-Seq annotation module to 
 the current (Gen II) `just-dna-format`, and lays out what's needed to reach full feature parity.
 
 Gen-I modules were OakVar *postaggregators*, one `just_*` repo per module in the
-[`dna-seq`](https://github.com/dna-seq) GitHub org, each shipping a small curated SQLite/TSV/txt data
+[`dna-seq`](https://anonymous.4open.science/r/dna-seq) GitHub org, each shipping a small curated SQLite/TSV/txt data
 file. Stage 1 (see `just_dna_pipelines.v1_port` and `data/interim/v1_port/`) reproducibly ports the
 variant-backed modules from that canonical source; this plan covers the rest.
 
@@ -21,7 +21,7 @@ just-dna-seq <name> <version> data/interim/v1_port/<name>`. The HuggingFace coll
 (`just-dna-seq/annotators`) is **legacy** and kept in sync via `pipelines v1-port publish <name>`.
 
 **All nine were published on 2026-07-09 and the registry has since been wiped** — `marketplace list`
-now returns only `eric-mods/lactose_tolerance`. So every module below needs republishing, not just
+now returns only `author-B/lactose_tolerance`. So every module below needs republishing, not just
 the rebuilt ones. The pre-wipe versions and changelogs are preserved in
 [MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) so the history stays continuous.
 

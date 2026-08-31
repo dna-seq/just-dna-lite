@@ -250,7 +250,7 @@ The DuckDB engine is tuned for out-of-core processing:
 
 ## Hugging Face Integration & Authentication
 
-The pipeline pulls reference data (like Ensembl shards) from Hugging Face Hub. This data is prepared and maintained using the [dna-seq/prepare-annotations](https://github.com/dna-seq/prepare-annotations) upstream repository.
+The pipeline pulls reference data (like Ensembl shards) from Hugging Face Hub. This data is prepared and maintained using the [dna-seq/prepare-annotations](https://anonymous.4open.science/r/prepare-annotations) upstream repository.
 
 ### Authentication
 If the dataset is private or you encounter rate limits, set your Hugging Face token:

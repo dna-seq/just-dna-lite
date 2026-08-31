@@ -1509,7 +1509,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         Map filenames to display names.
 
         Known public genomes (configured as default samples in modules.yaml)
-        show their curated label (e.g. "Livia Zaharia" instead of the
+        show their curated label (e.g. "Anonymous Contributor F" instead of the
         provider's anonymized filename). Otherwise Subject ID if available,
         otherwise the filename stem.
         """
@@ -2235,7 +2235,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
         # Drop the previous genome's rows and output lists immediately.
         # Annotations and reports live under {user}/{sample}/; leaving the
-        # old lists in place shows Oksana's files on Livia's remounted tabs.
+        # old lists in place shows Contributor G's files on Contributor F's remounted tabs.
         self._clear_vcf_preview()
         self._clear_sample_outputs()
         self.vcf_preview_loading = True

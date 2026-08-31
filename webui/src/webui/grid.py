@@ -70,7 +70,7 @@ def _artifact_key(
 
     ``cache_id`` is the state class name (``UploadState``), which is shared
     across every genome.  The source path must be part of the key or a sort
-    on Oksana is reused when the user switches to Livia.
+    on Contributor G is reused when the user switches to Contributor F.
     """
     return json.dumps(
         {

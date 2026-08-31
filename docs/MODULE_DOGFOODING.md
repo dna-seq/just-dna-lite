@@ -398,9 +398,9 @@ registry**. The production registry holds **8 modules across 5 namespaces**, and
 ours:
 
 ```
-antonkulaga/{aggression_anger_snps, big_five_personality_snps, bodybuilding, cognitive_intelligence}
-eric-mods/lactose_tolerance
-ksuha-dna/{placebo_response_claude, placebo_response_research}
+author-A/{aggression_anger_snps, big_five_personality_snps, bodybuilding, cognitive_intelligence}
+author-B/lactose_tolerance
+author-C/{placebo_response_claude, placebo_response_research}
 ```
 
 `registry_search(target="prod", query="coronary")` returns `total: 0`. `registry_is_published` on

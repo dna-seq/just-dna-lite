@@ -20,7 +20,7 @@ from webui.state import (
 
 
 def test_in_flight_compute_is_stale_after_genome_switch() -> None:
-    """Would have written Oksana's intelligence score onto Livia's tab."""
+    """Would have written Contributor G's intelligence score onto Contributor F's tab."""
     assert _prs_compute_belongs_to_current_genome(
         1, "/data/oksana/user_vcf_normalized.parquet",
         1, "/data/oksana/user_vcf_normalized.parquet",
@@ -66,7 +66,7 @@ def test_row_source_file_wins_over_state_source_file() -> None:
 
 
 def test_sorted_grid_artifact_is_per_file_not_per_state_class() -> None:
-    """Would have served Oksana's sorted view after switching to Livia."""
+    """Would have served Contributor G's sorted view after switching to Contributor F."""
     sort = [{"field": "pos", "sort": "asc"}]
     oksana = _artifact_key("UploadState", "/data/oksana.parquet", {}, sort)
     livia = _artifact_key("UploadState", "/data/livia.parquet", {}, sort)
@@ -141,12 +141,12 @@ def test_comparable_prs_samples_requires_same_species_genome_and_ready_parquet()
         "a.vcf.gz": {
             "species": "Homo sapiens",
             "reference_genome": "GRCh38",
-            "sample_name": "Anton",
+            "sample_name": "Author A",
         },
         "b.vcf.gz": {
             "species": "Homo sapiens",
             "reference_genome": "GRCh38",
-            "sample_name": "Livia",
+            "sample_name": "Contributor F",
         },
         "c.vcf.gz": {"species": "Mus musculus", "reference_genome": "GRCh38"},
         "d.vcf.gz": {"species": "Homo sapiens", "reference_genome": "GRCh37"},
@@ -161,18 +161,18 @@ def test_comparable_prs_samples_requires_same_species_genome_and_ready_parquet()
         files, "a.vcf.gz", meta, is_ready=lambda filename: filename in ready
     )
     assert [peer["filename"] for peer in peers] == ["b.vcf.gz"]
-    assert peers[0]["label"] == "Livia"
-    assert peers[0]["display_name"] == "Livia"
-    assert peers[0]["choice_label"] == "Livia (b.vcf.gz)"
+    assert peers[0]["label"] == "Contributor F"
+    assert peers[0]["display_name"] == "Contributor F"
+    assert peers[0]["choice_label"] == "Contributor F (b.vcf.gz)"
     named = comparable_prs_samples(
         files,
         "a.vcf.gz",
         meta,
         is_ready=lambda filename: filename in ready,
-        display_names={"b.vcf.gz": "Livia Zaharia"},
+        display_names={"b.vcf.gz": "Anonymous Contributor F"},
     )
-    assert named[0]["label"] == "Livia Zaharia"
-    assert named[0]["choice_label"] == "Livia Zaharia (b.vcf.gz)"
+    assert named[0]["label"] == "Anonymous Contributor F"
+    assert named[0]["choice_label"] == "Anonymous Contributor F (b.vcf.gz)"
     assert comparable_prs_samples(
         files, "a.vcf.gz", meta, is_ready=lambda _filename: False
     ) == []
@@ -181,10 +181,10 @@ def test_comparable_prs_samples_requires_same_species_genome_and_ready_parquet()
 def test_sample_choice_label_shows_name_and_filename() -> None:
     """Dropdown text keeps the VCF name when the left-panel label is different."""
     assert (
-        _sample_choice_label("Livia Zaharia", "SIMHIFQTILQ.hard-filtered.vcf.gz")
-        == "Livia Zaharia (SIMHIFQTILQ.hard-filtered.vcf.gz)"
+        _sample_choice_label("Anonymous Contributor F", "SIMHIFQTILQ.hard-filtered.vcf.gz")
+        == "Anonymous Contributor F (SIMHIFQTILQ.hard-filtered.vcf.gz)"
     )
-    assert _sample_choice_label("antonkulaga", "antonkulaga.vcf") == "antonkulaga.vcf"
+    assert _sample_choice_label("author-A", "author-A.vcf") == "author-A.vcf"
     assert _sample_choice_label("file.vcf", "file.vcf") == "file.vcf"
 
 

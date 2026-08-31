@@ -1,6 +1,6 @@
 # Review — PR #30: Completed-analysis actions & report redesign
 
-**Author:** ksuhaster · **Branch:** `codex/buttons-and-report` · **Base:** `main`
+**Author:** author-C-handle · **Branch:** `codex/buttons-and-report` · **Base:** `main`
 **Verdict: merged**, after four fixes pushed onto the branch. One of them was merge-blocking.
 
 Two independent changes in one PR:

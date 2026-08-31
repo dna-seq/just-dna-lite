@@ -2,9 +2,9 @@
 
 **Event:** CRABS 2026 (Computational Research Advances in Biomedical Sciences), Kyiv School of Economics, 16–23 August 2026
 **Slots:** Friday 21 August, ICU Event Hall
-**Instructors:** Livia Zaharia (IBIMA, Rostock University Medical Center) and Oksana Lobko (just-dna-seq open-source team)
+**Instructors:** Anonymous Contributor F (Anonymous Institution 1, Anonymous Institution 1) and Anonymous Contributor G (just-dna-seq open-source team)
 **Format:** In-person, hands-on, two parts on the same day
-**Repositories:** [just-dna-lite](https://github.com/dna-seq/just-dna-lite) · [just-dna-compiler](https://github.com/dna-seq/just-dna-compiler) · [dna-seq-claude-marketplace](https://github.com/dna-seq/dna-seq-claude-marketplace)
+**Repositories:** [just-dna-lite](https://anonymous.4open.science/r/just-dna-lite) · [just-dna-compiler](https://anonymous.4open.science/r/just-dna-compiler) · [dna-seq-claude-marketplace](https://anonymous.4open.science/r/dna-seq-claude-marketplace)
 
 | | Title | Time | Length |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Four things, and they reshape the session rather than extend it.
 
 **Part 2 is a different session, not a longer one.** RoBioinfo's AI Module Creator segment was a 25-minute demonstration of a button inside the web UI. Part 2 is now an authoring workflow in the participant's own AI coding agent, running `just-dna-compiler` and `just-dna-enricher` (both at 0.5.4), ending in a signed, published module. The web UI's Module Manager remains available as a fallback lane for participants who cannot get an agent working.
 
-**The registry is real and nearly empty.** `module-registry.just-dna.life` responds and currently holds exactly one module, `eric-mods/lactose_tolerance`. Participants who publish on Friday will be among the first. This is worth saying out loud in the room; it converts an exercise into a contribution.
+**The registry is real and nearly empty.** `module-registry.just-dna.life` responds and currently holds exactly one module, `author-B/lactose_tolerance`. Participants who publish on Friday will be among the first. This is worth saying out loud in the room; it converts an exercise into a contribution.
 
 **Reports are HTML, not PDF.** The RoBioinfo plan and the current README both say PDF. Only an HTML template exists (`annotation/templates/longevity_report.html.j2`). Corrected throughout below.
 
@@ -62,7 +62,7 @@ By the end, participants can:
 
 | Minutes | Clock | Segment | What happens |
 |---|---|---|---|
-| 0–10 | 12:30 | Load a genome | Confirm `uv run start` works. Load a sample: participant's own VCF, or Livia's or Anton's public Zenodo genome. Watch the normalisation job run. While it runs, orient the room on the fields that matter: chromosome, position, reference versus alternate allele, genotype, depth, quality. |
+| 0–10 | 12:30 | Load a genome | Confirm `uv run start` works. Load a sample: participant's own VCF, or Contributor F's or Author A's public Zenodo genome. Watch the normalisation job run. While it runs, orient the room on the fields that matter: chromosome, position, reference versus alternate allele, genotype, depth, quality. |
 | 10–15 | 12:40 | What filtering removed | Read the quality-filter banner. `PASS`/`.` filter values, depth ≥ 10, quality ≥ 20. Explain why gVCF reference blocks are dropped and why that is correct rather than data loss. |
 | 15–35 | 12:45 | Modules and report | Select all ten modules, run, open the HTML report. Start with `longevitymap` to anchor the session in the host programme's ageing focus, then compare how a curated module (`superhuman`) and a ClinVar panel (`pathogenic`) present findings differently. |
 | 35–50 | 13:05 | Interrogate one hit | Pick a single reported variant. Find its row in the annotated Parquet. Read its `state`, `weight`, `direction`, and the study behind it. Then look the same rsID up against live Ensembl and ClinVar through the `ensembl` plugin and compare. The gap between "a module flagged this" and "the literature says this" is the point of the segment. |
@@ -178,7 +178,7 @@ Only Claude Code can install `just-module-creator` as a plugin. The Codex catalo
 uv python install 3.13
 
 # 2. Clone and install
-git clone https://github.com/dna-seq/just-dna-lite.git
+git clone https://anonymous.4open.science/r/just-dna-lite.git
 cd just-dna-lite
 uv sync
 
@@ -206,7 +206,7 @@ There is no large download this year. If you attended a previous just-dna-seq wo
 |---|---|---|
 | Venue Wi-Fi cannot serve 30 people hitting Ensembl and PyPI | Medium | USB sticks with genomes and a local wheel cache. `JMC_OFFLINE=true` for the module creator. Reference examples work fully offline. |
 | Participants arrive with nothing installed | High | Sunday's software setup clinic (16.08, 12:00–13:00) is the natural place to catch this. Ask the organizers to add just-dna-lite to its tool list. |
-| Agent lanes fragment the room | Medium | CLI lane is the declared fallback from minute one, not a rescue. Oksana takes the non-Claude lanes. |
+| Agent lanes fragment the room | Medium | CLI lane is the declared fallback from minute one, not a rescue. Contributor G takes the non-Claude lanes. |
 | Part 2 runs long | Medium | Publishing (105–120) is the compressible segment. Compiling locally is the real deliverable; publishing is the flourish. |
 | A participant's own VCF is GRCh37 or a microarray export | Medium | Public genomes ready to swap in. Do not attempt liftover in the room. |
 

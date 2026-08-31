@@ -1,12 +1,12 @@
-# Annotation pipeline against Anton Kulaga's genome — run report and defects
+# Annotation pipeline against Anonymous Author's genome — run report and defects
 
 **Date:** 2026-08-16 · **Branch:** `ui-store` (working tree, 0.5-contract changes uncommitted)
-**Sample:** `antonkulaga.vcf` (Zenodo 18370498, CC-Zero) — DeepVariant 1.1.0, GRCh38, Ensembl contig
+**Sample:** `author-A.vcf` (Zenodo 18370498, CC-Zero) — DeepVariant 1.1.0, GRCh38, Ensembl contig
 naming (`1`…`22`, `X`, `Y`, `MT`), **variant-only** (no gVCF reference blocks), **no rsIDs in `ID`**.
-**Job:** `annotate_and_report_job`, all 12 discovered modules, partition `anonymous/antonkulaga`.
+**Job:** `annotate_and_report_job`, all 12 discovered modules, partition `anonymous/author-A`.
 **Result:** success in 2m13s (normalize 25.6s, annotate 59.0s, report 48.1s; peak 500 MB, 147% CPU).
 
-Outputs: `/data/just-dna-lite/output/users/anonymous/antonkulaga/`
+Outputs: `/data/just-dna-lite/output/users/anonymous/author-A/`
 (`user_vcf_normalized.parquet`, `modules/*_weights.parquet`, `reports/longevity_report_20260816_024256.html`).
 
 ---
@@ -106,7 +106,7 @@ unreachable in production.
 ### D3 — "No annotated variants found" where the true reason is "this VCF cannot match"
 
 `pharmgkb` is `pharm_variants`-led with null coordinates, so the engine correctly downgrades to an
-rsid join. Anton's DeepVariant VCF carries **0 rsIDs across 4,257,537 records**, so no variant *can*
+rsid join. Author A's DeepVariant VCF carries **0 rsIDs across 4,257,537 records**, so no variant *can*
 match. The engine detects this (`step="vcf_has_no_rsids"`) but:
 
 - the diagnostic goes nowhere (D2);
@@ -150,7 +150,7 @@ Authored genotype coverage per site, by module:
 | cardio | 115060 | 539 | 57465 | 56926 | 51988 | 656 (1%) |
 | coronary / lipidmetabolism / vo2max / thrombophilia | — | balanced | | | | 0 |
 
-Anton is homozygous for the alternate allele at **74 longevitymap sites the module covers**, and
+Author A is homozygous for the alternate allele at **74 longevitymap sites the module covers**, and
 every one is silently unreported. Concrete cases: `rs9899404` (17:48976466, he is C/C — module
 authors T/T and C/T only), `rs15606`, `rs1205035`, `rs10190125`. The four hand-curated modules
 (coronary, lipidmetabolism, vo2max, thrombophilia) are perfectly balanced, so this is a property of
@@ -159,7 +159,7 @@ the Gen-I port, not of the format.
 Related and structural: **193 of longevitymap's 1039 rows (19%) author a hom-ref genotype**, which
 can never match anything. A variant-only VCF emits no record at a hom-ref site, and in a gVCF the
 `RefCall` block is dropped by `pass_filters` (documented as intentional). `eric_mods__lactose_tolerance`
-is the pure case — it authors a `G/G` "lactase non-persistence" row for rs4988235, Anton has **no
+is the pure case — it authors a `G/G` "lactase non-persistence" row for rs4988235, Author A has **no
 record at all** at 2:135851076, and the module reports nothing rather than "you are G/G, non-persistent".
 That is the most common lactose-intolerance result and the module cannot deliver it.
 
@@ -313,8 +313,8 @@ nowhere too), **D3** (pharmgkb's "cannot be tested" reason not on the manifest o
 ## Reproducing
 
 The VCF was hard-linked into the input dir as
-`/data/just-dna-lite/input/users/anonymous/antonkulaga.vcf` (source:
-`/data/just-dna-lite/just-prs/genomes/antonkulaga.vcf`), the partition `anonymous/antonkulaga`
+`/data/just-dna-lite/input/users/anonymous/author-A.vcf` (source:
+`/data/just-dna-lite/just-prs/genomes/author-A.vcf`), the partition `anonymous/author-A`
 registered, and `annotate_and_report_job` executed with `execute_in_process` under the repo's
 `DAGSTER_HOME` (`data/interim/dagster`) — the same run config `webui.state.run_hf_annotation`
 builds, so this is the app's code path minus the compute-child marshalling.

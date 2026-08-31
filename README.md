@@ -6,7 +6,7 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/downloads/)
-[![GitHub](https://img.shields.io/badge/github-dna--seq%2Fjust--dna--lite-blue.svg)](https://github.com/dna-seq/just-dna-lite)
+[![GitHub](https://img.shields.io/badge/github-dna--seq%2Fjust--dna--lite-blue.svg)](https://anonymous.4open.science/r/just-dna-lite)
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
@@ -22,11 +22,11 @@ You have the right to look at your own genome without anyone filtering what you 
 
 ### Built-in Modules
 
-The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance. These modules were created with the expert curation of geneticist Olga Borysova and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
+The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance. These modules were created with the expert curation of geneticist Anonymous Expert and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
 
 ### Polygenic Risk Scores (PRS)
 
-**5,000+ Polygenic Risk Scores** from the [PGS Catalog](https://www.pgscatalog.org/) are available out of the box. Pick any score, click compute, and get your result with percentile ranking against 1000 Genomes reference populations (AFR, AMR, EAS, EUR, SAS). No command line, no scripting, just a few clicks. Under the hood, scoring runs via [just-prs](https://github.com/dna-seq/just-prs) using DuckDB (12.3× faster than PLINK2) or Polars (5.7× faster), with Pearson r = 0.9999 concordance against PLINK2 across 100 PGS IDs on a 4.66M-variant WGS. See the [full benchmark →](https://github.com/dna-seq/just-prs/blob/main/docs/benchmarks.md)
+**5,000+ Polygenic Risk Scores** from the [PGS Catalog](https://www.pgscatalog.org/) are available out of the box. Pick any score, click compute, and get your result with percentile ranking against 1000 Genomes reference populations (AFR, AMR, EAS, EUR, SAS). No command line, no scripting, just a few clicks. Under the hood, scoring runs via [just-prs](https://anonymous.4open.science/r/just-prs) using DuckDB (12.3× faster than PLINK2) or Polars (5.7× faster), with Pearson r = 0.9999 concordance against PLINK2 across 100 PGS IDs on a 4.66M-variant WGS. See the [full benchmark →](https://anonymous.4open.science/r/just-prs/blob/main/docs/benchmarks.md)
 
 ### AI Module Creator
 
@@ -82,16 +82,16 @@ You need a `.vcf` or `.vcf.gz` file from whole genome (WGS) or whole exome (WES)
 **Where to get your genome sequenced?**
 If you want to sequence your own genome, there are several commercial providers. As of early 2026, popular and accessible options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure the provider allows you to download your raw `.vcf` or `.vcf.gz` file. *(Disclaimer: We provide these links only as examples and are in no way affiliated with any of these companies or services).*
 
-If you live in Romania, you should follow the **[ROGEN (Romanian Genomics) project](https://rogen.umfcd.ro/)**. It is a major national initiative sequencing 5,000 individuals to create a genomic map of the population, and you might be able to get recruited to have your genome sequenced for free.
+If you live in Romania, you should follow the **[Anonymous Consortium (Anonymous Genomics) project](https://rogen.umfcd.ro/)**. It is a major national initiative sequencing 5,000 individuals to create a genomic map of the population, and you might be able to get recruited to have your genome sequenced for free.
 
 **Don't have your genome sequenced yet?**
 You can use any public genome to try out the tool. Some of our authors have voluntarily open-sourced their genomes:
 
-- **Anton Kulaga** (CC-Zero): [zenodo.org/records/18370498](https://zenodo.org/records/18370498)
+- **Anonymous Author** (CC-Zero): [zenodo.org/records/18370498](https://zenodo.org/records/18370498)
   ```
   https://zenodo.org/records/18370498
   ```
-- **Livia Zaharia** (CC-BY-4.0): [zenodo.org/records/19487816](https://zenodo.org/records/19487816)
+- **Anonymous Contributor F** (CC-BY-4.0): [zenodo.org/records/19487816](https://zenodo.org/records/19487816)
   ```
   https://zenodo.org/records/19487816
   ```
@@ -100,7 +100,7 @@ You can paste these URLs directly into the "Import from Zenodo" field in the app
 
 ### Download the installer (Windows / macOS)
 
-No terminal required. Go to the [latest release](https://github.com/dna-seq/just-dna-lite/releases/latest) and download the installer for your operating system:
+No terminal required. Go to the [latest release](https://anonymous.4open.science/r/just-dna-lite/releases/latest) and download the installer for your operating system:
 
 | Platform | File to download |
 |----------|-----------------|
@@ -145,7 +145,7 @@ This step is required on Windows (which ships without Python) and recommended on
 Then clone and run:
 
 ```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
+git clone https://anonymous.4open.science/r/just-dna-lite.git
 cd just-dna-lite
 uv sync
 uv run start
@@ -214,7 +214,7 @@ podman run -it --rm \
 **Using Podman Compose or Docker Compose:**
 
 ```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
+git clone https://anonymous.4open.science/r/just-dna-lite.git
 cd just-dna-lite
 
 # Podman (recommended)
@@ -429,19 +429,19 @@ GRCh38 VCF files (WGS and WES) are the primary supported path, along with PRS an
 
 ## Related projects
 
-- [just-prs](https://github.com/antonkulaga/just-prs) — Polygenic Risk Score library and UI ([PyPI](https://pypi.org/project/just-prs/))
-- [just-dna-format](https://github.com/dna-seq/just-dna-format) — annotation module schema, manifest/integrity contract, and reference compiler
-- [just-dna-marketplace](https://github.com/dna-seq/just-dna-marketplace) — catalog, publish, and download REST API for annotation modules
-- [prepare-annotations](https://github.com/dna-seq/prepare-annotations) — upstream pipeline for Ensembl and module annotation data
+- [just-prs](https://anonymous.4open.science/r/just-prs) — Polygenic Risk Score library and UI ([PyPI](https://pypi.org/project/just-prs/))
+- [just-dna-format](https://anonymous.4open.science/r/just-dna-format) — annotation module schema, manifest/integrity contract, and reference compiler
+- [just-dna-marketplace](https://anonymous.4open.science/r/just-dna-marketplace) — catalog, publish, and download REST API for annotation modules
+- [prepare-annotations](https://anonymous.4open.science/r/prepare-annotations) — upstream pipeline for Ensembl and module annotation data
 - [Just-DNA-Seq](https://just-dna.life/) — the original project
 
 ## Funding and Support
 
-This project is open source and intended for users worldwide. One of its core developers, [Anton Kulaga](https://github.com/antonkulaga), is funded through the **[ROGEN (Romanian Genomic) consortium](https://rogen.umfcd.ro/)**, and some parts of this roadmap are being developed with future ROGEN research use in mind.
+This project is open source and intended for users worldwide. One of its core developers, [Anonymous Author](https://anonymous.4open.science/r/author-A), is funded through the **[Anonymous Consortium (Anonymous Genomic) consortium](https://rogen.umfcd.ro/)**, and some parts of this roadmap are being developed with future Anonymous Consortium research use in mind.
 
-ROGEN recruitment and data collection are still ongoing, so the points below should be read as research targets and planned directions rather than completed outcomes. The broader goal is to contribute to the understanding of the genetic landscape of European populations while building methods that remain useful for users and researchers in Romania and beyond. Current priorities of the consortium include:
+Anonymous Consortium recruitment and data collection are still ongoing, so the points below should be read as research targets and planned directions rather than completed outcomes. The broader goal is to contribute to the understanding of the genetic landscape of European populations while building methods that remain useful for users and researchers in Romania and beyond. Current priorities of the consortium include:
 
-1. **Risk-stratified prevention:** Romanian-calibrated PRSes and aging clocks as future tools for more cost-effective prevention programs.
+1. **Risk-stratified prevention:** locally-calibrated PRSes and aging clocks as future tools for more cost-effective prevention programs.
 2. **Reducing health inequities:** Better imputation panels and ancestry-aware models for under-represented populations.
 3. **Gene-environment insights:** Analyses of interactions between genetics and factors such as diet, smoking, air pollution, occupational exposures, and pathogen burdens.
 4. **Reproducible public-health research:** Privacy-preserving analyses aligned with international research and regulatory norms for priorities such as cardiovascular risk, diabetes, and dementia.
@@ -455,4 +455,4 @@ AGPL v3. See [LICENSE](LICENSE).
 
 ## Contributors
 
-[Anton Kulaga](https://github.com/antonkulaga) (IBAR) and Nikolay Usanov (HEALES), with contributions from the [Just-DNA-Seq](https://github.com/dna-seq) community.
+[Anonymous Author](https://anonymous.4open.science/r/author-A) (Anonymous Institution 2) and Anonymous Contributor (HEALES), with contributions from the [Just-DNA-Seq](https://anonymous.4open.science/r/dna-seq) community.

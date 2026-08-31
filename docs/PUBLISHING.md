@@ -49,8 +49,8 @@ The namespace is not the same as your account name — it can be anything valid 
 account may hold a small number (default 2).
 
 ```bash
-uv run marketplace-client namespace-available eric-mods    # check it's free
-uv run marketplace-client claim-namespace     eric-mods    # claim it (uses your token)
+uv run marketplace-client namespace-available author-B    # check it's free
+uv run marketplace-client claim-namespace     author-B    # claim it (uses your token)
 ```
 
 ## 3. Publish the module
@@ -60,7 +60,7 @@ Args: `<namespace> <name> <version> <spec_dir>`. `spec_dir` is the authored spec
 recompiles server-side.
 
 ```bash
-uv run marketplace-client publish eric-mods lactose-tolerance 1.0.0 ./lactose-tolerance \
+uv run marketplace-client publish author-B lactose-tolerance 1.0.0 ./lactose-tolerance \
   --changelog "Initial release: rs4988235 (MCM6/LCT) + rs182549 tag SNP; 5 verified PMIDs"
 ```
 
@@ -68,7 +68,7 @@ If all you have is a packaged `zip`/`tar.gz` archive rather than a spec director
 `import-module` instead:
 
 ```bash
-uv run marketplace-client import-module eric-mods lactose-tolerance 1.0.0 ./lactose-tolerance.tar.gz \
+uv run marketplace-client import-module author-B lactose-tolerance 1.0.0 ./lactose-tolerance.tar.gz \
   --changelog "Initial release"
 ```
 
@@ -83,7 +83,7 @@ uv run marketplace-client list --q lactose
 `update-module-version` enforces that the new version is greater than the current latest.
 
 ```bash
-uv run marketplace-client update-module-version eric-mods lactose-tolerance 1.1.0 ./lactose-tolerance \
+uv run marketplace-client update-module-version author-B lactose-tolerance 1.1.0 ./lactose-tolerance \
   --changelog "Refine weights; add rs182549 study"
 ```
 
@@ -92,8 +92,8 @@ uv run marketplace-client update-module-version eric-mods lactose-tolerance 1.1.
 The artifact stays immutable, but you can update its changelog or logo:
 
 ```bash
-uv run marketplace-client amend-changelog eric-mods lactose-tolerance 1.0.0 "Corrected PMID list"
-uv run marketplace-client amend-logo      eric-mods lactose-tolerance 1.0.0 ./logo.png
+uv run marketplace-client amend-changelog author-B lactose-tolerance 1.0.0 "Corrected PMID list"
+uv run marketplace-client amend-logo      author-B lactose-tolerance 1.0.0 ./logo.png
 ```
 
 ## Notes

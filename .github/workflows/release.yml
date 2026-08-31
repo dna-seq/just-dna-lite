@@ -212,4 +212,4 @@ jobs:
 
             > **macOS note:** Since the app is not yet notarized, you may need to right-click the app and select "Open" on first launch to bypass Gatekeeper.
 
-            For Linux or advanced usage, see the [README](https://github.com/dna-seq/just-dna-lite#quick-start).
+            For Linux or advanced usage, see the [README](https://anonymous.4open.science/r/just-dna-lite#quick-start).

@@ -88,7 +88,7 @@ class TestPolarsReadsWhatWeBuild:
     """The end the bug was actually felt at: `scan_module_table` hands this string to polars."""
 
     def test_scan_parquet_reads_a_locally_built_url(self, tmp_path: Path) -> None:
-        module_dir = tmp_path / "antonkulaga__cognitive_intelligence"
+        module_dir = tmp_path / "author-A__cognitive_intelligence"
         module_dir.mkdir()
         pl.DataFrame({"rsid": ["rs1"], "weight": [1.0]}).write_parquet(
             module_dir / "weights.parquet"

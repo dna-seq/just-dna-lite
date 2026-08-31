@@ -633,7 +633,7 @@ publish/edit pane**, so it could not be published or edited at all. A new 0.4 fa
 **The count the engine returns is matched rows, never the parquet's height.** A position join keeps
 every unmatched VCF row on purpose (the report needs them to tell "probed and did not match" apart
 from "never looked"), so the height is a *positions probed* number. Reporting it as variants
-annotated made `total_variants_annotated` read **567 against a real 259** on Anton's genome and told
+annotated made `total_variants_annotated` read **567 against a real 259** on Author A's genome and told
 the user "cancer: 29 variants" for a module that annotated none. `annotate_vcf_with_module_weights`
 returns `(path, num_matched, restoration_stats)`; both numbers travel on the eliot log
 (`num_matched` / `num_written`) because they answer different questions.
@@ -967,8 +967,8 @@ Immutable mode disables file uploads and serves only pre-configured public genom
 
 ### Known public genomes
 
-- **Anton Kulaga** (CC-Zero): `https://zenodo.org/records/18370498` — `antonkulaga.vcf` (482 MB)
-- **Livia Zaharia** (CC-BY-4.0): `https://zenodo.org/records/19487816` — `SIMHIFQTILQ.hard-filtered.vcf.gz` (349 MB)
+- **Anonymous Author** (CC-Zero): `https://zenodo.org/records/18370498` — `author-A.vcf` (482 MB)
+- **Anonymous Contributor F** (CC-BY-4.0): `https://zenodo.org/records/19487816` — `SIMHIFQTILQ.hard-filtered.vcf.gz` (349 MB)
 
 ---
 
@@ -1979,7 +1979,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
 - **LazyFrame is the preferred input** — `set_prs_genotypes_lf(pl.scan_parquet(path))` avoids redundant I/O. The parquet path is also set as string fallback. just-dna-lite normalized parquets keep polars-bio `start`, not `pos`. Scoring and ancestry go through `_get_genotypes_lf()` / `_scan_prs_genotypes()`. Never pass a raw `scan_parquet` into `infer_sample_ancestry`.
 - **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
-- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Multi-genome scoring uses **Add for comparison** below the sample rows: picking a leftover left-panel sample adds it immediately (one leftover peer is a single button click; do not add a separate Compare then Add). Labels are **sample name and filename** (`Livia Zaharia (SIMH….vcf.gz)`), matching the left-panel display names. Peers share species, reference genome, and a ready normalized parquet. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs. Switching the left-panel file clears the comparison. Mixed comparison rows are not checkpointed to Dagster. Do **not** pass `UploadState.vcf_preview_loading` as `normalizing` — that locks the By Trait / By PRS grids (including filters) while the Input tab pages millions of VCF rows. Pass `normalizing=False`; PRS already gates on `prs_genotypes_path`.
+- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Multi-genome scoring uses **Add for comparison** below the sample rows: picking a leftover left-panel sample adds it immediately (one leftover peer is a single button click; do not add a separate Compare then Add). Labels are **sample name and filename** (`Anonymous Contributor F (SIMH….vcf.gz)`), matching the left-panel display names. Peers share species, reference genome, and a ready normalized parquet. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs. Switching the left-panel file clears the comparison. Mixed comparison rows are not checkpointed to Dagster. Do **not** pass `UploadState.vcf_preview_loading` as `normalizing` — that locks the By Trait / By PRS grids (including filters) while the Input tab pages millions of VCF rows. Pass `normalizing=False`; PRS already gates on `prs_genotypes_path`.
 - **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
 - **PRS results are per-genome** — `select_file` must reset PRS sample state even when the new parquet is still normalizing. `prs_results`, the Altair/iframe chart (`selected_result_*`), and `prs_results_source_file` belong to one sample. Compute snapshots `prs_compute_token` + the parquet path and must discard writes if the user switched genomes. Never treat a leftover PGS ID as "already computed" for a different file.
 - **Remount the sample workspace, not individual widgets** — the right-panel tabs/content wrap with `key=UploadState.selected_file`. One sample = one React tree (grids, Vega charts, reports, analysis). Destroying that subtree is cheap; the cost is the parquet page. Do not keep a widget per genome, and do not reuse one MUI/Vega instance across partitions. The left file list and top nav stay mounted. Sort artifacts must include the source path, not just the state class name.
@@ -1991,7 +1991,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 - **Never `scan_parquet` a just-dna-lite genome into `infer_sample_ancestry` / `compute_prs`** — those parquets keep `start`; just-prs looks up `pos`. Use `_get_genotypes_lf()` or `_scan_prs_genotypes()`.
 - **Never make PRSState a substate of UploadState** — it needs its own `LazyFrameGridMixin` instance; mixing into UploadState would create MRO conflicts.
 - **Never pass UploadState's internal LazyFrame across states** — Reflex states are isolated; create a new `pl.scan_parquet()` LazyFrame from the shared parquet path instead.
-- **Never keep the previous genome's `prs_results` or chart spec across a file switch** — the chart panel is gated on `selected_result_spec != {}`, so an uncleared Vega spec keeps showing the old sample. Compute also skips PGS IDs already present in `prs_results`, which turns a leftover Oksana score into a no-op on Livia.
+- **Never keep the previous genome's `prs_results` or chart spec across a file switch** — the chart panel is gated on `selected_result_spec != {}`, so an uncleared Vega spec keeps showing the old sample. Compute also skips PGS IDs already present in `prs_results`, which turns a leftover Contributor G score into a no-op on Contributor F.
 
 ---
 
@@ -2012,7 +2012,7 @@ Key principles:
 
 - When writing READMEs or user-facing docs: put images at the top, place caveats after Quick Start, and keep intros concise while avoiding technical jargon (e.g., "VCF", "Polars", "DuckDB"). Move deep implementation details to `docs/`.
 - Write in natural, human prose avoiding AI-typical patterns (em-dashes, filler transitions, marketing voice). Never hallucinate documentation.
-- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: ROGEN results are planned/future work, not finished outcomes. Never claim the tool solves alignment or variant calling — it only handles annotation of an existing VCF.
+- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: Anonymous Consortium results are planned/future work, not finished outcomes. Never claim the tool solves alignment or variant calling — it only handles annotation of an existing VCF.
 - Update related documentation (AGENTS.md, DAGSTER_GUIDE.md) immediately whenever code is refactored.
 - For upstream PyPI dependencies (like `prs-ui`), try to fix bugs locally or provide copy-paste prompts for upstream fixes rather than patching locally.
 - Use fsspec-based access patterns instead of symlinks. Cache HuggingFace data in the project's own cache using fsspec/HfFileSystem, never use `snapshot_download`.
@@ -2034,7 +2034,7 @@ Key principles:
 - `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g., `arrow up`), not hyphenated Lucide-style.
 - Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `webui/deployment_urls.py` builds the browser-reachable base URL: `PUBLIC_BACKEND_URL` overrides `API_URL` (needed when the image sets `API_URL=http://localhost:8000`). `webui.run` selects a free backend port and persists it in `API_URL` / `REFLEX_BACKEND_PORT`; `backend_api_url` reads those so the browser constructs direct URLs (e.g. `/api/report/...`). A leftover `API_URL=http://localhost:8000` must not win when Reflex actually bound 8002. Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
 - Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
-- Public genomes for demos: Anton Kulaga (Zenodo 18370498, CC-Zero, 482 MB) and Livia Zaharia (Zenodo 19487816, CC-BY-4.0, 349 MB). Both are configured as `default_samples` in `modules.yaml` `immutable_mode:` section. The app can also import arbitrary Zenodo records with open-access + permissive license + VCF via the "Import from Zenodo" UI.
+- Public genomes for demos: Anonymous Author (Zenodo 18370498, CC-Zero, 482 MB) and Anonymous Contributor F (Zenodo 19487816, CC-BY-4.0, 349 MB). Both are configured as `default_samples` in `modules.yaml` `immutable_mode:` section. The app can also import arbitrary Zenodo records with open-access + permissive license + VCF via the "Import from Zenodo" UI.
 - 6 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`, and `thrombophilia` (ported from Generation-I `dna-seq/just_thrombophilia` and published 2026-07, via `pipelines v1-port`). PharmGKB (drugs) has NOT been migrated from Generation I. HuggingFace `just-dna-seq` org hosts 6 datasets and 1 model (`GenNet`).
 - The first preprint was rejected by bioRxiv ("inference drawn between gene(s) and disease(s)") and medRxiv; published on arXiv instead. To avoid repeat rejection, frame the manuscript as a bioinformatics methods/software paper, not a genomic medicine paper.
 - `ghcr.io/dna-seq/just-dna-lite:latest` container image does not exist on GHCR yet; `compose.yaml` builds locally. The `Containerfile` needs `chmod -R 777 .venv` for Podman rootless compatibility and `UV_FROZEN=1` to prevent re-syncing. Workshop materials live in `docs/workshops/`. Pytest must stay in workspace root dev dependencies for `uv run pytest`, and `uv` does NOT have a `uv bundle` command as of April 2026.

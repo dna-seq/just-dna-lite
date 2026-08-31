@@ -260,7 +260,7 @@ uv run pipelines marketplace validate just-dna-seq vo2max data/interim/v1_port/v
 ### The republish, and the versions to use
 
 **The registry was wiped.** All nine `just-dna-seq` modules published on 2026-07-09 are gone —
-`marketplace list` returns only `eric-mods/lactose_tolerance`. The versions and changelogs below were
+`marketplace list` returns only `author-B/lactose_tolerance`. The versions and changelogs below were
 captured off the 0.9.1 server before the wipe (`data/mirror/republish-plan.json` in the mirror tree);
 they are recorded here because a changelog should read as one continuous history rather than
 restarting at "initial release" every time a server is rebuilt.

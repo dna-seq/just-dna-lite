@@ -6,27 +6,27 @@
 
 ### What is just-dna-lite?
 
-just-dna-lite is an open-source platform for personal genome annotation. You upload a genome file (VCF), pick what you want to know, and get results in minutes. It runs entirely on your machine — nothing leaves your computer. The source code is on [GitHub](https://github.com/dna-seq/just-dna-lite) under the AGPL v3 license.
+just-dna-lite is an open-source platform for personal genome annotation. You upload a genome file (VCF), pick what you want to know, and get results in minutes. It runs entirely on your machine — nothing leaves your computer. The source code is on [GitHub](https://anonymous.4open.science/r/just-dna-lite) under the AGPL v3 license.
 
 ![just-dna-lite annotation interface](/images/just_dna_lite_annotations.jpg)
 
 ### Who is behind this project?
 
-The project was started by [Anton Kulaga](https://github.com/antonkulaga) and Nikolay Usanov, who wanted to understand their own genomes and got tired of being the bioinformaticians without shoes — building tools for everyone else but having nothing good for personal use. Other contributors joined along the way, including geneticist Olga Borysova who built the expert-curated annotation modules. The full list is on the [GitHub contributors page](https://github.com/dna-seq/just-dna-lite).
+The project was started by [Anonymous Author](https://anonymous.4open.science/r/author-A) and Anonymous Contributor, who wanted to understand their own genomes and got tired of being the bioinformaticians without shoes — building tools for everyone else but having nothing good for personal use. Other contributors joined along the way, including geneticist Anonymous Expert who built the expert-curated annotation modules. The full list is on the [GitHub contributors page](https://anonymous.4open.science/r/just-dna-lite).
 
 ### Where is the source code?
 
-Everything is on the [dna-seq GitHub organization](https://github.com/dna-seq):
+Everything is on the [dna-seq GitHub organization](https://anonymous.4open.science/r/dna-seq):
 
-- [just-dna-lite](https://github.com/dna-seq/just-dna-lite) — the main platform
-- [just-prs](https://github.com/dna-seq/just-prs) — polygenic risk score library
-- [prepare-annotations](https://github.com/dna-seq/prepare-annotations) — upstream data preparation pipelines
+- [just-dna-lite](https://anonymous.4open.science/r/just-dna-lite) — the main platform
+- [just-prs](https://anonymous.4open.science/r/just-prs) — polygenic risk score library
+- [prepare-annotations](https://anonymous.4open.science/r/prepare-annotations) — upstream data preparation pipelines
 
 Annotation modules and reference datasets are published to the [just-dna-seq](https://huggingface.co/just-dna-seq) organization on HuggingFace.
 
 ### How do I install it?
 
-See the [Quick start](https://github.com/dna-seq/just-dna-lite#quick-start) section in the README. It runs on Windows, macOS, and Linux — installers are available for Windows and macOS, and on Linux you can run from source in four commands. No Docker required (though container deployment is also supported).
+See the [Quick start](https://anonymous.4open.science/r/just-dna-lite#quick-start) section in the README. It runs on Windows, macOS, and Linux — installers are available for Windows and macOS, and on Linux you can run from source in four commands. No Docker required (though container deployment is also supported).
 
 ### What file format does it accept?
 
@@ -40,7 +40,7 @@ Experimentally. Those services use microarray chips that read a few hundred thou
 
 Several commercial providers offer whole genome sequencing. As of 2026, options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure your provider allows you to download the raw `.vcf` or `.vcf.gz` file.
 
-If you live in Romania, the [ROGEN (Romanian Genomics) project](https://rogen.umfcd.ro/) is a national initiative sequencing 5,000 individuals — you might be able to participate and get your genome sequenced.
+If you live in Romania, the [Anonymous Consortium (Anonymous Genomics) project](https://rogen.umfcd.ro/) is a national initiative sequencing 5,000 individuals — you might be able to participate and get your genome sequenced.
 
 *(We are not affiliated with any of these companies or services.)*
 
@@ -48,8 +48,8 @@ If you live in Romania, the [ROGEN (Romanian Genomics) project](https://rogen.um
 
 Yes. Some of our authors have voluntarily open-sourced their genomes under permissive licenses:
 
-- **Anton Kulaga** (CC-Zero): `https://zenodo.org/records/18370498`
-- **Livia Zaharia** (CC-BY-4.0): `https://zenodo.org/records/19487816`
+- **Anonymous Author** (CC-Zero): `https://zenodo.org/records/18370498`
+- **Anonymous Contributor F** (CC-BY-4.0): `https://zenodo.org/records/19487816`
 
 Paste these URLs into the "Import from Zenodo" field in the app, or download the VCF and upload it manually. You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
 
@@ -63,7 +63,7 @@ Each module is a curated database of genetic variants with effect weights from p
 
 ### Which modules can I run on my genome?
 
-The tool ships with six expert-curated modules: **Longevity Map** (variant-trait associations from the LongevityMap database), **Coronary Artery Disease**, **Lipid Metabolism**, **VO2 Max**, **Athletic Performance (Superhuman)**, and **Thrombophilia** (inherited blood-clotting risk variants). These come from the expert curation of geneticist Olga Borysova. More modules can be added by hand or generated with the AI Module Creator.
+The tool ships with six expert-curated modules: **Longevity Map** (variant-trait associations from the LongevityMap database), **Coronary Artery Disease**, **Lipid Metabolism**, **VO2 Max**, **Athletic Performance (Superhuman)**, and **Thrombophilia** (inherited blood-clotting risk variants). These come from the expert curation of geneticist Anonymous Expert. More modules can be added by hand or generated with the AI Module Creator.
 
 ### What does turning on Ensembl annotation give me?
 
@@ -73,7 +73,7 @@ When enabled, the pipeline joins your variants against the [Ensembl Variation](h
 
 A PRS is a weighted sum of genetic variants from genome-wide association studies. The result is a number that tells you where you sit in a reference population's distribution. It is a rank, not a probability of disease. The model is linear; real biology is not — gene-gene interactions, gene-environment interactions, and developmental factors are not captured.
 
-Over 5,000 PRS from the [PGS Catalog](https://www.pgscatalog.org/) are available. Scores are computed via [just-prs](https://github.com/dna-seq/just-prs) with Pearson r = 0.9999 concordance against the established PLINK2 reference tool.
+Over 5,000 PRS from the [PGS Catalog](https://www.pgscatalog.org/) are available. Scores are computed via [just-prs](https://anonymous.4open.science/r/just-prs) with Pearson r = 0.9999 concordance against the established PLINK2 reference tool.
 
 ### My report mentions "heritability" — does that mean my genes decide my fate?
 
@@ -122,7 +122,7 @@ Studies of healthy populations show that the average person carries dozens to hu
 
 We built this tool for exploration and self-education. We know people will look at their health-related results, and that is the whole point — you have the right to look at your own genome. But you need to know what you are looking at: this is research-grade evidence, not a clinical test. If something concerns you, especially if it aligns with your family history, the right next step is to talk to a doctor or genetic counselor and get the finding validated with a clinical-grade test (like Sanger sequencing from a certified lab). The danger is not in looking — it is in acting on research-grade results without proper validation.
 
-For a deeper dive, see [Understanding What Your Genome Can and Cannot Tell You](https://github.com/dna-seq/just-dna-lite/blob/main/docs/SCIENCE_LITERACY.md).
+For a deeper dive, see [Understanding What Your Genome Can and Cannot Tell You](https://anonymous.4open.science/r/just-dna-lite/blob/main/docs/SCIENCE_LITERACY.md).
 
 ### Which of my results can I actually take seriously?
 
@@ -249,7 +249,7 @@ Everything else in just-dna-lite (annotation, PRS, self-exploration) works witho
 
 ### Can I create a module by hand without AI?
 
-Yes. A module is just a directory with two files: `module_spec.yaml` (metadata) and `variants.csv` (variant table with rsID, genotype, weight, state, conclusion, gene). No programming required. See the [README](https://github.com/dna-seq/just-dna-lite#writing-a-module-by-hand) for the format.
+Yes. A module is just a directory with two files: `module_spec.yaml` (metadata) and `variants.csv` (variant table with rsID, genotype, weight, state, conclusion, gene). No programming required. See the [README](https://anonymous.4open.science/r/just-dna-lite#writing-a-module-by-hand) for the format.
 
 ---
 
@@ -269,7 +269,7 @@ Not through this tool. Everything runs on your machine and nothing is uploaded, 
 
 ### Why can't I upload my genome on the public demo?
 
-Processing personal genomic data on a shared server triggers GDPR, HIPAA, and other data protection regulations requiring extensive compliance infrastructure. The demo only works with genomes already published on Zenodo under permissive licenses — if you have published yours there, you can import it via the Zenodo URL. We currently support only Zenodo because it is a reputable repository with clear, machine-verifiable open licenses; support for other trusted repositories is planned. For private genomes, install just-dna-lite locally — see the [Quick start](https://github.com/dna-seq/just-dna-lite#quick-start).
+Processing personal genomic data on a shared server triggers GDPR, HIPAA, and other data protection regulations requiring extensive compliance infrastructure. The demo only works with genomes already published on Zenodo under permissive licenses — if you have published yours there, you can import it via the Zenodo URL. We currently support only Zenodo because it is a reputable repository with clear, machine-verifiable open licenses; support for other trusted repositories is planned. For private genomes, install just-dna-lite locally — see the [Quick start](https://anonymous.4open.science/r/just-dna-lite#quick-start).
 
 ---
 
@@ -295,7 +295,7 @@ For public demos and workshops, the app has an immutable mode that blocks all us
 
 ### What is the license?
 
-AGPL v3. The software is provided "AS IS", without warranty of any kind. See the full [LICENSE](https://github.com/dna-seq/just-dna-lite/blob/main/LICENSE). The AGPL allows commercial use, but derivative works distributed or offered as a network service must also be released under AGPL v3 with full source code.
+AGPL v3. The software is provided "AS IS", without warranty of any kind. See the full [LICENSE](https://anonymous.4open.science/r/just-dna-lite/blob/main/LICENSE). The AGPL allows commercial use, but derivative works distributed or offered as a network service must also be released under AGPL v3 with full source code.
 
 ---
 
@@ -315,4 +315,4 @@ Primary outputs are **Parquet** files (Polars, Pandas, DuckDB, R, or any Arrow-c
 
 ### How do I report a bug or request a feature?
 
-Open an issue on [GitHub](https://github.com/dna-seq/just-dna-lite/issues). Pull requests are welcome.
+Open an issue on [GitHub](https://anonymous.4open.science/r/just-dna-lite/issues). Pull requests are welcome.

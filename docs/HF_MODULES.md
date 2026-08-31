@@ -42,7 +42,7 @@ Modules are **auto-discovered** by scanning each source for `weights.parquet` fi
 
 ## Data Provenance
 
-The annotation modules and Ensembl reference data are prepared and uploaded using the [dna-seq/prepare-annotations](https://github.com/dna-seq/prepare-annotations) toolkit. This upstream repository handles the complex pipelines for downloading raw genomic data, converting it to standardized Parquet schemas, and managing the HuggingFace Hub distribution.
+The annotation modules and Ensembl reference data are prepared and uploaded using the [dna-seq/prepare-annotations](https://anonymous.4open.science/r/prepare-annotations) toolkit. This upstream repository handles the complex pipelines for downloading raw genomic data, converting it to standardized Parquet schemas, and managing the HuggingFace Hub distribution.
 
 ---
 
