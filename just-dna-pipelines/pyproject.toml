@@ -22,36 +22,15 @@ dependencies = [
     "fsspec>=2026.7.0",
     "google-genai>=1.75.0,<2.0",
     "huggingface-hub>=1.27.0",
-    # 0.6.1, never 0.6.0: 0.6.0 shipped eight defects fixed the next day (upstream RM93-RM100),
-    # one of which (RM95) let a non-vocabulary `measure_kind` spelling into `content_signature` —
-    # the one identity that cannot be taken back, since it claims a global dedup slot.
-    #
-    # The enricher is ahead of the other two and that is the correct state: 0.6.2 was enricher-only
-    # (RM101), giving every pass an unavailability subclass so "the source is down" and "your data is
-    # wrong" are separable by type rather than by reading `exc.__cause__`.
-    #
-    # 0.6.3 is why this floor moves rather than merely being satisfiable. `clinvar_draft.multi_allelic_rsids`
-    # keyed its site as `(rsid, chrom, start, ref)`, so an rsID whose ClinVar records differ in the
-    # *reference* allele — the ordinary dup/del mirror pair, `A>AT` beside `ATT>A` at one position —
-    # was never flagged multi-allelic, both records collapsed onto one authored row, and the survivor
-    # was decided by allele spelling because `select_by_gene` orders by `ref` before `review_stars`.
-    # Measured on our own panels before the fix: 483 allele events absent from `cancer` entirely (108
-    # at 3 stars, across BRCA1/BRCA2/ATM/MLH1/MSH2) and 3,140 records dropped from `pathogenic`, whose
-    # coordinates then returned via expansion wearing the surviving record's clin_sig and condition.
-    # 0.6.3 groups over the whole event instead. `clinvar_panel._identity_collapse_note` predates the
-    # fix and now reports nothing on a 0.6.3 build — keep it as the regression guard, not a workaround.
-    #
-    # 0.6.4 (S45) is about *remediating* that collapse, and it is why a rebuild here is safe. Drafting
-    # appends and never mutates, so re-running the fixed drafter over an existing spec adds the
-    # coordinate-keyed rows BESIDE the collapsed rsid-only row rather than replacing it — leaving a
-    # module worse-formed than either the old one or a fresh one, and undetectably so from inside
-    # (a coordinate-identity row carries no `rsid`, so the obvious predicate finds 0 of 31 upstream).
-    # `_superseded_rsid_rows` now names them. We are not exposed: `build_clinvar_module` unlinks
-    # variants.csv / studies.csv / resolution.csv and the parquets before drafting, so our rebuild is
-    # a fresh draft rather than a re-draft. Keep that clearing — it is what makes this floor liveable.
-    "just-dna-compiler>=0.6.1",
-    "just-dna-enricher>=0.6.4",
-    "just-dna-format>=0.6.1",
+    # 0.6.6 is the current published trio (format / compiler / enricher, tagged 2026-08-21).
+    # Never 0.6.0: it shipped eight defects fixed the next day (RM93-RM100), one of which (RM95)
+    # let a non-vocabulary `measure_kind` spelling into `content_signature` — the one identity
+    # that cannot be taken back. 0.6.3–0.6.4 are why a rebuild is safe (multi-allelic grouping,
+    # `_superseded_rsid_rows`); `build_clinvar_module` still unlinks variants/studies/resolution
+    # before drafting so a rebuild is a fresh draft, not a re-draft beside a collapsed row.
+    "just-dna-compiler>=0.6.6",
+    "just-dna-enricher>=0.6.6",
+    "just-dna-format>=0.6.6",
     # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
     # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
     # mcp 2.0.0 removed both, so `from agno.tools.mcp import MCPTools` raises ImportError.
@@ -60,7 +39,7 @@ dependencies = [
     "numpy>=2.5.2",
     "openai>=3.0.0",
     "pillow>=12.3.0",
-    "polars-bio>=0.33.1",
+    "polars-bio>=0.35.1",
     "pooch>=1.9.0",
     "psutil>=7.2.2",
     "pycomfort>=0.0.18",

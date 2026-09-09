@@ -401,6 +401,8 @@ This pattern is also future-proof: swapping `HfFileSystem` for any other fsspec 
 - Use `concurrent_fetches` instead.
 - In `just_dna_pipelines.io.read_vcf_file()`, keep `thread_num` only as backward-compatible API and map it to `concurrent_fetches`.
 
+**Do not use polars-bio for PGEN reads.** `scan_pgen` / `read_pgen` / `read_pgen_matrix` refuse the published PGS Catalog 1000G `.pvar.zst` (~567 MB) because of a hardcoded 512 MB `max_companion_bytes` cap ([polars-bio#453](https://github.com/biodatageeks/polars-bio/issues/453)). just-prs scoring stays on `pgenlib` (`read_pgen_genotypes`). Revisit only after the upstream cap is raised.
+
 **polars-bio `write_vcf` with custom INFO fields requires `set_source_metadata`:**
 
 Without `pb.set_source_metadata()`, extra columns on the DataFrame are silently dropped and the VCF always outputs `INFO=.`. Register INFO field definitions **before** calling `pb.write_vcf()`:
@@ -1200,10 +1202,10 @@ The web UI integrates the `prs-ui` PyPI package for polygenic risk score computa
 
 ### Dependencies
 
-- **`just-prs>=0.9.0`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
-- **`prs-ui>=0.3.15`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench_mode_panel()`, score grid, results table
+- **`just-prs>=0.10.0`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
+- **`prs-ui>=0.3.16`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench_mode_panel()`, score grid, results table
 
-Both are added to `webui/pyproject.toml`.
+`just-prs` is pinned in the workspace root `pyproject.toml`; `prs-ui` is in `webui/pyproject.toml`.
 
 ### Architecture
 
@@ -1244,7 +1246,7 @@ class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
 
 - **LazyFrame is the preferred input** — `set_prs_genotypes_lf(pl.scan_parquet(path))` avoids redundant I/O. The parquet path is also set as string fallback. just-dna-lite normalized parquets keep polars-bio `start`, not `pos`. Scoring and ancestry go through `_get_genotypes_lf()` / `_scan_prs_genotypes()`, which alias `start` → `pos`. Never pass a raw `scan_parquet` into `infer_sample_ancestry`.
 - **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
-- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Multi-genome scoring uses **Add for comparison** below the sample rows: picking a leftover left-panel sample adds it immediately (one leftover peer is a single button click; do not add a separate Compare then Add). Labels are **sample name and filename** (`Livia Zaharia (SIMH….vcf.gz)`), matching the left-panel display names. Peers share species, reference genome, and a ready normalized parquet. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs. Switching the left-panel file clears the comparison. Mixed comparison rows are not checkpointed to Dagster. Do **not** pass `UploadState.vcf_preview_loading` as `normalizing` — that locks the By Trait / By PRS grids (including filters) while the Input tab pages millions of VCF rows. Pass `normalizing=False`; PRS already gates on `prs_genotypes_path`. `PRSTraitState.load_traits` must pass `eager_value_options_row_limit=0` like prs-ui.
+- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Multi-genome scoring uses **Add for comparison** below the sample rows: picking a leftover left-panel sample adds it immediately (one leftover peer is a single button click; do not add a separate Compare then Add). Labels are **sample name and filename** (`Livia Zaharia (SIMH….vcf.gz)`), matching the left-panel display names. Peers share species, reference genome, and a ready normalized parquet. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs. Switching the left-panel file clears the comparison. Mixed comparison rows are not checkpointed to Dagster. Do **not** pass `UploadState.vcf_preview_loading` as `normalizing` — that locks the By Trait / By PRS grids (including filters) while the Input tab pages millions of VCF rows. Pass `normalizing=False`; PRS already gates on `prs_genotypes_path`. `PRSTraitState.load_traits` must pass `eager_value_options_row_limit=0` like prs-ui. By PRS extract (Parquet/CSV of this sample's top `|contribution|` rows) comes from the mixin via `prs_workbench_mode_panel(..., "individual")` — do not reimplement it or feed it into `compute_selected_prs`.
 - **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
 - **PRS results are per-genome** — `select_file` must reset PRS sample state even when the new parquet is still normalizing. `prs_results`, the Altair/iframe chart (`selected_result_*`), and `prs_results_source_file` belong to one sample. Compute snapshots `prs_compute_token` + the parquet path and must discard writes if the user switched genomes. Never treat a leftover PGS ID as "already computed" for a different file. If the selected scores are already cached for this genome, Compute must still open that trait/score in the chart below (`_ensure_result_chart_selected`). A remount must not wipe `selected_pgs_ids` via an empty MUI selection replay.
 - **Remount the sample workspace, not individual widgets** — the right-panel tabs/content wrap with `key=UploadState.selected_file`. One sample = one React tree (grids, Vega charts, reports, analysis). Destroying that subtree is cheap; the cost is the parquet page. Do not keep a widget per genome, and do not reuse one MUI/Vega instance across partitions. The left file list and top nav stay mounted. Sort artifacts must include the source path, not just the state class name.

@@ -1,5 +1,39 @@
 # Paper 1 Blockers and Workarounds (v0.3)
 
+## Editorial pass, 9 September 2026
+
+### Author review corrections
+
+- Restored the competitor paragraph in the Introduction, including DNA Complete/Nebula, Dante Labs, PLINK, ANNOVAR, and VEP. Those details were removed, not relocated, in the first editorial pass.
+- Made the complete removal of OakVar explicit and named Dagster, polars-bio, Polars, and DuckDB as components of the replacement engine.
+- Corrected PLINK2's role throughout the methods: it is an external benchmark comparator, not a provided just-prs engine.
+- Verified the Parquet runtime path in `annotation/hf_modules.py` (`_probe_module_at_path`, `_remote_manifest`) and the separate YAML/CSV compilation route in `module_registry.py` (`register_custom_module`). Existing published modules need neither authoring files nor a manifest to be discovered.
+- Verified restoration and array features against just-prs's `docs/reference-restoration.md`, `docs/grch37-universe-build.md`, and `just-prs/src/just_prs/array_scoring.py`. Added reference-homozygote restoration and precomputed LD proxies without claiming that the historical engine benchmark measured their coverage gains.
+- **Figure 3, author action:** an image exists at `images/just_prs_trait_consensus.jpg`, but it is not embedded in the manuscript. Visual inspection found an absolute-risk percentage for intelligence and inconsistent quality labels. Replace it with a current screenshot showing trait, reference population, model IDs, coverage, and settings; embed the replacement and revise the caption to match. An inline HTML TODO now marks its location.
+- **Full-platform MCP, release check:** at the author's request, the manuscript describes the intended completed Just-DNA-Lite MCP interface in the present tense, separately from the existing standalone `just-prs-mcp`. The author identifies the full-platform interface as work in progress. Confirm implementation and document its tool inventory before submission; this pass did not implement or test it.
+- Restored the original opening of Section 6.3 on the right to read one's genome. The first pass removed useful motivation along with legal detail; that deletion was not requested.
+
+This status supersedes conflicting historical entries below. The manuscript received a prose-only pass; no application code, experiments, or benchmark calculations were run. Existing measurements remain unchanged. References and implementation claims have not yet been independently verified.
+
+**Completed:** shortened the abstract; clarified the platform contribution; renamed the registry; separated the format contract from the compiler; reduced MCP and companion-paper repetition; qualified warm-run speed claims; removed claims that cross-score correlation establishes individual risk rankings; distinguished local computation from external AI data sharing; removed the categorical GDPR-compliance claim; and shortened the ethical argument. The Introduction's original competitor comparison and exclusivity claim were restored at the author's request.
+
+**Evidence and reporting issues still requiring attention:**
+
+- Annotation counts: 4,729,824 SNPs and 1,414,226 indels do not reconcile with 6,138,868 total records. Check the original counting definitions and records before changing any number.
+- Annotation timing: define warm and cold cache states, timed pipeline boundaries, selected modules, whether normalization and report generation are included, and comparability with the historical Generation I runs. Identify the separate GVCF input and justify any cross-input speedup comparison.
+- Historical benchmark statistics: verify Table 2 and Supplementary S2 against the individual run records, including mean, SD, and SEM. The editorial pass preserved all supplied numbers.
+- PRS selection: the original text called PGS000006 through PGS000106 "100 consecutive" IDs, although that inclusive range contains 101 IDs. The prose now says 100 scores without asserting the range. Supply the exact evaluated ID list and exclusions.
+- PRS runtime: ratios of medians currently compare 100 successful just-prs scores with 96 PLINK2 scores. Report a paired comparison on the shared set if claiming a like-for-like speed advantage, and specify which preparation or loading costs are timed.
+- PRS agreement: one person's scores across different models cannot establish agreement in rankings across people. Verify the proposed matching explanation with per-variant discrepancies; report model-specific absolute/relative errors and comparable missing-genotype handling. Predictive validity requires separate evidence.
+- Memory: distinguish Python heap allocations, native allocations, total process memory, and baseline versus incremental use. The supplied heap and PLINK2 memory numbers are not yet an established comparable metric.
+- Reference comparison: document missing-variant handling and whether sample and reference scores use comparable variant sets. A 50 to 54% match rate alone does not justify a percentile's reliability.
+- Feature consistency: Section 3.2.1 lists ancestry detection, while Section 6.4 says automatic inference is not implemented. Confirm released behavior before resolving the discrepancy. Also confirm input builds, liftover status, the in-app creator, catalogue size/date, and exactly which validation checks the installed schema performs.
+- Module provenance: Table 1 includes an AI-generated module within a set introduced as expert-curated. Confirm whether it is a shipped default or an optional example, and distinguish it explicitly. Format and compiler ownership also needs consistent wording in the repository table.
+- Scientific citations and comparison: verify bibliographic records, especially the lifespan-heritability citation, and add a source-checked comparison with related platforms. No external literature verification was performed in this pass.
+- Submission assets and metadata: final figure files, full supplements, pinned software/data versions, a usable benchmark invocation, funding acknowledgment, equal-contribution markers, unused affiliations, and a public companion citation remain to be confirmed. Removing a placeholder caption alone does not resolve a missing figure.
+
+Paper 1 can report its own results independently of Paper 2; the earlier instruction to publish Paper 2 first is superseded by the v0.3 strategy.
+
 This note lists practical blockers for the Paper 1 preprint/journal submission and separates what can be fixed by manuscript editing from what needs assets, citation checking, user input, or repository work.
 
 ## Summary
