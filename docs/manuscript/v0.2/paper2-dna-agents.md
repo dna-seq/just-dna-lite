@@ -1,3 +1,7 @@
+> **RETIRED — do not submit.** `just-dna-agents` is deprecated and `just-module-creator`
+> replaces it. Paper 2 is now *Creating and Sharing Genomic Annotation Modules with AI: The
+> Just-DNA Ecosystem* (`../v0.3/paper2-just-module-creator.md`). Kept for inspiration only.
+
 # **just-dna-agents: an Agentic Toolkit for Evidence-Grounded Personal Genomics Research**
 
 > **Naming:** `just-dna-agents` is the paper/product name; the software package and repository remain `dna-agents` (with the `dna-agents-mcp` server). Both names refer to the same system.

@@ -1,3 +1,6 @@
+> **SUPERSEDED by `../v0.3/manuscript-strategy-v0.3.md`.** Paper 2 is no longer the
+> `just-dna-agents` toolkit; it is the just-module-creator manuscript. Kept for history.
+
 # **Just-DNA-Lite Manuscript Strategy (v0.2 — post-split)**
 
 **Supersedes:** the v0.1 "Just-DNA-Lite Manuscript Strategy" (single-manuscript assessment).
