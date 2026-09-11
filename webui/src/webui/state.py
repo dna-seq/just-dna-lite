@@ -82,6 +82,7 @@ _REGISTRY_MISMATCH_HINT: str = (
 )
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
+from webui.registry_errors import report_registry_failure
 
 logger = logging.getLogger(__name__)
 
@@ -6492,6 +6493,12 @@ class RegistryState(rx.State):
             try:
                 sig_matches, matches = await loop.run_in_executor(None, _lookup)
             except Exception:  # noqa: BLE001 - offline classification degrades to local-only
+                # Degrading to local-only is right (the modules are on disk and usable), but doing
+                # it silently hides the same outage the Catalog tab reports. Log, never surface.
+                logger.warning(
+                    "Registry lookup failed; classifying local modules offline (%s)", url,
+                    exc_info=True,
+                )
                 sig_matches, matches = {}, {}
         for m in local:
             # lookup_by_signatures returns VersionRef models; lookup_by_digests returns dicts.
@@ -6545,9 +6552,10 @@ class RegistryState(rx.State):
                 self.total = 0
             return
         except Exception as e:  # noqa: BLE001 - surface a message, don't crash the page
+            message = report_registry_failure("browse the catalog", url, e)
             async with self:
                 self.catalog_loading = False
-                self.catalog_error = f"Could not reach the registry: {e}"
+                self.catalog_error = message
                 self.cards = []
                 self.total = 0
             return
@@ -6753,9 +6761,10 @@ class RegistryState(rx.State):
                 self.detail_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
             return
         except Exception as e:  # noqa: BLE001
+            message = report_registry_failure(f"load details for {namespace}/{name}", url, e)
             async with self:
                 self.detail_loading = False
-                self.detail_error = f"Could not load details: {e}"
+                self.detail_error = message
             return
         versions = detail.get("versions", []) or []
         # Only offer versions that match the current schema/compiler contract. The live catalog
@@ -6881,8 +6890,9 @@ class RegistryState(rx.State):
                 self._end_action(f"{_REGISTRY_MISMATCH_HINT} ({e.detail})")
             return
         except Exception as e:  # noqa: BLE001
+            message = report_registry_failure(f"install {namespace}/{name} {version}", url, e)
             async with self:
-                self._end_action(f"Install failed: {e}")
+                self._end_action(message)
             return
         await self._refresh_local()
         await self._refresh_upload_ui()

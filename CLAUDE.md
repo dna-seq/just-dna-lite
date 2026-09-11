@@ -926,8 +926,24 @@ format 0.6.1 / compiler 0.6.1, so the contract guard is satisfied on either.
   sticky "polygon" from last week is exactly the setting nobody thinks to check. It defaults to
   `$REGISTRY_URL`'s store on every page load.
 
+- **A failed registry call must name the server it tried.** Every Catalog call is caught so an
+  outage cannot blank the page, which makes the message the *entire* report — there is no
+  traceback on screen and no log file behind it. `Could not reach the registry: [Errno 101]
+  Network is unreachable` named neither the host nor whose side the fault was on, and a user on a
+  fresh install could not tell an IPv6-only network from a typo'd `$REGISTRY_URL`. Go through
+  `webui.registry_errors.report_registry_failure(action, url, exc)`, which logs the traceback
+  (`exc_info`, not `logger.exception` — it is not always called from inside the `except`) and
+  returns text naming the URL and, where the OS said why, the remedy. Note the public registry is
+  **IPv4-only**, so an IPv6-only client gets ENETUNREACH against it while `huggingface.co` (which
+  has AAAA) still works — the Module Manager listing modules while the Catalog fails *is* that
+  diagnosis. `_refresh_local`'s offline degradation logs a warning for the same outage and stays
+  silent on screen, which is right: those modules are on disk and usable.
+
 Tests: `tests/test_registry_stores.py` (config parse, working-copy merge, `$REGISTRY_URL`
 resolution, identity migration, `_client_args` routing, switch reset). All network-free.
+`tests/test_registry_error_messages.py` pins the failure text against **real** httpx chains
+(the errno sits three links down, `httpx.ConnectError` → `httpcore.ConnectError` → `OSError`);
+every address it uses is reserved or undelegated, so nothing leaves the machine.
 
 ## Immutable (Public Demo) Mode
 
