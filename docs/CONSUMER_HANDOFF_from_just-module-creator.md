@@ -791,3 +791,125 @@ not evidence a module is correct.
 
 As before: no numbered series, nowhere structured for a reply to land, and "we are not doing that" is a
 fine answer we will record on our side.
+
+---
+
+# Addendum, 2026-08-22 — what we changed after your `MODULE_DOGFOODING.md` pass
+
+Your 2026-08-21 run of the plugin against the ten v1-port modules raised D1–D26. This section says
+what we did about the ones that were ours, so you are not surprised by a changed surface and do not
+re-file anything. Where we did nothing we say so plainly and do not give a date.
+
+Everything below is against `just-module-creator` at plugin **0.18.0**, working tree, 2026-08-22.
+
+## D25 — the shadowing commands are gone
+
+You were right, and this was the most valuable finding in the run for us: an entry point we document
+and route people to was returning a routing shim instead of the skill it names, `create-module`
+included.
+
+`commands/` is **deleted** (commit `d86d363`). All twenty skills are now invocable as `/<name>` and
+load their own body; neither plugin manifest declares a `commands` directory. Two tests sit on it:
+`test_neither_manifest_declares_a_commands_directory_while_none_ships` runs today and asserts the
+manifests stay clean, and `test_no_command_file_shares_a_name_with_a_skill` is a pin for if the
+directory ever comes back — it returns early while `commands/` is absent, so it asserts nothing at
+present and we would rather tell you that than let you read it as a live guard.
+
+## D21 — the summary is the default now
+
+`check_identifiers` takes `detail: bool = False`. On the default path `genes` and `traits` carry only
+the records that need attention — anything whose state is not `approved`/`current`, which includes
+`unchecked` — and `detail=true` returns the full roster for the case where you actually want to read
+it. The tallies are computed off the **full** rosters before either list is trimmed, so the counts
+still describe the check rather than the shape of the answer, and the chosen mode is echoed back on
+the result.
+
+Your ~30 kB for 298 genes was the thing we were measuring against.
+
+## D1 — the plugin version is in the instruction block
+
+The MCP instructions now open with the plugin version beside the two upstream ones — *"Authoring
+surface for just-dna annotation modules (plugin v{version}). Schema answers come from
+just-dna-format {…} and just-dna-compiler {…}"* — all three interpolated, none literal.
+
+Two caveats so you can reproduce it rather than take our word: a session running an **installed** copy
+built before today will still serve the old string, which is the same two-copies problem you found
+one level down; and no test asserts the plugin version appears, only the format and compiler ones.
+
+## D22 — `valid` and `name_matches_path` are three-valued, on the path you measured
+
+Both are `bool | None` now, as is `registry_url`, and the no-token pre-flight returns `null` for all
+three with `verdict_unavailable: "no_registry_token"` and an `unchecked` entry saying nothing ran.
+That is the path you hit — a module that `validate_module(strict=true)` passes clean coming back
+`valid: false` — and it no longer reports a negative for a check that never left the machine.
+
+**One place it is still a plain boolean, which we would rather flag than have you find.** On the path
+where the registry *did* answer, a field missing from the upstream report is still coerced with
+`bool(getattr(…, False))`, so absent becomes `false` there rather than `null`. And
+`module_level_clear` is a plain `bool` throughout. So the accurate claim is *null when the request
+never left*, not *null whenever the check did not run*. Your D22 framing — good three-valued fields
+sitting beside plain booleans in one response — is not fully retired.
+
+## D18 — real, and the cause is ours rather than the registry's
+
+We went to file this against `just-dna-registry` and stopped, because the registry already supplies
+what you asked for. `GET /api/v1/modules` returns `gene_count` in the same `stats` block as the
+truncated list — `aggression_anger_snps` comes back `gene_count: 22` beside its three genes — and
+the top-3 cut is documented in their API reference. Our own card projection reads `genes` and never
+reads `gene_count`, so the field was being dropped between their response and the tool's answer.
+
+Your finding stands exactly as written; only the address changed. Recording it here because you
+scoped it as a plugin defect and you were right to.
+
+## The tier change, which affects how you read your own run
+
+`registry_download`, `reverse_module` and `refresh_sidecar` are no longer behind `JMC_MODE=extended`
+— all three are registered unconditionally. Your pass ran in essentials, so any conclusion of the
+form "the plugin cannot get a published module onto disk" or "there is no way to re-derive a
+sidecar" was about the default tier at the time rather than about the tool set. One qualifier:
+`refresh_sidecar` is visible in essentials, but the two corpus-sized sidecars still refuse outside
+extended — the gate moved from the tool to its argument rather than disappearing.
+
+## D14 — the best new-rule proposal in either run, and it is on our roadmap
+
+`RM27 — check the conclusion against the row it sits on` is open. It takes both of your rules at the
+strengths your addendum argued for: `warning` for *conclusion names a genotype token built from
+alleles at this rsID's own locus*, `hint` for the duplicate-conclusion rule.
+
+What made it actionable was the addendum rather than the original finding. Proposing a lint rule is
+cheap; running it over 1,418 rows, hand-inspecting all 20 hits, reporting ~60% precision and
+therefore arguing *against* `error`, and separating the 492 duplicate-conclusion rows into "480 of
+these are one module and arguably correct" — that is the work that turns a proposal into something we
+can size. The swapped `rs17514846` conclusions are the case we will build the fixture from.
+
+We are not giving a date. It is open, unassigned, and it is the item we would pick up first.
+
+## D15 — we agree, and we are not doing it yet
+
+Your verdict is correct: `registry_is_published` answering `free_to_publish: true` for `coronary` is
+true about the registry and false about the world, and the plugin applies the "do not guess which
+instance" discipline one level below where it also applies. The asymmetry you point at is real —
+`target` is required with no default precisely so a read cannot answer confidently about the wrong
+place, and *which kind of publication* gets no such treatment.
+
+We are recording it as acknowledged and nothing more. It is written up in our `docs/dogfooding.md`
+but it is **not** an open roadmap item, and we would rather say that than imply it is scheduled. Your
+suggested minimum — the answer stating what it did not look at — is the shape we would take if we
+take one; the `compare_to_published`-against-a-source-URL version is a larger change and we have not
+decided on it.
+
+## D24, and the skill check
+
+D24 is yours and you have already fixed it; we are claiming nothing there.
+
+Separately: thank you for checking `module-install-local`'s four claims about this repository as
+falsifiable claims and reporting the result as a table. That skill exists to describe *your* code
+from the outside, which is the position where a doc rots without anyone noticing, and a
+claim-by-claim verification from the side that owns the code is the only thing that keeps it honest.
+If it drifts again we would rather hear it the same way.
+
+## What we are not asking for
+
+Nothing in this section is a request. The one open ask from us to you is still the 2026-08-21 one
+above — a CLI wrapper for `register_downloaded_module` — and "we are not doing that" closes it as
+completely as anything else would.
