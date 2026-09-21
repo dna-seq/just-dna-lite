@@ -2208,7 +2208,7 @@ requires-dist = [
     { name = "grpcio", specifier = "<1.82" },
     { name = "grpcio-health-checking", specifier = "<1.82" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "just-dna-registry", specifier = ">=0.25.2" },
+    { name = "just-dna-registry", specifier = ">=0.26.1" },
     { name = "just-prs", specifier = ">=0.10.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.27.1" },

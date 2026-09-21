@@ -53,7 +53,7 @@ def _build_stub() -> typer.Typer:
             "[bold red]✗ just-dna-enricher's CLI is not available in this environment[/bold red]\n"
             f"  {ENRICHER_CLI_UNAVAILABLE}\n"
             "  The enricher's Python API still works; only its command-line app failed to import.\n"
-            "  Cache provisioning is available as [bold]pipelines prepare-caches[/bold]."
+            "  Cache provisioning is available as [bold]uv run pipelines prepare-caches[/bold]."
         )
         raise typer.Exit(1)
 

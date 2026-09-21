@@ -639,6 +639,20 @@ def test_a_discordant_clinical_call_is_badged_and_nothing_picks_a_side(tmp_path)
     assert all(not _build_variant(r, {})["clin_sig_contested"] for r in plain.iter_rows(named=True))
 
 
+def test_a_lead_table_the_concordance_key_cannot_be_built_from_is_skipped_not_failed(tmp_path):
+    """`_genotype_key_expr` reads `phased`; a lead table without it must be a logged skip, not a
+    `ColumnNotFoundError` that costs the module its whole report section."""
+    from just_dna_pipelines.annotation.report_logic import _join_concordance
+
+    lead = pl.DataFrame({"rsid": ["rs1"], "variant_key": ["rs1"], "genotype": [["A", "T"]],
+                         "module": ["m"], "weight": [0.0]}).lazy()
+    concordance = pl.DataFrame({"variant_key": ["rs1"], "genotype": ["A/T"],
+                                "authority_concordance": ["discordant"], "opposed": [True]}).lazy()
+    out = _join_concordance(lead, concordance, "m").collect()
+    assert out.height == 1
+    assert "clin_sig_concordance" not in out.columns
+
+
 def test_an_expanded_locus_is_labelled_in_the_report():
     """`locus_count > 1` is stated to the reader rather than silently rendered as a finding.
 

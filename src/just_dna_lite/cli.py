@@ -11,6 +11,8 @@ from typing import Annotated, Dict, Optional
 
 import typer
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.table import Table
 
 load_dotenv()  # Load .env from cwd or parent dirs before any command runs
 
@@ -578,10 +580,7 @@ def prepare_caches_cmd(
 
     outcomes = prepare_caches(selected, declared_use=use)
 
-    from rich.console import Console as RichConsole
-    from rich.table import Table as RichTable
-
-    table = RichTable(title="Enricher caches")
+    table = Table(title="Enricher caches")
     for column in ("lane", "ready", "route", "path", "detail"):
         table.add_column(column)
     failed = 0
@@ -597,7 +596,7 @@ def prepare_caches_cmd(
             str(outcome.path) if outcome.path else "",
             outcome.detail or "",
         )
-    RichConsole().print(table)
+    Console().print(table)
     if failed:
         raise typer.Exit(1)
 

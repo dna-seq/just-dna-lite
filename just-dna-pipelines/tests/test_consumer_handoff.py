@@ -236,8 +236,6 @@ class TestDiscoveryProbeIsCallableAtImportTime:
         """Format 0.7's `clin_sig_concordance.parquet` reaches `ModuleInfo.concordance_url` the way
         the other side tables do, and a module without one answers `None` rather than a path that
         does not exist. Probing path (no manifest); the attested path goes through the same `_has`."""
-        import polars as pl
-
         pl.DataFrame({"rsid": ["rs1"], "genotype": [["A", "T"]]}).write_parquet(
             tmp_path / "weights.parquet"
         )

@@ -596,16 +596,24 @@ def _join_concordance(
     is explicit that the block is computed with by nothing — and ``unchecked`` renders nothing,
     because an authority that could not be consulted is not agreement.
 
-    Skipped, with the rows left un-badged rather than the join guessed, when the lead table has no
-    ``variant_key`` or no list genotype: a 0.3/0.5 artifact has no concordance table to join anyway.
+    Skipped, with the rows left un-badged rather than the join guessed, when the lead table lacks
+    anything ``_genotype_key_expr`` reads — ``variant_key``, a list ``genotype`` or ``phased``: a
+    0.3/0.5 artifact has no concordance table to join anyway, and the predicate names every column
+    the expression needs so a missing one is a logged skip rather than a ``ColumnNotFoundError``
+    that fails the whole report for that module.
     """
     schema = weights_lf.collect_schema()
-    if "variant_key" not in schema.names() or schema.get("genotype") != pl.List(pl.String):
+    names = set(schema.names())
+    if (
+        "variant_key" not in names
+        or "phased" not in names
+        or schema.get("genotype") != pl.List(pl.String)
+    ):
         log_message(
             message_type="info",
             action="concordance_join_skipped",
             module=module_name,
-            reason="lead table carries no variant_key + list genotype to key on",
+            reason="lead table carries no variant_key + list genotype + phased to key on",
         )
         return weights_lf
     right = (
