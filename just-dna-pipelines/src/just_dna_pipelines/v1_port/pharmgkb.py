@@ -196,8 +196,8 @@ def build_pharmgkb_module(
     reference = Path(snapshot) if snapshot is not None else resolve_clinpgx_reference()
     if reference is None:
         raise FileNotFoundError(
-            "no ClinPGx snapshot found. Provision it with `just-dna-enricher cache pull "
-            "--only clinpgx --use non-commercial`."
+            "no ClinPGx snapshot found. Provision it with `pipelines prepare-caches "
+            "--lane clinpgx --use non-commercial`."
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)

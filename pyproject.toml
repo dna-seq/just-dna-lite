@@ -1,6 +1,6 @@
 [project]
 name = "just-dna-lite"
-version = "0.3.21"
+version = "0.3.22"
 description = "Just DNA Lite version to analyze your omics faster"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
@@ -11,25 +11,18 @@ dependencies = [
   "pyyaml>=6.0.3",
   "dagster-dg-cli>=1.13.17",
   "just-prs>=0.10.0",
-  # The catalog client, pinned to the server's own version — `GET /api/v1/version` on
-  # module-marketplace.just-dna.life reports registry 0.14.0, and 0.14.0 is on PyPI. Anything older
-  # than 0.11.0 is unusable against that server: `just-dna-marketplace` was this package's old name,
-  # and 0.8.1 (its last release under it) raises a pydantic ValidationError in its compatibility
-  # guard before any request is sent, because 0.11.0 renamed `marketplace` to `registry` in the
-  # version payload. Never point a dependency at a directory outside this repo — bump to a published
-  # version instead.
-  # 0.17.0 is the format-0.6 cut. `version.contract_compatible` treats a 0.x minor as breaking, so
-  # this floor and the `just-dna-format` one move together: a 0.5-format client is refused by a
-  # 0.6-format server and vice versa. The client *surface* did not move in 0.17.
-  # 0.18.2 is the current PyPI client. It still declares `just-dna-format>=0.6.1`; our pipelines
-  # floor is 0.6.6 (format / compiler / enricher aligned on that cut). The registry's `server`
-  # extra is the only place it names the enricher, and we do not install that extra. Every client
-  # symbol we use is unchanged (`RegistryClient`, `RegistryError`, `VersionMismatchError`,
-  # `generate_install_id`, `validate_install_id`, `client_cli.app`, `version.contract_compatible`).
-  # Prod answers `registry 0.18.2 / format 0.6.1 / compiler 0.6.1` as of the last check — client
-  # and server agree. Verify before assuming either way:
+  # The catalog client. `version.contract_compatible` compares the installed `just-dna-format`
+  # on client and server and treats a 0.x minor as breaking, so this floor moves with the format
+  # floor in just-dna-pipelines/pyproject.toml, never alone. 0.25.0 is the format-0.7 cut; 0.26.1
+  # (2026-09-21) adopts compiler/enricher 0.7.1 and changes no client surface — "no endpoint and
+  # no RegistryClient method moves". Both servers answered `registry 0.25.2 / format 0.7.0 /
+  # compiler 0.7.0` the day we adopted it: a registry patch behind the client is not a contract
+  # gap, only the format minor is. Every client symbol we use is unchanged since 0.18
+  # (`RegistryClient`, `RegistryError`, `VersionMismatchError`, `generate_install_id`,
+  # `validate_install_id`, `client_cli.app`). Never point a dependency at a directory outside this
+  # repo. Verify what is deployed before assuming either way:
   #   curl -s $REGISTRY_URL/api/v1/version
-  "just-dna-registry>=0.18.2",
+  "just-dna-registry>=0.26.1",
   # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
   # but dagster still caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
   # the gencode and dagster fails to import (VersionError in health_pb2). Dagster 1.13.13

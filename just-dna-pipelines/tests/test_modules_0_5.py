@@ -64,11 +64,11 @@ def _clinpgx_snapshot() -> Optional[Path]:
 
 needs_clinvar = pytest.mark.skipif(
     _clinvar_snapshot() is None,
-    reason="no ClinVar snapshot (`just-dna-enricher cache pull --only clinvar`)",
+    reason="no ClinVar snapshot (`pipelines prepare-caches --lane clinvar`)",
 )
 needs_clinpgx = pytest.mark.skipif(
     _clinpgx_snapshot() is None,
-    reason="no ClinPGx snapshot (`just-dna-enricher cache pull --only clinpgx --use non-commercial`)",
+    reason="no ClinPGx snapshot (`pipelines prepare-caches --lane clinpgx --use non-commercial`)",
 )
 
 

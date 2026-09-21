@@ -8,11 +8,8 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    # >=2.7.0 is the first PyPI release containing agno-agi/agno#7674
-    # (AccuracyResult stat-field fix); previously pinned to a git rev because
-    # the fix was unreleased. See docs/reviews/pr-28-windows-installer.md.
-    # Do not float to 3.x alphas.
-    "agno>=2.9.0",
+    # >=2.7.0 was the first PyPI release containing agno-agi/agno#7674 (AccuracyResult
+    # stat-field fix). The `[mcp]` extra below carries the floor now; see that comment.
     "aiohttp>=3.14.3",
     "anthropic>=0.121.0",
     "dagster>=1.13.17",
@@ -22,20 +19,21 @@ dependencies = [
     "fsspec>=2026.7.0",
     "google-genai>=1.75.0,<2.0",
     "huggingface-hub>=1.27.0",
-    # 0.6.6 is the current published trio (format / compiler / enricher, tagged 2026-08-21).
-    # Never 0.6.0: it shipped eight defects fixed the next day (RM93-RM100), one of which (RM95)
-    # let a non-vocabulary `measure_kind` spelling into `content_signature` — the one identity
-    # that cannot be taken back. 0.6.3–0.6.4 are why a rebuild is safe (multi-allelic grouping,
-    # `_superseded_rsid_rows`); `build_clinvar_module` still unlinks variants/studies/resolution
-    # before drafting so a rebuild is a fresh draft, not a re-draft beside a collapsed row.
-    "just-dna-compiler>=0.6.6",
-    "just-dna-enricher>=0.6.6",
-    "just-dna-format>=0.6.6",
-    # agno's MCP toolkit (agents/module_creator.py) imports `McpError` from
-    # mcp.shared.exceptions and `streamablehttp_client` from mcp.client.streamable_http;
-    # mcp 2.0.0 removed both, so `from agno.tools.mcp import MCPTools` raises ImportError.
-    # Still broken as of agno 2.9.0. Drop the cap once agno supports mcp 2.x.
-    "mcp>=1.29.0,<2.0",
+    # The 0.7 line (adopted 2026-09-21): format 0.7.0, compiler and enricher 0.7.1 — a partial cut,
+    # the shape 0.6.3/0.6.4 used. The compiler moves with the enricher because enricher 0.7.1
+    # imports `just_dna_compiler.resolution_findings`, added after v0.7.0 was tagged; a 0.7.0
+    # compiler beside a 0.7.1 enricher is a ModuleNotFoundError in a clean venv. The three floors
+    # move together with the registry floor at the workspace root (`contract_compatible` treats a
+    # 0.x format minor as breaking). See CLAUDE.md § "What 0.7 changed on our side".
+    "just-dna-compiler>=0.7.1",
+    "just-dna-enricher>=0.7.1",
+    "just-dna-format>=0.7.0",
+    # agno 3.x imports the mcp 2.x names (`MCPError`, `streamable_http_client`) and `fastmcp`,
+    # all declared only under its `[mcp]` extra. Depend on the extra rather than re-listing its
+    # members: the 2026-09 relock floated agno to 3.0.10 against a bare `mcp<2.0` cap here, and
+    # `from agno.tools.mcp import MCPTools` died at import, taking the webui and the `pipelines`
+    # CLI with it. agno 2.x wanted the opposite cap (`McpError`, mcp<2); do not float back.
+    "agno[mcp]>=3.0.10",
     "numpy>=2.5.2",
     "openai>=3.0.0",
     "pillow>=12.3.0",

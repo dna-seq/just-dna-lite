@@ -31,19 +31,20 @@ Everything downstream reads local snapshots; none of the builds fetch a referenc
 
 ```bash
 uv run pipelines ensembl-setup                       # 25 parquet, ~14 GB, verified + DuckDB
-uv run just-dna-enricher cache pull --use non-commercial
-uv run just-dna-enricher cache status                # all six lines should read "present"
+uv run pipelines prepare-caches --use non-commercial # every enricher lane this machine can have
 ```
 
-`cache pull` writes to the platformdirs default (`~/.cache/just-dna-pipelines/`) while
-`cache status` and every resolver read `$JUST_DNA_PIPELINES_CACHE_DIR`. If `.env` points the cache
-elsewhere — it does here, at `/data/just-dna-lite/.cache/just-dna-pipelines` — move the pulled
-snapshots there, or `status` will report them absent immediately after a successful pull:
+`prepare-caches` is enricher 0.7's `cache prepare` (RM176) through its Python API: it pulls the
+published snapshots, builds the lanes that are unpublished for recorded reasons, and leaves a
+present cache alone, so it is safe to re-run. The older `cache pull` fetched only what was published
+and stopped, which left several caches absent with the checks reading them skipping themselves. The
+command loads `.env` first, so the snapshots land in `$JUST_DNA_PIPELINES_CACHE_DIR` where every
+resolver reads them (the 0.5 trap where `pull` wrote to the platformdirs default is gone with it).
 
-```bash
-mv ~/.cache/just-dna-pipelines/{clinvar,clinpgx,cpic,gnomad_constraint} \
-   "$JUST_DNA_PIPELINES_CACHE_DIR"/
-```
+The enricher's own `just-dna-enricher cache …` command line cannot be imported in this workspace as
+of enricher 0.7.1 — its AlphaGenome bindings are protobuf gencode newer than the runtime dagster
+pins — which is why the provisioning step is offered under `pipelines` (`pipelines enrich status`
+prints the reason; filed upstream as S107).
 
 ## 1. Build
 

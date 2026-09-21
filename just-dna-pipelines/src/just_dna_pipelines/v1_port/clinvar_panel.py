@@ -473,8 +473,8 @@ def build_clinvar_module(
     snapshot = Path(reference) if reference is not None else resolve_clinvar_reference()
     if snapshot is None:
         raise FileNotFoundError(
-            "no ClinVar snapshot found. Provision it with `just-dna-enricher cache pull "
-            "--only clinvar`, or build one with `just-dna-enricher clinvar build --download`."
+            "no ClinVar snapshot found. Provision it with `pipelines prepare-caches "
+            "--lane clinvar`, or build one with `just-dna-enricher clinvar build --download`."
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)

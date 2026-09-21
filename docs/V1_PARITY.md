@@ -101,7 +101,8 @@ same shape the Gen-I modules had.
 Two upstream defects were worked around and reported to the format repo (see
 `just-dna-format/docs/ROADMAP.md`): the provider's own study drafting raises on ClinVar's
 PubMedCentral/malformed citation ids, so the panel drafts its own `studies.csv` with a PMID filter;
-and `cache pull` writes where `resolve_*` does not look.
+and `cache pull` wrote where `resolve_*` does not look (superseded by `pipelines prepare-caches`,
+which loads `.env` before provisioning).
 
 **Publishing stays the maintainer's call.** Built under `data/interim/v1_port/`, not pushed. These
 three were live at 1.0.0 before the registry wipe; the rebuild makes them 2.0.0 rather than a

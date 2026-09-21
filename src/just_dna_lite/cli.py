@@ -38,7 +38,9 @@ from just_dna_pipelines.annotation.module_cache import (
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
-from just_dna_enricher.cli import app as enricher_app
+from just_dna_pipelines.enricher_cli import enricher_app
+from just_dna_pipelines.runtime import load_env
+from just_dna_enricher.caches import CACHE_LANES, prepare_caches
 from just_dna_registry.client_cli import app as registry_client_app
 from just_dna_lite.registry_org_cli import app as registry_org_app
 
@@ -59,6 +61,8 @@ app.add_typer(agent_app, name="agent")
 # consumes with no reference and no network — the replacement for injecting an Ensembl
 # DuckDB, which just-dna-compiler deprecates for removal at 1.0. Mounting the app whole
 # means new enricher commands surface here without further wiring.
+# `enricher_app` is a stub with one `status` command when the enricher CLI cannot be imported
+# here (protobuf gencode/runtime mismatch, S107) — see `just_dna_pipelines.enricher_cli`.
 app.add_typer(enricher_app, name="enrich")
 # Registry reference client (list/download/publish/import-module/find-by-hash/
 # update-module-version). Reads REGISTRY_URL / REGISTRY_TOKEN from flags, env, or .env.
@@ -521,6 +525,81 @@ _resolve_ensembl_cache = resolve_ensembl_cache_root
 _fetch_ensembl_manifest = fetch_ensembl_manifest
 _sha256_file = sha256_file
 _file_is_valid = file_is_valid
+
+
+@app.command("prepare-caches")
+def prepare_caches_cmd(
+    use: str = typer.Option(
+        "unstated",
+        "--use",
+        help="Declared use for the licence-gated lanes: unstated | non-commercial | commercial.",
+    ),
+    lane: Optional[list[str]] = typer.Option(
+        None,
+        "--lane", "-l",
+        help="Only these lanes (repeatable). Default: every lane the enricher registers.",
+    ),
+) -> None:
+    """
+    Provision every enricher reference cache this machine can have (enricher 0.7, RM176).
+
+    Pulls the published snapshots and builds the lanes that are unpublished for recorded reasons;
+    a lane that is already present is left alone, so this is safe to run on every deploy. This is
+    `just-dna-enricher cache prepare` through its Python API (`caches.prepare_caches`), offered
+    here because the enricher's own command line cannot be imported beside dagster's protobuf
+    pin (see `pipelines enrich status`). `cache pull` is the wrong command now: it fetches only
+    what is published and stops, so a deployment that only pulled ran with several caches absent
+    and the checks reading them skipping themselves.
+
+    Exit 1 if any lane failed. A lane that cannot run unattended (an operator-held workbook, a
+    personal key) is reported as such and is not a failure.
+
+    Examples:
+
+        uv run pipelines prepare-caches --use non-commercial
+        uv run pipelines prepare-caches --lane clinvar --lane clinpgx --use non-commercial
+    """
+    # The enricher's resolvers evaluate their default cache directory before they call
+    # `load_env()` themselves, so `.env` has to be loaded first or the first lane lands in the
+    # platformdirs default (the `cache pull` trap in CLAUDE.md).
+    load_env()
+    by_name = {cache_lane.name: cache_lane for cache_lane in CACHE_LANES}
+    if lane:
+        unknown = sorted(set(lane) - set(by_name))
+        if unknown:
+            typer.secho(
+                f"Unknown lane(s): {', '.join(unknown)}. Known: {', '.join(by_name)}",
+                fg=typer.colors.RED, err=True,
+            )
+            raise typer.Exit(2)
+        selected = [by_name[name] for name in lane]
+    else:
+        selected = None
+
+    outcomes = prepare_caches(selected, declared_use=use)
+
+    from rich.console import Console as RichConsole
+    from rich.table import Table as RichTable
+
+    table = RichTable(title="Enricher caches")
+    for column in ("lane", "ready", "route", "path", "detail"):
+        table.add_column(column)
+    failed = 0
+    for outcome in outcomes:
+        if outcome.ready is True:
+            ready = "[green]yes[/green]"
+        elif outcome.ready is False:
+            ready, failed = "[red]no[/red]", failed + 1
+        else:
+            ready = "[yellow]not unattended[/yellow]"
+        table.add_row(
+            outcome.lane, ready, outcome.route,
+            str(outcome.path) if outcome.path else "",
+            outcome.detail or "",
+        )
+    RichConsole().print(table)
+    if failed:
+        raise typer.Exit(1)
 
 
 @app.command("download-ensembl")

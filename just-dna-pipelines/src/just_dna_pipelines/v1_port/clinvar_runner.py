@@ -59,7 +59,7 @@ def module_gene_list(name: str, download_cache: Path) -> tuple[list[str], dict[s
         if reference is None:
             raise FileNotFoundError(
                 "no ClinVar snapshot found; provision it with "
-                "`just-dna-enricher cache pull --only clinvar`."
+                "`pipelines prepare-caches --lane clinvar`."
             )
         return panel_genes(reference), {}, []
 
