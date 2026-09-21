@@ -246,9 +246,11 @@ old name, so check here first:
   and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
   which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
 
-*(Floors as of 2026-09-02: format / compiler / enricher all `>=0.6.6`, registry `>=0.18.2`. The
-0.6 reasoning below is unchanged by those patches; only the pinned numbers moved. Prod still
-answers `format 0.6.1 / compiler 0.6.1` — a patch, so `contract_compatible` still holds.)*
+*(Floors as of 2026-09-21: format `>=0.7.0`, compiler and enricher `>=0.7.1`, registry `>=0.26.1`.
+**We are on the 0.7 line** — see "What 0.7 changed on our side" below. The 0.6 reasoning that follows
+is kept because every module we have published is still a 0.5 or 0.6 artifact and the mixed-era read
+paths it describes are all still live; only the pinned numbers moved. Both servers answer
+`registry 0.25.2 / format 0.7.0 / compiler 0.7.0`, so `contract_compatible` holds.)*
 
 **We are on 0.6 (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2, adopted 2026-08-18), and the digest
 window is not what the 0.5 note said it was.** That note claimed any new column was a 1.0. Principle 3
@@ -432,6 +434,63 @@ field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actu
   generations, the pre-0.6 `ref` guard, and `UNJOINABLE_PHRASE` all still have a real artifact
   exercising them.
 
+### What 0.7 changed on our side (adopted 2026-09-21)
+
+`just-dna-format/docs/INTEGRATION_0_7.md` is the upstream delta; § 3 has a per-consumer list and the
+just-dna-lite one has nine items. What actually changed here, in that order:
+
+- **Change 0 — `cache prepare` for `cache pull`**: `pipelines prepare-caches` (above). Every remedy
+  string that named `cache pull` now names it.
+- **Changes 1–3 needed nothing, and that is recorded so nobody re-derives it.** We match no warning
+  prose (`UNJOINABLE_PHRASE` is the registry's, and we read `trusted` from it rather than computing
+  it); we read no derived CSV on the consumer path (`v1_port` unlinks and regenerates `resolution.csv`
+  / `literature.csv` as the *author*, which is the side the overlay is applied for); and nothing here
+  reads `manifest.verification`, so the one old-reader break (`VerificationRecord.producer`) never
+  reached us. `warnings_summary` / `carried` are available on `Compilation` if a future reader wants
+  to classify a finding — use them, never the sentence.
+- **Check 9 — `direction` may read `contested`** (RM150). `_effective_direction` passes it through,
+  `_variant_sign` gives it 0 and `_variant_color` no colour, and the template renders the word. It is
+  a *finding* (the sources disagree about the sign) beside `unknown`'s *absence*, so never fold the two;
+  and it is authored-only — `direction_from_state` cannot produce it — so a 0.5 artifact never reads
+  it. `stat_significance` gains nothing.
+- **Check 6 — `requires_callable` is now a restoration gate.** `hom_ref_rows` never restores a row
+  whose `requires_callable` is `True`: the author has said the reference conclusion must be withheld
+  without callability proof and a flank proxy is not one. `False` and null both keep the row — a blank
+  cell is *unknown*, never `false` (CONSUMING.md). RM70 put the column on `haplotypes` and
+  `pharm_variants`, so it can arrive on any lead family once RM43's fill routes one to the position
+  join; the whole shipped corpus is null, so nothing measured moved. Written `is_null() | ~col`, not
+  `fill_null(False)`, so the tri-state stays visible at the seam.
+- **Check 4 — `studies.parquet` gains `statistical_test` and `confidence`/`confidence_unit`.**
+  `load_studies_for_variants` carries them and the study table renders each as a column only when
+  some study on that variant has it. `confidence` is the citing source's own review state in its own
+  units and renders **with its unit or not at all** — `accepted (civic_evidence_status)` is CIViC's
+  ladder, not a grade of ours.
+- **Check 5 — `pharm_variants.pmid`.** The view model carries `pmid` and the detail rows show a
+  PubMed-linked *Citation* beside *Evidence level*. Different axes — the citation points *at* the
+  evidence, the level is somebody's grading *of* it — so both rows or neither.
+- **Check 7 — `clin_sig_concordance` badges a contested clinical call.** Discovery attests
+  `clin_sig_concordance.parquet` onto `ModuleInfo.concordance_url` the way it does the other side
+  tables; `load_annotated_weights` left-joins it on `(variant_key, genotype)` through
+  `_genotype_key_expr` — the same key the 0.6 annotations join uses — and the report renders an
+  *Authorities disagree* row beside *ClinVar* when `authority_concordance == "discordant"`, naming
+  whether the split crosses the pathogenic/benign line (`opposed`). **Nothing resolves the split**:
+  no winner is read off `authority_precedence`, and `unchecked` renders nothing. No module we hold
+  carries the table yet (no reference example does either), so the test builds one from
+  `ClinSigConcordanceRow` — the model is the contract.
+- **Check 8 needed nothing**: we never read `gene_metrics.constraint_flags`.
+- **Pins**: `artifact.digest` moved on 14/15 upstream modules and `content_signature` on none, exactly
+  the 0.6 shape; we cache neither, and `read_module_provenance` renders the digest as the module's
+  *claim*, which is unaffected. `ARTIFACT_PARQUETS` went 19 → 23 and `LEAD_PARQUETS` is unchanged;
+  both are imported, never re-listed, so `tests/test_format_0_6.py`'s set-equality tests needed no
+  edit.
+
+**The dependency bump broke two things that had nothing to do with the format, and both are worth
+knowing before the next `uv lock --upgrade`.** agno floated 2.9 → 3.0.10, which imports the mcp 2.x
+names; our `mcp<2.0` cap (written for agno 2) then took the webui and the `pipelines` CLI down at
+import. The pipelines dependency is `agno[mcp]` now, so agno's own extra carries the mcp/fastmcp
+floors. And enricher 0.7.1's CLI cannot import beside dagster's protobuf pin — the S107 paragraph
+under *0.5 traps* above.
+
 ### Contract facts (0.1.0 libs)
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
   `categories` (sorted list), `study_count`, `module_name` — renamed from the old
@@ -454,10 +513,27 @@ platformdirs and returns `None` even when `$JUST_DNA_PIPELINES_CACHE_DIR` names 
 later call is fine. `v1_port/runner.py` and `tests/test_modules_0_5.py` both `load_env()` at import
 for exactly this reason.
 
-**`just-dna-enricher cache pull` writes where `cache status` does not look.** Same root cause: `pull`
-lands in `~/.cache/just-dna-pipelines/` while every resolver reads the configured cache dir, so
-`status` reports "absent" straight after a successful pull. Move them:
-`mv ~/.cache/just-dna-pipelines/{clinvar,clinpgx,cpic,gnomad_constraint} "$JUST_DNA_PIPELINES_CACHE_DIR"/`.
+**Provision caches with `uv run pipelines prepare-caches`, not `just-dna-enricher cache pull`.**
+Enricher 0.7 (RM176) replaced `pull` with `cache prepare`: `pull` fetched only the published snapshots
+and stopped, and several lanes are unpublished for recorded reasons, so a deployment that only pulled
+ran with those caches absent and the checks reading them skipping themselves. `prepare` pulls what is
+published, builds the rest, and leaves a present cache alone. Our command is that function
+(`caches.prepare_caches`) behind `load_env()`, which also closes the old trap where `pull` wrote to the
+platformdirs default while every resolver read `$JUST_DNA_PIPELINES_CACHE_DIR`. The enricher's own
+command line is dead in this workspace (next paragraph), which is why the command lives under
+`pipelines`.
+
+**`just-dna-enricher`'s CLI cannot be imported beside dagster (enricher 0.7.1, filed as S107).**
+`just_dna_enricher.cli` imports its AlphaGenome Atlas bindings at module scope, and those are protobuf
+gencode stamped 7.35 by the `grpcio-tools` RM247 pinned; dagster caps `protobuf<7`, and protobuf
+refuses a runtime older than its gencode with `google.protobuf.runtime_version.VersionError` — a bare
+`Exception` subclass that the enricher's `except (ImportError, RuntimeError)` guard does not catch. So
+the `just-dna-enricher` console script and anything mounting its Typer app die at import; the Python
+API (`resolver`, `enrich`, `caches`, `clinvar*`, `clinpgx*`) is unaffected and is what we call.
+`just_dna_pipelines.enricher_cli` is the one guarded import both `pipelines` entry points mount
+(`just_dna_lite.cli` owns the installed script; `just_dna_pipelines.cli` is shadowed): the real app when
+it imports, else a stub `enrich` group whose `status` prints the reason and exits 1. Do not re-import
+`just_dna_enricher.cli` anywhere else.
 
 **`clinvar_draft` raises on ClinVar's own citation ids.** `var_citations.txt` carries 632k
 PubMedCentral ids and a few malformed "PubMed" ones (Variation 12606 cites `168335863`, nine digits);
@@ -889,8 +965,9 @@ Browse/Publication tabs. Two are shipped:
 | `polygon` | `https://module-polygon.just-dna.life` | `test` | `REGISTRY_TOKEN_POLYGON` |
 
 `polygon` is the testing ground (the workshop runbook in `docs/workshops/crabs-2026.md` sends
-participants there to rehearse a claim + publish). Both currently answer registry 0.18.2 /
-format 0.6.1 / compiler 0.6.1, so the contract guard is satisfied on either.
+participants there to rehearse a claim + publish). Both answered registry 0.25.2 / format 0.7.0 /
+compiler 0.7.0 on 2026-09-21 with our client at 0.26.1, so the contract guard is satisfied on either
+— a registry patch behind the client is not a contract gap, only the format minor is.
 
 - **`RegistryStore` in `module_config.py` is the model; `modules.yaml` is the list.** Never hardcode
   a registry URL in Python or in a component — use `get_registry_stores()` / `get_registry_store()`
