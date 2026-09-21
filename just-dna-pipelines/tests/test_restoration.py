@@ -375,6 +375,37 @@ class TestHomRefRowSelection:
         ])
         assert hom_ref_rows(lead).collect()["rsid"].to_list() == ["rs4988235"]
 
+    @pytest.mark.parametrize(
+        "requires_callable, restored",
+        [(True, False), (False, True), (None, True)],
+        ids=["true-withholds", "false-restores", "unknown-restores"],
+    )
+    def test_a_row_that_requires_callability_is_never_restored(self, requires_callable, restored):
+        """Format RM6 / 0.7 RM70: `requires_callable=True` says the reference conclusion must be
+        withheld without callability proof, and a flank proxy is not one. Three states, one of
+        which withholds — a blank cell is *unknown*, never `false`, and unknown keeps today's
+        behaviour (CONSUMING.md § "Absence is not reference")."""
+        frame = pl.DataFrame(
+            [{"rsid": "rs1", "chrom": "1", "start": 10, "ref": "G", "genotype": ["G", "G"],
+              "module": "m", "weight": 0.0, "state": "neutral",
+              "requires_callable": requires_callable}],
+            schema={"rsid": pl.String, "chrom": pl.String, "start": pl.UInt32, "ref": pl.String,
+                    "genotype": pl.List(pl.String), "module": pl.String, "weight": pl.Float64,
+                    "state": pl.String, "requires_callable": pl.Boolean},
+        ).lazy()
+        assert hom_ref_rows(frame).collect().height == (1 if restored else 0)
+
+    def test_a_column_of_unknown_callability_changes_nothing(self):
+        """The whole shipped corpus: the column exists (0.5+) and every cell is null. That must be
+        indistinguishable from the column being absent, or every module loses restoration."""
+        rows = [{"rsid": "rs1", "chrom": "1", "start": 10, "ref": "G", "genotype": ["G", "G"],
+                 "module": "m", "weight": 0.0, "state": "neutral"}]
+        without = hom_ref_rows(_lead(rows)).collect()
+        with_null = hom_ref_rows(
+            _lead(rows).with_columns(pl.lit(None).cast(pl.Boolean).alias("requires_callable"))
+        ).collect()
+        assert with_null.height == without.height == 1
+
     def test_a_lead_table_without_coordinates_is_excluded_by_schema(self):
         """The `pharm_variants` case: no `ref`, no coordinates, so the question cannot be asked.
 

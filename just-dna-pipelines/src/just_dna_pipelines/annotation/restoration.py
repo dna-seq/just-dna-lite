@@ -38,6 +38,11 @@ the site, not that this base was covered at depth. The rigorous answer is the fo
 containment, and those columns are unpopulated across our whole corpus. Until they are populated this
 is the strongest honest gate available, which is why the evidence column exists and why the report
 must never merge the two categories.
+
+One half of that contract is honoured already: a row whose `requires_callable` is `True` is never a
+restoration candidate (`hom_ref_rows`), because the author has said the reference conclusion must be
+withheld without callability proof and a flank proxy is not one. Format 0.7 (RM70) put the column on
+`haplotypes` and `pharm_variants` beside `VariantRow`, so it can now arrive on any lead family.
 """
 
 from __future__ import annotations
@@ -326,6 +331,23 @@ def hom_ref_rows(lead_lf: pl.LazyFrame) -> Optional[pl.LazyFrame]:
     candidates = placed.join(ambiguous_sites, on=["chrom", "start"], how="anti")
     if "locus_count" in names:
         candidates = candidates.filter(pl.col("locus_count").fill_null(1) <= 1)
+
+    # `requires_callable` (format RM6, populated on the PGx locus tables since 0.7's RM70) is the
+    # author saying that the *absence* of this variant is the informative call — CPIC's assumption
+    # that an uncalled position is reference, made explicit — and that without callability data the
+    # reference conclusion must be **withheld rather than asserted**. Restoration is exactly that
+    # assertion made from a flank proxy, so a row that requires callability is never a candidate.
+    #
+    # Three states, and only one of them withholds: `True` excludes; `False` and null both keep the
+    # row, because a blank cell is *unknown*, never `false`, and unknown means today's behaviour
+    # (CONSUMING.md § "Absence is not reference": "a blank cell is unknown, never false"). Written as
+    # `is_null() | ~col` rather than `fill_null(False)` so that reading stays visible at the seam.
+    # The column is unpopulated across every module we ship, so this changes nothing measured; it
+    # is the gate that has to exist before the first authored `True` arrives.
+    if "requires_callable" in names:
+        candidates = candidates.filter(
+            pl.col("requires_callable").is_null() | ~pl.col("requires_callable").cast(pl.Boolean)
+        )
 
     return candidates.filter(
         (pl.col("genotype").list.len() > 0)
