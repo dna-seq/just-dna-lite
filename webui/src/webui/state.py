@@ -3716,8 +3716,10 @@ from prs_ui import PRSComputeStateMixin
 import prs_ui
 import prs_ui.mixin as _prs_ui_mixin
 from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
+from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from prs_ui.mixin import loaded_grid_selection_model as _loaded_grid_selection_model
+from prs_ui.mixin import normalize_trait_group_by, trait_group_label_expr
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
 from just_prs.prs import ReferenceUniverse as _ReferenceUniverse
@@ -5153,6 +5155,14 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     trait_selected_pgs_ids: list[str] = []
     prs_genotypes_path: str = ""
     traits_loaded: bool = False
+    # Which axis the selector groups scores on: the PGS Catalog's mapped EFO term
+    # (`ontology`, the default — fewer, broader groups) or the study's own reported
+    # phenotype (`reported`, which keeps opposite bins from being averaged together).
+    # prs-ui 0.3.17's `trait_selector` renders `trait_group_by_control` unconditionally
+    # and binds it to this var, so a state without it crashes the page at compile time.
+    # `PRSState` inherits its copy from `PRSComputeStateMixin`; this one is ours because
+    # `PRSTraitState` deliberately does not inherit that mixin (compute stays on PRSState).
+    trait_group_by: str = TRAIT_GROUP_BY_ONTOLOGY
     _ignore_empty_selection_replay: bool = False
 
     _trait_to_pgs: dict[str, list[str]] = {}
@@ -5176,12 +5186,12 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             "pgs_id", "trait_reported", "trait_efo", "trait_efo_id", "n_variants",
         ).collect()
 
-        df = df.with_columns(
-            pl.when(pl.col("trait_efo").is_not_null() & (pl.col("trait_efo") != ""))
-            .then(pl.col("trait_efo"))
-            .otherwise(pl.col("trait_reported"))
-            .alias("trait"),
-        )
+        # The format of the group label is prs-ui's rule, not ours: `trait_group_label_expr`
+        # is the same leaf its own `TraitBrowserState` groups with, so the two selectors
+        # cannot drift into naming the same trait differently. It was hand-rolled here as
+        # the ontology branch only, which is why the Reported-trait half of the control had
+        # nothing behind it.
+        df = df.with_columns(trait_group_label_expr(self.trait_group_by))
 
         grouped = df.group_by("trait").agg(
             pl.col("pgs_id").count().alias("n_models"),
@@ -5224,6 +5234,36 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             chunk_size=500,
             eager_value_options_row_limit=0,
             column_overrides=_build_trait_column_overrides(),
+        )
+
+    def set_trait_group_by(self, value: str | list[str]) -> Any:
+        """Switch the grouping axis, reload the grid, and carry the choice to PRSState.
+
+        The control this backs is labelled for one decision, and prs-ui's own docstring for
+        it says "selector + result grouping" — in their app one state carries both, because
+        `TraitBrowserState` computes as well as selects. Ours are two states by design
+        (`PRSState` computes, `PRSTraitState` only selects and syncs PGS IDs), so the value
+        has to be pushed across explicitly or one visible toggle would leave the selector
+        grouped one way and the results the other.
+
+        Reloading is not optional either: the ``trait`` column *is* the group label, so both
+        the grid's rows and ``_trait_to_pgs`` are keyed on names that no longer exist after a
+        switch. ``load_traits`` clears the selection for that reason, and PRSState is told
+        too — otherwise Compute would still hold the PGS IDs resolved under the old grouping,
+        which is the one state nothing on screen would show as stale.
+        """
+        normalized = normalize_trait_group_by(value)
+        if normalized == self.trait_group_by:
+            return
+        self.trait_group_by = normalized
+        yield PRSState.set_trait_group_by(normalized)
+        if not self.traits_loaded:
+            return
+        yield PRSState.sync_trait_pgs_ids([])
+        yield from self.load_traits(
+            self._traits_genome_build,
+            self.prs_genotypes_path,
+            self._traits_include_harmonized,
         )
 
     def reset_for_genome_switch(self) -> None:
