@@ -60,6 +60,11 @@ class ModuleInfo(BaseModel):
     # carries one, and a report that embeds a module's curated prose owes its attribution — so this
     # is discovered rather than left to a consumer that happens to know the file is there.
     sources_url: Optional[str] = None
+    # `clin_sig_concordance.parquet` (format 0.7, RM130): per `(variant_key, genotype)`, whether the
+    # clinical authorities consulted agree with each other about this subject. The report badges a
+    # `discordant` row beside its ClinVar tier. Attested like the other side parquets; `None` when
+    # the module carries no concordance record, which is every module published before 0.7.
+    concordance_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
     # What the source's own `manifest.json` states about these bytes, when it publishes one.
@@ -294,6 +299,7 @@ def _probe_module_at_path(
     annotations_path = f"{base_path}/annotations.parquet"
     studies_path = f"{base_path}/studies.parquet"
     sources_path = f"{base_path}/sources.parquet"
+    concordance_path = f"{base_path}/clin_sig_concordance.parquet"
     metadata_json_path = f"{base_path}/metadata.json"
     metadata_yaml_path = f"{base_path}/metadata.yaml"
 
@@ -327,6 +333,9 @@ def _probe_module_at_path(
         annotations_url=_build_url(protocol, annotations_path) if _has("annotations.parquet") else None,
         studies_url=_build_url(protocol, studies_path) if _has("studies.parquet") else None,
         sources_url=_build_url(protocol, sources_path) if _has("sources.parquet") else None,
+        concordance_url=(
+            _build_url(protocol, concordance_path) if _has("clin_sig_concordance.parquet") else None
+        ),
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
         # Stated, not checked: the digest is what the module *claims*, exactly as on the local path.
@@ -610,6 +619,7 @@ class ModuleTable(str, Enum):
     STUDIES = "studies"
     WEIGHTS = "weights"
     SOURCES = "sources"
+    CONCORDANCE = "clin_sig_concordance"
     # Whichever table family carries this module's rows — weights for most, pharm_variants for a
     # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
     LEAD = "lead"
@@ -657,6 +667,10 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
         if not info.sources_url:
             raise ValueError(f"Module {module_name} does not have a sources table")
         return info.sources_url
+    elif table_name == "clin_sig_concordance":
+        if not info.concordance_url:
+            raise ValueError(f"Module {module_name} does not have a clin_sig_concordance table")
+        return info.concordance_url
 
     # Fallback for unknown tables
     return f"{info.path}/{table_name}.parquet"

@@ -116,6 +116,11 @@ def _scan_optional_module_table(
         if table == ModuleTable.SOURCES and module_info.sources_url is None:
             _log_missing_module_table(module_name, table, "module metadata has no sources table")
             return None
+        if table == ModuleTable.CONCORDANCE and module_info.concordance_url is None:
+            _log_missing_module_table(
+                module_name, table, "module metadata has no clin_sig_concordance table"
+            )
+            return None
 
     try:
         return scan_module_table(module_name, table, module_info=module_info)
@@ -289,7 +294,11 @@ def _effective_direction(
     else derived from the legacy ``state`` (+ ``weight`` sign) via the format's own pure leaf
     ``direction_from_state``. Legacy/0.5 modules leave ``direction`` empty and populate ``state``;
     format 1.0 drops ``state`` and populates ``direction`` — deriving here keeps a single code path
-    correct in both eras. Returns one of {protective, risk, neutral, unknown}.
+    correct in both eras. Returns a member of ``VALID_DIRECTIONS`` — {protective, risk, neutral,
+    unknown, contested} since format 0.7 (RM150). ``contested`` means the sources disagree about
+    the *sign*, where ``unknown`` means nobody assessed it: a finding and an absence, which used to
+    share one member. It carries no benefit sign (``_variant_sign`` → 0, no colour) and can never be
+    *derived* — no legacy ``state`` value means it — so a 0.5 artifact never reads it.
     """
     d = (direction or "").strip().lower()
     if d:
@@ -566,6 +575,55 @@ def _join_annotations(
     return weights_lf.join(right, on="rsid", how="left", suffix="_ann")
 
 
+_CONCORDANCE_COLUMN = "clin_sig_concordance"
+_OPPOSED_COLUMN = "clin_sig_opposed"
+
+
+def _join_concordance(
+    weights_lf: pl.LazyFrame, concordance_lf: pl.LazyFrame, module_name: str
+) -> pl.LazyFrame:
+    """Attach the clinical-authority concordance verdict to each annotated row (format 0.7, RM130).
+
+    ``clin_sig_concordance.parquet`` is keyed ``(variant_key, genotype)`` with the genotype spelled
+    as ``variants.csv`` spells it, so the join key is the same authored string the 0.6 annotations
+    join rebuilds through ``_genotype_key_expr``. Two columns come across: ``authority_concordance``
+    (do the authorities agree *with each other* — ``discordant`` is the one the report badges) and
+    ``opposed`` (does the disagreement cross the pathogenic/benign line). ``authored_position`` is
+    deliberately not carried: it is a different axis (where the module sits) and the report already
+    shows the module's own tier beside the badge.
+
+    **Nothing here resolves the split.** No winner is read off ``authority_precedence`` — the format
+    is explicit that the block is computed with by nothing — and ``unchecked`` renders nothing,
+    because an authority that could not be consulted is not agreement.
+
+    Skipped, with the rows left un-badged rather than the join guessed, when the lead table has no
+    ``variant_key`` or no list genotype: a 0.3/0.5 artifact has no concordance table to join anyway.
+    """
+    schema = weights_lf.collect_schema()
+    if "variant_key" not in schema.names() or schema.get("genotype") != pl.List(pl.String):
+        log_message(
+            message_type="info",
+            action="concordance_join_skipped",
+            module=module_name,
+            reason="lead table carries no variant_key + list genotype to key on",
+        )
+        return weights_lf
+    right = (
+        concordance_lf.select(
+            "variant_key",
+            pl.col("genotype").alias(_GENOTYPE_KEY),
+            pl.col("authority_concordance").alias(_CONCORDANCE_COLUMN),
+            pl.col("opposed").alias(_OPPOSED_COLUMN),
+        )
+        .unique(subset=["variant_key", _GENOTYPE_KEY], keep="first")
+    )
+    return (
+        weights_lf.with_columns(_genotype_key_expr())
+        .join(right, on=["variant_key", _GENOTYPE_KEY], how="left")
+        .drop(_GENOTYPE_KEY)
+    )
+
+
 def load_annotated_weights(
     weights_parquet: Path,
     module_name: str,
@@ -609,10 +667,18 @@ def load_annotated_weights(
             ModuleTable.ANNOTATIONS,
             module_info=module_info,
         )
-        if annotations_lf is None:
-            return _ensure_annotation_report_columns(weights_lf.collect())
-
-        enriched = _join_annotations(weights_lf, annotations_lf, module_name)
+        enriched = (
+            weights_lf
+            if annotations_lf is None
+            else _join_annotations(weights_lf, annotations_lf, module_name)
+        )
+        # Independent of the annotations table: a module can carry a concordance record without
+        # curated annotations, so this join is not nested under the one above.
+        concordance_lf = _scan_optional_module_table(
+            module_name, ModuleTable.CONCORDANCE, module_info=module_info
+        )
+        if concordance_lf is not None:
+            enriched = _join_concordance(enriched, concordance_lf, module_name)
         return _ensure_annotation_report_columns(enriched.collect())
 
 
@@ -750,6 +816,13 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         "clinvar": row.get("clinvar", False),
         "clin_sig": clin_sig,
         "clin_sig_label": _clin_sig_label(clin_sig),
+        # Format 0.7 (RM130): whether the clinical authorities consulted agree with each other about
+        # this subject. Only `discordant` is a badge; `concordant`/`single`/`none`/`unchecked` and a
+        # module with no concordance table all render nothing — an authority that could not be
+        # consulted is not agreement, and its absence is not a finding either. `opposed` says the
+        # split crosses the pathogenic/benign line. Nothing resolves the split.
+        "clin_sig_contested": row.get(_CONCORDANCE_COLUMN) == "discordant",
+        "clin_sig_opposed": bool(row.get(_OPPOSED_COLUMN)) if row.get(_OPPOSED_COLUMN) is not None else None,
         # Keyed by rsID where the row has one, else by coordinate — a coordinate-authored variant's
         # citations are keyed the same way in `studies.parquet`. See `_study_key`.
         "studies": studies_by_rsid.get(
@@ -785,6 +858,12 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
         "evidence_level": row.get("evidence_level", "") or "",
         "phenotype_category": row.get("phenotype_category", "") or "",
         "response": row.get("response", "") or "",
+        # `pharm_variants.pmid` (format 0.7, RM132): the citation for *this row's own* drug/genotype
+        # claim. A different axis from `evidence_level`, which is somebody else's grading *of* the
+        # evidence where this points *at* it — so the template shows both or neither, never one
+        # standing in for the other. Empty on `weights`-led rows, whose citations live in
+        # `studies.parquet` and arrive through `studies` above.
+        "pmid": row.get("pmid", "") or "",
     }
     for axis in _AUTHORED_AXES:
         value = row.get(axis)
@@ -887,6 +966,17 @@ def load_studies_for_variants(
                 "p_value": row.get("p_value", ""),
                 "conclusion": row.get("conclusion", ""),
                 "study_design": row.get("study_design", ""),
+                # Format 0.7 columns (RM140, RM160), render-if-present like every other axis.
+                # `statistical_test` says which analysis produced this row's `p_value` /
+                # `effect_size`; `study_design` describes the study and one study runs several
+                # analyses, so a p-value from one and an effect size from another sit on one row
+                # with nothing but this column to say so. `confidence` is the *citing source's*
+                # own review state in its own units (CIViC's `submitted` / `accepted`) and is
+                # meaningless without `confidence_unit` beside it — the model refuses one without
+                # the other, and the template renders them as a pair or not at all.
+                "statistical_test": row.get("statistical_test") or "",
+                "confidence": row.get("confidence") or "",
+                "confidence_unit": row.get("confidence_unit") or "",
             })
 
         return result

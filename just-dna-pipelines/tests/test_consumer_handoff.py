@@ -232,6 +232,26 @@ class TestDiscoveryProbeIsCallableAtImportTime:
         assert info is not None
         assert info.lead_table == "pharm_variants"
 
+    def test_a_concordance_table_beside_the_lead_is_discovered(self, tmp_path: Path) -> None:
+        """Format 0.7's `clin_sig_concordance.parquet` reaches `ModuleInfo.concordance_url` the way
+        the other side tables do, and a module without one answers `None` rather than a path that
+        does not exist. Probing path (no manifest); the attested path goes through the same `_has`."""
+        import polars as pl
+
+        pl.DataFrame({"rsid": ["rs1"], "genotype": [["A", "T"]]}).write_parquet(
+            tmp_path / "weights.parquet"
+        )
+        info = self._probe(tmp_path)
+        assert info is not None and info.concordance_url is None
+
+        pl.DataFrame({"variant_key": ["rs1"], "genotype": ["A/T"]}).write_parquet(
+            tmp_path / "clin_sig_concordance.parquet"
+        )
+        info = self._probe(tmp_path)
+        assert info is not None
+        assert info.concordance_url is not None
+        assert info.concordance_url.endswith("clin_sig_concordance.parquet")
+
     def test_a_directory_that_is_not_a_module_probes_to_none(self, tmp_path: Path) -> None:
         (tmp_path / "notes.txt").write_text("not a module")
         assert self._probe(tmp_path) is None

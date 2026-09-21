@@ -657,9 +657,19 @@ window.addEventListener("scroll", function() {
             {% elif v.clinvar %}
             <tr><th>ClinVar</th><td>Yes</td></tr>
             {% endif %}
+            {# Format 0.7 `clin_sig_concordance`: the authorities consulted disagree with each other
+               about this call. Rendered only for `discordant`; nothing resolves the split. #}
+            {% if v.clin_sig_contested %}
+            <tr><th>Authorities disagree</th><td>The clinical databases consulted for this variant do not agree with each other about its significance{% if v.clin_sig_opposed %}, and the disagreement crosses the pathogenic/benign line{% endif %}. The module's own call is shown above; this report does not pick a side.</td></tr>
+            {% endif %}
             {{ variant_detail_row("Drug", v.drug) }}
             {{ variant_detail_row("Response", v.response) }}
             {{ variant_detail_row("Evidence level", v.evidence_level) }}
+            {# `pharm_variants.pmid` (0.7): the citation for this row's own claim, a different axis
+               from the evidence grade above — both rows or neither. #}
+            {% if v.pmid %}
+            <tr><th>Citation</th><td><a href="https://pubmed.ncbi.nlm.nih.gov/{{ v.pmid }}/">PMID {{ v.pmid }}</a></td></tr>
+            {% endif %}
             {{ variant_detail_row("Phenotype category", v.phenotype_category) }}
             {{ variant_detail_row("Effect size", v.effect_size) }}
             {{ variant_detail_row("Effect measure", v.effect_measure) }}
@@ -680,6 +690,12 @@ window.addEventListener("scroll", function() {
             </tr>
             {% endif %}
             {% if v.studies %}
+            {# Two optional 0.7 study columns, shown only when some study on this variant carries
+               them (render-if-present at the column level — a permanently empty column is the
+               blank-row anti-pattern in table form). `confidence` is meaningless without its unit,
+               so the pair renders together or not at all. #}
+            {% set show_test = v.studies | selectattr("statistical_test") | list | length > 0 %}
+            {% set show_confidence = v.studies | selectattr("confidence") | list | length > 0 %}
             <tr><th>Supporting studies</th><td>
                 <div class="table-shell nested-table-shell">
                     <div class="table-scroll">
@@ -689,6 +705,8 @@ window.addEventListener("scroll", function() {
                                 <th>PubMed ID</th>
                                 <th>Population</th>
                                 <th>Study design</th>
+                                {% if show_test %}<th>Analysis</th>{% endif %}
+                                {% if show_confidence %}<th>Source confidence</th>{% endif %}
                                 <th>Conclusions</th>
                             </tr>
                         </thead>
@@ -698,6 +716,8 @@ window.addEventListener("scroll", function() {
                                 <td><a href="https://pubmed.ncbi.nlm.nih.gov/{{ s.pmid }}/">{{ s.pmid }}</a></td>
                                 <td>{{ s.population }}</td>
                                 <td>{{ s.study_design }}</td>
+                                {% if show_test %}<td>{{ s.statistical_test }}</td>{% endif %}
+                                {% if show_confidence %}<td>{% if s.confidence %}{{ s.confidence }} <span style="color: var(--muted)">({{ s.confidence_unit }})</span>{% endif %}</td>{% endif %}
                                 <td>{{ s.conclusion }}</td>
                             </tr>
                             {% endfor %}

@@ -162,6 +162,7 @@ class TestModuleTableUrl:
             annotations_url=f"hf://{base}/annotations.parquet",
             studies_url=f"hf://{base}/studies.parquet",
             sources_url=f"hf://{base}/sources.parquet",
+            concordance_url=f"hf://{base}/clin_sig_concordance.parquet",
         )
         for table in ModuleTable:
             url = get_module_table_url(module_name, table, module_info=info)

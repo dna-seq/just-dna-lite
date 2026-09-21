@@ -114,6 +114,26 @@ def test_effective_direction_bridges_both_schemas():
     assert _effective_direction("", "significant", -0.7) == "risk"
 
 
+def test_a_contested_direction_carries_no_sign_and_no_colour():
+    """Format 0.7 (RM150) added `contested` to `VALID_DIRECTIONS`: the sources disagree about the
+    *sign*, where `unknown` means nobody assessed it. It is a finding, not a direction, so it must
+    not be coloured or counted as either benefit or risk — and it is authored-only, never derived
+    from a legacy `state`, so a 0.5 artifact can never read it."""
+    from just_dna_format.vocab import VALID_DIRECTIONS
+    assert "contested" in VALID_DIRECTIONS
+    assert _effective_direction("contested", "risk", 0.0) == "contested"
+    assert _variant_sign(None, "risk", "contested") == 0
+    assert _variant_color(None, "risk", "contested") == "transparent"
+    # every member of the vocabulary maps to a sign the report can act on
+    for member in VALID_DIRECTIONS:
+        assert _variant_sign(None, None, member) in (-1, 0, 1)
+    # and the word reaches the reader rather than being folded into "unknown"
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": None, "state": "risk", "direction": "contested"}
+    html = _render(other_modules=[_module_data([_build_variant(row, {})])])
+    assert "Contested" in html
+
+
 def test_variant_color_direction_only_is_green():
     # a 1.0-style row (state gone, direction set, no weight) still colors green/red
     assert _variant_color(None, None, "protective").startswith("rgba(0,")
@@ -510,6 +530,113 @@ def test_a_populated_0_5_axis_reaches_the_html():
     html = _render(other_modules=[_module_data([variant])])
     for axis, value in populated.items():
         assert value in html, f"{axis}={value!r} never reached the rendered report"
+
+
+def test_the_0_7_study_columns_render_as_a_pair_and_only_when_present():
+    """`statistical_test` (RM140) and `confidence`/`confidence_unit` (RM160) are optional study
+    columns. Render-if-present at the *column* level: a variant whose studies carry neither gets
+    the four-column table it always had, and `confidence` never renders without its unit."""
+    bare = [{"pmid": "111", "population": "EUR", "p_value": "1e-5", "conclusion": "c",
+             "study_design": "GWAS", "statistical_test": "", "confidence": "",
+             "confidence_unit": ""}]
+    rich = bare + [{"pmid": "222", "population": "EAS", "p_value": "2e-5", "conclusion": "d",
+                    "study_design": "meta-analysis", "statistical_test": "logistic regression",
+                    "confidence": "accepted", "confidence_unit": "civic_evidence_status"}]
+    row = {"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+           "weight": 0.5, "state": "risk"}
+
+    html_bare = _render(other_modules=[_module_data([_build_variant(row, {"rs1": bare})])])
+    assert "<th>Analysis</th>" not in html_bare
+    assert "Source confidence" not in html_bare
+
+    html_rich = _render(other_modules=[_module_data([_build_variant(row, {"rs1": rich})])])
+    assert "<th>Analysis</th>" in html_rich and "logistic regression" in html_rich
+    assert "Source confidence" in html_rich
+    assert "accepted" in html_rich and "civic_evidence_status" in html_rich
+
+
+def test_a_pharm_variant_citation_renders_beside_its_evidence_grade():
+    """`pharm_variants.pmid` (0.7, RM132) cites this row's own claim; `evidence_level` is somebody
+    else's grading of it. Different axes: both rows, and the citation links PubMed."""
+    row = {"rsid": "rs4149056", "gene": "SLCO1B1", "genotype": "C/C", "module": "m",
+           "weight": 0.0, "drug": "simvastatin", "evidence_level": "1A", "pmid": "24918167"}
+    variant = _build_variant(row, {})
+    assert variant["pmid"] == "24918167"
+    html = _render(other_modules=[_module_data([variant])])
+    assert "https://pubmed.ncbi.nlm.nih.gov/24918167/" in html
+    assert "Evidence level" in html
+
+    # a weights-led row states no pmid of its own and gets no citation row
+    plain = _build_variant({"rsid": "rs1", "gene": "G", "genotype": ["A", "T"], "module": "m",
+                            "weight": 0.5, "state": "risk"}, {})
+    assert plain["pmid"] == ""
+    assert "<th>Citation</th>" not in _render(other_modules=[_module_data([plain])])
+
+
+def test_a_discordant_clinical_call_is_badged_and_nothing_picks_a_side(tmp_path):
+    """Format 0.7 (RM130): `clin_sig_concordance.parquet` says whether the authorities consulted
+    agree with each other, per `(variant_key, genotype)`. `discordant` renders an "Authorities
+    disagree" note beside the module's own tier; every other member, and a module without the
+    table, renders nothing — an authority that could not be consulted is not agreement, and its
+    absence is not a finding. No module we hold carries the table yet (no reference example does
+    either), so the fixture is built from the format's own row model: the model is the contract."""
+    from just_dna_format.concordance import ClinSigConcordanceRow
+    from just_dna_pipelines.annotation.report_logic import load_annotated_weights
+
+    weights = pl.DataFrame({
+        "rsid": ["rs1", "rs2", "rs3", "rs4"],
+        "variant_key": ["rs1", "rs2", "rs3", "rs4"],
+        "genotype": [["T", "A"], ["G", "G"], ["C", "T"], ["A", "A"]],
+        "phased": [False, False, False, False],
+        "module": ["m"] * 4,
+        "weight": [0.0] * 4,
+        "clin_sig": ["pathogenic", "benign", "likely_pathogenic", "pathogenic"],
+        "conclusion": ["c1", "c2", "c3", "c4"],
+    })
+    weights_path = tmp_path / "m_weights.parquet"
+    weights.write_parquet(weights_path)
+
+    rows = [
+        # authored `A/T` is the sorted spelling `_genotype_key_expr` rebuilds from ["T", "A"]
+        ClinSigConcordanceRow(variant_key="rs1", genotype="A/T", authored_clin_sig="pathogenic",
+                              authority_concordance="discordant", authored_position="matches_some",
+                              opposed=True, checked_at="2026-09-21T00:00:00Z"),
+        ClinSigConcordanceRow(variant_key="rs2", genotype="G/G", authored_clin_sig="benign",
+                              authority_concordance="concordant", authored_position="matches_all",
+                              opposed=False, checked_at="2026-09-21T00:00:00Z"),
+        ClinSigConcordanceRow(variant_key="rs3", genotype="C/T", authored_clin_sig="likely_pathogenic",
+                              authority_concordance="unchecked", authored_position="unchecked",
+                              opposed=False, checked_at="2026-09-21T00:00:00Z"),
+        # a discordant record for a genotype the module does not carry must not leak onto rs4
+        ClinSigConcordanceRow(variant_key="rs4", genotype="A/G", authored_clin_sig="pathogenic",
+                              authority_concordance="discordant", authored_position="matches_none",
+                              opposed=False, checked_at="2026-09-21T00:00:00Z"),
+    ]
+    concordance_path = tmp_path / "clin_sig_concordance.parquet"
+    pl.DataFrame([r.model_dump() for r in rows]).write_parquet(concordance_path)
+
+    info = ModuleInfo(name="m", repo_id="local", path=str(tmp_path), lead_table="weights",
+                      lead_url=str(weights_path), concordance_url=str(concordance_path))
+    enriched = load_annotated_weights(weights_path, "m", info)
+    assert enriched.height == weights.height, "the concordance join must not fan rows out"
+    variants = {v["rsid"]: v for v in (_build_variant(r, {}) for r in enriched.iter_rows(named=True))}
+
+    assert variants["rs1"]["clin_sig_contested"] is True and variants["rs1"]["clin_sig_opposed"] is True
+    for rsid in ("rs2", "rs3", "rs4"):
+        assert variants[rsid]["clin_sig_contested"] is False, rsid
+
+    html = _render(other_modules=[_module_data(list(variants.values()))])
+    assert html.count("Authorities disagree") == 1
+    assert "crosses the pathogenic/benign line" in html
+    # the module's own tier still renders beside the badge, and no winner is named
+    assert "Pathogenic" in html
+
+    # the same module without the table: no badge, no crash, same row count
+    bare = ModuleInfo(name="m", repo_id="local", path=str(tmp_path), lead_table="weights",
+                      lead_url=str(weights_path))
+    plain = load_annotated_weights(weights_path, "m", bare)
+    assert plain.height == weights.height
+    assert all(not _build_variant(r, {})["clin_sig_contested"] for r in plain.iter_rows(named=True))
 
 
 def test_an_expanded_locus_is_labelled_in_the_report():
