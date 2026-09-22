@@ -38,6 +38,7 @@ fi
 APP_DEST="$APP_BUNDLE/Contents/Resources/app"
 
 cp "$REPO_ROOT/pyproject.toml" "$APP_DEST/"
+cp "$REPO_ROOT/README.md" "$APP_DEST/"  # the package readme; uv sync cannot build the root package without it
 cp "$REPO_ROOT/uv.lock" "$APP_DEST/"
 cp "$REPO_ROOT/modules.yaml" "$APP_DEST/"
 cp "$REPO_ROOT/.python-version" "$APP_DEST/"
@@ -54,5 +55,8 @@ rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='.web' --exclude='.
     "$REPO_ROOT/webui/" "$APP_DEST/webui/"
 
 rsync -a "$REPO_ROOT/images/" "$APP_DEST/images/"
+
+mkdir -p "$APP_DEST/docs"
+cp "$REPO_ROOT/docs/FAQ.md" "$APP_DEST/docs/"  # the FAQ page renders this file
 
 echo "Built $APP_BUNDLE (version $APP_VERSION)"

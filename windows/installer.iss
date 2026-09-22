@@ -1,3 +1,9 @@
+; Build locally (CI does the same in .github/workflows/release.yml; use its UV_VERSION):
+;   pwsh windows/fetch-uv.ps1 -UvVersion 0.7.8
+;   windows\uv.exe run --with Pillow python windows/generate_icon.py
+;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=<version> windows\installer.iss
+; uv.exe and icon.ico are build inputs and are gitignored; never commit them.
+
 #define MyAppName "Just DNA Lite"
 #ifndef APP_VERSION
   #define APP_VERSION "0.2.1"
@@ -42,15 +48,19 @@ Source: "uv.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Application source (excluding dev/runtime artifacts)
 Source: "..\pyproject.toml"; DestDir: "{app}\app"; Flags: ignoreversion
+; pyproject.toml names README.md as the package readme; uv sync cannot build the root package without it
+Source: "..\README.md"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\uv.lock"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\modules.yaml"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\.python-version"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\.env.template"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\dagster.yaml.template"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "..\src\*"; DestDir: "{app}\app\src"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\just-dna-pipelines\*"; DestDir: "{app}\app\just-dna-pipelines"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.ruff_cache"
-Source: "..\webui\*"; DestDir: "{app}\app\webui"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.web,.ruff_cache"
+Source: "..\just-dna-pipelines\*"; DestDir: "{app}\app\just-dna-pipelines"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.ruff_cache,.venv"
+Source: "..\webui\*"; DestDir: "{app}\app\webui"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__,*.pyc,.web,.ruff_cache,.states,.venv"
 Source: "..\images\*"; DestDir: "{app}\app\images"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The FAQ page renders this file
+Source: "..\docs\FAQ.md"; DestDir: "{app}\app\docs"; Flags: ignoreversion
 
 ; Launcher script
 Source: "just-dna-lite.bat"; DestDir: "{app}"; Flags: ignoreversion

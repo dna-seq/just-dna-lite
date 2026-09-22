@@ -10,6 +10,7 @@ on:
         required: true
 
 env:
+  # The only pin: windows/fetch-uv.ps1 takes it as a parameter rather than keeping its own copy.
   UV_VERSION: "0.7.8"
 
 jobs:
@@ -37,13 +38,7 @@ jobs:
 
       - name: Download uv for Windows
         shell: pwsh
-        run: |
-          $uvUrl = "https://github.com/astral-sh/uv/releases/download/${{ env.UV_VERSION }}/uv-x86_64-pc-windows-msvc.zip"
-          Invoke-WebRequest -Uri $uvUrl -OutFile uv.zip
-          Expand-Archive -Path uv.zip -DestinationPath uv-extracted -Force
-          # The archive may contain a nested directory or flat files
-          $uvExe = Get-ChildItem -Path uv-extracted -Recurse -Filter "uv.exe" | Select-Object -First 1
-          Copy-Item $uvExe.FullName windows/uv.exe
+        run: windows/fetch-uv.ps1 -UvVersion "${{ env.UV_VERSION }}"
 
       - name: Generate icon
         shell: pwsh
