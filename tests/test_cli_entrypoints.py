@@ -9,6 +9,7 @@ side — "a test imports the console entrypoint, which nothing did before". This
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import subprocess
 import sys
@@ -18,6 +19,9 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
+import just_dna_lite.cli
+import just_dna_lite.process
+import webui.run
 from just_dna_lite.cli import app as pipelines_app
 from just_dna_lite.process import dg_dev_argv, webui_dev_argv
 from just_dna_pipelines import enricher_cli
@@ -82,3 +86,46 @@ def test_the_wrapperless_entry_modules_answer_help(module_args: list[str]) -> No
     )
     assert result.returncode == 0, result.stderr
     assert "Usage" in result.stdout
+
+
+_WRAPPER_NAMES = frozenset({"uv", "uv.exe", "dg", "dg.exe", "run", "run.exe", "start", "start.exe"})
+
+
+def wrapper_launches(source: str) -> list[str]:
+    """Places *source* names a console-script wrapper as a program to start.
+
+    Two shapes: an argv list literal opening with the name (`["uv", "run", ...]`), and a path built
+    to it (`Path(sys.executable).parent / "dg"`). Both are how the three blocked hops were written.
+    """
+    found: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.List) and node.elts:
+            first = node.elts[0]
+            if isinstance(first, ast.Constant) and first.value in _WRAPPER_NAMES:
+                found.append(f"line {node.lineno}: argv starting {first.value!r}")
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            right = node.right
+            if isinstance(right, ast.Constant) and right.value in _WRAPPER_NAMES:
+                found.append(f"line {node.lineno}: path ending {right.value!r}")
+    return found
+
+
+@pytest.mark.parametrize(
+    "module", [just_dna_lite.cli, just_dna_lite.process, webui.run], ids=lambda m: m.__name__
+)
+def test_no_launcher_module_starts_a_wrapper(module: object) -> None:
+    """The helpers are fenced above; this fences their callers, which is where a regression lands."""
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    assert wrapper_launches(source) == []
+
+
+def test_the_wrapper_scan_catches_the_launcher_it_replaced() -> None:
+    """The pre-fix `start_all` spawned all three hops through wrappers; the scan must see them."""
+    old = """
+ui_proc = subprocess.Popen(["uv", "run", "--package", "webui", "run"], cwd=root)
+dg_path = Path(sys.executable).parent / "dg"
+"""
+    assert sorted(wrapper_launches(old)) == [
+        "line 2: argv starting 'uv'",
+        "line 3: path ending 'dg'",
+    ]
