@@ -93,7 +93,8 @@ uv sync
 ```
 
 Then verify with `uv pip list | grep reflex` against the release notes. Note reflex also caps some
-transitive deps (0.9.7 added `wrapt<2.2`, which *downgrades* `wrapt` — expected, not a mistake).
+transitive deps (0.9.7 added `wrapt<2.2`, which *downgraded* `wrapt`; by 0.9.11 the cap is gone and
+`wrapt` floats again, 2.3.0 as of 2026-09-22 — either direction is expected, not a mistake).
 
 ### Frontend (npm) pins
 
