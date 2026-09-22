@@ -153,6 +153,12 @@ uv run start
 
 Open the URL printed in the terminal (usually `http://localhost:3000`). Upload your VCF and start exploring.
 
+**Work laptop without admin rights?** Some managed Windows machines block the small `start.exe` helper that `uv run start` uses. Run the same thing through Python instead:
+
+```bash
+uv run python -m just_dna_lite.cli start
+```
+
 #### Production mode (no Node.js at runtime)
 
 If you don't need the development server and want a simpler, single-process setup:
