@@ -4,7 +4,6 @@ import os
 import shutil
 import signal
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Annotated, Dict, Optional
@@ -18,10 +17,12 @@ load_dotenv()  # Load .env from cwd or parent dirs before any command runs
 
 from just_dna_lite.process import (
     detached_popen_kwargs,
+    dg_dev_argv,
     install_launcher_signal_handlers,
     reap_dagster_instance,
     reap_webui_leftovers,
     shutdown_managed_processes,
+    webui_dev_argv,
 )
 from just_dna_pipelines.annotation.cli_annotate import annotate as annotate_cmd
 from just_dna_pipelines.annotation.cli_annotate import annotate_main
@@ -178,10 +179,10 @@ def _find_workspace_root(start: Path) -> Optional[Path]:
     return None
 
 
-def _run_managed_foreground(command: list[str], dagster_home: Path) -> int:
+def _run_managed_foreground(command: list[str], dagster_home: Path, cwd: Path) -> int:
     """Run a foreground child and tear down its whole tree on Ctrl+C."""
 
-    proc = subprocess.Popen(command, **detached_popen_kwargs())
+    proc = subprocess.Popen(command, cwd=cwd, **detached_popen_kwargs())
     processes = [proc]
 
     def _force(_signum: int, _frame: object) -> None:
@@ -336,10 +337,11 @@ def start_dagster(
             fg=typer.colors.YELLOW,
         )
     
-    dg_path = Path(sys.executable).parent / "dg"
+    # cwd=root, as in start_all: definitions.py resolves some paths against the working directory.
     exit_code = _run_managed_foreground(
-        [str(dg_path), "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
+        dg_dev_argv(dagster_file, dagster_port, dagster_host),
         dagster_home=dagster_home_path,
+        cwd=root,
     )
     if exit_code != 0:
         raise typer.Exit(exit_code)
@@ -449,7 +451,7 @@ def start_all(
     install_launcher_signal_handlers(_first, _force)
     try:
         ui_proc = subprocess.Popen(
-            ["uv", "run", "--package", "webui", "run"],
+            webui_dev_argv(),
             cwd=root,
             **detached_popen_kwargs(),
         )
@@ -492,9 +494,8 @@ def start_all(
         except Exception:
             pass
 
-        dg_path = Path(sys.executable).parent / "dg"
         dagster_proc = subprocess.Popen(
-            [str(dg_path), "dev", "-f", str(dagster_file_path), "-p", str(resolved_dagster_port), "-h", resolved_dagster_host],
+            dg_dev_argv(dagster_file_path, resolved_dagster_port, resolved_dagster_host),
             cwd=root,
             **detached_popen_kwargs(),
         )

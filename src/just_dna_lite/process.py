@@ -30,12 +30,21 @@ SignalHandler = Callable[[int, object], None]
 
 _IS_WINDOWS = sys.platform == "win32"
 
+# The launchers run ``dg`` and the Reflex UI as ``python -m <module>``, never through the
+# ``.venv/bin/<script>`` wrappers uv generates (``Scripts\<script>.exe`` on Windows). Those
+# wrappers are unsigned executables written into a user-writable directory, which is exactly what
+# AppLocker and Smart App Control refuse to run, so on a locked-down Windows laptop any hop through
+# one kills the stack. The interpreter itself is the one binary every hop already depends on.
+DG_MODULE = "just_dna_lite.dg"
+WEBUI_RUN_MODULE = "webui.run"
+
 DAGSTER_CMDLINE_MARKERS: tuple[str, ...] = (
     "dagster._daemon",
     "dagster_webserver",
     "dagster code-server",
     "dagster api grpc",
     "dg dev",
+    f"{DG_MODULE} dev",
 )
 
 # ``dg`` waits up to 60s per child for a clean IPC shutdown.  Users treat that
@@ -53,6 +62,21 @@ def snapshot_process_tree(pid: int) -> list[int]:
         return []
     children = proc.children(recursive=True)
     return [child.pid for child in children if _pid_is_live(child.pid)] + [pid]
+
+
+def python_module_argv(module: str, *args: str) -> list[str]:
+    """argv running *module* under this interpreter rather than through a console-script wrapper."""
+    return [sys.executable, "-m", module, *args]
+
+
+def dg_dev_argv(dagster_file: Path, port: int, host: str) -> list[str]:
+    """argv for ``dg dev`` on *dagster_file*, without the ``dg`` wrapper."""
+    return python_module_argv(DG_MODULE, "dev", "-f", str(dagster_file), "-p", str(port), "-h", host)
+
+
+def webui_dev_argv() -> list[str]:
+    """argv for the Reflex dev UI (``webui.run:main``), without the ``run`` wrapper."""
+    return python_module_argv(WEBUI_RUN_MODULE)
 
 
 def detached_popen_kwargs() -> dict[str, object]:
@@ -138,8 +162,9 @@ def find_webui_leftover_pids(
 ) -> list[int]:
     """PIDs for a leftover Reflex UI belonging to this workspace.
 
-    Matches ``uv run --package webui run``, the Reflex ``.venv/bin/run`` backend,
-    and ``react-router dev`` under ``webui/.web``.  Port cleanup is off by
+    Matches ``python -m webui.run`` (what the launcher starts), ``uv run --package
+    webui run``, the Reflex ``.venv/bin/run`` backend, and ``react-router dev`` under
+    ``webui/.web``.  Port cleanup is off by
     default because 8000/8001 may belong to unrelated tools; this targets only
     this repo's UI tree.
     """
@@ -191,7 +216,13 @@ def _is_workspace_webui_process(
     root_s = str(workspace_root)
     if cwd != root_s and not cwd.startswith(root_s + os.sep):
         return False
-    return _is_uv_package_webui_run(cmdline)
+    return _is_uv_package_webui_run(cmdline) or _is_module_webui_run(cmdline)
+
+
+def _is_module_webui_run(cmdline: list[str]) -> bool:
+    return any(
+        cmdline[i] == "-m" and cmdline[i + 1] == WEBUI_RUN_MODULE for i in range(len(cmdline) - 1)
+    )
 
 
 def _is_uv_package_webui_run(cmdline: list[str]) -> bool:

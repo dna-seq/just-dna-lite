@@ -21,12 +21,14 @@ import psutil
 import pytest
 
 from just_dna_lite.process import (
+    dg_dev_argv,
     find_dagster_instance_pids,
     find_webui_leftover_pids,
     reap_dagster_instance,
     reap_webui_leftovers,
     shutdown_managed_processes,
     snapshot_process_tree,
+    webui_dev_argv,
 )
 
 _unix_only = pytest.mark.skipif(sys.platform == "win32", reason="Unix process-group shutdown")
@@ -164,23 +166,28 @@ def test_reap_dagster_instance_kills_leftover_daemon_like_process(tmp_path: Path
         assert leftover.poll() is not None
         assert leftover.pid not in find_dagster_instance_pids(dagster_home)
 
-        env_leader = subprocess.Popen(
-            [sys.executable, "-c", _DEAF_CHILD, "dg", "dev", "-f", "definitions.py"],
-            env={**os.environ, "DAGSTER_HOME": str(dagster_home.resolve())},
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-        try:
-            assert env_leader.stdout is not None
-            assert env_leader.stdout.readline().strip() == "ready"
-            assert env_leader.pid in find_dagster_instance_pids(dagster_home)
-            killed_leader = reap_dagster_instance(dagster_home)
-            assert env_leader.pid in killed_leader
-            env_leader.wait(timeout=2)
-        finally:
-            if env_leader.poll() is None:
-                env_leader.kill()
+        # A hand-run `dg dev`, and the `python -m just_dna_lite.dg dev` the launchers start.
+        for leader_args in (
+            ["dg", "dev", "-f", "definitions.py"],
+            dg_dev_argv(Path("definitions.py"), 3005, "127.0.0.1")[1:],
+        ):
+            env_leader = subprocess.Popen(
+                [sys.executable, "-c", _DEAF_CHILD, *leader_args],
+                env={**os.environ, "DAGSTER_HOME": str(dagster_home.resolve())},
+                stdout=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert env_leader.stdout is not None
+                assert env_leader.stdout.readline().strip() == "ready"
+                assert env_leader.pid in find_dagster_instance_pids(dagster_home), leader_args
+                killed_leader = reap_dagster_instance(dagster_home)
+                assert env_leader.pid in killed_leader
                 env_leader.wait(timeout=2)
+            finally:
+                if env_leader.poll() is None:
+                    env_leader.kill()
+                    env_leader.wait(timeout=2)
     finally:
         if leftover.poll() is None:
             leftover.kill()
@@ -245,6 +252,12 @@ def test_reap_webui_leftovers_kills_this_workspace_ui_only(tmp_path: Path) -> No
         stdout=subprocess.PIPE,
         text=True,
     )
+    module_style = subprocess.Popen(
+        [sys.executable, "-c", _DEAF_CHILD, *webui_dev_argv()[1:]],
+        cwd=workspace,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
     foreign = subprocess.Popen(
         [
             sys.executable,
@@ -259,14 +272,14 @@ def test_reap_webui_leftovers_kills_this_workspace_ui_only(tmp_path: Path) -> No
         text=True,
     )
     try:
-        for proc in (leftover, uv_style, foreign):
+        for proc in (leftover, uv_style, module_style, foreign):
             assert proc.stdout is not None
             assert proc.stdout.readline().strip() == "ready"
 
         deadline = time.monotonic() + 2.0
         while time.monotonic() < deadline:
             found = set(find_webui_leftover_pids(workspace))
-            if leftover.pid in found and uv_style.pid in found:
+            if {leftover.pid, uv_style.pid, module_style.pid} <= found:
                 break
             time.sleep(0.05)
         else:
@@ -293,8 +306,10 @@ def test_reap_webui_leftovers_kills_this_workspace_ui_only(tmp_path: Path) -> No
             killed = reap_webui_leftovers(workspace, exclude_pids=[kept.pid])
             assert leftover.pid in killed
             assert uv_style.pid in killed
+            assert module_style.pid in killed
             leftover.wait(timeout=2)
             uv_style.wait(timeout=2)
+            module_style.wait(timeout=2)
             assert _is_live(kept.pid)
             assert _is_live(foreign.pid)
         finally:
@@ -302,7 +317,7 @@ def test_reap_webui_leftovers_kills_this_workspace_ui_only(tmp_path: Path) -> No
                 kept.kill()
                 kept.wait(timeout=2)
     finally:
-        for proc in (leftover, uv_style, foreign):
+        for proc in (leftover, uv_style, module_style, foreign):
             if proc.poll() is None:
                 proc.kill()
                 proc.wait(timeout=2)

@@ -14,6 +14,7 @@ _IS_WINDOWS = sys.platform == "win32"
 
 from just_dna_lite.process import (
     detached_popen_kwargs,
+    dg_dev_argv,
     reap_dagster_instance,
     shutdown_managed_processes,
 )
@@ -116,12 +117,9 @@ def _start_dagster_for_serve() -> subprocess.Popen[bytes] | None:
         )
         return None
 
-    dg_name = "dg.exe" if _IS_WINDOWS else "dg"
-    dg_path = Path(sys.executable).parent / dg_name
     process = subprocess.Popen(
-        ["dg", "dev", "-f", str(dagster_file), "-p", str(dagster_port), "-h", dagster_host],
+        dg_dev_argv(dagster_file, dagster_port, dagster_host),
         cwd=workspace_root,
-        executable=str(dg_path) if dg_path.exists() else None,
         **detached_popen_kwargs(),
     )
     print(f"Started Dagster UI at http://{dagster_host}:{dagster_port}", flush=True)
