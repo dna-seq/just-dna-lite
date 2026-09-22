@@ -115,6 +115,74 @@ def force_kill_pids(pids: Iterable[int]) -> None:
             continue
 
 
+def find_port_listeners(port: int) -> list[int]:
+    """PIDs listening on TCP *port*, other than this process.  Empty when none can be found.
+
+    Listeners only: a browser tab connected *to* port 3000 is not its owner.  ``netstat`` on
+    Windows, ``lsof`` then ``fuser`` elsewhere — ``psutil.net_connections`` would cover all three
+    but needs root on macOS.
+    """
+    pids = _windows_port_listeners(port) if _IS_WINDOWS else _posix_port_listeners(port)
+    my_pid = os.getpid()
+    return [pid for pid in _unique(pids) if pid not in (0, my_pid)]
+
+
+def _posix_port_listeners(port: int) -> list[int]:
+    commands = (
+        ["lsof", "-t", "-n", "-P", f"-iTCP:{port}", "-sTCP:LISTEN"],
+        ["fuser", f"{port}/tcp"],  # prints "3000/tcp:" to stderr, PIDs to stdout
+    )
+    for command in commands:
+        try:
+            out = subprocess.run(command, capture_output=True, text=True, check=False).stdout
+        except FileNotFoundError:
+            continue
+        pids = [int(token) for token in out.split() if token.isdigit()]
+        if pids:
+            return pids
+    return []
+
+
+def _windows_port_listeners(port: int) -> list[int]:
+    try:
+        out = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, check=False
+        ).stdout
+    except FileNotFoundError:
+        return []
+    pids: list[int] = []
+    for line in out.splitlines():
+        parts = line.split()
+        # Proto  Local Address  Foreign Address  State  PID
+        if len(parts) < 5 or parts[3] != "LISTENING" or not parts[1].endswith(f":{port}"):
+            continue
+        if parts[4].isdigit():
+            pids.append(int(parts[4]))
+    return pids
+
+
+def process_name(pid: int) -> str:
+    """Executable name of *pid*, or ``"?"`` when it has gone or is not ours to inspect."""
+    try:
+        return psutil.Process(pid).name()
+    except (psutil.Error, OSError):
+        return "?"
+
+
+def terminate_pids(pids: Iterable[int], grace_seconds: float = 0.5) -> None:
+    """Ask each pid to exit (SIGTERM / TerminateProcess), then force-kill what is left."""
+    procs: list[psutil.Process] = []
+    for pid in pids:
+        try:
+            proc = psutil.Process(pid)
+            proc.terminate()
+            procs.append(proc)
+        except (psutil.Error, OSError):
+            continue
+    _, alive = psutil.wait_procs(procs, timeout=grace_seconds)
+    force_kill_pids(proc.pid for proc in alive)
+
+
 def find_dagster_instance_pids(dagster_home: Path) -> list[int]:
     """PIDs whose command line is a Dagster service for this instance."""
     home = str(dagster_home.resolve())

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import signal
 import subprocess
 import time
 from pathlib import Path
@@ -18,10 +17,13 @@ load_dotenv()  # Load .env from cwd or parent dirs before any command runs
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
+    find_port_listeners,
     install_launcher_signal_handlers,
+    process_name,
     reap_dagster_instance,
     reap_webui_leftovers,
     shutdown_managed_processes,
+    terminate_pids,
     webui_dev_argv,
 )
 from just_dna_pipelines.annotation.cli_annotate import annotate as annotate_cmd
@@ -204,68 +206,15 @@ def _run_managed_foreground(command: list[str], dagster_home: Path, cwd: Path) -
 
 
 def _kill_port_owner(port: int) -> None:
-    """Kill the process listening on the specified port."""
-    import socket
-    
-    # Check if port is actually in use by trying to connect to it
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.connect(("127.0.0.1", port))
-            # If we reach here, the port is in use
-        except ConnectionRefusedError:
-            # Port is free
-            return
-        except Exception:
-            # Some other error, better to check with tools
-            pass
-
-    try:
-        typer.secho(f"🔍 Port {port} is in use, searching for owner...", fg=typer.colors.CYAN)
-        
-        # Try lsof with more specific flags
-        result = subprocess.run(
-            ["lsof", "-t", "-n", "-P", f"-iTCP:{port}", "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        pids = result.stdout.strip().split()
-        
-        if not pids:
-            # Try fuser as backup
-            result = subprocess.run(
-                ["fuser", f"{port}/tcp"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            # fuser output: 3000/tcp:  1234 5678
-            if result.returncode == 0:
-                output = result.stdout.split(":")[-1].strip()
-                pids = output.split()
-
-        if not pids:
-            typer.secho(f"⚠️  Port {port} is busy (maybe in TIME_WAIT?) but owner PID could not be found.", fg=typer.colors.YELLOW)
-            return
-
-        for pid_str in pids:
-            if pid_str:
-                try:
-                    pid = int(pid_str)
-                    if pid == os.getpid():
-                        continue
-                    typer.secho(f"Stopping process {pid} on port {port}...", fg=typer.colors.YELLOW)
-                    os.kill(pid, signal.SIGTERM)
-                    time.sleep(0.5)
-                    try:
-                        os.kill(pid, 0)
-                        os.kill(pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                except (ValueError, ProcessLookupError):
-                    pass
-    except Exception as e:
-        typer.secho(f"Error during port cleanup for {port}: {e}", fg=typer.colors.RED, err=True)
+    """Stop whatever is listening on *port*."""
+    pids = find_port_listeners(port)
+    if not pids:
+        return
+    typer.secho(
+        f"Stopping {', '.join(f'{pid} ({process_name(pid)})' for pid in pids)} on port {port}...",
+        fg=typer.colors.YELLOW,
+    )
+    terminate_pids(pids)
 
 
 def _env_flag_enabled(name: str) -> bool:
