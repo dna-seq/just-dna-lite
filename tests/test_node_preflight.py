@@ -7,11 +7,13 @@ been restarted". A Windows user on Node 22.15 hit exactly that.
 """
 
 import pytest
+import typer
 from packaging import version
 from reflex.utils import js_runtimes
 from reflex_base import constants
 
-from webui.run import _node_too_old_for_dev_server
+from just_dna_lite import cli
+from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
 
 REQUIRED = version.parse(constants.Node.MIN_VERSION)
 
@@ -32,13 +34,13 @@ def _older(v: version.Version) -> version.Version:
 )
 def test_supported_node_passes(monkeypatch: pytest.MonkeyPatch, installed: version.Version) -> None:
     monkeypatch.setattr(js_runtimes, "get_node_version", lambda: installed)
-    assert _node_too_old_for_dev_server() == ""
+    assert node_too_old_for_dev_server() == ""
 
 
 def test_outdated_node_names_both_versions_and_both_ways_out(monkeypatch: pytest.MonkeyPatch) -> None:
     installed = _older(REQUIRED)
     monkeypatch.setattr(js_runtimes, "get_node_version", lambda: installed)
-    message = _node_too_old_for_dev_server()
+    message = node_too_old_for_dev_server()
     assert str(installed) in message
     assert str(REQUIRED) in message
     assert "uv run serve" in message
@@ -47,4 +49,22 @@ def test_outdated_node_names_both_versions_and_both_ways_out(monkeypatch: pytest
 
 def test_missing_node_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(js_runtimes, "get_node_version", lambda: None)
-    assert "No Node.js was found" in _node_too_old_for_dev_server()
+    assert "No Node.js was found" in node_too_old_for_dev_server()
+
+
+def test_start_refuses_before_spawning_anything(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check runs in the launcher, ahead of Dagster, the reapers and the banner.
+
+    Inside the UI child it would fire only after `uv run start` had already launched Dagster and
+    printed "Stack is starting!", which reads as success.
+    """
+    monkeypatch.setattr(cli, "node_too_old_for_dev_server", lambda: "Node.js 22.15.0 is installed")
+
+    def must_not_run(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the launcher reached process startup")
+
+    monkeypatch.setattr(cli, "reap_dagster_instance", must_not_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", must_not_run)
+    with pytest.raises(typer.Exit) as exited:
+        cli.start_all()
+    assert exited.value.exit_code == 1

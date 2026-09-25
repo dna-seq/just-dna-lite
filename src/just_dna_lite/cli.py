@@ -14,6 +14,7 @@ from rich.table import Table
 
 load_dotenv()  # Load .env from cwd or parent dirs before any command runs
 
+from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
@@ -347,6 +348,11 @@ def start_all(
     dagster_home_path = Path(dagster_home)
     _ensure_dagster_config(dagster_home_path)
     os.environ["DAGSTER_HOME"] = dagster_home
+
+    node_problem = node_too_old_for_dev_server()
+    if node_problem:
+        typer.secho(node_problem, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
 
     typer.secho("🏗️  Starting full Just DNA Pipelines stack...", fg=typer.colors.BRIGHT_MAGENTA, bold=True)
 
