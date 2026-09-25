@@ -267,7 +267,9 @@ ensembl_source:
   repo_id: just-dna-seq/ensembl_variations
 ```
 
-The `ensembl_annotations` asset reads this config and downloads the parquet files via **fsspec** (`HfFileSystem`) directly into our local cache — no duplicate HuggingFace blob storage. Change `repo_id` to use a different Ensembl dataset without touching any Python code.
+The `ensembl_annotations` asset reads this config and downloads the parquet files directly into our local cache (no duplicate HuggingFace blob storage), through the same downloader as `uv run pipelines download-ensembl`. Change `repo_id` to use a different Ensembl dataset without touching any Python code.
+
+Every run checks each local file against the size and SHA256 HuggingFace publishes, re-downloads any that do not match (to a `.part` file, renamed only once it validates), and writes a `<file>.sha256` stamp so an unchanged file is hashed once, not on every run. The asset used to skip the download as soon as *any* parquet was present and wrote straight to the final name, so a partial or damaged file stayed in the cache and every Ensembl join then failed inside DuckDB (a Windows user saw `_duckdb.Error: Out of buffer`). When HuggingFace cannot be reached and a cache exists, the asset warns and uses it unchecked. `uv run pipelines verify-ensembl` always re-hashes, ignoring stamps.
 
 *   **Default Location**: `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`
 *   **Override**: Set `JUST_DNA_PIPELINES_CACHE_DIR`.

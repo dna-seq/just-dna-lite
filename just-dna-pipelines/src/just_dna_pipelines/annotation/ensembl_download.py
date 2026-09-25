@@ -91,11 +91,37 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _stamp_path(path: Path) -> Path:
+    return path.with_name(f"{path.name}.sha256")
+
+
+def _stamp_line(path: Path, sha256: str) -> str:
+    stat = path.stat()
+    return f"{stat.st_size} {stat.st_mtime_ns} {sha256}"
+
+
+def write_verified_stamp(path: Path, sha256: str) -> None:
+    """Record that ``path`` hashed to ``sha256`` at its current size and mtime."""
+    _stamp_path(path).write_text(_stamp_line(path, sha256), encoding="utf-8")
+
+
 def file_is_valid(path: Path, expected_size: int, expected_sha256: str) -> bool:
-    """True only if file exists, has the right size, AND the right SHA256."""
+    """True only if file exists, has the right size, AND the right SHA256.
+
+    A file that already hashed correctly carries a ``<name>.sha256`` stamp holding its size,
+    mtime and digest; while those still match, the ~14 GB cache is not re-hashed. That is what
+    lets the Dagster asset check the cache on every Ensembl run. ``verify-ensembl`` hashes
+    unconditionally and is the check for corruption that leaves size and mtime alone.
+    """
     if not path.exists() or path.stat().st_size != expected_size:
         return False
-    return sha256_file(path) == expected_sha256
+    stamp = _stamp_path(path)
+    if stamp.exists() and stamp.read_text(encoding="utf-8").strip() == _stamp_line(path, expected_sha256):
+        return True
+    if sha256_file(path) != expected_sha256:
+        return False
+    write_verified_stamp(path, expected_sha256)
+    return True
 
 
 def download_ensembl_cache(
@@ -103,6 +129,8 @@ def download_ensembl_cache(
     cache_dir: Optional[str] = None,
     force: bool = False,
     console: Optional[Console] = None,
+    manifest: Optional[EnsemblManifest] = None,
+    target_dir: Optional[Path] = None,
 ) -> Path:
     """Download the Ensembl parquet cache from HuggingFace, validating each file by SHA256.
 
@@ -111,6 +139,9 @@ def download_ensembl_cache(
         cache_dir: Override for the root cache directory (default: env var / platform default).
         force: Re-download even files that already pass SHA256 validation.
         console: Optional rich Console for progress output (a default one is created if omitted).
+        manifest: A manifest the caller already fetched; fetched here when omitted.
+        target_dir: The exact directory the parquets belong in, when the caller holds it rather
+            than a cache root (the Dagster asset's ``cache_dir`` is ``ensembl_variations`` itself).
 
     Returns:
         Path to the ``ensembl_variations/data`` directory holding the parquet files.
@@ -119,7 +150,8 @@ def download_ensembl_cache(
         EnsemblDownloadError: If the repo has no parquet files or any file fails validation.
     """
     rich = console or Console()
-    target_dir = resolve_ensembl_cache_root(cache_dir) / "ensembl_variations" / "data"
+    if target_dir is None:
+        target_dir = resolve_ensembl_cache_root(cache_dir) / "ensembl_variations" / "data"
     target_dir.mkdir(parents=True, exist_ok=True)
 
     rich.print("\n[bold]Ensembl Variations Downloader[/bold]")
@@ -127,8 +159,9 @@ def download_ensembl_cache(
     rich.print(f"  Target : [cyan]{target_dir}[/cyan]\n")
 
     token = get_token()
-    rich.print("[dim]Fetching remote manifest (size + SHA256)…[/dim]")
-    manifest = fetch_ensembl_manifest(repo_id, token)
+    if manifest is None:
+        rich.print("[dim]Fetching remote manifest (size + SHA256)…[/dim]")
+        manifest = fetch_ensembl_manifest(repo_id, token)
     if not manifest:
         raise EnsemblDownloadError(f"no parquet files found in repo {repo_id}")
 
@@ -179,11 +212,12 @@ def download_ensembl_cache(
                         fh.write(chunk)
                         progress.update(task, advance=len(chunk))
 
-            if not file_is_valid(tmp, expected_size, expected_sha256):
+            if tmp.stat().st_size != expected_size or sha256_file(tmp) != expected_sha256:
                 tmp.unlink(missing_ok=True)
                 errors.append(f"{filename}: SHA256 mismatch after download")
             else:
-                tmp.rename(dest)
+                tmp.replace(dest)
+                write_verified_stamp(dest, expected_sha256)
 
     if errors:
         rich.print(f"\n[bold red]✗ {len(errors)} file(s) failed validation:[/bold red]")

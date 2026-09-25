@@ -19,6 +19,9 @@ from dagster import (
 )
 
 import polars as pl
+import requests
+from huggingface_hub import get_token
+from huggingface_hub.utils import HfHubHTTPError
 
 from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.io import read_vcf_file
@@ -35,6 +38,12 @@ from just_dna_pipelines.annotation.resources import (
     ensure_vcf_in_user_input_dir,
 )
 from just_dna_pipelines.annotation.logic import annotate_vcf_with_ensembl
+from just_dna_pipelines.annotation.ensembl_download import (
+    EnsemblDownloadError,
+    EnsemblManifest,
+    download_ensembl_cache,
+    fetch_ensembl_manifest,
+)
 
 
 # ============================================================================
@@ -347,6 +356,16 @@ def user_vcf_normalized(
 # REFERENCE DATA ASSETS
 # ============================================================================
 
+def _fetch_manifest_or_reason(
+    repo_id: str, token: str | None
+) -> tuple[EnsemblManifest | None, str]:
+    """The remote manifest, or ``None`` and why it could not be fetched (usually: offline)."""
+    try:
+        return fetch_ensembl_manifest(repo_id, token), ""
+    except (HfHubHTTPError, EnsemblDownloadError, requests.RequestException, OSError) as exc:
+        return None, str(exc)
+
+
 @asset(
     description="Ensembl variation annotations downloaded from HuggingFace Hub.",
     compute_kind="huggingface",
@@ -360,12 +379,12 @@ def user_vcf_normalized(
 )
 def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotationsConfig) -> Output[Path]:
     """
-    Download Ensembl variation parquets via fsspec into our local cache.
+    Download Ensembl variation parquets into our local cache and check them.
 
-    Uses HfFileSystem (fsspec) so files land directly in
-    ``~/.cache/just-dna-pipelines/ensembl_variations/data/`` with no
-    duplicate HuggingFace blob storage.  Swap the ``repo_id`` for any
-    fsspec-compatible URL in the future without changing downstream code.
+    Files land directly in ``~/.cache/just-dna-pipelines/ensembl_variations/data/``
+    (no duplicate HuggingFace blob storage) through the same downloader as
+    ``pipelines download-ensembl``: each file is checked against HF's size and
+    SHA256 and fetched to a ``.part`` file that is renamed only once it matches.
     """
     logger = context.log
 
@@ -381,42 +400,30 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
     logger.info(f"Ensembl cache directory: {cache_dir}")
 
     with resource_tracker("Download Ensembl Reference") as tracker:
+        manifest, manifest_error = _fetch_manifest_or_reason(config.repo_id, config.token or get_token())
         existing = list(data_dir.glob("*.parquet"))
-        if existing and not config.force_download:
-            total_size = sum(p.stat().st_size for p in existing) / (1024 ** 3)
-            logger.info(f"Cache exists with {len(existing)} parquet files ({total_size:.2f} GB), skipping download.")
-            return Output(
-                cache_dir,
-                metadata={
-                    "cache_path": MetadataValue.path(str(cache_dir.absolute())),
-                    "num_files": MetadataValue.int(len(existing)),
-                    "total_size_gb": MetadataValue.float(round(total_size, 2)),
-                    "status": MetadataValue.text("cached"),
-                },
+        if manifest is None:
+            if not existing:
+                raise EnsemblDownloadError(
+                    f"Cannot download the Ensembl cache from {config.repo_id}: {manifest_error}"
+                )
+            logger.warning(
+                f"Could not reach {config.repo_id} to check the Ensembl cache ({manifest_error}); "
+                f"using the {len(existing)} local parquet file(s) unchecked."
             )
-
-        from huggingface_hub import HfFileSystem, get_token
-
-        token = config.token or get_token()
-        fs = HfFileSystem(token=token)
-
-        remote_prefix = f"datasets/{config.repo_id}/data"
-        remote_files = [
-            f for f in fs.ls(remote_prefix, detail=False)
-            if f.endswith(".parquet")
-        ]
-        logger.info(f"Found {len(remote_files)} remote parquet files in {config.repo_id}")
-
-        for remote_path in remote_files:
-            filename = remote_path.rsplit("/", 1)[-1]
-            local_path = data_dir / filename
-            if local_path.exists() and not config.force_download:
-                logger.info(f"  {filename} already cached, skipping")
-                continue
-            logger.info(f"  Downloading {filename} ...")
-            fs.get(remote_path, str(local_path))
-
-        logger.info("Download complete")
+            status = "unchecked (offline)"
+        else:
+            # Every file is checked against HF's size + SHA256, not just "some parquet exists".
+            # This asset used to skip the whole download if any parquet was present and wrote
+            # straight to the final name, so a partial or damaged cache was never repaired and
+            # every later Ensembl join failed inside DuckDB (reported as "Out of buffer").
+            download_ensembl_cache(
+                repo_id=config.repo_id,
+                force=config.force_download,
+                manifest=manifest,
+                target_dir=data_dir,
+            )
+            status = "verified"
 
     parquet_files = list(data_dir.glob("*.parquet"))
     total_size = sum(p.stat().st_size for p in parquet_files) / (1024 ** 3)
@@ -425,7 +432,7 @@ def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotatio
         "cache_path": MetadataValue.path(str(cache_dir.absolute())),
         "num_files": MetadataValue.int(len(parquet_files)),
         "total_size_gb": MetadataValue.float(round(total_size, 2)),
-        "status": MetadataValue.text("downloaded"),
+        "status": MetadataValue.text(status),
     }
     if "report" in tracker:
         report = tracker["report"]
