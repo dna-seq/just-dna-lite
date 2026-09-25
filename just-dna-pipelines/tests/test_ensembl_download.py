@@ -12,9 +12,15 @@ from pathlib import Path
 
 import duckdb
 import pytest
+import requests
+from dagster import build_asset_context
 
+from just_dna_pipelines.annotation import assets
+from just_dna_pipelines.annotation.assets import ensembl_annotations
+from just_dna_pipelines.annotation.configs import EnsemblAnnotationsConfig
 from just_dna_pipelines.annotation.ensembl_download import (
     DEFAULT_ENSEMBL_REPO,
+    EnsemblDownloadError,
     download_ensembl_cache,
     fetch_ensembl_manifest,
     file_is_valid,
@@ -107,3 +113,53 @@ class TestRepairAgainstHuggingFace:
             f"SELECT count(*) FROM read_parquet('{path.as_posix()}') WHERE chrom IS NOT NULL"
         ).fetchone()[0]
         assert rows > 0
+
+
+class TestAssetUsesTheDownloader:
+    """The Dagster asset itself: verified when HF answers, unchecked-but-usable when it does not.
+
+    Only the remote *listing* is narrowed to the one small file (the full cache is ~14 GB);
+    the bytes still come from HuggingFace.
+    """
+
+    @pytest.mark.integration
+    def test_fresh_cache_is_downloaded_and_stamped(
+        self, tmp_path: Path, small_manifest: dict[str, tuple[int, str]], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(assets, "fetch_ensembl_manifest", lambda *a, **k: small_manifest)
+        out = ensembl_annotations(
+            build_asset_context(), EnsemblAnnotationsConfig(cache_dir=str(tmp_path))
+        )
+        size, digest = small_manifest[SMALL_FILE]
+        path = tmp_path / "data" / SMALL_FILE
+        assert out.value == tmp_path
+        assert out.metadata["status"].value == "verified"
+        assert sha256_file(path) == digest
+        assert (tmp_path / "data" / f"{SMALL_FILE}.sha256").exists()
+
+    def test_offline_with_a_cache_proceeds_unchecked(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "data").mkdir()
+        (tmp_path / "data" / SMALL_FILE).write_bytes(b"not checked")
+
+        def offline(*args: object, **kwargs: object) -> None:
+            raise requests.ConnectionError("network unreachable")
+
+        monkeypatch.setattr(assets, "fetch_ensembl_manifest", offline)
+        out = ensembl_annotations(
+            build_asset_context(), EnsemblAnnotationsConfig(cache_dir=str(tmp_path))
+        )
+        assert out.metadata["status"].value == "unchecked (offline)"
+
+    def test_offline_without_a_cache_fails(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def offline(*args: object, **kwargs: object) -> None:
+            raise requests.ConnectionError("network unreachable")
+
+        monkeypatch.setattr(assets, "fetch_ensembl_manifest", offline)
+        with pytest.raises(EnsemblDownloadError, match="network unreachable"):
+            ensembl_annotations(
+                build_asset_context(), EnsemblAnnotationsConfig(cache_dir=str(tmp_path))
+            )

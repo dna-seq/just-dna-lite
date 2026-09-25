@@ -1181,8 +1181,8 @@ This hook logs a summary at the end of each successful run: Total Duration, Max 
 - **Declarative Assets**: We prioritize Software-Defined Assets (SDA) over imperative ops.
 - **IO Managers**: Reference assets (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`.
 - **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`.
-- **Ensembl cache layout**: Flat chromosome parquets at `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`. Downloaded via fsspec (`HfFileSystem`). The repo is configured in `modules.yaml` under `ensembl_source:`. DuckDB creates a single `ensembl_variations` VIEW over all files.
-- **Lazy materialization**: Assets check if cache exists before downloading.
+- **Ensembl cache layout**: Flat chromosome parquets at `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`. Downloaded by `annotation/ensembl_download.py` (the `ensembl_annotations` asset and `pipelines download-ensembl` share it). The repo is configured in `modules.yaml` under `ensembl_source:`. DuckDB creates a single `ensembl_variations` VIEW over all files.
+- **Lazy materialization, file by file**: `ensembl_annotations` checks every cached parquet against HF's size + SHA256 and re-downloads only what does not match (`.part`, then replace). A `<file>.sha256` stamp (size, mtime, digest) means an unchanged file is hashed once; `verify-ensembl` ignores stamps. Never go back to "any parquet present, skip": that kept a damaged file forever, and the symptom was `_duckdb.Error: Out of buffer` inside the Ensembl join. Readers must glob `*.parquet`, never the bare directory, or they pick up the stamps.
 - **Start UI**: `uv run start` (full stack) or `uv run dagster` (pipelines only).
 
 ### Asset Return Types
