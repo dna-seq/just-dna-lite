@@ -142,6 +142,8 @@ uv python install 3.13
 
 This step is required on Windows (which ships without Python) and recommended on macOS and Linux to guarantee you're on a supported version.
 
+`uv run start` also needs **Node.js 22.22 or newer** for the web interface. Check with `node --version`. If it is missing or older, install the current LTS from [nodejs.org](https://nodejs.org) (on Windows: `winget install OpenJS.NodeJS.LTS`) and open a new terminal. If you can't upgrade it, `uv run serve` (below) runs the app without the development server. `uv run start` stops with this same advice when it finds an older Node, instead of failing further on with an unrelated-looking `restartWithMergedOptions()` error.
+
 Then clone and run:
 
 ```bash
