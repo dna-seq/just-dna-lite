@@ -1019,6 +1019,14 @@ compiler 0.7.0 on 2026-09-21 with our client at 0.26.1, so the contract guard is
   diagnosis. `_refresh_local`'s offline degradation logs a warning for the same outage and stays
   silent on screen, which is right: those modules are on disk and usable.
 
+- **A contract refusal says which side is behind, judged on the contract.** A
+  `VersionMismatchError` carries both `VersionInfo`s; `describe_contract_mismatch(url, e.server,
+  e.client)` reads direction from the API version, then `just-dna-format`, and never from the
+  registry package version (path-versioned, not part of compatibility). The banner used to say
+  "Catalog server is newer than this app" for every mismatch, so a user whose app was the newer
+  side was told to update it. `RegistryState.contract_mismatch` holds that text ("" = none) and the
+  banner renders it verbatim.
+
 Tests: `tests/test_registry_stores.py` (config parse, working-copy merge, `$REGISTRY_URL`
 resolution, identity migration, `_client_args` routing, switch reset). All network-free.
 `tests/test_registry_error_messages.py` pins the failure text against **real** httpx chains

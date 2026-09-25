@@ -20,9 +20,11 @@ import socket
 
 import httpx
 import pytest
+from just_dna_registry.version import VersionInfo, compatibility_error
 
 from webui.registry_errors import (
     _os_error_in,
+    describe_contract_mismatch,
     describe_registry_failure,
     report_registry_failure,
 )
@@ -129,3 +131,73 @@ def test_reporting_puts_the_traceback_on_the_log_and_the_summary_on_screen(
     assert record.exc_info is not None, "no traceback logged — the on-screen text is all there is"
     assert UNRESOLVABLE in record.getMessage()
     assert message == describe_registry_failure("browse the catalog", UNRESOLVABLE, exc)
+
+
+# --- Contract mismatch: which side is behind -------------------------------------------------
+#
+# The banner used to say "Catalog server is newer than this app" for every `VersionMismatchError`,
+# whichever side was older. Direction is a property of the interface contract the two sides speak
+# (API, then just-dna-format); the registry package version decides nothing and must not steer it.
+
+CATALOG = "https://catalog.just-dna.invalid"
+
+
+def _pair(
+    server_format: str, client_format: str, *, server_api: str = "v1", client_api: str = "v1",
+    server_registry: str = "0.25.2", client_registry: str = "0.26.1",
+) -> tuple[VersionInfo, VersionInfo]:
+    server = VersionInfo(api=server_api, registry=server_registry, format=server_format)
+    client = VersionInfo(api=client_api, registry=client_registry, format=client_format)
+    # Only pairs the library itself refuses ever reach the message.
+    assert compatibility_error(server, client) is not None
+    return server, client
+
+
+@pytest.mark.parametrize(
+    ("server_format", "client_format"),
+    [("0.6.1", "0.7.0"), ("0.6.9", "0.7.0"), ("1.0.0", "2.0.0")],
+)
+def test_older_server_contract_blames_the_server(server_format: str, client_format: str) -> None:
+    server, client = _pair(server_format, client_format)
+    message = describe_contract_mismatch(CATALOG, server, client)
+    assert "server is behind" in message
+    assert "update just-dna-lite" not in message
+    assert server_format in message and client_format in message and CATALOG in message
+
+
+@pytest.mark.parametrize(
+    ("server_format", "client_format"),
+    [("0.8.0", "0.7.0"), ("0.7.0", "0.6.9"), ("2.0.0", "1.4.2")],
+)
+def test_newer_server_contract_asks_to_update_the_app(server_format: str, client_format: str) -> None:
+    server, client = _pair(server_format, client_format)
+    message = describe_contract_mismatch(CATALOG, server, client)
+    assert "update just-dna-lite" in message
+    assert "server is behind" not in message
+
+
+def test_registry_package_version_does_not_decide_direction() -> None:
+    """A server on a *newer* registry release but an *older* format is still the side behind."""
+    server, client = _pair("0.6.1", "0.7.0", server_registry="9.0.0", client_registry="0.1.0")
+    message = describe_contract_mismatch(CATALOG, server, client)
+    assert "server is behind" in message
+    assert "9.0.0" not in message and "0.1.0" not in message
+
+
+@pytest.mark.parametrize(
+    ("server_api", "client_api", "expected"),
+    [("v1", "v2", "server is behind"), ("v2", "v1", "update just-dna-lite")],
+)
+def test_api_contract_is_judged_before_format(server_api: str, client_api: str, expected: str) -> None:
+    # Format points the other way on purpose: the API gap is the one the client refused on.
+    server, client = _pair("0.7.0", "0.7.0", server_api=server_api, client_api=client_api)
+    message = describe_contract_mismatch(CATALOG, server, client)
+    assert expected in message
+    assert f"API {client_api}" in message and f"API {server_api}" in message
+
+
+def test_unparseable_contract_claims_no_direction() -> None:
+    server, client = _pair("0.7.0", "0.7.0", server_api="beta", client_api="v1")
+    message = describe_contract_mismatch(CATALOG, server, client)
+    assert "Could not tell which side is older" in message
+    assert "update just-dna-lite" not in message and "server is behind" not in message

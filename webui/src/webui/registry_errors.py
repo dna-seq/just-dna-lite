@@ -12,6 +12,10 @@ Two halves, both of which were missing:
 * :func:`describe_registry_failure` names the server in every case and, where the OS said *why*,
   what to check. The URL matters most when it is **not** the default — a self-hosted store or a
   ``$REGISTRY_URL`` typo reads identically to a network outage otherwise.
+* :func:`describe_contract_mismatch` covers the one refusal that *did* get an answer: the server
+  speaks a different interface contract. It says which side is behind, judged on the contract the
+  two sides speak (API version, then ``just-dna-format``), never on the registry package version,
+  which is path-versioned and does not decide compatibility.
 * :func:`report_registry_failure` also puts the traceback on the log. Nothing in this app
   configures a handler, so :mod:`logging`'s last-resort handler carries ``ERROR`` to stderr, i.e.
   the terminal running ``uv run start``. That is the only copy; do not describe it as a log file.
@@ -27,6 +31,9 @@ import errno
 import logging
 import socket
 from urllib.parse import urlsplit
+
+from just_dna_format.identity import parse_version
+from just_dna_registry.version import VersionInfo
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +129,46 @@ def report_registry_failure(action: str, url: str, exc: BaseException) -> str:
     """
     logger.error("Registry call failed: could not %s (%s)", action, url, exc_info=exc)
     return describe_registry_failure(action, url, exc)
+
+
+def _contract_order(server: str | None, client: str | None, parse) -> int | None:
+    """-1 if the server's side is older, 1 if newer, 0 if equal, ``None`` if it cannot be told."""
+    if not server or not client:
+        return None
+    try:
+        s, c = parse(server), parse(client)
+    except ValueError:
+        return None
+    return (s > c) - (s < c)
+
+
+def _api_number(api: str) -> int:
+    """``"v1"`` → ``1``; raises ``ValueError`` for anything else."""
+    return int(api.removeprefix("v"))
+
+
+def describe_contract_mismatch(url: str, server: VersionInfo, client: VersionInfo) -> str:
+    """User-facing text for a ``VersionMismatchError``: which contract differs and which side is behind.
+
+    The registry client refuses on the API version or on the ``just-dna-format`` contract, so the
+    direction is read from whichever of those differs. The registry *package* versions are
+    deliberately not consulted: a server one registry release behind the client is routine and
+    compatible, and reading direction off it is how this app came to say "the server is newer"
+    to a user whose app was the newer side.
+    """
+    if server.api != client.api:
+        what = f"API {client.api}, the server speaks API {server.api}"
+        order = _contract_order(server.api, client.api, _api_number)
+    else:
+        what = f"just-dna-format {client.format}, the server speaks {server.format}"
+        order = _contract_order(server.format, client.format, parse_version)
+    if order is not None and order < 0:
+        remedy = (
+            "The server is behind this app; it has to be upgraded before this app can exchange "
+            "modules with it. Nothing to do on this machine."
+        )
+    elif order is not None and order > 0:
+        remedy = "This app is behind the server; update just-dna-lite."
+    else:
+        remedy = "Could not tell which side is older."
+    return f"Incompatible catalog server {url}: this app speaks {what}. {remedy}"

@@ -75,14 +75,9 @@ from webui.registry_identity import (
 # Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
 _DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
 
-# Shown when the catalog server's contract (API / just-dna-format / compiler) is newer than
-# this app's client — swapping compiled artifacts would collide, so we refuse and tell the user.
-_REGISTRY_MISMATCH_HINT: str = (
-    "This app is out of date with the catalog server — update just-dna-lite to continue."
-)
 from reflex_mui_datagrid import LazyFrameGridMixin, extract_vcf_descriptions, scan_file
 from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public_backend_base_url
-from webui.registry_errors import report_registry_failure
+from webui.registry_errors import describe_contract_mismatch, report_registry_failure
 
 logger = logging.getLogger(__name__)
 
@@ -6258,7 +6253,8 @@ class RegistryState(rx.State):
     total: int = 0
     catalog_loading: bool = False
     catalog_error: str = ""
-    server_incompatible: bool = False   # server contract newer than this client (0.7.1 guard)
+    # Non-empty when the server speaks another interface contract; says which side is behind.
+    contract_mismatch: str = ""
 
     # --- Local registry snapshot (name -> metadata + in_catalog flag) ---
     local_modules: List[Dict[str, Any]] = []
@@ -6586,8 +6582,8 @@ class RegistryState(rx.State):
         except VersionMismatchError as e:
             async with self:
                 self.catalog_loading = False
-                self.server_incompatible = True
-                self.catalog_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self.contract_mismatch = describe_contract_mismatch(url, e.server, e.client)
+                self.catalog_error = self.contract_mismatch
                 self.cards = []
                 self.total = 0
             return
@@ -6617,7 +6613,7 @@ class RegistryState(rx.State):
             if not ns_filter:
                 seen = set(self.namespace_options) | {c.get("namespace", "") for c in items}
                 self.namespace_options = sorted(n for n in seen if n)
-            self.server_incompatible = False
+            self.contract_mismatch = ""
             self.catalog_loading = False
 
     async def _ensure_identity(self) -> None:
@@ -6699,7 +6695,7 @@ class RegistryState(rx.State):
         self.namespace_options = []
         self.namespace_filter = ""
         self.catalog_error = ""
-        self.server_incompatible = False
+        self.contract_mismatch = ""
         # Selection (a version list from one server does not describe another's module)
         self.selected_name = ""
         self.selected_catalog_name = ""
@@ -6797,8 +6793,8 @@ class RegistryState(rx.State):
         except VersionMismatchError as e:
             async with self:
                 self.detail_loading = False
-                self.server_incompatible = True
-                self.detail_error = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self.contract_mismatch = describe_contract_mismatch(url, e.server, e.client)
+                self.detail_error = self.contract_mismatch
             return
         except Exception as e:  # noqa: BLE001
             message = report_registry_failure(f"load details for {namespace}/{name}", url, e)
@@ -6926,8 +6922,8 @@ class RegistryState(rx.State):
             await loop.run_in_executor(None, _install)
         except VersionMismatchError as e:
             async with self:
-                self.server_incompatible = True
-                self._end_action(f"{_REGISTRY_MISMATCH_HINT} ({e.detail})")
+                self.contract_mismatch = describe_contract_mismatch(url, e.server, e.client)
+                self._end_action(self.contract_mismatch)
             return
         except Exception as e:  # noqa: BLE001
             message = report_registry_failure(f"install {namespace}/{name} {version}", url, e)
@@ -7483,9 +7479,9 @@ class RegistryState(rx.State):
         except VersionMismatchError as e:
             async with self:
                 self.precheck_busy = False
-                self.server_incompatible = True
+                self.contract_mismatch = describe_contract_mismatch(url, e.server, e.client)
                 self.precheck_verdict = "error"
-                self.precheck_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self.precheck_message = self.contract_mismatch
             return
         except RegistryError as e:
             async with self:
@@ -7587,8 +7583,8 @@ class RegistryState(rx.State):
         except VersionMismatchError as e:
             async with self:
                 self.publish_busy = False
-                self.server_incompatible = True
-                self.publish_message = f"{_REGISTRY_MISMATCH_HINT} ({e.detail})"
+                self.contract_mismatch = describe_contract_mismatch(url, e.server, e.client)
+                self.publish_message = self.contract_mismatch
             return
         except RegistryError as e:
             async with self:

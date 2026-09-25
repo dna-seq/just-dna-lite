@@ -1266,13 +1266,13 @@ def _publication_tab() -> rx.Component:
 
 
 def _incompatible_banner() -> rx.Component:
-    """Prominent banner when the registry server's contract is newer than this client."""
+    """Prominent banner when the server speaks another interface contract, naming the side behind."""
     return rx.cond(
-        RegistryState.server_incompatible,
+        RegistryState.contract_mismatch != "",
         rx.el.div(
             fomantic_icon("exclamation triangle", size=16, color="#9f3a38"),
             rx.el.span(
-                " Catalog server is newer than this app — update just-dna-lite to browse or install.",
+                RegistryState.contract_mismatch,
                 style={"marginLeft": "6px"},
             ),
             class_name="ui small error message",
