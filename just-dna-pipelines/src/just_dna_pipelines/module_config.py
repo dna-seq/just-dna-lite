@@ -51,11 +51,26 @@ class QualityFilters(BaseModel):
     """VCF quality filter thresholds loaded from modules.yaml.
 
     Applied during normalization to remove low-quality variants before annotation.
-    All fields default to None (no filtering) for backward compatibility.
+    All thresholds default to None (no filtering).
+
+    The policy is "the caller's verdict first; our thresholds judge only what a record states":
+
+    * ``pass_filters`` is the caller's own verdict and is applied as written. A record the caller
+      filtered (e.g. DRAGEN's ``TargetedConflict``, the small-variant call a targeted caller
+      overruled) is never resurrected.
+    * ``min_depth`` reads the first depth the record states: ``DP``, else DRAGEN's joint/targeted
+      depth ``JDP``. ``min_qual`` reads ``QUAL``.
+    * ``unstated_metrics`` decides a record that states **no** value for a thresholded metric.
+      ``keep`` (the default) lets the threshold abstain, so the record is judged by FILTER alone —
+      the same treatment a file with no DP column at all has always had. ``drop`` treats unstated
+      as failing. A VCF "." is *unknown*, not zero: DRAGEN's targeted callers (RH, GBA, CYP21A2,
+      CYP2D6) emit PASS calls that carry no DP by design, and under ``drop`` every one of them
+      is lost at exactly the paralogous loci where they are the better call.
     """
     pass_filters: Optional[list[str]] = None
     min_depth: Optional[int] = None
     min_qual: Optional[float] = None
+    unstated_metrics: Literal["keep", "drop"] = "keep"
 
     @property
     def is_active(self) -> bool:
@@ -105,19 +120,66 @@ def build_quality_filter_expr(
         if col is not None:
             conditions.append(pl.col(col).is_in(_expand_pass_filters(filters.pass_filters)))
 
+    keep_unstated = filters.unstated_metrics == "keep"
+
     if filters.min_depth is not None and filters.min_depth > 0:
-        col = _find_column(schema_names, ("DP", "Dp", "dp"))
-        if col is not None:
-            conditions.append(pl.col(col).cast(pl.Int64, strict=False) >= filters.min_depth)
+        depth = depth_expr(schema_names)
+        if depth is not None:
+            passes = depth >= filters.min_depth
+            conditions.append(passes | depth.is_null() if keep_unstated else passes.fill_null(False))
 
     if filters.min_qual is not None and filters.min_qual > 0:
-        col = _find_column(schema_names, ("qual", "Qual", "QUAL"))
-        if col is not None:
-            conditions.append(pl.col(col).cast(pl.Float64, strict=False) >= filters.min_qual)
+        qual = qual_expr(schema_names)
+        if qual is not None:
+            passes = qual >= filters.min_qual
+            conditions.append(passes | qual.is_null() if keep_unstated else passes.fill_null(False))
 
     if not conditions:
         return None
     return conditions[0] if len(conditions) == 1 else pl.all_horizontal(conditions)
+
+
+# Depth columns in the order a record is read: the standard DP (INFO or FORMAT, flattened into one
+# column by normalization), then DRAGEN's joint/targeted-caller depth, which its GBA, CYP21A2 and
+# CYP2D6 callers state instead of DP.
+_DEPTH_COLUMNS: tuple[tuple[str, ...], ...] = (("DP", "Dp", "dp"), ("JDP",))
+
+
+def depth_expr(schema_names: list[str]) -> Optional[pl.Expr]:
+    """The depth a record states (DP, else JDP) as Int64, null when it states none; None if no column."""
+    cols = [c for group in _DEPTH_COLUMNS if (c := _find_column(schema_names, group)) is not None]
+    if not cols:
+        return None
+    return pl.coalesce([pl.col(c).cast(pl.Int64, strict=False) for c in cols])
+
+
+def qual_expr(schema_names: list[str]) -> Optional[pl.Expr]:
+    """QUAL as Float64, null where the record states none ("."); None if there is no QUAL column."""
+    col = _find_column(schema_names, ("qual", "Qual", "QUAL"))
+    return None if col is None else pl.col(col).cast(pl.Float64, strict=False)
+
+
+def unstated_metric_counts(filters: QualityFilters, lf: pl.LazyFrame) -> dict[str, int]:
+    """How many records in *lf* (already filtered) survived only because a threshold abstained.
+
+    Run on the normalized output, not the raw VCF, so it is a cheap parquet scan. Empty when the
+    policy is ``drop`` or no threshold is active: nothing can then have been kept by abstention.
+    """
+    if filters.unstated_metrics != "keep":
+        return {}
+    names = lf.collect_schema().names()
+    exprs: list[pl.Expr] = []
+    if filters.min_depth:
+        depth = depth_expr(names)
+        if depth is not None:
+            exprs.append(depth.is_null().sum().alias("kept_depth_unstated"))
+    if filters.min_qual:
+        qual = qual_expr(names)
+        if qual is not None:
+            exprs.append(qual.is_null().sum().alias("kept_qual_unstated"))
+    if not exprs:
+        return {}
+    return {k: int(v) for k, v in lf.select(exprs).collect().row(0, named=True).items()}
 
 
 class ModuleMetadata(BaseModel):

@@ -4,6 +4,10 @@ quality_filters:
   - .
   min_depth: 10
   min_qual: 20
+  # A record that states no DP/JDP (or no QUAL) when the caller passed it: `keep` judges it by
+  # FILTER alone, `drop` treats unstated as failing. DRAGEN's targeted callers (RH, GBA, CYP21A2,
+  # CYP2D6) emit PASS calls with no DP by design; `drop` loses all of them.
+  unstated_metrics: keep
 
 immutable_mode:
   enabled: false

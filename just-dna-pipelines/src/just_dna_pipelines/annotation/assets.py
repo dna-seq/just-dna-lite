@@ -24,6 +24,12 @@ from huggingface_hub import get_token
 from huggingface_hub.utils import HfHubHTTPError
 
 from just_dna_pipelines.runtime import resource_tracker
+from just_dna_pipelines.module_config import (
+    QualityFilters,
+    _load_config,
+    build_quality_filter_expr,
+    unstated_metric_counts,
+)
 from just_dna_pipelines.io import read_vcf_file
 from just_dna_pipelines.annotation.chromosomes import rewrite_chromosome_column_strip_chr_prefix
 from just_dna_pipelines.annotation.configs import (
@@ -181,7 +187,6 @@ def quality_filters_config(context: AssetExecutionContext) -> Output[dict]:
     hash of the filter config — when it changes, Dagster marks downstream
     assets as stale.
     """
-    from just_dna_pipelines.module_config import _load_config, QualityFilters
 
     config = _load_config()
     filters = config.quality_filters
@@ -248,7 +253,6 @@ def user_vcf_normalized(
     If sex="Female" is set, logs a warning when chrY variants are present
     (informational only — never removes chrY).
     """
-    from just_dna_pipelines.module_config import QualityFilters, build_quality_filter_expr
 
     logger = context.log
     partition_key = context.partition_key
@@ -348,6 +352,13 @@ def user_vcf_normalized(
         metadata_dict["rows_after_filter"] = MetadataValue.int(row_count)
         metadata_dict["rows_removed"] = MetadataValue.int(rows_before_filter - row_count)
     metadata_dict["quality_filters_hash"] = MetadataValue.text(filters.config_hash())
+
+    # Records the caller passed that state no depth/QUAL survive by the threshold abstaining
+    # (QualityFilters.unstated_metrics). Say how many, so the policy is visible rather than silent.
+    for key, count in unstated_metric_counts(filters, pl.scan_parquet(str(output_path))).items():
+        metadata_dict[key] = MetadataValue.int(count)
+        if count:
+            logger.info(f"Quality filter kept {count} record(s) that state no value for this threshold ({key})")
 
     return Output(output_path, metadata=metadata_dict)
 
