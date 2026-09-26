@@ -589,7 +589,9 @@ in the library than it was here: 0.5.2 compares the module's `panel:` pin agains
 a different release still gets checked — where the local flag was unconditional. The reason travels
 on `EnrichmentResult.clin_sig_not_checked`, so an empty conflict list is no longer ambiguous.
 
-All five are filed upstream in `/data/sources/just-dna-format/docs/ROADMAP.md`.
+All five are filed upstream through the suggestions inbox
+(`/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`) — the single consumer entrypoint; the
+maintainers' triage spawns any `ROADMAP.md` / `RM` entries from there.
 
 **Resolution WAS scoped to `variants.csv`; RM43 shipped in 0.6 and this repo's docs did not notice
 until 2026-08-21.** Through 0.5 the compiler materialized `pharm_variants` / `haplotypes` /
@@ -1005,19 +1007,25 @@ derives its baseline by running the loader with no working copy rather than read
 since `_drop_project_runtime_sources` strips the two repo-local absolute sources whenever
 `JUST_DNA_PIPELINES_OUTPUT_DIR` is set — which another test module's `load_env()` does session-wide.
 
-### Working agreement: propose shared changes via the format repo's docs (don't manage that repo)
+### Working agreement: the suggestions inbox is the single entrypoint (don't manage that repo)
 
 When you find something that belongs in the shared schema/compiler (a bug, a missing field, a
-tightening, a parity gap), **do not edit or commit the `just-dna-format` repo** — we consume it, we
-don't own it. Just leave a note in its docs, which act as that repo's kanban intake; the format-repo
-owners pick it up as needed:
+tightening, a parity gap) — or want to record a consumer-side integration fact — **do not edit or
+commit the `just-dna-format` repo** — we consume it, we don't own it. There is **one** place to write:
 
-- **`/data/sources/just-dna-format/docs/ROADMAP.md`** — backlog / proposed changes (kanban first
-  column: "sticking a note", handled as needed).
-- **`/data/sources/just-dna-format/docs/CHANGELOG.md`** — record cross-repo integration changes made
-  on **our** (consumer) side, so parallel agents in the other repos aren't surprised.
+- **`/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`** — the suggestions **inbox**, and the
+  only file a consumer writes to. Append a `## Sn — <what happened>` section (claim the next id with
+  `.claude/triage-state.py --next`, which scans the inbox *and* the history file — never number from
+  what the inbox shows). Write the report, not a request: what you ran, what you expected, what
+  happened, what you did meanwhile; a candidate fix, or an argument against your own first one, is
+  welcome.
 
-Writing the note is the whole job on that side — do not follow it up with commits or PRs there.
+**Do not write to `ROADMAP.md` or `CHANGELOG.md`** — those are the format repo's own, maintained by its
+owners. The maintainers' triage loop reads the inbox, replies with a `**Status —**`, moves the item to
+`CONSUMER_SUGGESTIONS_HISTORY.md`, and spawns any `RM` / roadmap / changelog entries itself. A consumer
+who writes to `CHANGELOG.md` leaves a dangling edit in a repo the maintainers commit to; put the same
+content in an inbox item instead. Writing the inbox note is the whole job on that side — do not follow
+it up with commits or PRs there.
 
 ---
 
