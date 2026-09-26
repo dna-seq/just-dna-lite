@@ -449,10 +449,19 @@ field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actu
   six `port` modules compiled with `sidecar_spelling_deprecated`, while `clinvar_panel`/`pharmgkb`
   (which already swept via `sidecar_candidates`) did not. The runner now clears every sidecar
   candidate (root + `derived/`, both spellings) before `enrich`, so the rebuild writes the preferred
-  name; verified the warning clears on thrombophilia. **Not fixed (reported):** the three ClinVar
-  panels compile with `panel_block_deprecated` — `clinvar_panel.py` writes a `panel:` block that
-  format 0.6 deprecated and 1.0 removes; migrating off it is a format-level design decision, not a
-  local one-liner, and the block still works meanwhile.
+  name; verified the warning clears on thrombophilia.
+
+- **`clinvar_panel.py` no longer writes the deprecated `panel:` block (removed 2026-09-26).** Format
+  0.6 deprecated it and 1.0 removes it (RM4); its one machine reader — the enricher's ClinVar clin_sig
+  cross-check — reads the licence row's `dataset` column instead (which `draft_gene_panel` writes).
+  Nothing in this repo ever read the block. Its descriptive provenance moved into `clinvar_panel.log`
+  (hashed into `manifest.logs`, so it survives the 1.0 removal): `reference_sha256` and `significance`
+  were **already** there (`clinvar_source_sha256` / `clin_sig` lines), so only the requested gene list
+  (`panel_genes`) had to be added. `PanelBuild.panel_genes` carries the full requested set — kept even
+  for genes that matched no pathogenic variant, which `variants.csv`'s `gene` column would lose (cardio:
+  327 requested, 297 matched). Filed upstream as **S114** (the `replaced=True` branch of
+  `panel_block_deprecated` warns whether or not you need the three fields it says to keep the block for —
+  it needs a home for them or a split so it fires only on `replaced=False`).
 
 ### What 0.7 changed on our side (adopted 2026-09-21)
 

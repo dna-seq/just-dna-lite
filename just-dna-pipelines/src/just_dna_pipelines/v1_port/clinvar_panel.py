@@ -12,11 +12,13 @@ published ClinVar **parquet snapshot**, which changes five things:
 2. Every row carries a typed ``clin_sig`` from the closed ``VALID_CLIN_SIG`` vocabulary, so the
    module is checkable against the source it was built from (``enrich --verify-clinsig``).
 3. A **review-status floor** applies. Gen-I mixed 0★ "no assertion criteria provided" submissions in
-   silently; ``MIN_REVIEW_STARS`` states the floor and the panel declaration records it.
+   silently; ``MIN_REVIEW_STARS`` states the floor and ``clinvar_panel.log`` records it.
 4. Grounding is **per variant**, from ClinVar's own literature links, instead of one blanket
    citation of the ClinVar resource paper for every row.
-5. ``licensing.csv`` records ClinVar's terms, and ``module_spec.yaml`` carries a ``panel:`` block
-   (``GenePanelSpec``) pinning the reference release and the significance predicate.
+5. ``licensing.csv`` records ClinVar's terms (its ``dataset`` column pins the snapshot the enricher's
+   clin_sig cross-check compares against), and ``clinvar_panel.log`` records the panel provenance —
+   the reference release + sha, the significance predicate, and the requested gene list. The
+   deprecated ``panel:`` block (format 1.0 removes it, RM4) is no longer written.
 
 **The one judgement this module makes.** ``draft_gene_panel`` deliberately leaves ``genotype`` as a
 ``<<REPLACE>>`` placeholder: ClinVar publishes alleles, and whether carrying one is a carrier state
@@ -94,6 +96,14 @@ class PanelBuild(BaseModel):
     max_citations: int = MAX_CITATIONS
     genes_requested: int = 0
     genes_matched: int = 0
+    # The requested panel gene list itself, not just its count. It was the one piece of the
+    # deprecated `panel:` block (removed at format 1.0, RM4) with no home elsewhere — the block's
+    # other two provenance fields were already in this log (`reference_sha256` == the
+    # `clinvar_source_sha256` line, `significance` == the `clin_sig` line). Empty for the
+    # genome-wide `pathogenic` module, which applies no gene filter. `genes_requested`/`_matched`
+    # stay as the counts; this carries the membership the counts summarize, and unlike the `gene`
+    # column of variants.csv it keeps the requested genes that matched no pathogenic variant.
+    panel_genes: list[str] = Field(default_factory=list)
     clinvar_records: int = 0
     variant_rows: int = 0
     study_rows: int = 0
@@ -104,7 +114,7 @@ class PanelBuild(BaseModel):
 
 
 def snapshot_release(reference: Path) -> dict[str, object]:
-    """The snapshot's ``release.json`` — the reference identity a ``panel:`` block pins."""
+    """The snapshot's ``release.json`` — the reference identity ``clinvar_panel.log`` records."""
     release_file = reference / "release.json"
     if not release_file.exists():
         return {}
@@ -382,15 +392,14 @@ def draft_studies(
 def _module_spec_yaml(
     name: str, genes: list[str], release: dict[str, object], record_count: int
 ) -> str:
-    """``module_spec.yaml`` for a ClinVar module, including the ``panel:`` declaration.
+    """``module_spec.yaml`` for a ClinVar module.
 
-    ``panel.genes`` is left empty for the genome-wide module — ``GenePanelSpec`` documents empty as
-    "no gene filter", which is what ``pathogenic`` is. Listing its 4,793 derived symbols there would
-    read as a curated panel it is not.
+    No ``panel:`` block: it is deprecated in format 0.6 and removed at 1.0 (RM4). Its provenance now
+    lives in ``clinvar_panel.log`` (see ``_write_log``) and its one machine reader moved to the
+    licence row's ``dataset`` column. ``genes`` is still received (the drafter needs the panel set);
+    it is recorded in the log, empty for the genome-wide ``pathogenic`` module.
     """
     meta = display_meta(name)
-    genome_wide = name == "pathogenic"
-    source_sha = release.get("source_sha256")
     spec: dict[str, object] = {
         "schema_version": "1.0",
         "module": {
@@ -418,13 +427,12 @@ def _module_spec_yaml(
         # sees a matching pair. `CC0-1.0` is the same grant in substance and still trips the check.
         "license": "public-domain",
         "genome_build": "GRCh38",
-        "panel": {
-            "source": "clinvar",
-            "reference": str(release.get("clinvar_file_date") or "unknown"),
-            "reference_sha256": f"sha256:{source_sha}" if source_sha else None,
-            "genes": [] if genome_wide else sorted(genes),
-            "significance": sorted(PANEL_CLIN_SIG),
-        },
+        # The `panel:` block is gone (deprecated format 0.6, removed at 1.0 / RM4). Its one machine
+        # reader — the enricher's ClinVar clin_sig cross-check — now reads the `dataset` column of
+        # the module's licence row, which `draft_gene_panel` writes. Its descriptive provenance
+        # (`reference_sha256`, `significance`, the requested gene list) now lives in `clinvar_panel.log`
+        # (`clinvar_source_sha256`, `clin_sig`, `panel_genes`), which is hashed into `manifest.logs`
+        # and survives the 1.0 removal. See just-dna-format CONSUMER_SUGGESTIONS S114.
         "authorship": [
             {"who": "just-dna-seq", "role": "created", "kind": ["human", "ai"]},
         ],
@@ -534,6 +542,9 @@ def build_clinvar_module(
         max_citations=max_citations,
         genes_requested=len(genes),
         genes_matched=len({(r.get("gene") or "") for r in records} - {""}),
+        # Empty for genome-wide `pathogenic` (no gene filter), mirroring what the old panel block
+        # recorded — listing its ~4,793 derived symbols would read as a curated panel it is not.
+        panel_genes=[] if name == "pathogenic" else sorted(genes),
         clinvar_records=len(records),
         variant_rows=variant_rows,
         study_rows=study_rows,
@@ -578,6 +589,9 @@ def _write_log(out_dir: Path, build: PanelBuild, release: dict[str, object], sna
         f"unfilled_placeholders: {build.unfilled_placeholders}",
         f"built_at: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
     ]
+    if build.panel_genes:
+        lines.append(f"panel_genes ({len(build.panel_genes)} requested):")
+        lines += [f"  - {gene}" for gene in build.panel_genes]
     if build.alias_remaps:
         lines.append("alias_remaps:")
         lines += [f"  - {old} -> {new}" for old, new in sorted(build.alias_remaps.items())]

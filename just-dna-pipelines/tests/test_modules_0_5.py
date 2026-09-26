@@ -368,14 +368,27 @@ class TestClinVarPanel:
             "every citation is the fallback — the snapshot's citations table was not read"
         )
 
-    def test_panel_declaration_pins_the_reference(self, hbb_module: Path) -> None:
+    def test_panel_provenance_is_recorded_in_the_log_not_a_deprecated_block(
+        self, hbb_module: Path
+    ) -> None:
+        """The `panel:` block is deprecated (format 0.6, removed at 1.0 / RM4), so it is no longer
+        written; its provenance moved to `clinvar_panel.log`, which is hashed into `manifest.logs`
+        and survives the removal. The block's one machine reader (the enricher's clin_sig
+        cross-check) reads the licence row's `dataset` column instead."""
         spec = yaml.safe_load((hbb_module / "module_spec.yaml").read_text())
-        panel = spec["panel"]
-        assert panel["source"] == "clinvar"
-        assert panel["reference"] and panel["reference"] != "unknown"
-        assert panel["reference_sha256"].startswith("sha256:")
-        assert set(panel["significance"]) == set(PANEL_CLIN_SIG)
-        assert panel["genes"] == PANEL_GENES
+        assert "panel" not in spec, "the deprecated panel: block must not be written"
+
+        log = (hbb_module / "clinvar_panel.log").read_text().splitlines()
+        scalars = dict(
+            line.split(": ", 1) for line in log if ": " in line and not line.startswith("  ")
+        )
+        assert scalars["clinvar_source_sha256"].startswith("sha256:")  # was panel.reference_sha256
+        assert scalars["clinvar_release"] and scalars["clinvar_release"] != "unknown"
+        assert {s.strip() for s in scalars["clin_sig"].split(",")} == set(PANEL_CLIN_SIG)
+        # panel_genes is a "  - GENE" list under its header — the requested set, kept in full even
+        # for genes that matched no pathogenic variant (variants.csv would lose those).
+        logged_genes = [ln.strip()[2:] for ln in log if ln.startswith("  - ")]
+        assert set(PANEL_GENES).issubset(set(logged_genes))
 
     def test_display_metadata_comes_from_modules_yaml(self, hbb_module: Path) -> None:
         """Not the auto-generated default — the regression the config-merge bug caused."""
