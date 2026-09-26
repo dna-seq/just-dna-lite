@@ -249,8 +249,9 @@ old name, so check here first:
   and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
   which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
 
-*(Floors as of 2026-09-21: format `>=0.7.0`, compiler and enricher `>=0.7.1`, registry `>=0.26.1`.
-**We are on the 0.7 line** — see "What 0.7 changed on our side" below. The 0.6 reasoning that follows
+*(Floors as of 2026-09-26: format `>=0.7.0`, compiler `>=0.7.1`, **enricher `>=0.7.2`** (bumped from
+0.7.1 for RM254, the S107 CLI-beside-dagster fix — enricher-only patch, format/compiler unchanged),
+registry `>=0.26.1`. **We are on the 0.7 line** — see "What 0.7 changed on our side" below. The 0.6 reasoning that follows
 is kept because every module we have published is still a 0.5 or 0.6 artifact and the mixed-era read
 paths it describes are all still live; only the pinned numbers moved. Both servers answer
 `registry 0.25.2 / format 0.7.0 / compiler 0.7.0`, so `contract_compatible` holds.)*
@@ -313,9 +314,10 @@ derive with `just_dna_format.derive.direction_from_state(state, weight)`; never 
 column as directionless. Whether the artifact itself should carry the derived axes is a format-0.6
 question tracked in just-dna-format's ROADMAP.
 
-**Status (2026-08-09):** the tests are re-baselined and green, and all ten modules are rebuilt under
-0.5 in `data/interim/v1_port/`. What is left is **republishing**, which is the maintainer's call —
-see [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md).
+**Status (updated 2026-09-26):** the tests are re-baselined and green, and all ten modules have now
+been **rebuilt under 0.7** in `data/interim/v1_port/` (the 0.5 build this line used to describe is
+preserved at `data/interim/v1_port_0_5/`). What is left is **republishing**, which is the maintainer's
+call — see [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md).
 
 ### What 0.6 changed on our side (adopted 2026-08-18)
 
@@ -431,11 +433,26 @@ field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actu
 - **Trust badging needs nothing.** We read `trusted` from the registry rather than computing it, and
   `_trust_word` already keeps it tri-state. Registry 0.17 reads RM44's counters (`resolution_subjects`
   beside `fully_resolved`) and keeps the `UNJOINABLE_PHRASE` match for artifacts predating them.
-- **The ten modules in `data/interim/v1_port/` were deliberately NOT rebuilt or republished.** That is
-  the maintainer's call (see `docs/MODULE_RELEASE_0_5.md`), and leaving them as 0.5 artifacts keeps the
-  mixed-era read paths under live test rather than under fixture only — `_annotations_keying`'s three
-  generations, the pre-0.6 `ref` guard, and `UNJOINABLE_PHRASE` all still have a real artifact
-  exercising them.
+- **The ten modules in `data/interim/v1_port/` were rebuilt under 0.7 on 2026-09-26** (against enricher
+  0.7.2 / compiler 0.7.1 / format 0.7.0), replacing the long-standing 0.5 artifacts. The pre-rebuild
+  0.5 corpus is preserved at `data/interim/v1_port_0_5/` (gitignored, local-only), so the mixed-era
+  read paths — `_annotations_keying`'s three generations, the pre-0.6 `ref` guard, `UNJOINABLE_PHRASE`
+  — still have live 0.5 artifacts to exercise them, now via that backup and the HuggingFace-published
+  0.3/0.5 copies rather than the working tree. Republishing remains the maintainer's call (see
+  `docs/MODULE_RELEASE_0_5.md`). The rebuild was clean (all ten compile; pharmgkb now places 1531/1531
+  and annotates — see the pharmgkb note under *0.5 traps*); the only code change it required was a
+  sidecar sweep in `v1_port/runner.py` (below).
+
+- **`v1_port/runner.py` sweeps the deprecated licence sidecar before enrich (added 2026-09-26).** The
+  enricher writes the sidecar write-what-you-read, so a port dir carrying a seeded `sources.csv` (the
+  spelling format 0.6 deprecated in favour of `licensing.csv`, RM51) had it rewritten in place — all
+  six `port` modules compiled with `sidecar_spelling_deprecated`, while `clinvar_panel`/`pharmgkb`
+  (which already swept via `sidecar_candidates`) did not. The runner now clears every sidecar
+  candidate (root + `derived/`, both spellings) before `enrich`, so the rebuild writes the preferred
+  name; verified the warning clears on thrombophilia. **Not fixed (reported):** the three ClinVar
+  panels compile with `panel_block_deprecated` — `clinvar_panel.py` writes a `panel:` block that
+  format 0.6 deprecated and 1.0 removes; migrating off it is a format-level design decision, not a
+  local one-liner, and the block still works meanwhile.
 
 ### What 0.7 changed on our side (adopted 2026-09-21)
 
@@ -491,8 +508,8 @@ just-dna-lite one has nine items. What actually changed here, in that order:
 knowing before the next `uv lock --upgrade`.** agno floated 2.9 → 3.0.10, which imports the mcp 2.x
 names; our `mcp<2.0` cap (written for agno 2) then took the webui and the `pipelines` CLI down at
 import. The pipelines dependency is `agno[mcp]` now, so agno's own extra carries the mcp/fastmcp
-floors. And enricher 0.7.1's CLI cannot import beside dagster's protobuf pin — the S107 paragraph
-under *0.5 traps* above.
+floors. Enricher 0.7.1's CLI could not import beside dagster's protobuf pin (S107); **enricher 0.7.2
+/ RM254 fixed that** — see the S107 paragraph under *0.5 traps* above.
 
 ### Contract facts (0.1.0 libs)
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
@@ -526,17 +543,21 @@ platformdirs default while every resolver read `$JUST_DNA_PIPELINES_CACHE_DIR`. 
 command line is dead in this workspace (next paragraph), which is why the command lives under
 `pipelines`.
 
-**`just-dna-enricher`'s CLI cannot be imported beside dagster (enricher 0.7.1, filed as S107).**
-`just_dna_enricher.cli` imports its AlphaGenome Atlas bindings at module scope, and those are protobuf
+**`just-dna-enricher`'s CLI now imports beside dagster (fixed in enricher 0.7.2 / RM254; was the S107 block on 0.7.1).**
+The break: `just_dna_enricher.cli` imports its AlphaGenome Atlas bindings at module scope, protobuf
 gencode stamped 7.35 by the `grpcio-tools` RM247 pinned; dagster caps `protobuf<7`, and protobuf
 refuses a runtime older than its gencode with `google.protobuf.runtime_version.VersionError` — a bare
-`Exception` subclass that the enricher's `except (ImportError, RuntimeError)` guard does not catch. So
-the `just-dna-enricher` console script and anything mounting its Typer app die at import; the Python
-API (`resolver`, `enrich`, `caches`, `clinvar*`, `clinpgx*`) is unaffected and is what we call.
-`just_dna_pipelines.enricher_cli` is the one guarded import both `pipelines` entry points mount
-(`just_dna_lite.cli` owns the installed script; `just_dna_pipelines.cli` is shadowed): the real app when
-it imports, else a stub `enrich` group whose `status` prints the reason and exits 1. Do not re-import
-`just_dna_enricher.cli` anywhere else.
+`Exception` subclass that the enricher's `except (ImportError, RuntimeError)` guard did **not** catch,
+so on 0.7.1 the console script and anything mounting its Typer app died at import. **RM254 (0.7.2)
+fixed it**: `atlas_protos.ATLAS_IMPORT_FAILURES = (ImportError, RuntimeError, VersionError)` catches
+it now, and the `protobuf>=7.35.1` floor moved onto the `[atlas]` extra — so the **bare**
+`just-dna-enricher` we depend on (no extra; the lock pulls no atlas/alphagenome dep) imports cleanly,
+and only an install asking for `[atlas]` would fail to *resolve* rather than crash. Verified on our
+side 2026-09-26: `just_dna_pipelines.enricher_cli` now mounts the **real** app
+(`ENRICHER_CLI_UNAVAILABLE is None`), not the stub. The guarded import stays regardless — `[atlas]`
+would still trip it — but the fallback is now the exception, not the rule. Do not re-import
+`just_dna_enricher.cli` anywhere else. (`just_dna_lite.cli` owns the installed script;
+`just_dna_pipelines.cli` is shadowed.)
 
 **`clinvar_draft` raises on ClinVar's own citation ids.** `var_citations.txt` carries 632k
 PubMedCentral ids and a few malformed "PubMed" ones (Variation 12606 cites `168335863`, nine digits);
@@ -573,12 +594,16 @@ the position join, and the previous sentence in this file — "the fix waits on 
 0.6 onward. Reported by just-module-creator, 2026-08-20; verified against the installed compiler
 0.6.1 (`compiler.py:499`).
 
-**Both generations are live, so classify by value and never by family name.** The shipped
-`pharmgkb` in `data/interim/v1_port/` is a 0.5 artifact: measured **0 of 1482 rows placed**, `chrom`
-null throughout. `_lead_join_strategy` probes the values, so it routes that module to rsid and a
-recompiled one to position with no code change — which is why no `positional_rows` gate belongs in
-`hf_logic`. That branch has never run on this family; recompiling `pharmgkb` under 0.6 is what would
-exercise it.
+**Both generations are live, so classify by value and never by family name.** The *old* shipped
+`pharmgkb` was a 0.5 artifact: **0 of 1482 rows placed**, `chrom` null throughout, routed to rsid.
+**Rebuilt under 0.7 on 2026-09-26 it now places 1531/1531** (`positional_rows=placed=1531`), `chrom`
+non-null throughout, and `_lead_join_strategy` routes it to **position** — the branch this file long
+said "has never run on this family" now runs. Proof it annotates: `annotate_vcf_with_module_weights`
+on the antonkulaga WGS sample returns **48 matched** drug-gene rows, matched **by position with empty
+rsID** (SLCO1B1/rosuvastatin, IFNL3/4 antivirals, atorvastatin) — the exact case the 0.5 build (rsid
+fallback) matched none of. `_lead_join_strategy` still probes values not the family name, so no
+`positional_rows` gate belongs in `hf_logic`; the shipped 0.5 corpus for testing that dual routing now
+lives in `data/interim/v1_port_0_5/` (local-only backup) and on HuggingFace.
 
 Two consequences live here. `hf_logic.annotate_vcf_with_module_weights` detects the null-coordinate
 case and downgrades a position join to **rsid + genotype**, because the alternative is annotating

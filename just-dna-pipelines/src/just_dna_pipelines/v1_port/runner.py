@@ -21,6 +21,7 @@ from typing import Optional
 from just_dna_enricher.enrich import enrich
 from just_dna_enricher.literature import enrich_literature
 from just_dna_enricher.locations import resolve_ensembl_reference
+from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
 from just_dna_pipelines.module_compiler.compiler import compile_module, validate_spec
@@ -108,6 +109,14 @@ def port_module(
     # A rebuild must re-resolve: `enrich` treats existing rows as authoritative and merges, so a
     # stale resolution.csv from a previous adapter run would survive an adapter fix unnoticed.
     (out_dir / "resolution.csv").unlink(missing_ok=True)
+    # Clear the licence sidecar through `layout`, not by name, for the same reason clinvar_panel
+    # does: `enrich` writes it write-what-you-read, so a seeded `sources.csv` (the deprecated
+    # spelling since format 0.6 renamed it `sources.csv` -> `licensing.csv`, RM51) is rewritten
+    # in place and the module keeps the deprecated name for good — every one of these long-lived
+    # port dirs carried one, so all six ports compiled with `sidecar_spelling_deprecated`. Clearing
+    # every candidate (root + `derived/`, both spellings) makes enrich write the preferred name.
+    for stale_sidecar in sidecar_candidates(out_dir, SOURCES_CSV):
+        stale_sidecar.unlink(missing_ok=True)
     cache = ensembl_cache if (ensembl_cache and ensembl_cache.exists()) else None
     if module.needs_ensembl:
         enrichment = enrich(
