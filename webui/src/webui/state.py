@@ -5822,8 +5822,13 @@ class AgentState(rx.State):
             self._add_chat_message("agent", "Upload failed: module_spec.yaml not found")
             shutil.rmtree(tmp_path, ignore_errors=True)
             return
-        if "variants.csv" not in extracted_names:
-            self._add_chat_message("agent", "Upload failed: variants.csv not found")
+        # Any lead table makes a module, not only variants.csv: a phenotype module leads with
+        # haplotypes/diplotypes and a PGx module with pharm_variants, and neither carries variants.csv.
+        if not extracted_names.intersection(LEAD_TABLE_CSVS):
+            self._add_chat_message(
+                "agent",
+                "Upload failed: no lead table found (one of " + ", ".join(LEAD_TABLE_CSVS) + ")",
+            )
             shutil.rmtree(tmp_path, ignore_errors=True)
             return
 

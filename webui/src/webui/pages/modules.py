@@ -378,7 +378,7 @@ def editing_slot() -> rx.Component:
         # Button bar (always visible)
         _slot_button_bar(),
         rx.el.div(
-            "Upload module_spec.yaml + variants.csv (.zip OK)",
+            "Upload module_spec.yaml + its tables (.zip OK)",
             style={"fontSize": "0.72rem", "color": "#aaa", "marginTop": "6px"},
         ),
         class_name="ui segment",
@@ -740,7 +740,7 @@ def _module_manager_readme() -> rx.Component:
                    "padding": "6px 10px", "backgroundColor": "#f4f8fe",
                    "border": "1px solid #c5daf5", "borderRadius": "6px", "marginBottom": "6px"},
         ),
-        _row("upload", "Upload: drag-drop module_spec.yaml + variants.csv (or a .zip containing both) into the slot."),
+        _row("upload", "Upload: drag-drop module_spec.yaml + its tables (or a .zip of the spec folder) into the slot."),
         _row("arrow down", "Register: compiles CSVs to Parquet, adds the module to modules.yaml, refreshes discovery immediately."),
         _row("download", ".zip: download the raw spec files at any time — useful for version control or sharing."),
 
