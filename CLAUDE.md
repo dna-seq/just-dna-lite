@@ -260,9 +260,14 @@ was lost in the report, not here.
 A module with `haplotypes` plus a combiner (`diplotypes`, or `allele_function` + `activity_phenotype`)
 is a phenotype module (`hf_modules.module_kind`). `annotate_vcf_with_all_modules` dispatches it to
 `phenotype_caller.call_phenotype_module` before the weights path, writing `{module}_phenotypes.parquet`
-and counting calls apart from variants (`manifest.phenotype_calls`). v1 is enumerative, unphased,
-diploid. Contract: [docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). Hom-ref sites reuse
-`restoration.restorable_sites`.
+and counting calls apart from variants (`manifest.phenotype_calls`). Both combiners are read; phase
+comes from `GT` `|` plus an equal non-null `PS` (already in the normalized parquet when the VCF has it,
+so do not add it to normalization); an indel site also matches its event respelled within 10 bp, and a
+non-unique window is `no_call`, never restored. Diploid only. Contract and pilots (ABO, FUT2, APOE,
+HFE): [docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). Hom-ref sites reuse
+`restoration.restorable_sites`. `validate_modules` drops a module name discovery does not know without
+an error, so a script that imports discovery before `load_env()` silently runs none of the locally
+registered modules — load `.env` first.
 
 ### Reference-genotype restoration (`restoration.py`)
 

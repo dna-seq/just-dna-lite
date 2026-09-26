@@ -492,6 +492,18 @@ about where citations live.
 
 ## The star-allele family: three tables, one caller
 
+> **Status (2026-09-27): built in just-dna-lite.** `annotation/phenotype_caller.py` reads
+> `haplotypes` with either combiner (`diplotypes`, or `allele_function` + `activity_phenotype`
+> summed and binned by the rule below), reports defined-but-unpaired haplotypes, groups drug rows by
+> `(drug, clinical_context)` without picking one, passes the compiler's warnings through, and
+> withholds on phase: an unphased double-het is `ambiguous` with `phase_would_decide`, and a phased
+> callset (`|` + equal `PS`) resolves HFE cis vs trans. `module_kind` routes these modules before the
+> weights engine, so they are no longer a recorded skip. Contract: [PHENOTYPE_CALLS.md](PHENOTYPE_CALLS.md).
+> Still open from the asks below: the `copy_number` / *cis* rule for duplicated alleles, accepting an
+> external diplotype call (PharmCAT, Aldy, Cyrius), `hosting_verdict` (the caller compares called
+> alleles directly), and the measure-based binning family (`copynumbers`, `heteroplasmy`,
+> `repeat_alleles`, and `activity_phenotype` read from a VCF field rather than from haplotypes).
+
 ### `diplotypes.csv`
 
 The conclusion table for star alleles: `(gene, hap_a, hap_b)` → phenotype, with `drug` and

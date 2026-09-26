@@ -80,7 +80,7 @@ Module display metadata (titles, icons, colors) is configured in `modules.yaml` 
 1. `hf_annotators_dataset`: External HuggingFace modules source
 2. `user_vcf_source`: Partitioned source for input VCFs (metadata: path, size, upload date)
 3. `user_vcf_normalized`: Normalized VCF as parquet (strip chr prefix, id→rsid, genotype); **required** before both HF and Ensembl annotation
-4. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module)
+4. `user_hf_module_annotations`: Partitioned annotation output (one parquet per module: `{module}_weights.parquet` for a per-variant module, `{module}_phenotypes.parquet` for a compound-phenotype module such as ABO or APOE; see [PHENOTYPE_CALLS.md](PHENOTYPE_CALLS.md)). Phenotype calls are counted in the `modules_phenotype` / `total_phenotypes_called` metadata, never in the variant totals
 5. `user_longevity_report`: HTML report generated from annotated parquets (depends on `user_hf_module_annotations`)
 
 **Execution order:** For each partition (e.g. `anonymous/other_livia`), Dagster runs: `user_vcf_normalized` → `user_hf_module_annotations` → `user_longevity_report`. The HF annotation asset **requires** `user_vcf_normalized` as input; if the parquet does not exist, the IO manager raises `FileNotFoundError`.
