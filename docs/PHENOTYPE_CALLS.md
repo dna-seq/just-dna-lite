@@ -128,9 +128,13 @@ strict with the published compiler at test time, and registered locally on the d
 | `abo_phenotype` | enumerative | five ABO alleles over six sites; the reference genome is O, two indel sites whose spelling varies by source |
 | `fut2_secretor` | score-and-bin | three FUT2 alleles; the activity scale is chosen so secretion stays dominant |
 
-Measured on this machine: Anton B/O1 → **B** and secretor; Livia A1/B → **AB** (her two B markers are
-`0|1` in one phase set) with ε3/ε3 and wt/wt read from restored sites; the two other WGS samples O1/O1
-→ **O**, one of them H63D/wt.
+Measured on this machine: Anton B/O1 → **Blood group B (III)** and secretor; Livia A1/B → **Blood
+group AB (IV)** (her two B markers are `0|1` in one phase set) with ε3/ε3 and wt/wt read from restored
+sites; the two other WGS samples O1/O1 → **Blood group O (I)**, one of them H63D/wt.
+
+The fixtures' labels, conclusions, titles and README `## How this works` sections were rewritten in the
+report voice ([REPORT_VOICE.md](REPORT_VOICE.md)) on 2026-09-27; their rows and rules still match the
+upstream reference examples, and each README says so under *About this copy*.
 
 ## Authoring rules (for a phenotype module)
 
@@ -143,9 +147,13 @@ Measured on this machine: Anton B/O1 → **B** and secretor; Livia A1/B → **AB
   bin, since secretion is dominant) and pin that in a test, because an additive scale does not do it by
   itself.
 - Author an indel at the left-normalized position a VCF caller writes, checked against the reference
-  sequence, and put the phenotype's group in `phenotype` with any subgroup in `conclusion` (ABO: `AB`,
-  with A2 named in the text), so an unphased callset that cannot resolve the subgroup still calls the
-  group.
+  sequence, and put the phenotype's group in `phenotype` with any subgroup in `conclusion` (ABO:
+  `Blood group AB (IV)`, with A2 named in the text), so an unphased callset that cannot resolve the
+  subgroup still calls the group.
+- Write labels and conclusions for a lay reader ([REPORT_VOICE.md](REPORT_VOICE.md)): the label is the
+  result in words, the conclusion starts with it about the reader, and every term (ε4, C282Y) is
+  explained in the conclusion that uses it. Put the rule in plain words under `## How this works` in the
+  module's `README.md`; the report shows that section before the results.
 - A structural or copy-number allele carries its symbolic spelling; the caller reports it not assessable
   from an SNV VCF rather than guessing.
 
@@ -161,3 +169,49 @@ Measured on this machine: Anton B/O1 → **B** and secretor; Livia A1/B → **AB
   and native annotation is deterministic across runs.
 - Fixtures are vendored spec directories (`tests/fixtures/phenotypes/`) compiled at test time with the
   published compiler, so there is no path dependency on a sibling checkout.
+
+## Candidate phenotypes and where the design stops
+
+From the design survey (2026-09-26). Beyond the four pilots, these fit the two combiners with no format
+change: CYP2C19 metaboliser status (about 35 star alleles over about 60 sites, enumerated by CPIC in
+about 600 diplotype rows, or score-and-bin; `*1` is defined by absence and uncertain-function alleles
+give *Indeterminate*), alpha-1 antitrypsin PI*S/PI*Z (enumerative), HbS/HbC (a compound heterozygote
+like HFE), and multi-SNP lactase persistence (any-of, several rows).
+
+They do not fit, and are out of scope here:
+
+| case | why |
+|---|---|
+| RhD | a whole-gene deletion, which a small-variant VCF cannot show; it must render *cannot tell*, never "RhD positive" |
+| Lewis (FUT3 × FUT2), warfarin (CYP2C9 × VKORC1) | a phenotype over two genes' phenotypes; not expressible in the format (upstream RM28, parked) |
+| G6PD | X-linked; a male's hemizygous call has no diplotype spelling (`haplotype_b` is required) |
+| HIrisPlex eye colour | a fitted multinomial model, not a rule; this is where "not PRS" ends |
+
+## Upstream notes not yet filed
+
+Found while building the pilots, meant for the `just-dna-compiler` consumer inbox
+(`docs/CONSUMER_SUGGESTIONS.md`, id from `.claude/triage-state.py --next`). None is filed as of
+2026-09-27; measure before filing, and file each as a report with a reproducer.
+
+1. **The enricher places the rs8176719 insertion at `9:133257520 G>GC`**; dbSNP, gnomAD and DRAGEN use
+   `133257521 T>TC` (gnomAD shows AF 6e-7 at the Ensembl spelling). Possibly an off-by-one on Ensembl
+   insertions generally: count how many insertion rsIDs in the cache disagree with gnomAD first. The
+   indel window hides it here; nothing else does.
+2. **No hemizygous diplotype spelling**, which blocks G6PD and other X-linked phenotypes in males.
+3. **Cross-gene phenotypes** as corpus evidence for RM28, with the enumerative answer: a table keyed on
+   the per-gene phenotypes.
+4. **The unlisted-site convention is unstated.** The caller assumes a haplotype carries `ref` at any
+   defining site it does not list (the PharmVar/CPIC reading). Ask upstream to state it, or have
+   `validate` warn when one gene's haplotypes list different site sets.
+
+## Regression gate for native modules
+
+A phenotype module must not change what any weights- or `pharm_variants`-led module produces.
+`scripts/regression_snapshot.py` (Typer `snapshot` / `compare`, baseline under
+`data/interim/regression_baseline/`, gitignored) pins, per sample and module: the manifest entry, the
+parquet's schema and per-column hashes after a total sort, and the report rows. Run it with the native
+modules alone and again beside the phenotype modules (`--with-module`); pass means identical schema,
+hashes, manifest counts and report rows, with phenotype calls counted only in
+`total_phenotypes_called`. The gate covers `longevitymap` (largest, restoration-heavy), `thrombophilia`
+(clinically sharp rows, and the native module most tempting to reroute), `coronary` (the 0.6
+annotations join) and `pharmgkb` (the nearest routing neighbour; validate on a sample with rsIDs).
