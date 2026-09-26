@@ -9,7 +9,7 @@ Sources are configured in modules.yaml (see module_config.py).
 import re
 from enum import Enum
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Optional
+from typing import Literal, Optional
 
 import polars as pl
 from eliot import log_message
@@ -984,6 +984,11 @@ class ModuleOutputMapping(BaseModel):
     # What the module says its `weight` column means (format 0.6, RM92), verbatim. `None` means the
     # module has not said, which a reader must not take as "these weights are comparable".
     weighting: Optional[str] = None
+    # A phenotype module (haplotypes + a combiner) is annotated by the diplotype caller, not the
+    # weights engine, and writes `{module}_phenotypes.parquet` instead of a weights parquet. Default
+    # "variant" keeps every manifest written before this valid, and its variant counts untouched.
+    kind: Literal["variant", "phenotype"] = "variant"
+    phenotypes_path: Optional[str] = None
 
 
 class AnnotationManifest(BaseModel):
@@ -1007,6 +1012,12 @@ class AnnotationManifest(BaseModel):
     # total because these were inferred, never observed, and a reader is owed that distinction.
     restored_variants: dict[str, int] = {}
     total_variants_restored: int = 0
+    # Compound-phenotype calls, counted apart from the variant totals for the same reason restored
+    # rows are: a phenotype call is a different kind of result from a per-variant annotation, and
+    # folding it into `total_variants_annotated` would misreport both. Per-module status counts
+    # (`{module: {status: n}}`) and the number of `called` genes across the run.
+    phenotype_calls: dict[str, dict[str, int]] = {}
+    total_phenotypes_called: int = 0
     # Execution metrics
     duration_sec: Optional[float] = None
     cpu_percent: Optional[float] = None

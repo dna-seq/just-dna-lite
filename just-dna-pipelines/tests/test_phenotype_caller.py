@@ -253,6 +253,67 @@ class TestParquetContract:
         assert set(df.columns) == set(PHENOTYPE_CALL_SCHEMA)
 
 
+class TestEngineDispatch:
+    """The engine routes a phenotype module to the caller and records it apart from variant totals."""
+
+    def test_a_phenotype_module_writes_a_phenotypes_parquet_and_manifest_entry(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        import logging
+
+        from just_dna_pipelines.annotation import hf_logic, hf_modules
+        from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
+
+        module_dir = compile_fixture("apoe_epsilon", tmp_path / "apoe_mod")
+        info = probe_local(module_dir, "apoe_epsilon")
+
+        # Inject the compiled module into discovery so the engine treats it as a first-class module,
+        # without registering it on the machine.
+        monkeypatch.setitem(hf_logic.MODULE_INFOS, "apoe_epsilon", info)
+        monkeypatch.setattr(
+            hf_modules, "DISCOVERED_MODULES", [*hf_modules.DISCOVERED_MODULES, "apoe_epsilon"]
+        )
+
+        # A tiny callset carrying both APOE sites het → called ε2/ε4 (restoration is off on a frame
+        # this small, but the sites are present so it is not needed).
+        normalized = tmp_path / "sample.parquet"
+        pl.DataFrame(
+            {
+                "chrom": ["19", "19"],
+                "start": [44908684, 44908822],
+                "rsid": [None, None],
+                "ref": ["T", "C"],
+                "alt": ["C", "T"],
+                "filter": ["PASS", "PASS"],
+                "GT": ["0/1", "0/1"],
+                "genotype": [["C", "T"], ["C", "T"]],
+            },
+            schema_overrides={"start": pl.UInt32, "genotype": pl.List(pl.String)},
+        ).write_parquet(normalized)
+
+        out_dir = tmp_path / "modules"
+        config = HfModuleAnnotationConfig(
+            vcf_path=str(normalized),
+            user_name="t",
+            modules=["apoe_epsilon"],
+            output_dir=str(out_dir),
+        )
+        manifest, _ = hf_logic.annotate_vcf_with_all_modules(
+            logging.getLogger("t"), normalized, config, "t", "sample", normalized
+        )
+
+        assert (out_dir / "apoe_epsilon_phenotypes.parquet").exists()
+        assert not (out_dir / "apoe_epsilon_weights.parquet").exists()
+        entry = next(m for m in manifest.modules if m.module == "apoe_epsilon")
+        assert entry.kind == "phenotype"
+        assert entry.phenotypes_path is not None
+        assert manifest.phenotype_calls["apoe_epsilon"].get("called") == 1
+        assert manifest.total_phenotypes_called == 1
+        # A phenotype call is never folded into the variant totals.
+        assert manifest.total_variants_annotated == 0
+        assert manifest.total_variants_restored == 0
+
+
 class TestRealSample:
     """Anton is het at both APOE sites (0/1, no rsIDs), so this matches by position → e2/e4."""
 
