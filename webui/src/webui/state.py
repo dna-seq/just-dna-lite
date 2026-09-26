@@ -3718,7 +3718,7 @@ from prs_ui import PRSComputeStateMixin
 import prs_ui
 import prs_ui.mixin as _prs_ui_mixin
 from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
-from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY
+from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from prs_ui.mixin import loaded_grid_selection_model as _loaded_grid_selection_model
 from prs_ui.mixin import normalize_trait_group_by, trait_group_label_expr
@@ -5125,9 +5125,138 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 # PRS TRAIT STATE — Grouped-by-trait PRS selection
 # ============================================================================
 
-def _build_trait_column_overrides() -> dict:
+_TRAIT_TEXT_FIELDS = frozenset({"trait", "trait_efo", "trait_reported"})
+_TRAIT_SEARCH_NOTE = (
+    "A text filter matches both the mapped ontology term and the study's reported trait. "
+    "Longevity and life span also match age, aging, and ageing."
+)
+# Whole words only. The letters "aging" inside "imaging" are not this family.
+_AGING_FAMILY = r"(?i)\b(?:longevity|lifespans?|life spans?|ageing|aging)\b"
+_AGING_SEARCH_TOKEN = "aging ageing"
+
+
+def _unique_label_list(column: str) -> pl.Expr:
+    """Sorted, de-duplicated labels in one group, joined for display and search."""
+    values = pl.col(column)
+    return values.drop_nulls().filter(values != "").unique().sort().str.join(" | ")
+
+
+def _trait_summary_frame(
+    scores: pl.DataFrame,
+    group_by: str,
+) -> tuple[pl.DataFrame, dict[str, list[str]]]:
+    """Group catalog scores and keep both trait names searchable.
+
+    The group label is prs-ui's ``trait_group_label_expr``. ``trait_search``
+    concatenates that label with the mapped term and the reported phenotype.
+    Longevity and life-span rows also carry ``aging ageing``: the catalog names
+    themselves do not contain "age".
+    """
+    labeled = scores.with_columns(trait_group_label_expr(group_by))
+    grouped = labeled.group_by("trait").agg(
+        pl.col("pgs_id").count().alias("n_models"),
+        pl.col("pgs_id").alias("_pgs_list"),
+        pl.col("trait_efo_id").first().alias("trait_efo_id"),
+        _unique_label_list("trait_efo").alias("trait_efo"),
+        _unique_label_list("trait_reported").alias("trait_reported"),
+        pl.col("n_variants").mean().cast(pl.Int64).alias("avg_variants"),
+        pl.col("n_variants").min().alias("min_variants"),
+        pl.col("n_variants").max().alias("max_variants"),
+    ).sort("n_models", descending=True)
+
+    mapping: dict[str, list[str]] = {}
+    for row in grouped.iter_rows(named=True):
+        trait = row["trait"]
+        if trait:
+            mapping[str(trait)] = list(row["_pgs_list"])
+
+    searched = grouped.with_columns(
+        pl.col("_pgs_list").list.join(", ").alias("pgs_ids"),
+        pl.concat_str(
+            [
+                pl.col("trait").fill_null(""),
+                pl.col("trait_efo").fill_null(""),
+                pl.col("trait_reported").fill_null(""),
+            ],
+            separator="\n",
+        ).alias("trait_search"),
+    ).with_columns(
+        pl.when(pl.col("trait_search").str.contains(_AGING_FAMILY))
+        .then(
+            pl.concat_str(
+                [pl.col("trait_search"), pl.lit(_AGING_SEARCH_TOKEN)],
+                separator="\n",
+            )
+        )
+        .otherwise(pl.col("trait_search"))
+        .alias("trait_search")
+    ).drop("_pgs_list")
+
+    other = (
+        "trait_efo"
+        if normalize_trait_group_by(group_by) == TRAIT_GROUP_BY_REPORTED
+        else "trait_reported"
+    )
+    result = searched.select(
+        "trait",
+        other,
+        "n_models",
+        "avg_variants",
+        "min_variants",
+        "max_variants",
+        "pgs_ids",
+        "trait_efo_id",
+        "trait_search",
+    )
+    return result, mapping
+
+
+def _trait_filter_searches_both(filter_model: dict[str, Any] | None) -> dict[str, Any]:
+    """Retarget trait text filters onto the combined mapped+reported column.
+
+    The stored filter model stays on the column the user clicked. Only the
+    query applied to the frame changes.
+    """
+    if not filter_model:
+        return {}
+    items = filter_model.get("items")
+    if not isinstance(items, list) or not items:
+        return filter_model
+    rewritten: list[Any] = []
+    changed = False
+    for item in items:
+        if isinstance(item, dict):
+            field = str(item.get("field") or "")
+            operator = str(item.get("operator") or "contains").lower()
+            if field in _TRAIT_TEXT_FIELDS and operator == "contains":
+                rewritten.append({**item, "field": "trait_search", "operator": "contains"})
+                changed = True
+                continue
+        rewritten.append(item)
+    if not changed:
+        return filter_model
+    return {**filter_model, "items": rewritten}
+
+
+def _build_trait_column_overrides(group_by: str = TRAIT_GROUP_BY_ONTOLOGY) -> dict:
+    reported = normalize_trait_group_by(group_by) == TRAIT_GROUP_BY_REPORTED
+    other = "trait_efo" if reported else "trait_reported"
+    other_header = "Mapped trait" if reported else "Reported trait"
+    label_header = "Reported trait" if reported else "Mapped trait"
     return {
-        "trait": {"minWidth": 200, "flex": 2},
+        "trait": {
+            "minWidth": 200,
+            "flex": 2,
+            "headerName": label_header,
+            "description": _TRAIT_SEARCH_NOTE,
+        },
+        other: {
+            "minWidth": 220,
+            "flex": 2,
+            "headerName": other_header,
+            "description": _TRAIT_SEARCH_NOTE,
+        },
+        "trait_search": {"hide": True},
         "trait_efo_id": {
             "width": 160,
             "cellRendererType": "url",
@@ -5165,6 +5294,7 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     # `PRSState` inherits its copy from `PRSComputeStateMixin`; this one is ours because
     # `PRSTraitState` deliberately does not inherit that mixin (compute stays on PRSState).
     trait_group_by: str = TRAIT_GROUP_BY_ONTOLOGY
+    trait_query: str = ""
     _ignore_empty_selection_replay: bool = False
 
     _trait_to_pgs: dict[str, list[str]] = {}
@@ -5188,31 +5318,35 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             "pgs_id", "trait_reported", "trait_efo", "trait_efo_id", "n_variants",
         ).collect()
 
-        # The format of the group label is prs-ui's rule, not ours: `trait_group_label_expr`
-        # is the same leaf its own `TraitBrowserState` groups with, so the two selectors
-        # cannot drift into naming the same trait differently. It was hand-rolled here as
-        # the ontology branch only, which is why the Reported-trait half of the control had
-        # nothing behind it.
-        df = df.with_columns(trait_group_label_expr(self.trait_group_by))
-
-        grouped = df.group_by("trait").agg(
-            pl.col("pgs_id").count().alias("n_models"),
-            pl.col("pgs_id").alias("_pgs_list"),
-            pl.col("trait_efo_id").first().alias("trait_efo_id"),
-            pl.col("n_variants").mean().cast(pl.Int64).alias("avg_variants"),
-            pl.col("n_variants").min().alias("min_variants"),
-            pl.col("n_variants").max().alias("max_variants"),
-        ).sort("n_models", descending=True)
-
-        mapping: dict[str, list[str]] = {}
-        for row in grouped.iter_rows(named=True):
-            mapping[row["trait"]] = row["_pgs_list"]
+        # The group label is prs-ui's `trait_group_label_expr`, the same leaf its own
+        # TraitBrowserState groups with. Both names stay on the row for search.
+        result, mapping = _trait_summary_frame(df, self.trait_group_by)
         self._trait_to_pgs = mapping
-
-        result = grouped.with_columns(
-            pl.col("_pgs_list").list.join(", ").alias("pgs_ids"),
-        ).drop("_pgs_list")
         return result
+
+    def _refresh_lf_grid_page(self, append: bool = False, refresh_row_count: bool = False) -> None:
+        """Apply trait text filters to both names, then the search box."""
+        stored = self._lf_grid_filter
+        model = _trait_filter_searches_both(stored if isinstance(stored, dict) else {})
+        query = self.trait_query.strip()
+        if query:
+            items = list(model.get("items") or [])
+            items.append({
+                "field": "trait_search",
+                "operator": "contains",
+                "value": query,
+                "id": "trait-query",
+            })
+            model = {**model, "items": items, "logicOperator": model.get("logicOperator") or "and"}
+        self._lf_grid_filter = model
+        try:
+            LazyFrameGridMixin._refresh_lf_grid_page(
+                self,
+                append=append,
+                refresh_row_count=refresh_row_count,
+            )
+        finally:
+            self._lf_grid_filter = stored
 
     def load_traits(
         self,
@@ -5235,8 +5369,33 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             trait_df.lazy(),
             chunk_size=500,
             eager_value_options_row_limit=0,
-            column_overrides=_build_trait_column_overrides(),
+            column_overrides=_build_trait_column_overrides(self.trait_group_by),
         )
+
+    def set_trait_query(self, value: str) -> None:
+        """Store the By Trait search box text. Apply it with ``apply_trait_query``."""
+        self.trait_query = value
+
+    @rx.event(background=True)
+    async def apply_trait_query(self) -> None:
+        """Reload the trait grid so the search matches mapped and reported names."""
+        async with self:
+            pagination = dict(self.lf_grid_pagination_model)
+            pagination["page"] = 0
+            self.lf_grid_pagination_model = pagination
+            self.lf_grid_loading = True
+        await self._publish_page(append=False, with_count=True)
+
+    @rx.event(background=True)
+    async def clear_trait_query(self) -> None:
+        """Clear the By Trait search box and show the full grouped catalog."""
+        async with self:
+            self.trait_query = ""
+            pagination = dict(self.lf_grid_pagination_model)
+            pagination["page"] = 0
+            self.lf_grid_pagination_model = pagination
+            self.lf_grid_loading = True
+        await self._publish_page(append=False, with_count=True)
 
     def set_trait_group_by(self, value: str | list[str]) -> Any:
         """Switch the grouping axis, reload the grid, and carry the choice to PRSState.

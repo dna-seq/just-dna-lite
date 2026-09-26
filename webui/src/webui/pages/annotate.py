@@ -3305,6 +3305,43 @@ def _prs_current_sample_source() -> rx.Component:
     )
 
 
+def _prs_trait_browser() -> rx.Component:
+    """prs-ui's trait selector, plus a search that matches both trait names."""
+    return rx.vstack(
+        rx.hstack(
+            rx.input(
+                placeholder="Search mapped trait or reported trait",
+                value=PRSTraitState.trait_query,
+                on_change=PRSTraitState.set_trait_query,
+                on_blur=PRSTraitState.apply_trait_query,
+                width="100%",
+            ),
+            rx.button("Search", on_click=PRSTraitState.apply_trait_query, size="2"),
+            rx.button(
+                "Reset",
+                on_click=PRSTraitState.clear_trait_query,
+                variant="soft",
+                color_scheme="gray",
+                size="2",
+                disabled=PRSTraitState.trait_query == "",
+            ),
+            spacing="2",
+            align="center",
+            width="100%",
+        ),
+        rx.text(
+            "Search and column filters match both the mapped ontology term and the "
+            "study's reported trait. Age, aging, and ageing also find longevity and "
+            "life span. Group by chooses which name the rows are bundled under.",
+            size="1",
+            color="gray",
+        ),
+        trait_selector(PRSTraitState, normalizing=False),
+        spacing="2",
+        width="100%",
+    )
+
+
 def _prs_tab_content() -> rx.Component:
     """PRS tab: prs-ui workbench layout driven by the selected left-panel genome."""
     # Do not pass UploadState.vcf_preview_loading: that flag tracks the Input
@@ -3313,7 +3350,7 @@ def _prs_tab_content() -> rx.Component:
     # gates on prs_genotypes_path.
     trait_panel = prs_workbench_mode_panel(
         PRSState,
-        lambda: trait_selector(PRSTraitState, normalizing=False),
+        _prs_trait_browser,
         "grouped",
         "Compute PRS for Selected Traits",
         normalizing=False,

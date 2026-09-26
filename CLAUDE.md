@@ -589,6 +589,10 @@ reused for annotation.
   comparison** adds a left-panel peer (same species, build, ready parquet) in one click, labelled
   `Sample Name (filename)`. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs
   PGS IDs. Comparisons are not checkpointed to Dagster.
+- By Trait groups with prs-ui's `trait_group_by`. Search and a contains-filter on either trait column
+  match **both** the mapped and the reported name (`trait_search`), and longevity / lifespan / life span
+  rows also match age, aging and ageing (`_AGING_SEARCH_TOKEN`, whole words, so "imaging" stays out).
+  `PRSTraitState.load_traits` passes `eager_value_options_row_limit=0`, like prs-ui.
 - Pass `normalizing=False` to the workbench, **never** `UploadState.vcf_preview_loading` (it locks the
   grids while the Input tab pages). The By PRS extract comes from the mixin; don't reimplement it.
 
