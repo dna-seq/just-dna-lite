@@ -810,6 +810,9 @@ window.addEventListener("scroll", function() {
     <nav class="contents" aria-label="Report contents">
         <p class="contents-title">Report contents</p>
         <ul>
+            {% if phenotype_modules %}
+            <li><a href="#phenotypes">Phenotypes from combined variants</a></li>
+            {% endif %}
             {% if longevity %}
             <li><a href="#variants">Longevity variants</a></li>
             {% endif %}
@@ -830,6 +833,121 @@ window.addEventListener("scroll", function() {
             {% endif %}
         </ul>
     </nav>
+
+    {% macro phenotype_status_badge(status) %}
+        {%- if status == "called" -%}<span class="ui green label">Called</span>
+        {%- elif status == "ambiguous" -%}<span class="ui yellow label">Ambiguous</span>
+        {%- elif status == "not_assessable" -%}<span class="ui grey label">Not assessable</span>
+        {%- else -%}<span class="ui grey label">No match</span>{%- endif -%}
+    {% endmacro %}
+
+    {% macro phenotype_evidence_badge(evidence) %}
+        {%- if evidence == "called" -%}<span class="ui mini green label">observed</span>
+        {%- elif evidence == "restored_hom_ref" -%}<span class="ui mini blue label">inferred</span>
+        {%- else -%}<span class="ui mini grey label">no call</span>{%- endif -%}
+    {% endmacro %}
+
+    {% macro phenotype_card(gene) %}
+    <article class="module-panel" id="phenotype-{{ gene.gene }}">
+        <div class="module-panel-heading">
+            <h3>{{ gene.gene }} {{ phenotype_status_badge(gene.status) }}</h3>
+        </div>
+        <div class="module-panel-body">
+            {% if gene.status == "called" %}
+            <p class="phenotype-result"><strong>{{ gene.phenotype }}</strong></p>
+            {% elif gene.status == "ambiguous" %}
+            <p>This genotype is consistent with more than one diplotype:</p>
+            <ul class="phenotype-candidates">
+                {% for c in gene.candidates %}
+                <li><strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.phenotype %} — {{ c.phenotype }}{% endif %}{% if c.not_assessable %} <span class="ui mini grey label">needs a structural call</span>{% endif %}</li>
+                {% endfor %}
+            </ul>
+            {% if gene.phase_would_decide %}
+            <aside class="scientific-note">Knowing the <strong>phase</strong> (which allele sits on which chromosome copy) would settle this. This callset is unphased, so both readings are reported.</aside>
+            {% endif %}
+            {% elif gene.status == "not_assessable" %}
+            <p>This phenotype could not be assessed from this callset.</p>
+            {% else %}
+            <p>No diplotype this module defines matches the observed genotype.</p>
+            {% endif %}
+
+            <table class="phenotype-sites">
+                <thead><tr><th>Variant</th><th>Position</th><th>Ref</th><th>Observed</th><th>Evidence</th></tr></thead>
+                <tbody>
+                {% for site in gene.sites %}
+                    <tr>
+                        <td>{{ site.rsid or "—" }}</td>
+                        <td>chr{{ site.chrom }}:{{ site.start }}</td>
+                        <td>{{ site.ref }}</td>
+                        <td>{% if site.observed %}{{ site.observed|join("/") }}{% else %}—{% endif %}</td>
+                        <td>
+                            {{ phenotype_evidence_badge(site.evidence) }}
+                            {% if site.evidence == "restored_hom_ref" %}
+                            <span class="phenotype-inferred-note">inferred from coverage {{ site.restored_flank_bp }} bp away; this can also mean the position was not covered</span>
+                            {% elif site.matched_by == "rsid" %}
+                            <span class="phenotype-inferred-note">matched by rsID</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <p class="phenotype-coverage">
+                Alleles considered: {{ gene.alleles_considered|join(", ") }}.
+                {% if gene.alleles_not_assessable %}
+                Not assessable from an SNV VCF (structural or copy-number): {{ gene.alleles_not_assessable|join(", ") }}.
+                {% endif %}
+                {% if gene.unpaired_haplotypes %}
+                Defined but not paired by any diplotype: {{ gene.unpaired_haplotypes|join(", ") }}.
+                {% endif %}
+            </p>
+
+            {% if gene.drug_rows %}
+            <table class="phenotype-drugs">
+                <thead><tr><th>Drug</th><th>Response</th><th>Evidence</th><th>Strength</th><th>Clinical context</th></tr></thead>
+                <tbody>
+                {% for d in gene.drug_rows %}
+                    <tr><td>{{ d.drug }}</td><td>{{ d.response or "—" }}</td><td>{{ d.evidence_level or "—" }}</td><td>{{ d.recommendation_strength or "—" }}</td><td>{{ d.clinical_context or "—" }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if gene.compiler_warnings %}
+            <aside class="scientific-note">
+                <strong>Compiler notes:</strong>
+                {% for w in gene.compiler_warnings %}{{ w }}{% if not loop.last %} · {% endif %}{% endfor %}
+            </aside>
+            {% endif %}
+        </div>
+    </article>
+    {% endmacro %}
+
+    {% if phenotype_modules %}
+    <section class="report-section" id="phenotypes">
+        <p class="section-kicker">Module results</p>
+        <h2>Phenotypes from combined variants</h2>
+        <p class="section-intro">
+            These results read several positions together to name a phenotype — a blood group, an
+            APOE ε-status, a metaboliser class — rather than reporting one variant at a time. A
+            phenotype is stated only when every diplotype consistent with your genotype agrees;
+            otherwise the consistent readings are listed, and where phase would settle them that is
+            said. An <span class="ui mini blue label">inferred</span> site was not called and was read
+            as reference from nearby coverage.
+        </p>
+        {% for mod in phenotype_modules %}
+        <article class="module-panel" id="phenotype-module-{{ mod.module_name }}">
+            <div class="module-panel-heading"><h3>{{ mod.display_name }}</h3></div>
+            <div class="module-panel-body">
+                {% for gene in mod.genes %}
+                {{ phenotype_card(gene) }}
+                {% endfor %}
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    {% endif %}
 
     {% if longevity %}
     <section class="report-section" id="variants">

@@ -1,0 +1,14 @@
+schema_version: '1.0'
+module:
+  title: APOE ε2/ε3/ε4
+  description: The APOE epsilon haplotypes, defined by rs429358 and rs7412 together,
+    and the six diplotypes they form.
+  report_title: APOE ε2/ε3/ε4
+  icon: brain
+  icon_set: fomantic
+  color: '#a333c8'
+  name: apoe_epsilon
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+genome_build: GRCh38

@@ -1372,6 +1372,57 @@ def build_module_exclusions(manifest: Optional[AnnotationManifest]) -> list[dict
     return rows
 
 
+def build_phenotype_report_data(
+    manifest: Optional[AnnotationManifest],
+    modules_dir: Path,
+) -> list[dict]:
+    """One entry per phenotype module in the run, each with its per-gene calls, for the template.
+
+    Reads ``{module}_phenotypes.parquet`` for every module the manifest recorded as
+    ``kind == "phenotype"``. The parquet is the caller's contract (see phenotype_caller), so this is a
+    straight projection into template dicts — no interpretation. A module whose parquet is missing
+    (an error the manifest already recorded under ``failed_modules``) is skipped here and surfaces in
+    "Modules not read" instead.
+
+    Returns ``[]`` when the run had no phenotype module, so the template renders no section at all and
+    a variant-only report is byte-identical to one produced before this existed.
+    """
+    if manifest is None:
+        return []
+    entries: list[dict] = []
+    for output in manifest.modules:
+        if output.kind != "phenotype":
+            continue
+        parquet_path = modules_dir / f"{output.module}_phenotypes.parquet"
+        if not parquet_path.exists():
+            continue
+        frame = pl.read_parquet(parquet_path)
+        genes = [
+            {
+                "gene": row["gene"],
+                "status": row["status"],
+                "phenotype": row["phenotype"],
+                "candidates": row["candidates"],
+                "sites": row["sites"],
+                "phase_would_decide": row["phase_would_decide"],
+                "alleles_considered": row["alleles_considered"],
+                "alleles_not_assessable": row["alleles_not_assessable"],
+                "unpaired_haplotypes": row["unpaired_haplotypes"],
+                "drug_rows": row["drug_rows"],
+                "compiler_warnings": row["compiler_warnings"],
+            }
+            for row in frame.iter_rows(named=True)
+        ]
+        entries.append(
+            {
+                "module_name": output.module,
+                "display_name": get_module_display_name(output.module),
+                "genes": genes,
+            }
+        )
+    return entries
+
+
 def build_module_provenance(
     module_names: list[str],
     module_outputs: dict[str, ModuleOutputMapping],
@@ -1448,6 +1499,13 @@ def generate_longevity_report(
         module_exclusions = build_module_exclusions(manifest)
         lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
 
+        # Phenotype modules are a separate engine path with no weights parquet, so they never enter
+        # `available_modules` (the variant loop below is untouched by them). Build their section here so
+        # their names can reach `reported_modules` too — a single-module APOE run must take APOE's own
+        # report title and filename stem, not the generic multi-module heading.
+        phenotype_modules = build_phenotype_report_data(manifest, modules_dir)
+        phenotype_names = [entry["module_name"] for entry in phenotype_modules]
+
         # Find available parquet files
         available_modules: list[str] = []
         if module_names:
@@ -1474,6 +1532,9 @@ def generate_longevity_report(
         # "Modules not read", and a single-module run that was skipped must not fall back to the
         # generic multi-module heading as though nothing had been selected.
         reported_modules = list(available_modules)
+        for name in phenotype_names:
+            if name not in reported_modules:
+                reported_modules.append(name)
         for excluded in module_exclusions:
             if excluded["name"] not in reported_modules:
                 reported_modules.append(excluded["name"])
@@ -1505,9 +1566,11 @@ def generate_longevity_report(
                 mod_data["display_name"] = display_name
                 other_modules_data.append(mod_data)
 
+        # Phenotype modules are named in the provenance table too, so a saved report ties a phenotype
+        # call to the module bytes behind it exactly as a variant module.
         credits = build_report_credits(available_modules, module_infos)
         module_provenance = build_module_provenance(
-            available_modules, module_outputs, module_infos
+            available_modules + phenotype_names, module_outputs, module_infos
         )
 
         # Load and render template
@@ -1531,6 +1594,7 @@ def generate_longevity_report(
             longevity=longevity_data,
             other_modules=other_modules_data,
             pgx_modules=pgx_modules_data,
+            phenotype_modules=phenotype_modules,
             credits=credits,
             module_provenance=module_provenance,
             module_exclusions=module_exclusions,

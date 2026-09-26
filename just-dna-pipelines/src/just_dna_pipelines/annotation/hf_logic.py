@@ -28,11 +28,13 @@ from just_dna_pipelines.annotation.hf_modules import (
     AnnotationManifest,
     scan_module_table,
     get_module_info,
+    module_kind,
     read_module_provenance,
     ModuleInfo,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
 from just_dna_pipelines.annotation.resources import get_user_output_dir
+from just_dna_pipelines.annotation.phenotype_caller import call_phenotype_module
 from just_dna_pipelines.annotation.restoration import (
     EVIDENCE_CALLED,
     EVIDENCE_COLUMN,
@@ -522,6 +524,28 @@ def annotate_vcf_with_module_weights(
                     **restoration_stats,
                 )
 
+        # A total-order sort before the streaming sink, for determinism. `sink_parquet` runs the
+        # streaming engine, which emits a left join's rows in a **non-deterministic multiset** — two
+        # identical runs of `longevitymap` on one genome produced different `qual`/`conclusion`
+        # multisets and a different rendered report each time, because a poly-effect module fans one
+        # position into several rows and the streaming join's morsel emission is not stable. A sort is
+        # a pipeline barrier: it forces the join to complete before emitting, which both stabilises the
+        # multiset and gives the report a deterministic row order — without materialising the frame
+        # into memory the way `collect()` would (the point of streaming for a large module). `genotype`
+        # is a List, so it is stringified into a throwaway key for the sort; every other key is used
+        # only where the column is present (the rsid- and position-join paths carry different columns).
+        sort_keys = ["chrom", "start", "_genotype_sort_key"]
+        for optional in ("variant_key", "weight", "conclusion", "priority", EVIDENCE_COLUMN):
+            if optional in annotated_lf.collect_schema().names():
+                sort_keys.append(optional)
+        annotated_lf = (
+            annotated_lf.with_columns(
+                pl.col("genotype").list.join("/").alias("_genotype_sort_key")
+            )
+            .sort(sort_keys, nulls_last=True)
+            .drop("_genotype_sort_key")
+        )
+
         # Write to parquet using streaming
         output_path.parent.mkdir(parents=True, exist_ok=True)
         annotated_lf.sink_parquet(output_path, compression=compression)
@@ -614,6 +638,22 @@ def download_file(url: str, output_path: Path) -> Path:
     return output_path
 
 
+def _phenotype_status_counts(phenotypes_path: Path) -> dict[str, int]:
+    """Count phenotype calls by status from a written `{module}_phenotypes.parquet`.
+
+    Returns e.g. `{"called": 1, "ambiguous": 0, ...}` — one entry per status present. Best-effort: an
+    unreadable or absent parquet returns an empty dict, since the file was just written and a failure
+    to re-read it should not sink a completed run.
+    """
+    if not phenotypes_path.exists():
+        return {}
+    frame = pl.read_parquet(phenotypes_path)
+    if frame.height == 0 or "status" not in frame.columns:
+        return {}
+    counts = frame.group_by("status").len()
+    return {row["status"]: int(row["len"]) for row in counts.iter_rows(named=True)}
+
+
 def annotate_vcf_with_all_modules(
     logger,
     vcf_path: Path,
@@ -697,10 +737,64 @@ def annotate_vcf_with_all_modules(
         skipped: dict[str, str] = {}
         failed: dict[str, str] = {}
         restored_by_module: dict[str, int] = {}
+        phenotype_calls: dict[str, dict[str, int]] = {}
+        total_phenotypes_called = 0
 
         for module_name in selected_names:
             logger.info(f"Processing module: {module_name}")
             info = module_infos[module_name]
+
+            # A compound-phenotype module (haplotypes + a combiner) is a different kind of
+            # annotation: the diplotype caller reads a gene's sites together, where the weights
+            # engine reads one position at a time. Dispatch on `module_kind` *before* the weights
+            # call — the caller is reached only here, so a weights- or pharm-led module (even a mixed
+            # one that also ships haplotypes) is untouched. This is the whole of the routing change.
+            kind = module_kind(info)
+
+            # A phenotype-shaped module that lost its combiner table (a `haplotypes` lead whose
+            # `diplotypes`/activity attestation is incomplete — the "partial manifest" case) would
+            # otherwise fall to the weights call and be skipped with a misleading "no coordinates"
+            # reason. Say what actually happened.
+            if kind == "unsupported" and info.haplotypes_url is not None:
+                skipped[module_name] = (
+                    "phenotype-shaped module (has a haplotypes table) but no usable combiner — needs "
+                    "diplotypes, or both allele_function and activity_phenotype; the diplotypes/activity "
+                    "table may have failed to attest"
+                )
+                logger.warning(f"  Skipping {module_name}: {skipped[module_name]}")
+                continue
+
+            if kind == "phenotype":
+                phenotypes_path = output_dir / f"{module_name}_phenotypes.parquet"
+                try:
+                    phenotypes_path, n_called = call_phenotype_module(
+                        vcf_lf, module_name, info, restoration, phenotypes_path
+                    )
+                except Exception as exc:
+                    failed[module_name] = f"{type(exc).__name__}: {exc}"
+                    logger.error(f"  Failed to call phenotype module {module_name}: {exc}")
+                    continue
+                status_counts = _phenotype_status_counts(phenotypes_path)
+                phenotype_calls[module_name] = status_counts
+                total_phenotypes_called += n_called
+                module_version, module_digest, module_weighting = read_module_provenance(info)
+                module_outputs.append(
+                    ModuleOutputMapping(
+                        module=module_name,
+                        lead_table=info.lead_table,
+                        kind="phenotype",
+                        phenotypes_path=str(phenotypes_path),
+                        version=module_version,
+                        digest=module_digest,
+                        weighting=module_weighting,
+                        source_url=info.source_url or info.lead_url or None,
+                    )
+                )
+                logger.info(
+                    f"  {module_name}: {n_called} phenotype(s) called "
+                    f"({sum(status_counts.values())} gene(s) assessed)"
+                )
+                continue
 
             # Weights (genotype-specific) - main annotation.
             #
@@ -799,6 +893,8 @@ def annotate_vcf_with_all_modules(
         total_variants_annotated=total_annotated,
         restored_variants=restored_by_module,
         total_variants_restored=total_restored,
+        phenotype_calls=phenotype_calls,
+        total_phenotypes_called=total_phenotypes_called,
         duration_sec=duration_sec,
         cpu_percent=cpu_percent,
         peak_memory_mb=peak_memory_mb,
@@ -833,7 +929,10 @@ def annotate_vcf_with_all_modules(
     if restored_by_module:
         metadata_dict["variants_restored"] = MetadataValue.json(restored_by_module)
         metadata_dict["total_variants_restored"] = MetadataValue.int(total_restored)
-    
+    if phenotype_calls:
+        metadata_dict["modules_phenotype"] = MetadataValue.json(phenotype_calls)
+        metadata_dict["total_phenotypes_called"] = MetadataValue.int(total_phenotypes_called)
+
     # Add resource metrics to Dagster metadata
     if duration_sec is not None:
         metadata_dict.update({

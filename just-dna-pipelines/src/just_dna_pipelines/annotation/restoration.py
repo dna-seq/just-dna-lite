@@ -344,10 +344,7 @@ def hom_ref_rows(lead_lf: pl.LazyFrame) -> Optional[pl.LazyFrame]:
     # `is_null() | ~col` rather than `fill_null(False)` so that reading stays visible at the seam.
     # The column is unpopulated across every module we ship, so this changes nothing measured; it
     # is the gate that has to exist before the first authored `True` arrives.
-    if "requires_callable" in names:
-        candidates = candidates.filter(
-            pl.col("requires_callable").is_null() | ~pl.col("requires_callable").cast(pl.Boolean)
-        )
+    candidates = _filter_requires_callable(candidates)
 
     return candidates.filter(
         (pl.col("genotype").list.len() > 0)
@@ -382,10 +379,14 @@ def _with_flanking_distance(
     nearest = called.rename({"start": "_called_start"}).with_columns(
         pl.col("_called_start").alias("_asof_key")
     )
+    # `join_asof(by="chrom", ...)` requires the asof key sorted *within* each group. A global sort on
+    # the key alone happens to satisfy that, but polars cannot verify it (the "Sortedness ... cannot
+    # be checked when 'by' groups provided" warning) — so sort by `(chrom, key)` to state the
+    # invariant rather than inherit it, on both sides.
     return (
-        candidates.sort("start")
+        candidates.sort(["chrom", "start"])
         .join_asof(
-            nearest.lazy().sort("_asof_key"),
+            nearest.lazy().sort(["chrom", "_asof_key"]),
             left_on="start",
             right_on="_asof_key",
             by="chrom",
@@ -399,6 +400,53 @@ def _with_flanking_distance(
         .filter(pl.col(FLANK_COLUMN).is_not_null() & (pl.col(FLANK_COLUMN) <= max_flank_bp))
         .drop("_called_start", "_asof_key")
     )
+
+
+def _filter_requires_callable(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Drop rows the author marked ``requires_callable`` — the reference conclusion is withheld.
+
+    ``requires_callable`` (format RM6, on the PGx locus tables since 0.7's RM70) is the author saying
+    that the *absence* of this variant is the informative call, and that without callability data the
+    reference conclusion must be **withheld rather than asserted**. Restoration is exactly that
+    assertion from a flank proxy, so a ``True`` row is never restorable.
+
+    Three states, one of which withholds: ``True`` excludes; ``False`` and null both keep the row,
+    because a blank cell is *unknown*, never ``false`` (CONSUMING.md § "Absence is not reference").
+    Written as ``is_null() | ~col`` rather than ``fill_null(False)`` so the tri-state stays visible.
+    The column is unpopulated across every module we ship, so this changes nothing measured today; it
+    is the gate that has to exist before the first authored ``True`` arrives.
+    """
+    if "requires_callable" not in lf.collect_schema().names():
+        return lf
+    return lf.filter(
+        pl.col("requires_callable").is_null() | ~pl.col("requires_callable").cast(pl.Boolean)
+    )
+
+
+def restorable_sites(
+    sites_lf: pl.LazyFrame,
+    called_sites: pl.DataFrame,
+    context: RestorationContext,
+) -> pl.LazyFrame:
+    """Sites from ``sites_lf`` the callset did not emit but whose neighbourhood it reached.
+
+    This is the site-level core the reference-genotype restoration is built on, made public so the
+    compound-phenotype caller can ask the same question of a gene's *defining* sites (from
+    ``haplotypes``) that :func:`restored_rows` asks of a module's authored hom-ref rows. It composes
+    exactly the primitives ``restored_rows`` uses — :func:`_absent_sites`,
+    :func:`_filter_requires_callable`, :func:`_with_flanking_distance` — so the two paths cannot drift
+    on what counts as a restorable position.
+
+    ``sites_lf`` must carry ``chrom``/``start`` (and, for the callability gate, may carry
+    ``requires_callable``). Returns the surviving sites with a ``restored_flank_bp`` column giving the
+    distance to the nearest call. Returns an **empty** frame — never the input unfiltered — when
+    ``context.enabled`` is false, because a callset that cannot support restoration restores nothing.
+    """
+    if not context.enabled:
+        return sites_lf.head(0)
+    absent = _absent_sites(sites_lf, called_sites)
+    absent = _filter_requires_callable(absent)
+    return _with_flanking_distance(absent, called_sites, context.max_flank_bp)
 
 
 def restored_rows(
