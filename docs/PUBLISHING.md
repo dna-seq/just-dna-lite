@@ -2,7 +2,8 @@
 
 > Never made an API token before? Start with [REGISTRY_ACCOUNT_SETUP.md](REGISTRY_ACCOUNT_SETUP.md).
 > The account is only for publishing. The app has no form for it. The first section of that page
-> is one command that creates the account on the test server and tells you which line to put in `.env`.
+> is two commands: one for the main catalog (`REGISTRY_TOKEN`) and one for the test server
+> (`REGISTRY_TOKEN_POLYGON`).
 
 How to register an account, claim a namespace, and publish an annotation module to the public
 marketplace using the `marketplace-client` CLI (shipped with the `just-dna-marketplace` client

@@ -4,56 +4,67 @@ You need an account only to **publish** a module, so other people can install it
 Browsing the catalog, downloading modules, building a module, and annotating a genome do not need one.
 
 There is no account form in the app. Module Creator does not have one. The catalog's Publication
-tab, which would hold an Account pane, is turned off. Create the account with the command below.
+tab, which would hold an Account pane, is turned off. Create the account with one of the two
+commands below.
 
-## The one command
+## The two commands
 
 Open a terminal in the just-dna-lite folder. That is the folder that contains `pyproject.toml`
-and `modules.yaml`, the same folder where you run `uv run start`. Then run:
+and `modules.yaml`, the same folder where you run `uv run start`.
+
+Change `your-name` before you run either command. Use lowercase letters, digits, and hyphens only.
+`livia-zaharia` is accepted. `Livia_Zaharia` is rejected.
+
+The two servers do not share accounts. A token from one is rejected by the other. Run the command
+for the server you are publishing to. Run both if you want an account on each.
+
+On macOS or Linux, replace `.\.venv\Scripts\python.exe -m just_dna_lite.cli` with `uv run pipelines`.
+
+### Main catalog
+
+This is the public catalog, `https://module-registry.just-dna.life`. Modules published here are
+what other people install. A published module is not deleted.
+
+```powershell
+.\.venv\Scripts\python.exe -m just_dna_lite.cli registry register your-name --url https://module-registry.just-dna.life
+```
+
+The command prints `install-id` and `API key` once. Save both. Open `.env` in that same folder
+(copy `.env.template` to `.env` if you do not have one yet) and add the API key on this line:
+
+```
+REGISTRY_TOKEN=paste-the-api-key-here
+```
+
+### Test server
+
+This is the practice catalog, `https://module-polygon.just-dna.life`. What you publish here can
+be removed.
 
 ```powershell
 .\.venv\Scripts\python.exe -m just_dna_lite.cli registry register your-name --url https://module-polygon.just-dna.life
 ```
 
-On macOS or Linux the same command is:
-
-```bash
-uv run pipelines registry register your-name --url https://module-polygon.just-dna.life
-```
-
-Change `your-name` before you run it. Use lowercase letters, digits, and hyphens only.
-`livia-zaharia` is accepted. `Livia_Zaharia` is rejected.
-
-The command takes a few seconds, then prints two lines, once:
+Save this API key on its own line. Do not put the test key in `REGISTRY_TOKEN`.
 
 ```
-install-id: <long secret>
-API key: <long secret>
+REGISTRY_TOKEN_POLYGON=paste-the-api-key-here
 ```
 
-Copy both into a password manager before you close the terminal.
+If you already registered on the main catalog, pass that install-id so this is the same account
+name on the test server:
 
-- The **API key** is the token. Open `.env` in that same just-dna-lite folder (if you have no
-  `.env` yet, copy `.env.template` to `.env`) and add this line, with your key pasted in:
+```powershell
+.\.venv\Scripts\python.exe -m just_dna_lite.cli registry register your-name --install-id PASTE-INSTALL-ID --url https://module-polygon.just-dna.life
+```
 
-  ```
-  REGISTRY_TOKEN_POLYGON=paste-the-api-key-here
-  ```
+The install-id is the only way to get an account back. There is no email, no password, and nobody
+who can reset it. Running the command again without `--install-id` creates a different account.
 
-- The **install-id** is the only way to get this account back. There is no email, no password,
-  and nobody who can reset it. If you lose the token, run the same command again with
-  `--install-id` and the saved install-id, and you get a new token for the same account.
-  If you run it again without the install-id, you create a different account.
+Either command creates the account only. It does not publish a module and it does not claim a
+namespace (the folder name modules are published under). Claiming is a later command, below.
 
-This command talks to the **test** server (`module-polygon.just-dna.life`). What you publish
-there can be deleted. It does not create an account on the public catalog. The public catalog
-is a second registration, written out below.
-
-This creates the account. It does not publish a module and it does not claim a namespace
-(the folder name modules are published under). Claiming is a later command, also below.
-
-The rest of this page is the same process with the choices written out: which server, where
-`.env` lives, and what to do when a message comes back.
+The rest of this page writes out where `.env` lives and what to do when a message comes back.
 
 ## Do I need this at all?
 
@@ -67,7 +78,7 @@ Only if you want to **put something into** the catalog.
 | Claim a namespace (your own "folder" in the catalog) | **Yes** |
 | Ask the server to validate or dry-run your module before publishing | **Yes** |
 
-If you only want to use modules, ignore the command above. Nothing else on this page is required.
+If you only want to use modules, ignore the two commands above. Nothing else on this page is required.
 
 ## The four things you will get
 
