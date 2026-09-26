@@ -615,7 +615,7 @@ class TestRealSample:
         ("module", "gene", "phenotype", "pairs"),
         [
             # Het at 261 (one insertion) and at both B markers, unphased: only B/O1 explains it among
-            # the five defined alleles. Matches what the weights-led abo_blood_group renders per site.
+            # the five defined alleles. Checked against his raw VCF records at the six sites.
             ("abo_phenotype", "ABO", "B", {("B", "O1")}),
             # Het for the se428 null at rs601338: one functional copy, and secretion is dominant.
             ("fut2_secretor", "FUT2", "Secretor", {("Se", "se428")}),
