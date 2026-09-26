@@ -40,8 +40,8 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
 |---|---|
 | `status` | `called` \| `ambiguous` \| `not_assessable` \| `no_match`. Never silence, never a default. |
 | `phenotype` | set only when every consistent diplotype maps to one phenotype |
-| `candidates` | the consistent diplotypes: `{haplotype_a, haplotype_b, phenotype, conclusion, direction, clin_sig, not_assessable}` |
-| `sites` | per defining site: `{rsid, chrom, start, ref, observed, evidence, matched_by, restored_flank_bp}` |
+| `candidates` | the consistent diplotypes: `{haplotype_a, haplotype_b, phenotype, conclusion, direction, clin_sig, not_assessable, activity_score}` (`activity_score` only on a score-and-bin module) |
+| `sites` | per defining site: `{rsid, chrom, start, ref, observed, evidence, matched_by, restored_flank_bp, phased_alleles, phase_set}`. `observed` is sorted; `phased_alleles` keeps homolog order and is set only for a phased call |
 | `phase_would_decide` | true when the ambiguity is pure cis/trans — knowing the phase would settle it |
 | `alleles_considered` | the haplotypes the module defines (a coverage statement) |
 | `alleles_not_assessable` | alleles needing a structural/copy-number call an SNV VCF cannot make |
@@ -51,42 +51,86 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
 
 ### How a status is reached
 
-1. **Resolve each defining site** against the callset (`gather_site_evidence`): by `(chrom, start)`
-   first, then by rsID where the site names one and the VCF carries IDs, then — for a site the callset
-   never emitted — `restoration.restorable_sites`, which restores it to hom-ref only where the callset's
-   coverage supports it (the same gates the weights engine uses). Everything else is `no_call`. Each site
-   records its `evidence` (`called` / `restored_hom_ref` / `no_call`) and `matched_by`.
-2. **Keep the consistent diplotypes** (`call_gene`): a candidate is consistent when its expected
-   unordered genotype equals the observed one at every `called` or `restored` site. A `no_call` site is a
-   wildcard. A haplotype carries `ref` at any defining site it does not list (the PharmVar/CPIC
-   unlisted-site convention).
-3. **Set the status**: `called` when all consistent candidates agree on one phenotype; `ambiguous` when
+1. **Resolve each defining site** against the callset (`gather_site_evidence`), in this order:
+   - by `(chrom, start)`, where the record's `ref` equals the site's (a record at that position with
+     another `ref` is a different event, such as an indel anchored on the same base). When several
+     records share the position, the one whose ALTs include an allele the site defines wins;
+   - by rsID, where the site names one and the VCF carries IDs (a `;`-joined ID matches on each part);
+   - for an **indel** site only, the same event at another anchor within ±10 bp
+     (`INDEL_WINDOW_BP`): `just_dna_format.alleles.parsimony_reduce` of the record must equal the
+     site's for one of its non-reference alleles, and **exactly one** record in the window may qualify.
+     The record's alleles are rewritten into the site's spelling before any comparison
+     (`matched_by = "indel_window"`). Two qualifying records is a refusal, logged as
+     `step="indel_window_not_unique"`, and that site is `no_call` — it is **never** restored, because
+     the callset demonstrably carries an event of that shape there;
+   - otherwise `restoration.restorable_sites`, which restores the site to hom-ref only where the
+     callset's coverage supports it (the same gates the weights engine uses). Everything else is
+     `no_call`.
+
+   Each site records its `evidence` (`called` / `restored_hom_ref` / `no_call`) and `matched_by`.
+2. **Read phase where the callset states it.** A called site is *phased* when its `GT` uses `|` **and**
+   it carries a non-null `PS`; its alleles are then kept in homolog order on `phased_alleles` with the
+   `phase_set`. The alleles come from the `GT` indices, not from the `genotype` column, which the reader
+   sorts and which has therefore lost homolog order. `PS` already reaches the normalized parquet when the
+   VCF carries it (polars-bio reads every FORMAT field the header declares), so no normalization change
+   was needed. A `|` genotype with no `PS` is read unphased.
+3. **List the candidate diplotypes** (`_candidate_rows`). Enumerative module: the `diplotypes` rows as
+   authored. Score-and-bin module: every unordered pair of alleles that both `haplotypes` and
+   `allele_function` define, with the pair's summed `activity_value` binned by `activity_phenotype`
+   (inclusive bounds, `None` open, a shared endpoint owned by the bin with the greater `measure_min`,
+   compared in float32 — TABLES.md). The `unresolved` sentinel row never takes part in the bin scan. An
+   allele missing from either table cannot be scored and is listed under `unpaired_haplotypes`.
+4. **Keep the consistent diplotypes** (`call_gene`). Unphased and restored sites compare as unordered
+   pairs. Phased sites are grouped by phase set, and inside one set the diplotype must fit under a
+   **single orientation** (haplotype A on the first homolog at every site of the set, or on the second at
+   every site). That is what separates the HFE compound heterozygote (trans) from both variants in cis. A
+   `no_call` site is a wildcard. A haplotype carries `ref` at any defining site it does not list (the
+   PharmVar/CPIC unlisted-site convention).
+5. **Set the status**: `called` when all consistent candidates agree on one phenotype; `ambiguous` when
    they disagree; `no_match` when none is consistent; `not_assessable` when nothing was observed at all
-   (never a reference default), or when the only consistent candidates need an allele an SNV VCF cannot
-   confirm.
-4. **`phase_would_decide`** is true for an `ambiguous` call when the consistent candidates agree on the
-   expected genotype at every `no_call` site — so the only remaining unknown is which homolog carries
+   (never a reference default), when the only consistent candidates need an allele an SNV VCF cannot
+   confirm, or when they agree on *no* phenotype (a score in no bin, an unstated activity value).
+6. **`phase_would_decide`** is true for an `ambiguous` call when the consistent candidates agree on the
+   expected genotype at every `no_call` site, so the only remaining unknown is which homolog carries
    which observed allele. It is false when a `no_call` site (a missing *call*, not phase) is what splits
-   them.
+   them. Two `|` genotypes in *different* phase sets say nothing about each other, so such a pair stays
+   ambiguous with this flag set.
 
-## v1 scope (what this version does not do)
+## Scope (what this version does not do)
 
-- **Enumerative only.** Only the `diplotypes` combiner is implemented. The score-and-bin combiner
-  (`allele_function` + `activity_phenotype`, e.g. a CYP2C19 activity score → metaboliser bin) is not — no
-  reference example exercises it yet, and untested paths are not built.
-- **Unphased.** The normalized parquet keeps `GT` but not `PS`, so every call is unphased. An unphased
-  double-het two diplotypes both explain is `ambiguous` with `phase_would_decide` set (the HFE
-  compound-het-vs-cis case), never resolved by a guess. Carrying `PS` through normalization to unlock the
-  phased HFE rows is a separate, later change.
 - **Diploid.** A site's genotype is compared as a two-allele set and a restored site is `[ref, ref]`, so a
   haploid contig (chrY/chrM, or a male's hemizygous X for G6PD) reads as `no_match` rather than a haploid
-  call.
+  call. The format has no hemizygous diplotype spelling either (`DiplotypeRow.haplotype_b` is required).
 - **`*1` is not synthesised.** A diplotype naming a haplotype the module does not define (an implicit
-  `*1`) is skipped rather than assumed all-reference. The reference examples we support (APOE, HFE) define
-  every allele explicitly, so this does not arise; a module relying on an implicit `*1` needs that rule
-  added.
+  `*1`) is skipped rather than assumed all-reference. Every module we hold defines every allele
+  explicitly, so this does not arise; a module relying on an implicit `*1` needs that rule added.
 - **Structural alleles** are detected from the `allele` spelling (there is no `sv_type` column on
   `haplotypes`; a structural allele is a non-nucleotide spelling) and reported `not_assessable`.
+- **One gene at a time.** A phenotype over two genes' phenotypes (Lewis = FUT3 × FUT2, warfarin
+  CYP2C9 × VKORC1) is not expressible in the format and not attempted here.
+- **The indel window is a tolerance, and it says so.** Two spellings that reduce to the same event but
+  sit at different anchors are not always the same variant: rs8176719's Ensembl placement
+  (`133257520 G>GC`) is a genuinely different event from dbSNP's `133257521 T>TC`, because the flanking
+  bases are G and T. The window treats them as one because a reference cache that places an rsID one base
+  off is the case it exists for, and because a unique match within 10 bp is a strong signal. Every such
+  match is labelled `indel_window` in the report so a reader can see it was not an exact hit.
+
+## Pilot modules
+
+Four phenotype modules are vendored under `just-dna-pipelines/tests/fixtures/phenotypes/`, compiled
+strict with the published compiler at test time, and registered locally on the development machine with
+`pipelines module register-compiled` (**not published**):
+
+| module | combiner | what it exercises |
+|---|---|---|
+| `apoe_epsilon` | enumerative | copy of the just-dna-format reference example; the unphased double-het |
+| `hfe_compound_het` | enumerative | copy of the reference example; cis vs trans, decided by phase sets |
+| `abo_phenotype` | enumerative | five ABO alleles over six sites; the reference genome is O, two indel sites whose spelling varies by source |
+| `fut2_secretor` | score-and-bin | three FUT2 alleles; the activity scale is chosen so secretion stays dominant |
+
+Measured on this machine: Anton B/O1 → **B** and secretor; Livia A1/B → **AB** (her two B markers are
+`0|1` in one phase set) with ε3/ε3 and wt/wt read from restored sites; the two other WGS samples O1/O1
+→ **O**, one of them H63D/wt.
 
 ## Authoring rules (for a phenotype module)
 
@@ -94,17 +138,26 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
   HFE's `wt`, APOE's `e3`). `*1` is the only implicit allele the format allows, and this consumer does not
   yet synthesise it.
 - Enumerate the diplotypes in `diplotypes.csv` (allele pair → phenotype), or supply
-  `allele_function` + `activity_phenotype` for score-and-bin (not yet consumed here).
+  `allele_function` + `activity_phenotype` for score-and-bin. With score-and-bin, choose the
+  `activity_value`s so the bins honour the biology (FUT2: one functional copy must reach the secretor
+  bin, since secretion is dominant) and pin that in a test, because an additive scale does not do it by
+  itself.
+- Author an indel at the left-normalized position a VCF caller writes, checked against the reference
+  sequence, and put the phenotype's group in `phenotype` with any subgroup in `conclusion` (ABO: `AB`,
+  with A2 named in the text), so an unphased callset that cannot resolve the subgroup still calls the
+  group.
 - A structural or copy-number allele carries its symbolic spelling; the caller reports it not assessable
   from an SNV VCF rather than guessing.
 
 ## Tests
 
-- `tests/test_phenotype_caller.py` — the four statuses, phase ambiguity, restoration, the parquet
-  contract, and a **derived** test that reads each fixture's own diplotype table, feeds the exact genotype
-  it implies, and requires the module's own phenotype back (runtime ground truth, not magic numbers).
+- `tests/test_phenotype_caller.py` — the four statuses, phase ambiguity and phase sets, restoration,
+  both combiners, the indel window (both spellings of both ABO indels, and the refusal), the parquet
+  contract, and a **derived** test that reads each fixture's own candidate list, feeds the exact genotype
+  it implies, and requires the module's own phenotype back (runtime ground truth, not magic numbers). The
+  score-and-bin test re-bins every pair straight from the authored CSV rather than trusting the caller's
+  binning.
 - `tests/test_native_module_regression.py` — `module_kind` routing is unchanged for every native module,
   and native annotation is deterministic across runs.
-- Fixtures are vendored spec directories (`tests/fixtures/phenotypes/`, copies of just-dna-format's
-  `apoe_epsilon` / `hfe_compound_het`) compiled at test time with the published compiler, so there is no
-  path dependency on a sibling checkout.
+- Fixtures are vendored spec directories (`tests/fixtures/phenotypes/`) compiled at test time with the
+  published compiler, so there is no path dependency on a sibling checkout.

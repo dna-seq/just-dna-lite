@@ -1,0 +1,16 @@
+gene,haplotype_a,haplotype_b,trait_efo_id,direction,clin_sig,phenotype,conclusion
+ABO,A1,A1,,neutral,,A,Blood group A (A1/A1).
+ABO,A1,A2,,neutral,,A,Blood group A (A1/A2).
+ABO,A1,B,,neutral,,AB,"Blood group AB (A1/B): one A and one B allele, expressed codominantly."
+ABO,A1,O1,,neutral,,A,Blood group A (A1/O1).
+ABO,A1,O2,,neutral,,A,Blood group A (A1/O2).
+ABO,A2,A2,,neutral,,A,Blood group A (A2/A2). A2 is a weaker A subgroup; it still types as A.
+ABO,A2,B,,neutral,,AB,"Blood group AB (A2/B): one A and one B allele, expressed codominantly. The A allele is the weaker A2 subgroup."
+ABO,A2,O1,,neutral,,A,Blood group A (A2/O1). A2 is a weaker A subgroup; it still types as A.
+ABO,A2,O2,,neutral,,A,Blood group A (A2/O2). A2 is a weaker A subgroup; it still types as A.
+ABO,B,B,,neutral,,B,Blood group B (B/B).
+ABO,B,O1,,neutral,,B,Blood group B (B/O1).
+ABO,B,O2,,neutral,,B,Blood group B (B/O2).
+ABO,O1,O1,,neutral,,O,Blood group O (O1/O1): neither allele makes an active A or B transferase.
+ABO,O1,O2,,neutral,,O,Blood group O (O1/O2): neither allele makes an active A or B transferase.
+ABO,O2,O2,,neutral,,O,Blood group O (O2/O2): neither allele makes an active A or B transferase.

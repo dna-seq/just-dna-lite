@@ -20,7 +20,7 @@ from just_dna_compiler.compiler import compile_module
 from just_dna_pipelines.annotation.hf_modules import ModuleInfo, _probe_module_at_path
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "phenotypes"
-PHENOTYPE_FIXTURES = ("apoe_epsilon", "hfe_compound_het")
+PHENOTYPE_FIXTURES = ("apoe_epsilon", "hfe_compound_het", "fut2_secretor", "abo_phenotype")
 
 
 def compile_fixture(name: str, out_dir: Path) -> Path:

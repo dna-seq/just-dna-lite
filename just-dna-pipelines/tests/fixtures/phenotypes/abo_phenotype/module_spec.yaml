@@ -1,0 +1,13 @@
+schema_version: '1.0'
+module:
+  title: ABO blood group
+  description: ABO blood group (A, B, AB or O) from six ABO variants read together.
+  report_title: ABO blood group
+  icon: tint
+  icon_set: fomantic
+  color: '#db2828'
+  name: abo_phenotype
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+genome_build: GRCh38

@@ -1,0 +1,4 @@
+gene,allele,activity_value,function_status,suballele,copy_number,sv_type,hybrid_orientation
+FUT2,Se,1.0,normal_function,,,,
+FUT2,se428,0.0,no_function,,,,
+FUT2,se385,0.25,decreased_function,,,,

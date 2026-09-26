@@ -6,19 +6,18 @@ named haplotypes (a diplotype). The per-position weights engine cannot express t
 authored with ``haplotypes`` + ``diplotypes`` (format 0.7) lands in ``skipped_modules`` there. This
 module is the second engine path that handles it.
 
-Scope of this version (v1):
+Scope of this version:
 
-* **Enumerative combiner only.** A module's ``diplotypes`` table enumerates allele-pair → phenotype;
-  each row is a candidate diplotype with a known phenotype. The score-and-bin combiner
-  (``allele_function`` + ``activity_phenotype``) is not yet implemented — no reference example
-  exercises it, and building untested paths is how the report came to render 11 of 37 columns.
-* **Unphased.** The normalized parquet keeps ``GT`` but not ``PS``, so every call is made from the
-  unphased genotype. An unphased double-het that two diplotypes both explain is reported
-  ``ambiguous`` with ``phase_would_decide`` set, never resolved by a guess. Phase sets are a
-  separate, later change.
+* **Two combiners, both the format's own.** Enumerative (``diplotypes``: each row an allele pair with
+  a known phenotype) and score-and-bin (``allele_function.activity_value`` summed over the pair, then
+  binned by ``activity_phenotype``). There is no rule language in the module and no evaluator here.
+* **Phase is read where the callset states it.** Two sites are read as phased together only when both
+  genotypes use ``|`` *and* carry the same non-null ``PS``; everything else is unphased, and an
+  unphased double-het that two diplotypes both explain is ``ambiguous`` with ``phase_would_decide``
+  set, never resolved by a guess.
 * **Diploid.** A site's expected genotype is compared as a two-allele set, and a restored site is
   ``[ref, ref]``. A haploid contig (chrY/chrM, or the hemizygous X of a male G6PD call) therefore
-  reads as ``no_match`` rather than a haploid call — out of v1 scope, tracked in PHENOTYPE_CALLS.md.
+  reads as ``no_match`` rather than a haploid call — out of scope, tracked in PHENOTYPE_CALLS.md.
 
 The result is one :class:`PhenotypeCall` per (module, gene), written to
 ``{module}_phenotypes.parquet`` and rendered in its own report section. A call is **never** a silent
@@ -30,11 +29,14 @@ weights engine uses (:func:`restoration.restorable_sites`), tri-state on the row
 from __future__ import annotations
 
 import re
+import struct
+from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Literal, Optional
 
 import polars as pl
-from eliot import start_action
+from eliot import log_message, start_action
+from just_dna_format.alleles import parsimony_reduce
 from pydantic import BaseModel
 
 from just_dna_pipelines.annotation.hf_modules import (
@@ -65,7 +67,14 @@ def _is_structural_allele(allele: Optional[str]) -> bool:
 
 
 Evidence = Literal["called", "restored_hom_ref", "no_call"]
-MatchedBy = Literal["position", "rsid"]
+MatchedBy = Literal["position", "rsid", "indel_window"]
+Combiner = Literal["diplotypes", "activity"]
+
+# How far from an indel site the caller looks for the same event spelled at another anchor. An indel
+# in a repeat has several valid VCF spellings (ABO's A2 c.1061delC is `GGG>GG` at 133255670 in
+# Ensembl and `CG>C` at 133255669 left-normalized), and a reference cache can place an rsID one base
+# off (rs8176719: Ensembl 133257520 G>GC, dbSNP/gnomAD/DRAGEN 133257521 T>TC). ±10 bp covers both.
+INDEL_WINDOW_BP = 10
 Status = Literal["called", "ambiguous", "not_assessable", "no_match"]
 
 
@@ -82,6 +91,10 @@ class SiteEvidence(BaseModel):
     evidence: Evidence
     matched_by: Optional[MatchedBy]
     restored_flank_bp: Optional[int]
+    # The sample's alleles in homolog order, set only for a phased call (`|` with a non-null PS). The
+    # `observed` list is sorted, so it has already lost which allele sits on which chromosome copy.
+    phased_alleles: Optional[list[str]] = None
+    phase_set: Optional[int] = None
 
 
 class Candidate(BaseModel):
@@ -95,6 +108,9 @@ class Candidate(BaseModel):
     clin_sig: Optional[str]
     # True when this candidate needs a structural/copy-number allele an SNV VCF cannot confirm.
     not_assessable: bool = False
+    # Score-and-bin only: the summed activity value of the pair (None on an enumerative module, and
+    # None when either allele's activity value is unstated — then no bin is chosen).
+    activity_score: Optional[float] = None
 
 
 class DrugRow(BaseModel):
@@ -137,11 +153,17 @@ class GeneDefinition(BaseModel):
     # allele name -> {(chrom, start) -> allele base at that site}. A haplotype carries `ref` at any
     # defining site it does not list (the PharmVar/CPIC unlisted-site convention).
     haplotype_alleles: dict[str, dict[str, str]]
-    # (chrom, start) -> (rsid, ref, requires_callable) for every defining site of this gene.
+    # (chrom, start) -> {rsid, ref, requires_callable, alleles} for every defining site of this gene;
+    # `alleles` is every allele any haplotype carries there, ref included.
     site_meta: dict[str, dict]
-    # The diplotype rows: each a dict with haplotype_a/b, phenotype, conclusion, direction, clin_sig,
-    # and the drug columns.
-    diplotypes: list[dict]
+    combiner: Combiner = "diplotypes"
+    # Enumerative: the diplotype rows, each a dict with haplotype_a/b, phenotype, conclusion,
+    # direction, clin_sig, and the drug columns.
+    diplotypes: list[dict] = []
+    # Score-and-bin: allele -> activity_value (None = unstated), and the activity_phenotype bins with
+    # the `unresolved` sentinel row already removed.
+    activity_values: dict[str, Optional[float]] = {}
+    activity_bins: list[dict] = []
     # Alleles that need a structural/copy-number call an SNV VCF cannot make.
     structural_alleles: set[str]
 
@@ -157,16 +179,29 @@ def _site_key(chrom: str, start: int) -> str:
 
 
 def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDefinition:
-    """Read a module's haplotypes + diplotypes into the per-gene structure the caller enumerates.
+    """Read a module's haplotypes + combiner tables into the per-gene structure the caller enumerates.
 
-    The compiler's own manifest carries any phase-ambiguity warnings it raised; those are surfaced
-    verbatim on every call for the module rather than recomputed here.
+    The combiner is chosen by which tables the module carries, the same test ``module_kind`` routes
+    on: ``diplotypes`` when present (enumerative), else ``allele_function`` + ``activity_phenotype``
+    (score-and-bin). The compiler's own phase-ambiguity warnings are surfaced verbatim on every call
+    for the module rather than recomputed here.
     """
     haplotypes = scan_module_table(module_name, ModuleTable.HAPLOTYPES, module_info=info).collect()
-    diplotypes = scan_module_table(module_name, ModuleTable.DIPLOTYPES, module_info=info).collect()
+    combiner: Combiner = "diplotypes" if info.diplotypes_url is not None else "activity"
+    if combiner == "diplotypes":
+        diplotypes = scan_module_table(module_name, ModuleTable.DIPLOTYPES, module_info=info).collect()
+        allele_function = activity_phenotype = None
+    else:
+        diplotypes = None
+        allele_function = scan_module_table(
+            module_name, ModuleTable.ALLELE_FUNCTION, module_info=info
+        ).collect()
+        activity_phenotype = scan_module_table(
+            module_name, ModuleTable.ACTIVITY_PHENOTYPE, module_info=info
+        ).collect()
 
     genes: dict[str, GeneDefinition] = {}
-    for gene in haplotypes["gene"].unique().drop_nulls().to_list():
+    for gene in haplotypes["gene"].unique().drop_nulls().sort().to_list():
         gene_haps = haplotypes.filter(pl.col("gene") == gene)
         haplotype_alleles: dict[str, dict[str, str]] = {}
         site_meta: dict[str, dict] = {}
@@ -175,25 +210,47 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
             name = row["haplotype_name"]
             key = _site_key(row["chrom"], row["start"])
             haplotype_alleles.setdefault(name, {})[key] = row["allele"]
-            site_meta.setdefault(
+            meta = site_meta.setdefault(
                 key,
                 {
                     "rsid": row.get("rsid"),
                     "ref": row["ref"],
                     "requires_callable": row.get("requires_callable"),
+                    "alleles": {row["ref"]},
                 },
             )
+            meta["alleles"].add(row["allele"])
             if _is_structural_allele(row["allele"]):
                 structural_alleles.add(name)
 
-        gene_diplos = diplotypes.filter(pl.col("gene") == gene) if "gene" in diplotypes.columns else diplotypes
-        genes[gene] = GeneDefinition(
-            gene=gene,
-            haplotype_alleles=haplotype_alleles,
-            site_meta=site_meta,
-            diplotypes=[dict(r) for r in gene_diplos.iter_rows(named=True)],
-            structural_alleles=structural_alleles,
-        )
+        if combiner == "diplotypes":
+            gene_diplos = (
+                diplotypes.filter(pl.col("gene") == gene) if "gene" in diplotypes.columns else diplotypes
+            )
+            genes[gene] = GeneDefinition(
+                gene=gene,
+                haplotype_alleles=haplotype_alleles,
+                site_meta=site_meta,
+                combiner="diplotypes",
+                diplotypes=[dict(r) for r in gene_diplos.iter_rows(named=True)],
+                structural_alleles=structural_alleles,
+            )
+        else:
+            functions = allele_function.filter(pl.col("gene") == gene)
+            bins = activity_phenotype.filter(pl.col("gene") == gene)
+            if "unresolved" in bins.columns:
+                bins = bins.filter(~pl.col("unresolved").fill_null(False))
+            genes[gene] = GeneDefinition(
+                gene=gene,
+                haplotype_alleles=haplotype_alleles,
+                site_meta=site_meta,
+                combiner="activity",
+                activity_values={
+                    r["allele"]: r.get("activity_value") for r in functions.iter_rows(named=True)
+                },
+                activity_bins=[dict(r) for r in bins.iter_rows(named=True)],
+                structural_alleles=structural_alleles,
+            )
 
     # The compiler's warnings for these bytes were kept on ModuleInfo at discovery time (the fsspec
     # probe already read and validated the manifest). Reading them from the manifest again here would
@@ -203,6 +260,44 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
     )
 
 
+_GT_INDEX = re.compile(r"\d+|\.")
+
+
+def _record_alleles(gt: Optional[str], ref: str, alt: Optional[str]) -> Optional[list[str]]:
+    """The alleles a GT names, in the order it names them (homolog order when phased).
+
+    Returns None for a missing call (any ``.`` index), which the caller treats as nothing observed.
+    """
+    if gt is None:
+        return None
+    indices = _GT_INDEX.findall(gt)
+    if not indices or "." in indices:
+        return None
+    pool = [ref] + (alt.split(",") if alt else [])
+    return [pool[int(i)] for i in indices]
+
+
+def _is_indel_site(meta: dict) -> bool:
+    return any(len(a) != len(meta["ref"]) for a in meta["alleles"] if not _is_structural_allele(a))
+
+
+def _translate(alleles: list[str], record_ref: str, record_alts: list[str], meta: dict) -> list[str]:
+    """Rewrite a record's alleles into the site's spelling, for a record matched in the indel window.
+
+    The record's ref becomes the site's ref, and each record ALT that represents the same event as
+    one of the site's non-ref alleles becomes that allele. An ALT that represents none of them is kept
+    verbatim — it then matches no haplotype, which is the honest outcome (a different event was seen).
+    """
+    site_ref = meta["ref"]
+    mapping = {record_ref: site_ref}
+    for alt in record_alts:
+        event = parsimony_reduce([record_ref, alt])
+        for allele in meta["alleles"]:
+            if allele != site_ref and parsimony_reduce([site_ref, allele]) == event:
+                mapping[alt] = allele
+    return [mapping.get(a, a) for a in alleles]
+
+
 def gather_site_evidence(
     vcf_lf: pl.LazyFrame,
     gene_def: GeneDefinition,
@@ -210,12 +305,27 @@ def gather_site_evidence(
 ) -> list[SiteEvidence]:
     """Resolve every defining site of a gene against the callset.
 
-    Match order (SNV v1): by ``(chrom, start)`` first, then by rsID where the site carries one and the
-    VCF has IDs; an unmatched site falls back to :func:`restoration.restorable_sites` (→ hom-ref where
-    the callset's coverage supports it), and otherwise records ``no_call``. The indel-window match the
-    ABO indel needs is deliberately out of this version.
+    Match order:
+
+    1. by ``(chrom, start)`` where the record's ``ref`` equals the site's (a record at the same
+       position with a different ``ref`` is a different event — an indel anchored on this base, say);
+    2. by rsID where the site names one and the VCF carries IDs;
+    3. for an **indel** site only, the same event at another anchor within ``INDEL_WINDOW_BP``: the
+       record's ``parsimony_reduce`` must equal the site's for one of its non-ref alleles, and exactly
+       one record in the window may qualify (two candidates is a refusal, logged, never a pick).
+       The record's alleles are rewritten into the site's spelling before any comparison;
+    4. otherwise :func:`restoration.restorable_sites` (hom-ref where the callset's coverage supports
+       it, honouring ``requires_callable``), and failing that ``no_call``. A site whose window was
+       refused is never restored: an event of its shape is right there.
+
+    A record whose GT uses ``|`` and carries a non-null ``PS`` keeps its alleles in homolog order on
+    ``phased_alleles`` with the ``phase_set``; everything else is read unphased.
     """
-    sites = list(gene_def.site_meta.items())  # [(key, {rsid, ref, requires_callable}), ...]
+    sites = list(gene_def.site_meta.items())  # [(key, meta), ...]
+    vcf_names = vcf_lf.collect_schema().names()
+    has_ps = "PS" in vcf_names
+    record_cols = ["chrom", "start", "ref", "alt", "GT", "genotype"] + (["PS"] if has_ps else [])
+    record_cols = [c for c in record_cols if c in vcf_names]
 
     site_frame = pl.DataFrame(
         {
@@ -223,33 +333,36 @@ def gather_site_evidence(
             "chrom": [k.split(":")[0] for k, _ in sites],
             "start": [int(k.split(":")[1]) for k, _ in sites],
             "rsid": [m["rsid"] for _, m in sites],
-            "ref": [m["ref"] for _, m in sites],
+            "_site_ref": [m["ref"] for _, m in sites],
             "requires_callable": [m.get("requires_callable") for _, m in sites],
         },
         schema_overrides={"start": pl.UInt32},
     )
 
-    observed: dict[str, dict] = {}  # key -> {"observed": [...], "matched_by": ...}
+    # key -> {"record": dict, "matched_by": ...}
+    matched: dict[str, dict] = {}
 
-    # 1. Position match. An inner join to the callset gives the sample's genotype at each site.
+    # 1. Position match, ref-agreeing. Several records can share a position (an SNV beside an indel
+    #    anchored on the same base); prefer the one whose ALTs include an allele the site defines.
     pos = (
         site_frame.lazy()
-        .join(
-            vcf_lf.select("chrom", "start", "genotype"),
-            on=["chrom", "start"],
-            how="inner",
-        )
-        .select("_key", "genotype")
+        .join(vcf_lf.select(record_cols), on=["chrom", "start"], how="inner")
+        .filter(pl.col("ref") == pl.col("_site_ref"))
+        .select(["_key"] + [c for c in record_cols if c not in ("chrom", "start")])
         .collect()
     )
-    for row in pos.iter_rows(named=True):
-        observed[row["_key"]] = {"observed": row["genotype"], "matched_by": "position"}
+    for row in pos.sort(["_key", "alt"], nulls_last=True).iter_rows(named=True):
+        meta = gene_def.site_meta[row["_key"]]
+        relevant = bool(set((row.get("alt") or "").split(",")) & (meta["alleles"] - {meta["ref"]}))
+        current = matched.get(row["_key"])
+        if current is None or (relevant and not current["relevant"]):
+            matched[row["_key"]] = {"record": row, "matched_by": "position", "relevant": relevant}
 
     # 2. rsID match for sites position did not find, when the site names one and the VCF carries IDs.
     unresolved = site_frame.filter(
-        ~pl.col("_key").is_in(list(observed.keys())) & pl.col("rsid").is_not_null()
+        ~pl.col("_key").is_in(list(matched.keys())) & pl.col("rsid").is_not_null()
     )
-    if unresolved.height and "rsid" in vcf_lf.collect_schema().names():
+    if unresolved.height and "rsid" in vcf_names:
         # Cast first: a callset with no IDs at all can carry an all-null `rsid` column typed `Null`,
         # which `str.split` refuses. Casting to Utf8 makes it null-valued Utf8, which splits to null.
         vcf_by_rsid = vcf_lf.with_columns(
@@ -257,21 +370,57 @@ def gather_site_evidence(
         ).explode("_rsid_key", empty_as_null=True)
         rs = (
             unresolved.lazy()
+            .select("_key", "rsid")
             .join(
-                vcf_by_rsid.select(pl.col("_rsid_key"), pl.col("genotype")),
+                vcf_by_rsid.select(["_rsid_key"] + [c for c in record_cols if c not in ("chrom", "start")]),
                 left_on="rsid",
                 right_on="_rsid_key",
                 how="inner",
             )
-            .select("_key", "genotype")
             .collect()
         )
-        for row in rs.iter_rows(named=True):
-            observed.setdefault(row["_key"], {"observed": row["genotype"], "matched_by": "rsid"})
+        for row in rs.sort("_key").iter_rows(named=True):
+            matched.setdefault(row["_key"], {"record": row, "matched_by": "rsid", "relevant": True})
 
-    # 3. Restoration for sites still unresolved. `restorable_sites` returns those whose neighbourhood
+    # 3. Indel window: the same event spelled at another anchor. A site with more than one qualifying
+    #    record is refused — and kept out of restoration below: the callset demonstrably carries an
+    #    event of this shape here, so reading the site as reference would fabricate a hom-ref.
+    window_refused: set[str] = set()
+    for key, meta in sites:
+        if key in matched or not _is_indel_site(meta):
+            continue
+        chrom, start = key.split(":")[0], int(key.split(":")[1])
+        events = {
+            parsimony_reduce([meta["ref"], a]) for a in meta["alleles"] if a != meta["ref"]
+        }
+        window = (
+            vcf_lf.filter(
+                (pl.col("chrom") == chrom)
+                & pl.col("start").is_between(start - INDEL_WINDOW_BP, start + INDEL_WINDOW_BP)
+            )
+            .select([c for c in record_cols if c != "chrom"])
+            .collect()
+        )
+        hits = [
+            row
+            for row in window.iter_rows(named=True)
+            if row.get("alt")
+            and any(parsimony_reduce([row["ref"], alt]) in events for alt in row["alt"].split(","))
+        ]
+        if len(hits) == 1:
+            matched[key] = {"record": hits[0], "matched_by": "indel_window", "relevant": True}
+        elif len(hits) > 1:
+            window_refused.add(key)
+            log_message(
+                message_type="phenotype_caller",
+                step="indel_window_not_unique",
+                site=key,
+                candidates=[f"{chrom}:{h['start']} {h['ref']}>{h['alt']}" for h in hits],
+            )
+
+    # 4. Restoration for sites still unresolved. `restorable_sites` returns those whose neighbourhood
     #    the callset demonstrably reached (and honours `requires_callable`); the rest are `no_call`.
-    still_absent = site_frame.filter(~pl.col("_key").is_in(list(observed.keys())))
+    still_absent = site_frame.filter(~pl.col("_key").is_in([*matched.keys(), *window_refused]))
     restored: dict[str, int] = {}
     if still_absent.height:
         eligible = restorable_sites(
@@ -284,45 +433,47 @@ def gather_site_evidence(
 
     evidence: list[SiteEvidence] = []
     for key, meta in sites:
-        if key in observed:
+        base = {
+            "rsid": meta["rsid"],
+            "chrom": key.split(":")[0],
+            "start": int(key.split(":")[1]),
+            "ref": meta["ref"],
+        }
+        if key in matched:
+            record = matched[key]["record"]
+            ordered = _record_alleles(record.get("GT"), record["ref"], record.get("alt"))
+            if ordered is None:
+                # No GT to read (a callset without FORMAT) — fall back to the stored genotype list.
+                ordered = list(record["genotype"] or [])
+            if matched[key]["matched_by"] == "indel_window":
+                ordered = _translate(
+                    ordered, record["ref"], (record.get("alt") or "").split(","), meta
+                )
+            if not ordered:
+                evidence.append(SiteEvidence(**base, observed=None, evidence="no_call",
+                                             matched_by=None, restored_flank_bp=None))
+                continue
+            phase_set = record.get("PS")
+            phased = "|" in (record.get("GT") or "") and phase_set is not None
             evidence.append(
                 SiteEvidence(
-                    rsid=meta["rsid"],
-                    chrom=key.split(":")[0],
-                    start=int(key.split(":")[1]),
-                    ref=meta["ref"],
-                    observed=list(observed[key]["observed"]),
+                    **base,
+                    observed=sorted(ordered),
                     evidence="called",
-                    matched_by=observed[key]["matched_by"],
+                    matched_by=matched[key]["matched_by"],
                     restored_flank_bp=None,
+                    phased_alleles=ordered if phased else None,
+                    phase_set=int(phase_set) if phased else None,
                 )
             )
         elif key in restored:
             evidence.append(
-                SiteEvidence(
-                    rsid=meta["rsid"],
-                    chrom=key.split(":")[0],
-                    start=int(key.split(":")[1]),
-                    ref=meta["ref"],
-                    observed=[meta["ref"], meta["ref"]],
-                    evidence="restored_hom_ref",
-                    matched_by=None,
-                    restored_flank_bp=restored[key],
-                )
+                SiteEvidence(**base, observed=[meta["ref"], meta["ref"]], evidence="restored_hom_ref",
+                             matched_by=None, restored_flank_bp=restored[key])
             )
         else:
-            evidence.append(
-                SiteEvidence(
-                    rsid=meta["rsid"],
-                    chrom=key.split(":")[0],
-                    start=int(key.split(":")[1]),
-                    ref=meta["ref"],
-                    observed=None,
-                    evidence="no_call",
-                    matched_by=None,
-                    restored_flank_bp=None,
-                )
-            )
+            evidence.append(SiteEvidence(**base, observed=None, evidence="no_call",
+                                         matched_by=None, restored_flank_bp=None))
     return evidence
 
 
@@ -340,6 +491,86 @@ def _allele_at(gene_def: GeneDefinition, haplotype: str, key: str) -> Optional[s
     return gene_def.site_meta[key]["ref"]
 
 
+def _float32(value: float) -> float:
+    """Narrow to float32, the precision TABLES.md says bin bounds are compared in."""
+    return struct.unpack("f", struct.pack("f", value))[0]
+
+
+def _bin_activity(score: float, bins: list[dict]) -> Optional[dict]:
+    """The ``activity_phenotype`` row a summed activity score falls in, or None.
+
+    Bounds are inclusive and ``None`` is open; where two bins share an endpoint the one with the
+    greater ``measure_min`` owns it (TABLES.md). Compared in float32, never with an epsilon.
+    """
+    value = _float32(score)
+    hits = [
+        b
+        for b in bins
+        if (b.get("measure_min") is None or value >= _float32(b["measure_min"]))
+        and (b.get("measure_max") is None or value <= _float32(b["measure_max"]))
+    ]
+    if not hits:
+        return None
+    return max(hits, key=lambda b: float("-inf") if b.get("measure_min") is None else b["measure_min"])
+
+
+def _candidate_rows(gene_def: GeneDefinition) -> list[dict]:
+    """Every diplotype the module lets the caller consider, as a row carrying its phenotype.
+
+    Enumerative: the ``diplotypes`` rows as authored. Score-and-bin: every unordered pair of alleles
+    that both ``haplotypes`` (which says what an allele looks like) and ``allele_function`` (which says
+    what it is worth) define, with its summed ``activity_value`` binned — an allele missing from either
+    table cannot be scored and is reported as unpaired rather than guessed.
+    """
+    if gene_def.combiner == "diplotypes":
+        return gene_def.diplotypes
+    scorable = sorted(set(gene_def.haplotype_alleles) & set(gene_def.activity_values))
+    rows: list[dict] = []
+    for a, b in combinations_with_replacement(scorable, 2):
+        value_a, value_b = gene_def.activity_values[a], gene_def.activity_values[b]
+        score = None if value_a is None or value_b is None else value_a + value_b
+        bin_row = _bin_activity(score, gene_def.activity_bins) if score is not None else None
+        rows.append(
+            {
+                "haplotype_a": a,
+                "haplotype_b": b,
+                "activity_score": score,
+                "phenotype": bin_row.get("phenotype") if bin_row else None,
+                "conclusion": bin_row.get("conclusion") if bin_row else None,
+                "direction": bin_row.get("direction") if bin_row else None,
+                "clin_sig": bin_row.get("clin_sig") if bin_row else None,
+            }
+        )
+    return rows
+
+
+def _consistent(
+    expected: dict[str, tuple[str, str]],
+    evidence_by_key: dict[str, SiteEvidence],
+    observed_keys: list[str],
+) -> bool:
+    """Whether a diplotype's expected alleles explain every observed site.
+
+    Unphased (and restored) sites compare as unordered pairs. Phased sites are grouped by phase set,
+    and within one set the diplotype must fit under a *single* orientation — haplotype A on the first
+    homolog at every site of the set, or on the second at every site. That is what tells the HFE
+    compound heterozygote (trans) from both variants in cis.
+    """
+    blocks: dict[int, list[str]] = {}
+    for key in observed_keys:
+        site = evidence_by_key[key]
+        if site.phased_alleles is not None and site.phase_set is not None:
+            blocks.setdefault(site.phase_set, []).append(key)
+        elif sorted(expected[key]) != sorted(site.observed):
+            return False
+    for keys in blocks.values():
+        forward = all(list(expected[k]) == evidence_by_key[k].phased_alleles for k in keys)
+        reverse = all(list(expected[k][::-1]) == evidence_by_key[k].phased_alleles for k in keys)
+        if not (forward or reverse):
+            return False
+    return True
+
+
 def call_gene(
     module: str,
     gene_def: GeneDefinition,
@@ -347,11 +578,12 @@ def call_gene(
 ) -> PhenotypeCall:
     """Turn the site evidence into a set of consistent diplotypes and a status.
 
-    A candidate diplotype is *consistent* when its expected unordered genotype equals the observed
-    one at every called or restored site; a no_call site is a wildcard. The phenotype is *called*
-    only when every consistent candidate maps to the same phenotype, ``ambiguous`` when they disagree,
-    ``no_match`` when none is consistent, and ``not_assessable`` when nothing could be observed at all
-    (or the only consistent candidates need an allele an SNV VCF cannot confirm).
+    A candidate diplotype is *consistent* when its expected genotype equals the observed one at every
+    called or restored site (as an unordered pair, or under one orientation per phase set where the
+    callset is phased); a no_call site is a wildcard. The phenotype is *called* only when every
+    consistent candidate maps to the same phenotype, ``ambiguous`` when they disagree, ``no_match``
+    when none is consistent, and ``not_assessable`` when nothing could be observed at all (or the only
+    consistent candidates need an allele an SNV VCF cannot confirm).
     """
     evidence_by_key = {_site_key(e.chrom, e.start): e for e in evidence}
     observed_keys = [k for k, e in evidence_by_key.items() if e.evidence != "no_call"]
@@ -361,12 +593,11 @@ def call_gene(
     not_assessable_alleles = sorted(gene_def.structural_alleles)
     paired: set[str] = set()
 
-    kept: list[tuple[dict, dict[str, list[str]]]] = []  # (diplotype row, expected genotype per key)
-    unpaired_candidates_structural = False
-    for diplo in gene_def.diplotypes:
+    kept: list[tuple[dict, dict[str, tuple[str, str]]]] = []  # (row, expected alleles per key)
+    for diplo in _candidate_rows(gene_def):
         a, b = diplo["haplotype_a"], diplo["haplotype_b"]
         paired.update({a, b})
-        expected: dict[str, list[str]] = {}
+        expected: dict[str, tuple[str, str]] = {}
         undefined = False
         for key in gene_def.site_meta:
             allele_a = _allele_at(gene_def, a, key)
@@ -374,14 +605,10 @@ def call_gene(
             if allele_a is None or allele_b is None:
                 undefined = True
                 break
-            expected[key] = sorted([allele_a, allele_b])
+            expected[key] = (allele_a, allele_b)
         if undefined:
             continue
-        # Consistent with every observed (called or restored) site?
-        consistent = all(
-            expected[key] == sorted(evidence_by_key[key].observed) for key in observed_keys
-        )
-        if consistent:
+        if _consistent(expected, evidence_by_key, observed_keys):
             kept.append((diplo, expected))
 
     unpaired = sorted(set(gene_def.haplotype_alleles.keys()) - paired)
@@ -401,6 +628,7 @@ def call_gene(
                 direction=diplo.get("direction"),
                 clin_sig=diplo.get("clin_sig"),
                 not_assessable=needs_structural,
+                activity_score=diplo.get("activity_score"),
             )
         )
 
@@ -420,9 +648,14 @@ def call_gene(
         phenotype = None
     else:
         phenotypes = {c.phenotype for c in assessable}
-        if len(phenotypes) == 1:
+        if len(phenotypes) == 1 and None not in phenotypes:
             status = "called"
             phenotype = next(iter(phenotypes))
+        elif len(phenotypes) == 1:
+            # Every consistent pair agrees, but on *no* phenotype — a score that falls in no bin, or an
+            # allele whose activity value the module leaves unstated. There is nothing to name.
+            status = "not_assessable"
+            phenotype = None
         else:
             status = "ambiguous"
             phenotype = None
@@ -433,7 +666,7 @@ def call_gene(
     phase_would_decide = False
     if status == "ambiguous":
         no_call_sigs = {
-            tuple(tuple(expected[k]) for k in no_call_keys) for _, expected in kept
+            tuple(tuple(sorted(expected[k])) for k in no_call_keys) for _, expected in kept
         }
         phase_would_decide = len(no_call_sigs) == 1
 
@@ -495,7 +728,6 @@ def call_phenotype_module(
     """Call every gene of a phenotype module and write ``{module}_phenotypes.parquet``.
 
     Returns ``(path, n_called)`` where ``n_called`` is the number of genes whose status is ``called``.
-    v1 treats every call as unphased.
     """
     with start_action(action_type="call_phenotype_module", module=module_name):
         definition = load_phenotype_definition(module_name, info)
@@ -525,6 +757,7 @@ _CANDIDATE_STRUCT = pl.Struct(
         "direction": pl.String,
         "clin_sig": pl.String,
         "not_assessable": pl.Boolean,
+        "activity_score": pl.Float64,
     }
 )
 _SITE_STRUCT = pl.Struct(
@@ -537,6 +770,8 @@ _SITE_STRUCT = pl.Struct(
         "evidence": pl.String,
         "matched_by": pl.String,
         "restored_flank_bp": pl.Int64,
+        "phased_alleles": pl.List(pl.String),
+        "phase_set": pl.Int64,
     }
 )
 _DRUG_STRUCT = pl.Struct(

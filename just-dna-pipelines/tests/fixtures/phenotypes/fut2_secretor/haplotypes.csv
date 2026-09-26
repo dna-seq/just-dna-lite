@@ -1,0 +1,7 @@
+haplotype_name,rsid,chrom,start,ref,allele,gene,requires_callable
+Se,rs601338,19,48703417,G,G,FUT2,
+Se,rs1047781,19,48703374,A,A,FUT2,
+se428,rs601338,19,48703417,G,A,FUT2,
+se428,rs1047781,19,48703374,A,A,FUT2,
+se385,rs601338,19,48703417,G,G,FUT2,
+se385,rs1047781,19,48703374,A,T,FUT2,

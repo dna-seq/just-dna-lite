@@ -1,0 +1,21 @@
+{
+  "generator": "just-module-creator",
+  "items": [
+    {
+      "variant_key": "rs56392308",
+      "rationale": "Same one-base deletion in a GGG run; authored in the left-normalized spelling a VCF caller writes (anchor C at 133255669, checked against the GRCh38 sequence) so a position match finds it without the indel window. Source said: 133255670 GGG>GG. [jmc field=start value_sha256=011896e4c6d4 source=ensembl_variation_cache recorded=2026-09-26T20:49:36Z by=just-dna-lite phenotype-caller pilot]",
+      "human_reviewed": false,
+      "outranks": {
+        "start": "Same one-base deletion in a GGG run; authored in the left-normalized spelling a VCF caller writes (anchor C at 133255669, checked against the GRCh38 sequence) so a position match finds it without the indel window. Source said: 133255670 GGG>GG."
+      }
+    },
+    {
+      "variant_key": "rs8176719",
+      "rationale": "dbSNP, gnomAD and a DRAGEN callset place the ABO c.261delG insertion at 133257521 T>TC; GRCh38 has G at 520 and T at 521, so 520 G>GC is a different event (gnomAD AF about 6e-7). Resolving through Ensembl would match no real sample. Filed upstream as a consumer note. Source said: 133257520 G>GC. [jmc field=start value_sha256=3ecdb444b967 source=ensembl_variation_cache recorded=2026-09-26T20:49:36Z by=just-dna-lite phenotype-caller pilot]",
+      "human_reviewed": false,
+      "outranks": {
+        "start": "dbSNP, gnomAD and a DRAGEN callset place the ABO c.261delG insertion at 133257521 T>TC; GRCh38 has G at 520 and T at 521, so 520 G>GC is a different event (gnomAD AF about 6e-7). Resolving through Ensembl would match no real sample. Filed upstream as a consumer note. Source said: 133257520 G>GC."
+      }
+    }
+  ]
+}
