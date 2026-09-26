@@ -518,7 +518,9 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 `PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`
 itself. Genome build: `GRCh38`/`T2T-CHM13v2.0` → `GRCh38`; `GRCh37`/`hg19` → `GRCh37`. Only GRCh38 is
-fully supported.
+fully supported. A GRCh37 sample scores against the PGS Catalog's **harmonized** scoring files for that
+build; the VCF itself is never lifted over. `just_prs.liftover` is not a VCF liftover and cannot be
+reused for annotation.
 
 - **Genotypes**: `initialize_prs_for_file(parquet_path, genome_build)` calls
   `set_prs_genotypes_lf(pl.scan_parquet(path))`. Normalized parquets keep polars-bio `start`; just-prs wants `pos`. Always go through
@@ -561,7 +563,9 @@ fully supported.
 
 - User docs: images on top, caveats after Quick Start, short jargon-free intros; details go in `docs/`.
 - Natural prose: no em-dashes, filler transitions or marketing voice. Never invent documentation.
-- Don't overpromise: GRCh37, T2T, microarray/23andMe and ROGEN results are planned, not done. The tool
+- Don't overpromise: GRCh37, T2T, microarray/23andMe and ROGEN results are planned, not done. GRCh37
+  is "done, not done": PRS works through the Catalog's per-build harmonized scores, but annotation is
+  GRCh38-only because no VCF liftover exists. Never write "liftover support added". The tool
   annotates an existing VCF by joining it against module databases; it does not call variants or draw
   gene-disease inferences (bioRxiv/medRxiv rejected the preprint on that point; it is on arXiv, framed
   as a methods/software paper).
