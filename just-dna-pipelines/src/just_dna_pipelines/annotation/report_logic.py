@@ -1499,6 +1499,13 @@ def generate_longevity_report(
         module_exclusions = build_module_exclusions(manifest)
         lead_tables = {name: m.lead_table for name, m in module_outputs.items()}
 
+        # Phenotype modules are a separate engine path with no weights parquet, so they never enter
+        # `available_modules` (the variant loop below is untouched by them). Build their section here so
+        # their names can reach `reported_modules` too — a single-module APOE run must take APOE's own
+        # report title and filename stem, not the generic multi-module heading.
+        phenotype_modules = build_phenotype_report_data(manifest, modules_dir)
+        phenotype_names = [entry["module_name"] for entry in phenotype_modules]
+
         # Find available parquet files
         available_modules: list[str] = []
         if module_names:
@@ -1525,6 +1532,9 @@ def generate_longevity_report(
         # "Modules not read", and a single-module run that was skipped must not fall back to the
         # generic multi-module heading as though nothing had been selected.
         reported_modules = list(available_modules)
+        for name in phenotype_names:
+            if name not in reported_modules:
+                reported_modules.append(name)
         for excluded in module_exclusions:
             if excluded["name"] not in reported_modules:
                 reported_modules.append(excluded["name"])
@@ -1556,13 +1566,8 @@ def generate_longevity_report(
                 mod_data["display_name"] = display_name
                 other_modules_data.append(mod_data)
 
-        # Phenotype modules are a separate engine path with no weights parquet, so they never enter
-        # `available_modules` (the variant loop above is untouched by them). Build their section
-        # separately and name them in the provenance table too, so a saved report ties a phenotype
+        # Phenotype modules are named in the provenance table too, so a saved report ties a phenotype
         # call to the module bytes behind it exactly as a variant module.
-        phenotype_modules = build_phenotype_report_data(manifest, modules_dir)
-        phenotype_names = [entry["module_name"] for entry in phenotype_modules]
-
         credits = build_report_credits(available_modules, module_infos)
         module_provenance = build_module_provenance(
             available_modules + phenotype_names, module_outputs, module_infos
