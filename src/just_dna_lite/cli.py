@@ -20,6 +20,7 @@ from just_dna_lite.process import (
     dg_dev_argv,
     find_port_listeners,
     install_launcher_signal_handlers,
+    lite_mcp_http_argv,
     process_name,
     reap_dagster_instance,
     reap_webui_leftovers,
@@ -45,6 +46,8 @@ from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_pipelines.enricher_cli import enricher_app
+from just_dna_pipelines.lite_mcp.server import DEFAULT_HTTP_PORT as DEFAULT_MCP_PORT
+from just_dna_pipelines.lite_mcp.server import serve as mcp_serve
 from just_dna_pipelines.runtime import load_env
 from just_dna_enricher.caches import CACHE_LANES, prepare_caches
 from just_dna_registry.client_cli import app as registry_client_app
@@ -76,6 +79,9 @@ app.add_typer(registry_client_app, name="registry")
 
 # Same callback as ``uv run annotate``; discovery stays inside the command body.
 app.command("annotate")(annotate_cmd)
+# The MCP server (samples, modules, annotation jobs, validation). stdio by default, which is what an
+# MCP client launches: `claude mcp add just-dna-lite -- uv run --project <checkout> pipelines mcp`.
+app.command("mcp")(mcp_serve)
 
 
 @app.command("list-modules")
@@ -297,6 +303,31 @@ def start_dagster(
         raise typer.Exit(exit_code)
 
 
+def _start_lite_mcp_http(child_processes: list[subprocess.Popen], root: Path) -> Optional[str]:
+    """Serve the MCP server over HTTP beside the UI; returns its URL, or None when not started.
+
+    Off with ``JUST_DNA_MCP_HTTP=false``. A port that is already listening is left alone rather than
+    killed: it is most likely this stack's MCP server from another terminal, and the stdio transport
+    works without it anyway.
+    """
+    if os.getenv("JUST_DNA_MCP_HTTP", "true").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    host = os.getenv("JUST_DNA_MCP_HOST", "127.0.0.1")
+    port = int(os.getenv("JUST_DNA_MCP_PORT", str(DEFAULT_MCP_PORT)))
+    if find_port_listeners(port):
+        typer.secho(
+            f"MCP port {port} is already in use; not starting the MCP HTTP server "
+            "(set JUST_DNA_MCP_PORT to use another).",
+            fg=typer.colors.YELLOW,
+        )
+        return None
+    typer.secho("🔌 Starting just-dna-lite MCP server (HTTP)...", fg=typer.colors.BRIGHT_CYAN)
+    child_processes.append(
+        subprocess.Popen(lite_mcp_http_argv(host, port), cwd=root, **detached_popen_kwargs())
+    )
+    return f"http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}/mcp"
+
+
 @app.command("start")
 def start_all(
     granian: Annotated[
@@ -415,6 +446,8 @@ def start_all(
         # Give it a moment to initialize
         time.sleep(2)
 
+        mcp_url = _start_lite_mcp_http(child_processes, root)
+
         # 2. Start Dagster as the foreground child. The root launcher owns shutdown
         # ordering so child processes can flush and exit before the root exits.
         typer.secho(f"🧬 Starting Dagster Pipelines for {dagster_file}...", fg=typer.colors.BRIGHT_BLUE)
@@ -429,6 +462,8 @@ def start_all(
         typer.echo("  • Web UI:       http://localhost:3000 (use the URL Reflex prints if 3000 is taken)")
         typer.echo(f"  • Pipelines UI: http://localhost:{resolved_dagster_port} (Dagster Dashboard)")
         typer.echo("  • Backend API:  http://localhost:8000+ (Reflex Internal, auto-selected)")
+        if mcp_url:
+            typer.echo(f"  • MCP server:   {mcp_url} (claude mcp add --transport http just-dna-lite {mcp_url})")
         typer.echo("═" * 65 + "\n")
 
         # Clean up orphaned STARTED runs from previous session

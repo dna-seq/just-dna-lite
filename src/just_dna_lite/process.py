@@ -37,6 +37,7 @@ _IS_WINDOWS = sys.platform == "win32"
 # one kills the stack. The interpreter itself is the one binary every hop already depends on.
 DG_MODULE = "just_dna_lite.dg"
 WEBUI_RUN_MODULE = "webui.run"
+LITE_MCP_MODULE = "just_dna_pipelines.lite_mcp"
 
 DAGSTER_CMDLINE_MARKERS: tuple[str, ...] = (
     "dagster._daemon",
@@ -77,6 +78,11 @@ def dg_dev_argv(dagster_file: Path, port: int, host: str) -> list[str]:
 def webui_dev_argv() -> list[str]:
     """argv for the Reflex dev UI (``webui.run:main``), without the ``run`` wrapper."""
     return python_module_argv(WEBUI_RUN_MODULE)
+
+
+def lite_mcp_http_argv(host: str, port: int) -> list[str]:
+    """argv for the just-dna-lite MCP server over streamable HTTP (``/mcp`` on *host*:*port*)."""
+    return python_module_argv(LITE_MCP_MODULE, "--transport", "http", "--host", host, "--port", str(port))
 
 
 def detached_popen_kwargs() -> dict[str, object]:

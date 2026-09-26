@@ -104,6 +104,32 @@ get generated defaults.
 - Key files: `module_config.py` (models, loader, helpers), `annotation/hf_modules.py` (discovery,
   `MODULE_INFOS`, `DISCOVERED_MODULES`).
 
+## MCP server (`just_dna_pipelines.lite_mcp`)
+
+`uv run pipelines mcp` (stdio) and `uv run pipelines mcp --transport http` expose samples, modules,
+trial installs, background annotation jobs, results and module validation to MCP clients. `uv run
+start` also serves HTTP on `JUST_DNA_MCP_PORT` (default 3006) unless `JUST_DNA_MCP_HTTP=false`.
+Full reference: **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)**. Rules that keep it working:
+
+- **No tool does annotation work in-process.** `start_annotation` writes
+  `data/interim/lite_mcp/jobs/<id>/job.json` and spawns `python -m just_dna_pipelines.lite_mcp.worker`
+  (never a fork, never a console-script wrapper); the worker owns `job.json` from then on, and the
+  server records the pid in `worker.pid` rather than rewriting it. State lives on disk so a stdio
+  server restarted by the next client session can still report on an earlier job.
+- **`annotation_runner.run_annotation` is the one path for a sample's run**, shared by `uv run
+  annotate` and the worker. It picks `annotate_modules_and_report_job` (no normalization) when
+  `normalized_parquet_is_current` says the parquet matches the quality-filter hash in force, else
+  `annotate_and_report_job`. Config for a job must only name assets in its selection;
+  `test_the_runner_config_validates_against_the_job_it_is_for` fences that for all three jobs.
+  `webui.state._normalize_run_config_if_stale` still carries its own copy of the staleness test.
+- **`install_module` copies, never recompiles or symlinks,** and only replaces what its own ledger
+  (`data/interim/lite_mcp/installs.json`) says it installed: a registry install under the same name
+  is refused, as is a name another source already supplies (discovery would shadow it).
+- **Validation reads presence from `user_vcf_normalized.parquet` and matches from the job's own
+  snapshot** of `{module}_weights.parquet` (`jobs/<id>/results/<user>__<sample>/`). In a run's
+  output the module's rsID is `rsid_{module}`; plain `rsid` is the VCF's ID cell, often empty.
+- **Findings stay three-valued**: `not_assessed` when a check could not run, never silence.
+
 ## Shared format libraries
 
 The module schema, compiler and enricher are published libraries shared with `just-dna-marketplace` and

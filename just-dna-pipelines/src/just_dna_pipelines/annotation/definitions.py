@@ -90,6 +90,19 @@ annotate_and_report_job = define_asset_job(
     hooks={resource_summary_hook},
 )
 
+# Annotate + report against an already-normalized parquet. `user_vcf_normalized` is not in the
+# selection, so the IO manager hands the existing `user_vcf_normalized.parquet` to the module
+# annotation asset instead of re-reading the whole VCF. Only valid when that parquet is current for
+# the quality filters in force — `annotation_runner.normalized_parquet_is_current` decides, and the
+# runner falls back to `annotate_and_report_job` when it is not.
+annotate_modules_and_report_job = define_asset_job(
+    name="annotate_modules_and_report_job",
+    selection=AssetSelection.assets("user_hf_module_annotations", "user_longevity_report"),
+    description="Annotate an already-normalized VCF with modules and generate the report (no re-normalization).",
+    tags={"annotation": "hf_modules", "report": "longevity", "multi-user": "true"},
+    hooks={resource_summary_hook},
+)
+
 # Job for full pipeline with Ensembl: normalize + HF modules + Ensembl DuckDB + report
 annotate_all_job = define_asset_job(
     name="annotate_all_job",
@@ -158,7 +171,14 @@ def _build_definitions() -> Definitions:
     # 4. Report generation and VCF export assets (depend on module annotation outputs)
     _reports = Definitions(
         assets=[user_longevity_report, user_vcf_exports],
-        jobs=[generate_longevity_report_job, export_vcf_job, annotate_and_report_job, annotate_all_job, annotate_ensembl_only_job],
+        jobs=[
+            generate_longevity_report_job,
+            export_vcf_job,
+            annotate_and_report_job,
+            annotate_modules_and_report_job,
+            annotate_all_job,
+            annotate_ensembl_only_job,
+        ],
     )
     
     # 5. Discover and merge module definitions from data/modules/

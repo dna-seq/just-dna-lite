@@ -15,12 +15,14 @@ import typer
 from dagster import DagsterInstance
 from rich.console import Console
 
-from just_dna_pipelines.annotation.assets import user_vcf_partitions
-from just_dna_pipelines.annotation.hf_modules import AnnotationManifest
+from just_dna_pipelines.annotation.annotation_runner import (
+    AnnotationOutcome,
+    AnnotationRequest,
+    ensure_dagster_home,
+    run_annotation,
+)
 from just_dna_pipelines.annotation.resources import (
     ensure_vcf_in_user_input_dir,
-    get_user_output_dir,
-    get_workspace_root,
     list_default_sample_alias_map,
     resolve_default_sample,
 )
@@ -30,31 +32,7 @@ from just_dna_pipelines.urls import resolve_dagster_web_public_url
 
 console = Console()
 
-DEFAULT_DAGSTER_HOME = "data/interim/dagster"
 DEFAULT_USER = "local"
-
-
-def _ensure_dagster_home() -> Path:
-    """Resolve and export ``DAGSTER_HOME`` the same way other pipeline CLIs do."""
-    root = get_workspace_root()
-    configured = os.getenv("DAGSTER_HOME", DEFAULT_DAGSTER_HOME)
-    dagster_home = Path(configured)
-    if not dagster_home.is_absolute():
-        dagster_home = (root / dagster_home).resolve()
-    dagster_home.mkdir(parents=True, exist_ok=True)
-    (dagster_home / "logs").mkdir(parents=True, exist_ok=True)
-    os.environ["DAGSTER_HOME"] = str(dagster_home)
-    return dagster_home
-
-
-def _sample_name_from_vcf(vcf_path: Path) -> str:
-    """Match partition discovery: strip ``.vcf`` / ``.vcf.gz`` from the filename."""
-    name = vcf_path.name
-    if name.endswith(".vcf.gz"):
-        return name[: -len(".vcf.gz")]
-    if name.endswith(".vcf"):
-        return name[: -len(".vcf")]
-    return vcf_path.stem
 
 
 def _resolve_modules(
@@ -246,7 +224,7 @@ def annotate(
     from just_dna_pipelines.annotation.hf_modules import DISCOVERED_MODULES
 
     load_env()
-    _ensure_dagster_home()
+    ensure_dagster_home()
 
     modules_to_use = _resolve_modules(
         modules=module or [],
@@ -256,73 +234,27 @@ def annotate(
 
     user_name = user.strip() or DEFAULT_USER
     placed_vcf, sample_meta = _resolve_vcf_target(vcf, user_name)
-    sample_name = _sample_name_from_vcf(placed_vcf)
-    partition_key = f"{user_name}/{sample_name}"
 
     resolved_sex = sex if sex is not None else sample_meta.get("sex") or None
     if resolved_sex in ("", "N/A"):
         resolved_sex = None
-    resolved_reference = (
-        reference_genome
-        or sample_meta.get("reference_genome")
-        or "GRCh38"
+    request = AnnotationRequest(
+        vcf_path=placed_vcf,
+        user_name=user_name,
+        modules=modules_to_use,
+        ensembl=ensembl,
+        sex=resolved_sex,
+        reference_genome=reference_genome or sample_meta.get("reference_genome") or "GRCh38",
+        species=sample_meta.get("species") or "Homo sapiens",
+        subject_id=sample_meta.get("subject_id") or None,
+        source_tag="cli",
     )
-    resolved_species = sample_meta.get("species") or "Homo sapiens"
-    subject_id = sample_meta.get("subject_id") or None
-
-    job_name = "annotate_all_job" if ensembl else "annotate_and_report_job"
-
-    normalize_config: dict[str, Any] = {
-        "vcf_path": str(placed_vcf),
-    }
-    if resolved_sex:
-        normalize_config["sex"] = resolved_sex
-
-    hf_config: dict[str, Any] = {
-        "vcf_path": str(placed_vcf),
-        "user_name": user_name,
-        "sample_name": sample_name,
-        "modules": modules_to_use,
-        "species": resolved_species,
-        "reference_genome": resolved_reference,
-        "sex": resolved_sex,
-    }
-    if subject_id:
-        hf_config["subject_id"] = subject_id
-
-    ops_config: dict[str, Any] = {
-        "user_vcf_normalized": {
-            "config": normalize_config,
-        },
-        "user_hf_module_annotations": {
-            "config": hf_config,
-        },
-        "user_longevity_report": {
-            "config": {
-                "user_name": user_name,
-                "sample_name": sample_name,
-                "modules": modules_to_use,
-            }
-        },
-    }
-
-    if ensembl:
-        ops_config["user_annotated_vcf_duckdb"] = {
-            "config": {
-                "vcf_path": str(placed_vcf),
-                "user_name": user_name,
-                "sample_name": sample_name,
-            }
-        }
-
-    run_config: dict[str, Any] = {"ops": ops_config}
 
     console.print("\n[bold]Annotation run[/bold]")
     if sample_meta.get("label"):
         console.print(f"  Sample:    {sample_meta['label']}")
     console.print(f"  VCF:       {placed_vcf}")
-    console.print(f"  Partition: {partition_key}")
-    console.print(f"  Job:       {job_name}")
+    console.print(f"  Partition: {request.partition_key}")
     console.print(f"  Modules:   {', '.join(modules_to_use)}")
     console.print(f"  Dagster:   {os.environ['DAGSTER_HOME']}")
     console.print(
@@ -330,64 +262,45 @@ def annotate(
         "(start with [cyan]uv run dagster-ui[/cyan] in another terminal)\n"
     )
 
-    instance = DagsterInstance.get()
-    existing = instance.get_dynamic_partitions(user_vcf_partitions.name)
-    if partition_key not in existing:
-        instance.add_dynamic_partitions(user_vcf_partitions.name, [partition_key])
-        console.print(f"[dim]Registered partition {partition_key}[/dim]")
-
-    job_def = defs.resolve_job_def(job_name)
-    result = job_def.execute_in_process(
-        run_config=run_config,
-        instance=instance,
-        tags={
-            "dagster/partition": partition_key,
-            "source": "cli",
-        },
+    outcome = run_annotation(request, DagsterInstance.get(), defs)
+    console.print(
+        f"  Job:       {outcome.job_name}"
+        + (" (normalized parquet reused)" if outcome.normalized_reused else "")
     )
 
-    if not result.success:
+    if not outcome.success:
         console.print(
-            f"[bold red]Annotation failed[/bold red] (run_id={result.run_id})"
+            f"[bold red]Annotation failed[/bold red] (run_id={outcome.run_id})"
         )
+        if outcome.error:
+            console.print(f"  {outcome.error}")
         raise typer.Exit(1)
 
-    sample_out = get_user_output_dir() / partition_key
-    modules_dir = sample_out / "modules"
-    reports_dir = sample_out / "reports"
-    report_files = sorted(reports_dir.glob("*.html")) if reports_dir.exists() else []
-
-    console.print(f"\n[bold green]Annotation complete[/bold green] (run_id={result.run_id})")
-    console.print(f"  Modules: {modules_dir}")
-    if report_files:
-        latest_report = max(report_files, key=lambda path: path.stat().st_mtime)
-        console.print(f"  Report:  {latest_report}")
+    console.print(f"\n[bold green]Annotation complete[/bold green] (run_id={outcome.run_id})")
+    console.print(f"  Modules: {outcome.modules_dir}")
+    if outcome.report_path:
+        console.print(f"  Report:  {outcome.report_path}")
     else:
-        console.print(f"  Reports: {reports_dir} (no HTML report found yet)")
+        console.print(f"  Reports: {Path(outcome.sample_output_dir) / 'reports'} (no HTML report found yet)")
 
-    _report_module_outcomes(modules_dir / "manifest.json")
+    _report_module_outcomes(outcome)
     console.print()
 
 
-def _report_module_outcomes(manifest_path: Path) -> None:
-    """Say what each requested module actually did, reading the run's manifest.
+def _report_module_outcomes(outcome: AnnotationOutcome) -> None:
+    """Say what each requested module actually did, from the run's manifest.
 
     A module that produced nothing is a result too. The job succeeds when a module is skipped
     (an unsupported lead-table family) or fails on its own, so without this the only trace is an
     absence from the output directory — the user is told "Annotation complete" and left to notice
     that a module they asked for is simply not there.
-
-    Best-effort: a missing or unreadable manifest is not worth failing a completed run over, since
-    the annotation outputs themselves are already on disk.
     """
-    if not manifest_path.exists():
-        return
-    manifest = AnnotationManifest.model_validate_json(manifest_path.read_text())
-    for name, reason in manifest.skipped_modules.items():
+    for name, reason in outcome.skipped_modules.items():
         console.print(f"  [yellow]Skipped[/yellow] {name}: {reason}")
-    for name, reason in manifest.failed_modules.items():
+    for name, reason in outcome.failed_modules.items():
         console.print(f"  [red]Failed[/red] {name}: {reason}")
-    console.print(f"  Variants annotated: {manifest.total_variants_annotated}")
+    if outcome.total_variants_annotated is not None:
+        console.print(f"  Variants annotated: {outcome.total_variants_annotated}")
 
 
 def annotate_main() -> None:

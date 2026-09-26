@@ -23,7 +23,7 @@ import just_dna_lite.cli
 import just_dna_lite.process
 import webui.run
 from just_dna_lite.cli import app as pipelines_app
-from just_dna_lite.process import dg_dev_argv, webui_dev_argv
+from just_dna_lite.process import dg_dev_argv, lite_mcp_http_argv, webui_dev_argv
 from just_dna_pipelines import enricher_cli
 from just_dna_pipelines.cli import app as shadowed_pipelines_app
 
@@ -31,7 +31,7 @@ from just_dna_pipelines.cli import app as shadowed_pipelines_app
 def test_the_installed_pipelines_entrypoint_answers_help() -> None:
     result = CliRunner().invoke(pipelines_app, ["--help"])
     assert result.exit_code == 0, result.output
-    for command in ("annotate", "module", "enrich", "registry", "prepare-caches"):
+    for command in ("annotate", "module", "enrich", "registry", "prepare-caches", "mcp"):
         assert command in result.output, command
 
 
@@ -63,7 +63,11 @@ def test_launcher_children_never_start_through_a_console_script_wrapper() -> Non
     which locked-down Windows laptops (AppLocker, Smart App Control) refuse to run. A user reported
     exactly that for `start.exe`; `run.exe` and `dg.exe` sat behind it on the same path.
     """
-    for argv in (webui_dev_argv(), dg_dev_argv(Path("definitions.py"), 3005, "127.0.0.1")):
+    for argv in (
+        webui_dev_argv(),
+        dg_dev_argv(Path("definitions.py"), 3005, "127.0.0.1"),
+        lite_mcp_http_argv("127.0.0.1", 3006),
+    ):
         assert argv[:2] == [sys.executable, "-m"], argv
         assert importlib.util.find_spec(argv[2]) is not None, argv[2]
 
@@ -73,8 +77,9 @@ def test_launcher_children_never_start_through_a_console_script_wrapper() -> Non
     [
         ["just_dna_lite.dg", "dev", "--help"],
         ["just_dna_lite.cli", "start", "--help"],
+        ["just_dna_pipelines.lite_mcp", "--help"],
     ],
-    ids=["dg-shim", "start-without-wrapper"],
+    ids=["dg-shim", "start-without-wrapper", "mcp-server"],
 )
 def test_the_wrapperless_entry_modules_answer_help(module_args: list[str]) -> None:
     """The `python -m` forms the launchers and the Windows `.bat` rely on really run."""
