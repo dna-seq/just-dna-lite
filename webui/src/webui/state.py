@@ -2384,6 +2384,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             for f in output_dir.glob("*.parquet"):
                 if "_weights" in f.name:
                     file_type = "weights"
+                elif "_phenotypes" in f.name:
+                    # A compound-phenotype module's calls (one row per gene), written by the
+                    # diplotype caller instead of a weights parquet.
+                    file_type = "phenotypes"
                 elif "_annotations" in f.name:
                     file_type = "annotations"
                 elif "_studies" in f.name:
@@ -2391,7 +2395,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 else:
                     file_type = "data"
                 
-                module = f.stem.replace("_weights", "").replace("_annotations", "").replace("_studies", "")
+                module = (
+                    f.stem.replace("_weights", "").replace("_phenotypes", "")
+                    .replace("_annotations", "").replace("_studies", "")
+                )
                 
                 run_id = annotations_mat.get("run_id", "")
                 files.append({
@@ -2581,7 +2588,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             if (
                 file_info.get("run_id") == run_id
                 and file_info.get("module") in modules
-                and file_info.get("type") in {"annotations", "data", "weights"}
+                and file_info.get("type") in {"annotations", "data", "weights", "phenotypes"}
             ):
                 return str(file_info.get("path") or "")
         return ""

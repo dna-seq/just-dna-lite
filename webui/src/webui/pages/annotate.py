@@ -1441,6 +1441,7 @@ def file_type_icon(file_type: rx.Var[str]) -> rx.Component:
         ("weights", fomantic_icon("scale", size=22, color="#2185d0")),
         ("annotations", fomantic_icon("file-text", size=22, color="#21ba45")),
         ("studies", fomantic_icon("book-open", size=22, color="#00b5ad")),
+        ("phenotypes", fomantic_icon("boxes", size=22, color="#a333c8")),
         ("vcf_export", fomantic_icon("dna", size=22, color="#6435c9")),
         fomantic_icon("file", size=22, color="#767676"),
     )
@@ -1453,6 +1454,7 @@ def file_type_label(file_type: rx.Var[str]) -> rx.Component:
         ("weights", rx.el.span("weights", class_name="ui blue label")),
         ("annotations", rx.el.span("annotations", class_name="ui green label")),
         ("studies", rx.el.span("studies", class_name="ui teal label")),
+        ("phenotypes", rx.el.span("phenotypes", class_name="ui purple label")),
         ("vcf_export", rx.el.span("vcf", class_name="ui violet label")),
         rx.el.span(file_type, class_name="ui grey label"),
     )
