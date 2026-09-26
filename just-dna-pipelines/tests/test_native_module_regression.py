@@ -76,6 +76,54 @@ class TestModuleKindIsPure:
         assert module_kind(info) == "variant"
 
 
+class TestAnnotationIsDeterministic:
+    """The streaming sink emitted a different multiset each run until a sort barrier was added."""
+
+    @pytest.mark.integration
+    def test_a_native_module_annotates_identically_across_runs(self, tmp_path) -> None:
+        """Two identical runs of a poly-effect module on one genome must produce the same rows.
+
+        `longevitymap` fans 520 positions into 1039 weight rows; before the sort-before-sink barrier
+        the streaming left join emitted a different multiset of `qual`/`conclusion` values (and a
+        different report) each run. Skips where the sample is not on this machine.
+        """
+        import hashlib
+        import io
+        import logging
+
+        from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
+        from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_all_modules
+        from just_dna_pipelines.annotation.resources import get_user_output_dir
+        from just_dna_pipelines.runtime import load_env
+
+        load_env()
+        normalized = get_user_output_dir() / "anonymous/antonkulaga/user_vcf_normalized.parquet"
+        if not normalized.exists() or "longevitymap" not in MODULE_INFOS:
+            pytest.skip("antonkulaga sample / longevitymap not present on this machine")
+
+        def run(tag: str) -> str:
+            out = tmp_path / tag
+            cfg = HfModuleAnnotationConfig(
+                vcf_path=str(normalized), user_name="d", modules=["longevitymap"], output_dir=str(out)
+            )
+            annotate_vcf_with_all_modules(
+                logging.getLogger("d"), normalized, cfg, "d", "anton", normalized
+            )
+            df = pl.read_parquet(out / "longevitymap_weights.parquet")
+            casts = [
+                pl.col(n).list.eval(pl.element().cast(pl.Utf8, strict=False)).list.join(",").alias(n)
+                for n, t in df.schema.items()
+                if isinstance(t, pl.List)
+            ]
+            df = df.with_columns(casts) if casts else df
+            df = df.sort(df.columns)
+            buf = io.BytesIO()
+            df.write_ipc(buf, compression="uncompressed")
+            return hashlib.sha256(buf.getvalue()).hexdigest()
+
+        assert run("a") == run("b")
+
+
 class TestCompiledFixtureIsDiscoveredAsPhenotype:
     """End to end over the fsspec probe: a real 0.7 artifact wires the tables and classifies right."""
 

@@ -522,6 +522,28 @@ def annotate_vcf_with_module_weights(
                     **restoration_stats,
                 )
 
+        # A total-order sort before the streaming sink, for determinism. `sink_parquet` runs the
+        # streaming engine, which emits a left join's rows in a **non-deterministic multiset** — two
+        # identical runs of `longevitymap` on one genome produced different `qual`/`conclusion`
+        # multisets and a different rendered report each time, because a poly-effect module fans one
+        # position into several rows and the streaming join's morsel emission is not stable. A sort is
+        # a pipeline barrier: it forces the join to complete before emitting, which both stabilises the
+        # multiset and gives the report a deterministic row order — without materialising the frame
+        # into memory the way `collect()` would (the point of streaming for a large module). `genotype`
+        # is a List, so it is stringified into a throwaway key for the sort; every other key is used
+        # only where the column is present (the rsid- and position-join paths carry different columns).
+        sort_keys = ["chrom", "start", "_genotype_sort_key"]
+        for optional in ("variant_key", "weight", "conclusion", "priority", EVIDENCE_COLUMN):
+            if optional in annotated_lf.collect_schema().names():
+                sort_keys.append(optional)
+        annotated_lf = (
+            annotated_lf.with_columns(
+                pl.col("genotype").list.join("/").alias("_genotype_sort_key")
+            )
+            .sort(sort_keys, nulls_last=True)
+            .drop("_genotype_sort_key")
+        )
+
         # Write to parquet using streaming
         output_path.parent.mkdir(parents=True, exist_ok=True)
         annotated_lf.sink_parquet(output_path, compression=compression)

@@ -379,10 +379,14 @@ def _with_flanking_distance(
     nearest = called.rename({"start": "_called_start"}).with_columns(
         pl.col("_called_start").alias("_asof_key")
     )
+    # `join_asof(by="chrom", ...)` requires the asof key sorted *within* each group. A global sort on
+    # the key alone happens to satisfy that, but polars cannot verify it (the "Sortedness ... cannot
+    # be checked when 'by' groups provided" warning) — so sort by `(chrom, key)` to state the
+    # invariant rather than inherit it, on both sides.
     return (
-        candidates.sort("start")
+        candidates.sort(["chrom", "start"])
         .join_asof(
-            nearest.lazy().sort("_asof_key"),
+            nearest.lazy().sort(["chrom", "_asof_key"]),
             left_on="start",
             right_on="_asof_key",
             by="chrom",
