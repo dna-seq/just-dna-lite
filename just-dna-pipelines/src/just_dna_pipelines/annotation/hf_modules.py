@@ -14,7 +14,7 @@ from typing import Optional
 import polars as pl
 from eliot import log_message
 from just_dna_format.manifest import ModuleManifest, read_manifest
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from just_dna_pipelines.annotation.module_cache import (
     invalidate_module_cache_on_version_change,
@@ -92,6 +92,12 @@ class ModuleInfo(BaseModel):
     manifest_version: Optional[str] = None
     manifest_digest: Optional[str] = None
     manifest_weighting: Optional[str] = None
+    # The compiler's own warnings for these bytes (``manifest.compilation.warnings_summary``), kept
+    # from the manifest discovery already fetched. The phenotype report surfaces them verbatim beside
+    # a call, since a phase-ambiguity warning the compiler raised is exactly what a reader of an
+    # ``ambiguous`` diplotype needs. Empty when the source states no manifest (tri-state: not "none
+    # were raised", but "not stated").
+    manifest_compilation_warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _default_lead_to_weights(self) -> "ModuleInfo":
@@ -276,6 +282,24 @@ def _weighting_summary(manifest: "ModuleManifest") -> Optional[str]:
     return " · ".join(parts) or None
 
 
+def _compilation_warnings(manifest: "ModuleManifest") -> list[str]:
+    """The compiler's warnings for this artifact (``compilation.warnings_summary``), as a list.
+
+    ``warnings_summary`` is a human-readable roll-up the compiler writes; the phenotype report shows
+    it verbatim beside a call. Returns ``[]`` when there is no manifest or the compiler wrote none —
+    which the report keeps distinct from "not stated" by only reaching here when a manifest exists.
+    """
+    compilation = getattr(manifest, "compilation", None)
+    if compilation is None:
+        return []
+    summary = getattr(compilation, "warnings_summary", None)
+    if not summary:
+        return []
+    if isinstance(summary, str):
+        return [summary]
+    return [str(item) for item in summary]
+
+
 def _probe_module_at_path(
     fs: "AbstractFileSystem",
     base_path: str,
@@ -365,6 +389,7 @@ def _probe_module_at_path(
         manifest_version=(manifest.identity.version or None) if manifest else None,
         manifest_digest=(manifest.artifact.digest or None) if manifest and manifest.artifact else None,
         manifest_weighting=_weighting_summary(manifest) if manifest else None,
+        manifest_compilation_warnings=_compilation_warnings(manifest) if manifest else [],
     )
 
 
