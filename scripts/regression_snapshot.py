@@ -12,6 +12,13 @@ Usage::
     uv run python scripts/regression_snapshot.py snapshot --out data/interim/regression_baseline
     uv run python scripts/regression_snapshot.py compare  data/interim/regression_baseline data/interim/regression_current
 
+    # Mixed run: the same native modules with phenotype modules selected beside them, compared
+    # against a native-alone run on the same code (manifest, weights and the module's own section).
+    uv run python scripts/regression_snapshot.py snapshot --out data/interim/regression_mixed \
+        --with-module abo_phenotype --with-module fut2_secretor --with-module apoe_epsilon
+    uv run python scripts/regression_snapshot.py compare data/interim/regression_current \
+        data/interim/regression_mixed --native-only
+
 ``compare`` exits non-zero on any difference. The only difference the compound-phenotype
 change is allowed to introduce is a new, separate "Phenotypes" report section that appears
 *only* when a phenotype module is selected — which this gate never selects, so here the
@@ -33,10 +40,17 @@ import polars as pl
 import typer
 from rich.console import Console
 
-from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
-from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_all_modules
-from just_dna_pipelines.annotation.report_logic import generate_longevity_report
 from just_dna_pipelines.runtime import load_env
+
+# Discovery runs when hf_modules is imported, and it finds locally registered modules through
+# JUST_DNA_PIPELINES_OUTPUT_DIR. Loading .env after the imports below left every local module
+# undiscovered, and the engine drops a module name it does not know without an error.
+load_env()
+
+from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig  # noqa: E402
+from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_all_modules  # noqa: E402
+from just_dna_pipelines.annotation.hf_modules import MODULE_INFOS  # noqa: E402
+from just_dna_pipelines.annotation.report_logic import generate_longevity_report  # noqa: E402
 
 console = Console()
 app = typer.Typer(add_completion=False, help=__doc__)
@@ -134,21 +148,48 @@ _ABS_PATH = re.compile(r"/[\w./-]+/(?:modules|reports)/[\w./-]+")
 _PREVIEW_ROW = re.compile(r"data-preview-row")
 
 
-def _report_signature(report_path: Optional[Path]) -> dict:
+def _native_section(html: str, module: str) -> Optional[str]:
+    """The module's own report section: ``#variants`` for longevitymap, ``#module-<name>`` otherwise.
+
+    This is the part of the report a companion module in the same run must not touch. The rest of
+    the page (title, TOC, provenance table) legitimately changes when a second module is selected.
+    """
+    anchor = 'id="variants"' if module == "longevitymap" else f'id="module-{module}"'
+    start = html.find(anchor)
+    if start < 0:
+        return None
+    return html[start:html.index("</section>", start)]
+
+
+def _report_signature(report_path: Optional[Path], module: str) -> dict:
     if report_path is None or not report_path.exists():
         return {"exists": False}
     html = report_path.read_text()
     normalized = _ISO_TS.sub("<TS>", html)
     normalized = _ABS_PATH.sub("<PATH>", normalized)
+    section = _native_section(normalized, module)
     return {
         "exists": True,
         "preview_row_count": len(_PREVIEW_ROW.findall(html)),
         "html_sha256": hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+        "native_section_sha256": (
+            hashlib.sha256(section.encode("utf-8")).hexdigest() if section is not None else None
+        ),
     }
 
 
-def _run_one(sample: str, module: str, user: str, work_root: Path) -> dict:
-    """Annotate one sample with one module into a scratch dir and snapshot the result."""
+def _run_one(
+    sample: str, module: str, user: str, work_root: Path, companions: Optional[list[str]] = None
+) -> dict:
+    """Annotate one sample with one module into a scratch dir and snapshot the result.
+
+    ``companions`` are annotated in the *same* run (the mixed-run check: a phenotype module beside a
+    native one must not change the native module's parquet, manifest counts or report section).
+    """
+    selected = [module, *(companions or [])]
+    unknown = [name for name in selected if name not in MODULE_INFOS]
+    if unknown:
+        return {"sample": sample, "module": module, "error": f"modules not discovered: {unknown}"}
     normalized = _normalized_parquet(sample, user)
     if not normalized.exists():
         return {"sample": sample, "module": module, "error": f"no normalized parquet: {normalized}"}
@@ -165,7 +206,7 @@ def _run_one(sample: str, module: str, user: str, work_root: Path) -> dict:
     config = HfModuleAnnotationConfig(
         vcf_path=str(normalized),
         user_name=user,
-        modules=[module],
+        modules=selected,
         output_dir=str(modules_dir),
     )
     annotate_vcf_with_all_modules(
@@ -183,7 +224,7 @@ def _run_one(sample: str, module: str, user: str, work_root: Path) -> dict:
     generate_longevity_report(
         modules_dir=modules_dir,
         output_path=reports_dir / "report.html",
-        module_names=[module],
+        module_names=selected,
         user_name=user,
         sample_name=sample,
     )
@@ -196,7 +237,7 @@ def _run_one(sample: str, module: str, user: str, work_root: Path) -> dict:
         "module": module,
         "manifest": _manifest_signature(modules_dir, module),
         "weights": _weights_signature(modules_dir / f"{module}_weights.parquet"),
-        "report": _report_signature(report_path),
+        "report": _report_signature(report_path, module),
     }
 
 
@@ -209,9 +250,12 @@ def snapshot(
         Optional[Path],
         typer.Option(help="Scratch dir for annotation outputs (default: <out>/_work)."),
     ] = None,
+    with_module: Annotated[
+        Optional[list[str]],
+        typer.Option(help="Also annotate this module in every run (repeatable); for the mixed-run check."),
+    ] = None,
 ) -> None:
     """Run every (sample, module) pair and write one JSON signature each."""
-    load_env()
     out.mkdir(parents=True, exist_ok=True)
     work_root = work or (out / "_work")
     work_root.mkdir(parents=True, exist_ok=True)
@@ -221,7 +265,7 @@ def snapshot(
     for sample in sample_list:
         for module in GATE_MODULES:
             console.print(f"[cyan]snapshot[/cyan] {sample} × {module}")
-            sig = _run_one(sample, module, user, work_root)
+            sig = _run_one(sample, module, user, work_root, with_module)
             target = out / f"{sample}__{module}.json"
             target.write_text(json.dumps(sig, indent=2, sort_keys=True))
             written += 1
@@ -234,6 +278,13 @@ def snapshot(
 def compare(
     baseline: Annotated[Path, typer.Argument(help="Baseline snapshot directory.")],
     current: Annotated[Path, typer.Argument(help="Current snapshot directory.")],
+    native_only: Annotated[
+        bool,
+        typer.Option(
+            help="Compare the module's own report section instead of the whole page (for a mixed "
+            "run, whose title, TOC and provenance table name the companion modules too)."
+        ),
+    ] = False,
 ) -> None:
     """Diff two snapshot directories; exit non-zero on any difference."""
     baseline_files = {p.name for p in baseline.glob("*.json")}
@@ -250,6 +301,12 @@ def compare(
     for name in sorted(baseline_files & current_files):
         b = json.loads((baseline / name).read_text())
         c = json.loads((current / name).read_text())
+        if native_only:
+            # Both are whole-page measures: the provenance table gains one preview row per
+            # companion module. The module's own rows are covered by native_section_sha256.
+            for sig in (b, c):
+                sig.get("report", {}).pop("html_sha256", None)
+                sig.get("report", {}).pop("preview_row_count", None)
         for diff in _diff(b, c, path=name):
             problems.append(diff)
 
@@ -261,11 +318,18 @@ def compare(
     console.print(f"[bold green]IDENTICAL[/bold green] — {len(baseline_files)} snapshots match")
 
 
+# Signature keys added after a baseline may have been taken: absent from the baseline is not a
+# regression, and the next baseline records them.
+_KEYS_NEWER_THAN_BASELINES = {"native_section_sha256"}
+
+
 def _diff(b, c, path: str) -> list[str]:
     """Recursively diff two JSON-like values, yielding a message per leaf mismatch."""
     out: list[str] = []
     if isinstance(b, dict) and isinstance(c, dict):
         for key in sorted(set(b) | set(c)):
+            if key not in b and key in _KEYS_NEWER_THAN_BASELINES:
+                continue
             if key not in b:
                 out.append(f"{path}.{key}: added ({c[key]!r})")
             elif key not in c:
