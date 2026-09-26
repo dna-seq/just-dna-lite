@@ -25,8 +25,17 @@ dependencies = [
     # compiler beside a 0.7.1 enricher is a ModuleNotFoundError in a clean venv. The three floors
     # move together with the registry floor at the workspace root (`contract_compatible` treats a
     # 0.x format minor as breaking). See CLAUDE.md § "What 0.7 changed on our side".
+    # enricher 0.7.2 (2026-09-25) is an enricher-only patch cut from the 0.7 branch — format
+    # stays 0.7.0, compiler 0.7.1, and the enricher's floors are unchanged. RM254 is the S107
+    # fix we filed: the Atlas gencode's `protobuf.runtime_version.VersionError` is neither
+    # ImportError nor RuntimeError, so the RM247 guards let it through and every enricher command
+    # died at import beside dagster's `protobuf<7`. 0.7.2 binds
+    # `atlas_protos.ATLAS_IMPORT_FAILURES = (ImportError, RuntimeError, VersionError)` and moves
+    # the `protobuf>=7.35.1` floor onto the `[atlas]` extra — so the bare `just-dna-enricher` we
+    # depend on (no extra; the lock pulls no atlas/alphagenome dep) now imports cleanly, and only
+    # an install that asks for `[atlas]` fails to resolve rather than crashing at runtime.
     "just-dna-compiler>=0.7.1",
-    "just-dna-enricher>=0.7.1",
+    "just-dna-enricher>=0.7.2",
     "just-dna-format>=0.7.0",
     # agno 3.x imports the mcp 2.x names (`MCPError`, `streamable_http_client`) and `fastmcp`,
     # all declared only under its `[mcp]` extra. Depend on the extra rather than re-listing its

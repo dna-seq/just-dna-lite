@@ -2147,7 +2147,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-enricher"
-version = "0.7.1"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "duckdb" },
@@ -2161,9 +2161,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/b2/1b43c6683882307a4a2d1c99aa30d27c2d6aae3d61f8c0e2682bf56b4c2a/just_dna_enricher-0.7.1.tar.gz", hash = "sha256:9efb19178622227ae43f33b35ccf1ed2f697a0f5819b67737b509731529ff518", size = 804683, upload-time = "2026-09-21T15:10:24.541Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/eb/5bb33efb9c606852bde7ce81bfb3fe3d83028f882ff4568c399c9d6d17d3/just_dna_enricher-0.7.2.tar.gz", hash = "sha256:99033e52e9c43080de29ec054d98d292c896928fb21602103b84d385980e50d9", size = 807507, upload-time = "2026-09-25T13:50:16.96Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/2b/187081574063b7d0b4851d75c9bccfb4275703eac37e96f4f06cc01b88d2/just_dna_enricher-0.7.1-py3-none-any.whl", hash = "sha256:ca3633c8948d569e15b9d0f9383c81fe29ecaec03226fa97afd852f2c7f052cc", size = 890525, upload-time = "2026-09-21T15:10:19.805Z" },
+    { url = "https://files.pythonhosted.org/packages/21/c1/7b812414a01541bf496215f8d3983b641637533f25e13478b442ac5fe077/just_dna_enricher-0.7.2-py3-none-any.whl", hash = "sha256:4f10e5e2a3a7119bf25b92c71af7117b29f57f2e667ac7d8fec60f1106eaae2c", size = 893198, upload-time = "2026-09-25T13:50:18.605Z" },
 ]
 
 [[package]]
@@ -2281,7 +2281,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.75.0,<2.0" },
     { name = "huggingface-hub", specifier = ">=1.27.0" },
     { name = "just-dna-compiler", specifier = ">=0.7.1" },
-    { name = "just-dna-enricher", specifier = ">=0.7.1" },
+    { name = "just-dna-enricher", specifier = ">=0.7.2" },
     { name = "just-dna-format", specifier = ">=0.7.0" },
     { name = "numpy", specifier = ">=2.5.2" },
     { name = "openai", specifier = ">=3.0.0" },
