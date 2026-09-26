@@ -12,119 +12,44 @@
 
 [![Watch the tutorial: Unlocking Your DNA](https://img.youtube.com/vi/NcOiEUaIpUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=NcOiEUaIpUk)
 
-<sub><i>Research Use Only (RUO): just-dna-lite is a bioinformatics research tool for academic studies, citizen science, and educational self-exploration. It is not a medical device, not intended for clinical diagnostic use, and does not provide medical advice. The software and its modules (including AI-generated content) are provided "as is" without warranties of any kind. Our philosophy is to display everything — including PRS scores and community-generated AI modules that may attempt to predict disease probabilities — but you must never use this tool to make medical, diagnostic, or health-related decisions. Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.</i></sub>
+Upload a genome file, pick a topic, and read a report in ordinary language. The app runs on your computer. The file stays there.
 
-**Runs on your laptop.** Upload your genome file, pick what you want to know, get results in minutes. Installs in four commands, runs entirely on your machine, nothing leaves your computer.
+The topics that come with it cover longevity, heart disease, cholesterol, fitness, and clotting. You can install more from the [public catalog](https://module-registry.just-dna.life). You can also write a new topic from a paper, with an assistant, and run it on the same file. That assistant is [just-module-creator](https://github.com/dna-seq/just-module-creator).
 
-> **Just want to try it?** Jump to [Quick start](#quick-start) — you'll be up and running in under five minutes.
+Some results are one position. Others are several positions read together. A blood group is the clear case: the report gives you one result in a sentence. APOE type and a drug-response class can be written the same way. When the file cannot decide, the report says so, and names the possibilities.
 
-You have the right to look at your own genome without anyone filtering what you see. Consumer genomics tools surface findings their teams picked; clinical genomics only shows what has strong evidence and a clear path to action. This tool takes a different approach: you get access to everything — all modules, all 5,000+ PRS scores from the [PGS Catalog](https://www.pgscatalog.org/), your complete variant table cross-referenced against [Ensembl](https://www.ensembl.org/), community-built annotation modules, and an AI assistant that can turn a research paper into a new genetic module in minutes. What you do with all of that is your decision.
+Thousands of polygenic scores from the [PGS Catalog](https://www.pgscatalog.org/) sit next to those topics. A score adds up many small genetic clues and places you on a chart of reference genomes.
 
-## Genomic Annotations
+If you would rather add a topic than click through one, a module is a folder of tables. People who want to work on the app itself can start at [For contributors](#for-contributors).
 
-### Built-in Modules
+## Try it
 
-The tool ships with annotation modules for longevity, coronary artery disease, lipid metabolism, VO2 max, athletic performance. These modules were created with the expert curation of geneticist Olga Borysova and serve as a reliable starting point. The real idea, however, is that modules are easy to create and the list will grow fast.
+You need a genome file from whole-genome or whole-exome sequencing, the kind companies such as [DNA Complete](https://dnacomplete.com/), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/) let you download. Look for a file ending in `.vcf` or `.vcf.gz`. We are not affiliated with those companies.
 
-### Polygenic Risk Scores (PRS)
-
-**5,000+ Polygenic Risk Scores** from the [PGS Catalog](https://www.pgscatalog.org/) are available out of the box. Pick any score, click compute, and get your result with percentile ranking against 1000 Genomes reference populations (AFR, AMR, EAS, EUR, SAS). No command line, no scripting, just a few clicks. Under the hood, scoring runs via [just-prs](https://github.com/dna-seq/just-prs) using DuckDB (12.3× faster than PLINK2) or Polars (5.7× faster), with Pearson r = 0.9999 concordance against PLINK2 across 100 PGS IDs on a 4.66M-variant WGS. See the [full benchmark →](https://github.com/dna-seq/just-prs/blob/main/docs/benchmarks.md)
-
-### AI Module Creator
-
-Annotation modules in just-dna-lite are curated SNP filter sets containing variants, per-genotype weights, states, and literature evidence. Building these by hand is labour-intensive. To solve this, just-dna-lite includes an **AI Module Creator**—an agentic pipeline that turns arbitrary input (a research article PDF, CSV dump, or free-text description) into a valid, deployable annotation module.
-
-Got a research paper about a trait that interests you? Just upload the PDF and ask the AI to build a module. Powered by the Agno agentic framework, the tool supports Gemini, GPT, and Claude. It operates in two modes:
-
-- **Simple mode (Solo Agent)** — a single agent handles everything. It queries biomedical databases (EuropePMC, Open Targets, BioRxiv) using the BioContext MCP, extracts variants with per-genotype weights, validates the spec, and writes the module. If validation fails, the agent self-corrects and retries.
-  - *Best for:* Single well-defined papers, quick iteration, simple trait panels.
-  - *Typical runtime:* ~2 minutes for a single paper.
-
-- **Research team mode (Multi-Agent Swarm)** — a coordinated team of agents. A Principal Investigator (PI) agent dispatches up to three Researcher agents (e.g., Gemini, GPT, and Claude Sonnet) in parallel, each independently querying the literature. This model diversity reduces systematic blind spots. The PI synthesises the findings by consensus (variants need ≥2 researchers to confirm; weight disagreements use the median). A Reviewer agent then fact-checks the data via Google Search before the PI writes the final module.
-  - *Best for:* Complex topics spanning multiple papers, large variant sets, cross-model validation.
-  - *Typical runtime:* ~7–8 minutes.
-
-Both modes output a deterministic DSL specification (`module_spec.yaml` + `variants.csv` + `studies.csv`), which the compiler validates and turns into Parquet tables. The drafted module is loaded into an editing slot for your review. You can manually edit the files, iterate by sending follow-up messages to the AI in the same chat, and then register the module with one click so it becomes instantly available in your local app.
-
-[Full walkthrough with real examples and timing logs →](docs/AI_MODULE_WALKTHROUGH.md)
-
-### Self-exploration
-
-Even without a specific module, you can browse your full variant table with sorting, filtering, and search. Cross-reference against [Ensembl](https://www.ensembl.org/) for clinical significance labels. Export everything as Parquet for your own analysis in Python, R, or any tool that reads Arrow.
-
-### VCF export
-
-Annotation results are stored as Parquet for speed and columnar tooling, but you can also get **standard VCF** files. The pipeline materializes a `user_vcf_exports` asset: one VCF per selected HF module (annotations in INFO), an optional Ensembl-annotated VCF when you run Ensembl, and a **combined** VCF that merges module (and Ensembl) fields into INFO. Exports land under your sample’s `vcf_exports/` folder.
-
-In the web app, open **Outputs** → **Data Files** and use **Export VCF** to run the export job again (for example after new modules or a stale run). While the job runs, **View in Dagster** opens the live run in the pipeline UI—exports that join large Ensembl tables can take several minutes.
-
-## Creating a Module with the AI Team
-
-Got a research paper about a trait that interests you? Upload the PDF, describe what you want, and the AI team does the rest — querying EuropePMC, Open Targets, and BioRxiv, extracting variants with per-genotype weights, validating the spec, and writing all module files in one uninterrupted run. No bioinformatics knowledge needed.
-
-<div>
-  <img src="images/just_dna_lite_AI_module_builder_step_I.jpg" alt="Step 1: open Module Manager, attach your paper, describe the module, click Send" width="960">
-  <img src="images/just_dna_lite_AI_module_builder_step_II.jpg" alt="Step 2: module auto-loaded with all files generated; register as annotation source in one click" width="960">
-</div>
-
-The module lands in the editing slot automatically with its name, description, and all generated files: `module_spec.yaml` and `variants.csv` (the core spec), `studies.csv` (literature references), `MODULE.md` (human-readable summary), an AI-generated `logo.png`, and a timestamped log for each creation or edit run. Review the files, then click **Register Module as source** — the module appears immediately in the Annotation tab's module list. Re-run the annotation job on your sample and the report will include the new module automatically. You can iterate by sending follow-up messages in the same chat — the team reads the existing module and extends it to a new version, adding a fresh log entry for each revision.
-
-Simple mode runs in about 2 minutes. Research team mode takes 7–8 minutes: a PI (Principal Investigator) agent dispatches Researcher agents in parallel, then a Reviewer fact-checks via Google Search before the PI writes the final module. With only a Gemini key you get one Researcher; adding an OpenAI key brings in a GPT researcher, and adding an Anthropic key adds Claude Sonnet — up to three researchers running simultaneously, each independently querying the literature and reporting findings back to the PI. Having multiple models report independently and requiring cross-model agreement (the PI only retains variants confirmed by at least two researchers, using the median weight on disagreements) greatly reduces hallucination and increases the reliability of the resulting module. Both modes require a free Gemini API key.
-
-## Quick start
-
-Everything runs locally on your computer. You can install it on a laptop, a desktop, or a lab workstation — no cloud account, no institutional server, no IT department needed.
-
-### What you need
-
-You need a `.vcf` or `.vcf.gz` file from whole genome (WGS) or whole exome (WES) sequencing. If you had your genome sequenced through a company like DNA Complete (Nebula), Dante Labs, or Sequencing.com, log into your account and look for a **"Download Raw Data"** or **"Download VCF"** option. The file you want ends in `.vcf` or `.vcf.gz`. You may also see `.bam` or `.fastq` files — you don't need those, just the VCF. Most providers deliver GRCh38 by default. If unsure, check with your provider.
-
-> **23andMe, AncestryDNA, MyHeritage?** These services use microarray chips that read a few hundred thousand pre-selected positions — a tiny fraction of your genome. just-dna-lite works best with whole genome or whole exome VCF files, which cover millions of positions. Consumer microarray support is experimental and lower-coverage, so results will be much sparser than WGS/WES. Not sure what you have? Check with your provider.
-
-**Where to get your genome sequenced?**
-If you want to sequence your own genome, there are several commercial providers. As of early 2026, popular and accessible options include [DNA Complete](https://dnacomplete.com/) (formerly Nebula Genomics), [Dante Labs](https://www.dantelabs.com/), and [Sequencing.com](https://sequencing.com/). Make sure the provider allows you to download your raw `.vcf` or `.vcf.gz` file. *(Disclaimer: We provide these links only as examples and are in no way affiliated with any of these companies or services).*
-
-If you live in Romania, you should follow the **[ROGEN (Romanian Genomics) project](https://rogen.umfcd.ro/)**. It is a major national initiative sequencing 5,000 individuals to create a genomic map of the population, and you might be able to get recruited to have your genome sequenced for free.
-
-**Don't have your genome sequenced yet?**
-You can use any public genome to try out the tool. Some of our authors have voluntarily open-sourced their genomes:
+No file of your own yet? Two of the authors published theirs. Paste either link into **Import from Zenodo**, or download it and upload it.
 
 - **Anton Kulaga** (CC-Zero): [zenodo.org/records/18370498](https://zenodo.org/records/18370498)
-  ```
-  https://zenodo.org/records/18370498
-  ```
 - **Livia Zaharia** (CC-BY-4.0): [zenodo.org/records/19487816](https://zenodo.org/records/19487816)
-  ```
-  https://zenodo.org/records/19487816
-  ```
 
-You can paste these URLs directly into the "Import from Zenodo" field in the app, or download the VCF file and upload it manually. You can also find other public genomes on platforms like [Open Humans](https://www.openhumans.org/).
+Other public genomes are on [Open Humans](https://www.openhumans.org/). If you are in Romania, the [ROGEN project](https://rogen.umfcd.ro/) is sequencing thousands of people and sometimes recruits participants.
 
-### Download the installer (Windows / macOS)
+It runs on Linux, macOS, and Windows the same way. Install [uv](https://github.com/astral-sh/uv) once, then:
 
-No terminal required. Go to the [latest release](https://github.com/dna-seq/just-dna-lite/releases/latest) and download the installer for your operating system:
+```bash
+git clone https://github.com/dna-seq/just-dna-lite.git
+cd just-dna-lite
+uv sync
+uv run start
+```
 
-| Platform | File to download |
-|----------|-----------------|
-| **Windows** (64-bit) | `JustDNALite-{version}-Setup.exe` |
-| **macOS** (Apple Silicon M1-M4) | `JustDNALite-{version}-arm64.dmg` |
-| **macOS** (Intel) | `JustDNALite-{version}-x64.dmg` |
+Open the address the terminal prints, usually `http://localhost:3000`.
 
-**Windows:** Run the installer, follow the wizard, then launch from the Start Menu or Desktop shortcut.
+<details>
+<summary><strong>First-time setup, and when <code>uv run start</code> complains</strong></summary>
 
-**macOS:** Open the `.dmg`, drag Just DNA Lite to your Applications folder, then double-click to launch. On first launch, you may need to right-click the app and select "Open" to bypass Gatekeeper (the app is not yet notarized).
+**git** has to be installed. macOS and most Linux machines already have it. On Windows, if `git --version` fails, install it from [git-scm.com/install/windows](https://git-scm.com/install/windows) and open a new terminal.
 
-The first launch takes 1-3 minutes (it downloads Python and dependencies automatically). After that, startup is fast. Your browser will open to `http://localhost:3000` where you can upload your VCF and start exploring.
-
-> **Linux users:** Use the [Install from source](#install-from-source-python) or [Container](#run-with-podman-or-docker-no-python-required) methods below.
-
-### Install from source (Python)
-
-If you're comfortable with a terminal, this is the fastest way to get started. Open a terminal (Terminal on macOS, PowerShell on Windows, any terminal on Linux) and run the commands below.
-
-You'll need **git** installed. macOS and most Linux distributions already have it. Windows does not ship with git unless you've set it up as a developer — if `git --version` fails, install it from [git-scm.com/install/windows](https://git-scm.com/install/windows) and restart your terminal.
-
-First, install [uv](https://github.com/astral-sh/uv) — a tool that manages Python and all dependencies for you automatically:
+**uv**, once:
 
 ```bash
 # Linux / macOS
@@ -134,335 +59,143 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-> **Restart your terminal after installing uv.** The installer adds `uv` to your `PATH`, but the change only takes effect in a new shell. Close the terminal and open a fresh one before continuing, otherwise `uv` won't be recognized.
+Close the terminal and open a new one afterwards, or the shell will not see `uv` yet.
 
-Next, install Python 3.13 with uv. This is a self-contained local download managed by uv — it won't touch any system Python:
+**Python 3.13**, managed by uv so it does not replace the system Python:
 
 ```bash
 uv python install 3.13
 ```
 
-This step is required on Windows (which ships without Python) and recommended on macOS and Linux to guarantee you're on a supported version.
+**Node.js 22.22 or newer** is what `uv run start` uses for the web interface. Check with `node --version`. If it is missing or older, install the current LTS from [nodejs.org](https://nodejs.org) (on Windows: `winget install OpenJS.NodeJS.LTS`) and open a new terminal. If you cannot upgrade Node, `uv run serve` runs the app without that development server.
 
-`uv run start` also needs **Node.js 22.22 or newer** for the web interface. Check with `node --version`. If it is missing or older, install the current LTS from [nodejs.org](https://nodejs.org) (on Windows: `winget install OpenJS.NodeJS.LTS`) and open a new terminal. If you can't upgrade it, `uv run serve` (below) runs the app without the development server. `uv run start` stops with this same advice when it finds an older Node, instead of failing further on with an unrelated-looking `restartWithMergedOptions()` error.
-
-Then clone and run:
-
-```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
-cd just-dna-lite
-uv sync
-uv run start
-```
-
-Open the URL printed in the terminal (usually `http://localhost:3000`). Upload your VCF and start exploring.
-
-**Work laptop without admin rights?** Some managed Windows machines block the small `start.exe` helper that `uv run start` uses. Run the same thing through Python instead:
+**A work laptop that blocks `start.exe`.** Some managed Windows machines refuse the small helper `uv` writes. Run the same command through Python:
 
 ```bash
 uv run python -m just_dna_lite.cli start
 ```
 
-#### Production mode (no Node.js at runtime)
-
-If you don't need the development server and want a simpler, single-process setup:
+**A single process, for a demo or a workshop:**
 
 ```bash
 uv run serve
 ```
 
-This compiles the frontend once and serves everything from a single Python process on one port. No Node.js dev server running, no hot-reload overhead, no port juggling — just the app. Good for workshops, demos, or if you simply want to use the tool without debugging anything. Use `uv run kill-ports` to clean up stale processes if needed.
+`uv run kill-ports` clears a leftover server if the port is already taken.
 
-### Run with Podman or Docker (no Python required)
-
-Don't want to install Python? [Podman](https://podman.io/) (or [Docker](https://www.docker.com/products/docker-desktop/)) packages the entire app so it runs the same on any computer. This still runs on your machine — the container is just a convenient way to get everything pre-installed.
-
-We recommend **Podman** — it runs without root privileges by default, which is a better fit for a tool that handles personal genomic data. Docker works identically; just swap `podman` for `docker` in any command below.
-
-**Install Podman** (one-time):
+**Apple Silicon, when native libraries complain.** The Nix flake pins Python, Node, and uv for that machine:
 
 ```bash
-# Linux (Debian/Ubuntu)
-sudo apt install podman
-
-# macOS (via Homebrew — install Homebrew first from https://brew.sh if needed)
-brew install podman && podman machine init && podman machine start
-
-# Windows: install Podman Desktop from https://podman-desktop.io
-# Or install Docker Desktop from https://www.docker.com/products/docker-desktop/
-```
-
-**Step 1.** Create a folder and put your VCF files in it:
-
-```bash
-mkdir -p my_genomes
-# Copy or move your .vcf / .vcf.gz file into my_genomes/
-```
-
-**Step 2.** Run the app:
-
-```bash
-podman run -it --rm \
-  -p 3000:3000 -p 3005:3005 -p 8000:8000 \
-  -v ./my_genomes:/app/data/input/users/default \
-  -v ./my_results:/app/data/output/users/default \
-  -v just-dna-cache:/app/data/cache \
-  ghcr.io/dna-seq/just-dna-lite:latest
-```
-
-> **Docker users:** replace `podman` with `docker` — everything else stays the same.
-
-**Step 3.** Open `http://localhost:3000` in your browser. Upload your VCF and start exploring.
-
-**Step 4.** When annotation finishes, find your reports and results in the `my_results/` folder (created automatically next to `my_genomes/`). The Ensembl cache (~14 GB, downloaded on first use) and PRS scores are persisted so they survive restarts.
-
-#### Advanced container usage
-
-<details>
-<summary>Compose, building from source, ports, and environment variables</summary>
-
-**Using Podman Compose or Docker Compose:**
-
-```bash
-git clone https://github.com/dna-seq/just-dna-lite.git
-cd just-dna-lite
-
-# Podman (recommended)
-podman-compose up --build
-
-# Docker
-docker compose up --build
-```
-
-The compose file automatically creates `my_genomes/` and `my_results/` folders in your project directory.
-
-**Building from source:**
-
-```bash
-# Podman
-podman build -t just-dna-lite .
-
-# Docker
-docker build -t just-dna-lite .
-```
-
-**Ports:**
-
-| Port | Service |
-|------|---------|
-| 3000 | Web UI (main interface) |
-| 3005 | Dagster pipeline dashboard |
-| 8000 | Backend API (used internally) |
-
-**Environment variables** (pass via `-e` or `--env-file .env`):
-
-| Variable | Purpose |
-|----------|---------|
-| `HF_TOKEN` | HuggingFace token (for private datasets) |
-| `GEMINI_API_KEY` | Enables AI Module Creator |
-| `API_URL` | Override backend URL (for remote deployments) |
-| `JUST_DNA_PIPELINES_LOGIN` | `none` (default in container), `false` (email login), or `user:pass` |
-
-</details>
-
-To use the AI Module Creator, copy `.env.template` to `.env` and add your Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey) — see [this short video](https://www.youtube.com/watch?v=SbT6WbISBow) if you haven't done this before). That's enough for both simple and team modes. Adding `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` brings in GPT and Claude Sonnet as additional Researcher agents in team mode (more cross-model diversity). Everything else works without any API keys.
-
-<details>
-<summary><strong>macOS Apple Silicon: using Nix (optional)</strong></summary>
-
-If you're on an Apple Silicon Mac (M1/M2/M3/M4) and run into architecture issues (e.g. Polars CPU warnings, wrong native bindings), the included [Nix flake](https://nix.dev/concepts/flakes) provides Python, Node.js, and uv at the correct architecture automatically.
-
-```bash
-# Install Nix (one-time, ~2 minutes)
 sh <(curl -L https://nixos.org/nix/install)
-# Restart your terminal, then enable flakes:
 mkdir -p ~/.config/nix
 echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-
-# Enter the dev environment and start as usual
 cd just-dna-lite
 nix develop
 uv sync
 uv run start
 ```
 
-Run `nix develop` each time you open a new terminal to work on this project, or use [direnv](https://direnv.net/) to activate it automatically (`echo "use flake" > .envrc && direnv allow`).
+</details>
+
+<details>
+<summary><strong>Podman or Docker, if you would rather not install Python</strong></summary>
+
+The container still runs on your machine. [Podman](https://podman.io/) is the better default for a personal genome file, because it does not need root. Docker works the same way if you already have it: swap `podman` for `docker`.
+
+```bash
+git clone https://github.com/dna-seq/just-dna-lite.git
+cd just-dna-lite
+mkdir -p my_genomes
+# put your .vcf or .vcf.gz files in my_genomes/
+podman-compose up --build
+```
+
+With Docker Compose the last line is `docker compose up --build`. Open `http://localhost:3000`. Reports land in `my_results/`. The first Ensembl cross-check, if you turn it on, downloads about 14 GB into a volume that survives restarts.
+
+There is no prebuilt image to pull yet. Compose builds it from this repository.
 
 </details>
 
-## How it works
+<details>
+<summary><strong>Chip files from consumer tests, and the command line</strong></summary>
 
-You upload a VCF through the web interface. The pipeline normalizes it (quality filtering, chromosome prefix stripping, Parquet conversion), then matches your variants against whichever modules you've selected. Each module is a curated database of variants with effect weights from published research. Results come back as downloadable PDF/HTML reports. The whole process takes minutes, not hours.
-
-For Polygenic Risk Scores, the tool pulls scoring files from the PGS Catalog, computes your score, and ranks it against five 1000 Genomes superpopulations (European, African, East Asian, South Asian, American).
-
-Primary outputs are **Parquet** files—open them in Polars, Pandas, DuckDB, R, or anything that speaks Arrow. **VCF export** (see above) is available when you need a classic variant file with annotations in INFO.
-
-## What the numbers actually mean
-
-Genomics has a gap between what sounds precise and what's actually known. Here's the short version before you start digging.
-
-> **⚠️ IMPORTANT LIABILITY NOTICE:** just-dna-lite is a bioinformatics research tool for personal self-exploration and research purposes only. It is **not** a medical device, diagnostic tool, or a substitute for professional medical advice. By using this tool, you acknowledge that the developers, contributors, and affiliated institutions accept **zero liability** for any physical, psychological, or financial harm resulting from the interpretation of these results. Always consult a healthcare provider or certified genetic counselor for clinical interpretation.
-
-### What to do when you see something scary
-
-Imagine you run your genome through a module and see a red flag—a variant labeled "pathogenic" or a PRS score in the 99th percentile for a serious disease. 
-
-**Do not rush to panic.** Studies of healthy populations (like the 1000 Genomes Project) show that the average, completely healthy person walks around with *dozens to hundreds* of variants historically flagged as "pathogenic" in research databases. Why aren't they sick? Because many of these database entries are false alarms, or the variants have very low penetrance (meaning they only cause disease in a tiny fraction of the people who carry them). Furthermore, for nearly every common chronic disease, lifestyle factors — smoking, activity, diet, sleep — have larger effect sizes than any common genetic variant. If the disease hasn't manifested, a standalone variant is often not a concern.
-
-**Understand our tool's limits.** We built just-dna-lite for rapid exploration, open access, and speed of development. We do *not* validate our modules with the rigorous, painstaking manual curation of a clinical laboratory. Our **AI-generated modules** are even less reliable—they are literal first drafts written by an AI agent reading a PDF, and they *will* contain mistakes.
-
-**The clinical reality check.** Raw VCFs have false positives, and automated annotations have high error rates. In a true clinical setting, a genomic finding is *never* trusted from a single exploratory sequencing run. If a potential risk variant aligns with your family history and you are genuinely concerned, you must get it orthogonally validated. This means going to a doctor and getting a targeted, clinical-grade test (like quantitative PCR or Sanger sequencing) from a certified lab to prove the variant is actually there, followed by a genetic counselor's interpretation. Never make medical decisions based on a hit in this app.
-
-### Heritability and GWAS limitations
-
-When a trait is described as "70% heritable," most people read that as "70% determined by genes." It doesn't mean that. Heritability is a population statistic — it measures how much of the variation *between people in a specific study* is associated with genetic differences. It changes depending on the environment. Height is around 80% heritable in well-nourished populations; that number drops significantly in populations with childhood malnutrition. The genes didn't change. The environment did. So heritability tells you something real, but not what most people think it tells you.
-
-A polygenic risk score is a weighted sum. You take a list of SNPs from GWAS studies, multiply each by its effect weight, add them up, and get a number that tells you where you sit in a reference population's distribution. That's it. It's not a probability of disease; it's a rank. The model is linear and the underlying biology isn't. And most PGS Catalog scores were built from predominantly European cohorts, so if your ancestry is different, the score loses accuracy — sometimes a little, sometimes a lot.
-
-Most of the variants in GWAS-based annotation are statistical associations, not causal mechanisms. A lot of GWAS hits are tagging SNPs — correlated with a causal variant nearby, not the causal variant itself. Effect sizes also shrink consistently in replication studies; estimates from the original GWAS tend to be inflated.
-
-[Full explainer with more detail on heritability, GWAS, and what clinical-grade actually means →](docs/SCIENCE_LITERACY.md)
-
-## Running individual components
+23andMe, AncestryDNA, and MyHeritage read a few hundred thousand chosen positions. The app can take those files, and the report will be much thinner than one from a whole genome. Whole-genome and whole-exome files on the GRCh38 reference are the path this was built for. Older GRCh37 files can be lifted. A T2T reference is still planned.
 
 ```bash
-uv run start             # Full stack (Web UI + pipeline) — development mode
-uv run serve             # Production mode — single Python process, no Node.js
-uv run ui                # Web UI only (dev mode)
-uv run dagster-ui        # Dagster pipeline UI only
-uv run annotate --help   # Annotate a VCF + report from the CLI (no web UI clicking)
-uv run pipelines --help  # CLI tools (includes annotate, list-modules, …)
-uv run kill-ports        # Kill stale processes on ports 3000/8000
-```
-
-### CLI annotation (no web UI)
-
-To run selected modules on a VCF and get the HTML report without clicking through the app:
-
-```bash
-# See discovered modules
 uv run pipelines list-modules
-
-# Annotate a VCF with specific modules (report under data/output/users/...)
-uv run annotate path/to/genome.vcf.gz -m thrombophilia -m coronary
-
-# Or use a built-in public genome alias (no VCF path needed)
 uv run annotate anton -m longevitymap
-uv run annotate livia -m thrombophilia -m coronary
-
-# Or via the pipelines group; optional Ensembl
+uv run annotate path/to/genome.vcf.gz -m thrombophilia -m coronary
 uv run pipelines annotate genome.vcf --all-modules --ensembl
-
-# Watch the run (same DAGSTER_HOME) in another terminal
-uv run dagster-ui
 ```
 
-### Optional: pre-download Ensembl annotations
+`anton` and `livia` are the public genomes above, so you can try a report without a file of your own. `uv run pipelines ensembl-setup` downloads the Ensembl database (about 14 GB) before the first cross-check, if you would rather do that while you have a quiet connection.
 
-Cross-referencing your variants against [Ensembl](https://www.ensembl.org/) (for clinical significance labels and full variant metadata) requires the Ensembl variation database, which is roughly **14 GB**. This data is downloaded on demand the first time you run an Ensembl annotation job, but if you'd rather fetch it upfront while you have time and a stable connection, run:
+</details>
+
+## Before you read a result as news
+
+This is a research tool for learning, citizen science, and teaching. A health decision belongs with a clinician or a genetic counsellor. The modules, including ones an assistant drafted from a paper, are provided as they are.
+
+A red label is common in healthy people. Reference projects find that an ordinary genome carries many variants some database once called pathogenic. A polygenic score is a place on a chart, mostly built from European studies, so the chart fits some ancestries better than others. Lifestyle often moves a common disease more than any single common variant.
+
+If a finding matches a real family history and you are worried, the next step is a doctor and a clinical test.
+
+<details>
+<summary><strong>Heritability, scores, and why a database label is not a diagnosis</strong></summary>
+
+"70% heritable" describes how much of the *difference between people in one study* lined up with genetic differences. Change the environment and the number moves. Height is highly heritable where children are well fed, and less so where they are not. The genes did not change.
+
+A polygenic score multiplies each listed variant by a weight from a study and adds them up. The biology underneath is not a sum. Many of the variants are neighbors of a cause, tagged along because they travel with it. The original studies tend to overstate the size of the effect.
+
+The longer version, including when a clinical lab would and would not act, is [Understanding Your Genome](docs/SCIENCE_LITERACY.md).
+
+</details>
+
+## Write a topic, or help build the app
+
+A topic you care about can become a module: claims, each tied to a paper, compiled into something this app can run. [just-module-creator](https://github.com/dna-seq/just-module-creator) is the assistant for that. You bring the question and the sources. It reads them, writes the rows, and checks them. If you want to see the result on a real genome, say so. It can connect this app and ask which files to use.
+
+Combination topics (a blood group, an APOE type) are a different shape from a list of single variants. The report is written for two readers at once: a person with no science background, and a professional who wants the identifiers folded underneath. The rules for that voice are in [docs/REPORT_VOICE.md](docs/REPORT_VOICE.md).
+
+## For contributors
+
+<details>
+<summary><strong>Layout, tests, and the neighbouring projects</strong></summary>
+
+The repository is a [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/). `just-dna-pipelines` is the annotation pipeline and the command line. `webui` is the browser app, written in Python. Tests:
 
 ```bash
-uv run pipelines ensembl-setup
+uv run pytest
+uv run pytest just-dna-pipelines/tests/
 ```
 
-This pre-caches the data to `~/.cache/just-dna-pipelines/ensembl_variations/` so the annotation job starts immediately instead of waiting for the download.
+A module the app can run is described in [docs/HF_MODULES.md](docs/HF_MODULES.md). How a combination such as a blood group is called from a genome file is [docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). The pipeline, the local MCP server, and the layout of the app:
 
-## For bioinformaticians
+- [Architecture](docs/ARCHITECTURE.md)
+- [Pipeline guide](docs/DAGSTER_GUIDE.md)
+- [MCP server](docs/MCP_SERVER.md)
+- [FAQ](docs/FAQ.md)
+- [Setup](docs/CLEAN_SETUP.md)
 
-The project is a [uv workspace](https://docs.astral.sh/uv/concepts/workspaces/) with two packages: `just-dna-pipelines` (Dagster assets, VCF processing, annotation logic, CLI) and `webui` (Reflex web UI, pure Python).
+This app is a rewrite of [Just-DNA-Seq](https://just-dna.life/). The same family of projects:
 
-The pipeline runs on [Dagster](https://dagster.io/) with Software-Defined Assets, giving you automatic data lineage and resource tracking (CPU, RAM, duration). Data processing uses [Polars](https://pola.rs/) by default, with [DuckDB](https://duckdb.org/) for streaming joins when memory is tight. VCF reading goes through [polars-bio](https://github.com/polars-contrib/polars-bio). PRS computation comes from [just-prs](https://pypi.org/project/just-prs/) with reusable [prs-ui](https://pypi.org/project/prs-ui/) Reflex components.
+- [just-module-creator](https://github.com/dna-seq/just-module-creator) writes modules with an assistant
+- [just-prs](https://github.com/dna-seq/just-prs) computes the polygenic scores
+- [just-dna-compiler](https://github.com/dna-seq/just-dna-compiler) is the module format and the compiler
+- [just-dna-registry](https://github.com/dna-seq/just-dna-registry) is the catalog
 
-Annotation modules are auto-discovered from any [fsspec](https://filesystem-spec.readthedocs.io/)-compatible URL (HuggingFace, GitHub, S3, HTTP). Sources and quality filters live in `modules.yaml` at the project root.
+</details>
 
-### Writing a module by hand
+## Funding
 
-A module is a directory with two files — no Python required:
+Open source, for anyone. One of the core developers, [Anton Kulaga](https://github.com/antonkulaga), is funded through the [ROGEN consortium](https://rogen.umfcd.ro/). Recruitment there is still going, so Romanian-calibrated scores and the related public-health work are research directions, not finished results.
 
-```
-my_module/
-├── module_spec.yaml    # metadata, version, genome build
-└── variants.csv        # per-variant annotation table
-```
-
-Minimal `module_spec.yaml`:
-
-```yaml
-schema_version: "1.0"
-module:
-  name: my_module
-  version: 1
-  title: "My Module"
-  description: "One-line description."
-  report_title: "My Module Report Section"
-  icon: dna
-  color: "#21ba45"
-defaults:
-  curator: human
-  method: literature-review
-  priority: medium
-genome_build: GRCh38
-```
-
-`variants.csv` required columns: `rsid`, `genotype` (slash-separated, alphabetically sorted e.g. `A/G`), `weight` (negative = risk, positive = protective, range −1.2 to +1.2), `state` (`risk`/`protective`/`neutral`), `conclusion` (≤50 words), `gene` (HGNC symbol). Extra columns are preserved in annotation output.
-
-To add the module: upload it in the UI editing slot and click **Register**, or add its path/URL as a source in `modules.yaml`. Modules hosted on HuggingFace, GitHub, S3, or any HTTP server are supported.
-
-For architecture, pipeline details, and configuration, see the [docs](#documentation).
-
-## Just-DNA-Seq vs Just-DNA-Lite
-
-just-dna-lite is a ground-up rewrite of [Just-DNA-Seq](https://just-dna.life/). The original used OakVar and took hours per VCF. The rewrite drops OakVar in favor of Dagster + Polars/DuckDB and finishes in seconds. The web UI moved from OakVar's viewer to [Reflex](https://reflex.dev/) (pure Python, no JavaScript). Data lineage is automatic. And adding new modules went from "write Python code" to "upload a paper and let the AI handle it."
-
-## Testing
-
-```bash
-uv run pytest                           # All tests
-uv run pytest just-dna-pipelines/tests/ # Pipeline tests only
-```
-
-## Documentation
-
-- [Understanding Your Genome: Science vs Clinical Grade](docs/SCIENCE_LITERACY.md) — what heritability means, why PRS are linear models, when to act on a finding (and when not to)
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [AI Module Creation](docs/AI_MODULE_CREATION.md) — DSL spec, compiler, registry API, Agno agent (solo + team), module discovery
-- [AI Module Walkthrough](docs/AI_MODULE_WALKTHROUGH.md) — three real end-to-end examples with timing logs, agent outputs, and generated module files
-- [Dagster Pipeline Guide](docs/DAGSTER_GUIDE.md)
-- [Annotation Modules](docs/HF_MODULES.md)
-- [Configuration & Setup](docs/CLEAN_SETUP.md)
-- [Design System & UI Architecture](docs/DESIGN.md)
-
-## Roadmap
-
-GRCh38 VCF files (WGS and WES) are the primary supported path, along with PRS and AI-assisted module creation. GRCh37/hg19 is handled through liftover, and consumer microarray data (23andMe, AncestryDNA, MyHeritage) is supported experimentally with much lower coverage. T2T reference genomes and multi-species support remain planned.
-
-## Related projects
-
-- [just-prs](https://github.com/antonkulaga/just-prs) — Polygenic Risk Score library and UI ([PyPI](https://pypi.org/project/just-prs/))
-- [just-dna-format](https://github.com/dna-seq/just-dna-format) — annotation module schema, manifest/integrity contract, and reference compiler
-- [just-dna-marketplace](https://github.com/dna-seq/just-dna-marketplace) — catalog, publish, and download REST API for annotation modules
-- [prepare-annotations](https://github.com/dna-seq/prepare-annotations) — upstream pipeline for Ensembl and module annotation data
-- [Just-DNA-Seq](https://just-dna.life/) — the original project
-
-## Funding and Support
-
-This project is open source and intended for users worldwide. One of its core developers, [Anton Kulaga](https://github.com/antonkulaga), is funded through the **[ROGEN (Romanian Genomic) consortium](https://rogen.umfcd.ro/)**, and some parts of this roadmap are being developed with future ROGEN research use in mind.
-
-ROGEN recruitment and data collection are still ongoing, so the points below should be read as research targets and planned directions rather than completed outcomes. The broader goal is to contribute to the understanding of the genetic landscape of European populations while building methods that remain useful for users and researchers in Romania and beyond. Current priorities of the consortium include:
-
-1. **Risk-stratified prevention:** Romanian-calibrated PRSes and aging clocks as future tools for more cost-effective prevention programs.
-2. **Reducing health inequities:** Better imputation panels and ancestry-aware models for under-represented populations.
-3. **Gene-environment insights:** Analyses of interactions between genetics and factors such as diet, smoking, air pollution, occupational exposures, and pathogen burdens.
-4. **Reproducible public-health research:** Privacy-preserving analyses aligned with international research and regulatory norms for priorities such as cardiovascular risk, diabetes, and dementia.
-5. **Clinical translation:** Locally calibrated models that could eventually help inform clinical guidelines once properly validated.
-
-## License and Disclaimer
+## License
 
 AGPL v3. See [LICENSE](LICENSE).
 
-**LIMITATION OF LIABILITY:** The software is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. In no event shall the authors, contributors, or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software.
+The software is provided as is, without warranty. The authors and contributors accept no liability for what anyone does with a result. Read the note [above](#before-you-read-a-result-as-news) before you treat a screen as news about your health.
 
 ## Contributors
 
-[Anton Kulaga](https://github.com/antonkulaga) (IBAR) and Nikolay Usanov (HEALES), with contributions from the [Just-DNA-Seq](https://github.com/dna-seq) community.
+[Anton Kulaga](https://github.com/antonkulaga) (IBAR) and Nikolay Usanov (HEALES), with the [Just-DNA-Seq](https://github.com/dna-seq) community.
