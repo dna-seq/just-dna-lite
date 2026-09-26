@@ -855,15 +855,20 @@ window.addEventListener("scroll", function() {
         <div class="module-panel-body">
             {% if gene.status == "called" %}
             <p class="phenotype-result"><strong>{{ gene.phenotype }}</strong></p>
+            <ul class="phenotype-candidates">
+                {% for c in gene.candidates %}
+                <li>Diplotype <strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.activity_score is not none %} (activity score {{ c.activity_score }}){% endif %}{% if c.conclusion %}: {{ c.conclusion }}{% endif %}</li>
+                {% endfor %}
+            </ul>
             {% elif gene.status == "ambiguous" %}
             <p>This genotype is consistent with more than one diplotype:</p>
             <ul class="phenotype-candidates">
                 {% for c in gene.candidates %}
-                <li><strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.phenotype %} — {{ c.phenotype }}{% endif %}{% if c.not_assessable %} <span class="ui mini grey label">needs a structural call</span>{% endif %}</li>
+                <li><strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.activity_score is not none %} (activity score {{ c.activity_score }}){% endif %}{% if c.phenotype %} — {{ c.phenotype }}{% endif %}{% if c.not_assessable %} <span class="ui mini grey label">needs a structural call</span>{% endif %}</li>
                 {% endfor %}
             </ul>
             {% if gene.phase_would_decide %}
-            <aside class="scientific-note">Knowing the <strong>phase</strong> (which allele sits on which chromosome copy) would settle this. This callset is unphased, so both readings are reported.</aside>
+            <aside class="scientific-note">Knowing the <strong>phase</strong> (which allele sits on which chromosome copy) would settle this. These sites are not phased together in this callset, so every reading is reported.</aside>
             {% endif %}
             {% elif gene.status == "not_assessable" %}
             <p>This phenotype could not be assessed from this callset.</p>
@@ -886,6 +891,11 @@ window.addEventListener("scroll", function() {
                             <span class="phenotype-inferred-note">inferred from coverage {{ site.restored_flank_bp }} bp away; this can also mean the position was not covered</span>
                             {% elif site.matched_by == "rsid" %}
                             <span class="phenotype-inferred-note">matched by rsID</span>
+                            {% elif site.matched_by == "indel_window" %}
+                            <span class="phenotype-inferred-note">matched the same insertion/deletion written at a nearby position; shown in this module's spelling</span>
+                            {% endif %}
+                            {% if site.phase_set is not none %}
+                            <span class="phenotype-inferred-note">phased ({{ site.phased_alleles|join("|") }}, phase set {{ site.phase_set }})</span>
                             {% endif %}
                         </td>
                     </tr>
