@@ -24,6 +24,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     ModuleInfo,
     ModuleTable,
     local_module_dir,
+    module_kind,
     read_module_provenance,
     scan_module_table,
 )
@@ -246,7 +247,7 @@ class InstallResult(BaseModel):
     digest: Optional[str] = None
     lead_rows: Optional[int] = None
     rows_without_coordinates: Optional[int] = Field(
-        None, description="Lead rows with null chrom — these can only join on rsid"
+        None, description="Site rows with null chrom (lead rows, or haplotypes rows for a phenotype module) — these can only join on rsid"
     )
     warnings: list[str] = Field(default_factory=list)
 
@@ -322,15 +323,21 @@ def install_module(compiled_dir: Path, name: Optional[str] = None, replace: bool
         return result.model_copy(update={"warnings": warnings})
 
     version, digest, _ = read_module_provenance(info)
-    lead_lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=info)
-    schema = lead_lf.collect_schema().names()
-    counts = lead_lf.select(
+    lead_rows = scan_module_table(module_name, ModuleTable.LEAD, module_info=info).select(pl.len()).collect().item()
+    # A phenotype module's lead (diplotypes) names allele pairs and never carries coordinates; the
+    # sites the caller matches against the VCF are the haplotypes rows, so that is the table to check.
+    is_phenotype = module_kind(info) == "phenotype"
+    site_table = ModuleTable.HAPLOTYPES if is_phenotype else ModuleTable.LEAD
+    site_label = "haplotype rows" if is_phenotype else "lead rows"
+    site_lf = scan_module_table(module_name, site_table, module_info=info)
+    schema = site_lf.collect_schema().names()
+    counts = site_lf.select(
         pl.len().alias("rows"),
         (pl.col("chrom").is_null().sum() if "chrom" in schema else pl.len()).alias("no_coords"),
     ).collect().row(0, named=True)
     if counts["no_coords"]:
         warnings.append(
-            f"{counts['no_coords']} of {counts['rows']} lead rows have no coordinates; they can only match a "
+            f"{counts['no_coords']} of {counts['rows']} {site_label} have no coordinates; they can only match a "
             "VCF that carries rsIDs in its ID column. Resolve the module (enrich) before relying on a run."
         )
     return result.model_copy(
@@ -338,7 +345,7 @@ def install_module(compiled_dir: Path, name: Optional[str] = None, replace: bool
             "lead_table": info.lead_table,
             "version": version,
             "digest": digest,
-            "lead_rows": counts["rows"],
+            "lead_rows": lead_rows,
             "rows_without_coordinates": counts["no_coords"],
             "warnings": warnings,
         }

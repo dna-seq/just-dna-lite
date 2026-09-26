@@ -55,6 +55,21 @@ Set `JUST_DNA_MCP_PORT` to move it, `JUST_DNA_MCP_HOST` to bind elsewhere, and
 already taken, `uv run start` says so and carries on without it. To serve HTTP without the rest of
 the stack: `uv run pipelines mcp --transport http`.
 
+Opening `http://127.0.0.1:3006/mcp` in a browser is not a tool list. The page that lists and calls
+the tools is the MCP Inspector, pointed at the server `uv run start` is already serving:
+
+```bash
+npx @modelcontextprotocol/inspector http://127.0.0.1:3006/mcp
+```
+
+`npx` downloads it the first time. The process prints the page to open (port 6274 by default, and
+the query token belongs in the address). `fastmcp dev apps` is a preview for tools registered with
+`@app.ui()`; this server has none, so that page stays empty.
+
+While that stack is running, the other two pages are the ones the launcher prints: the web app
+(Reflex, `http://localhost:3000` only when that port was free) and the Dagster dashboard
+(`http://127.0.0.1:3005` unless `DAGSTER_PORT` or `--dagster-port` moved it).
+
 ## Tools
 
 | Tool | What it does |
