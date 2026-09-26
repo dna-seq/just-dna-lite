@@ -121,8 +121,15 @@ def _after_fork_in_child() -> None:
 
 
 def install_fork_tripwire() -> None:
-    """Register fork hooks that report a fork-after-native-init as it happens."""
-    os.register_at_fork(before=_before_fork, after_in_child=_after_fork_in_child)
+    """Register fork hooks that report a fork-after-native-init as it happens.
+
+    ``os.register_at_fork`` is POSIX-only. Windows never ``fork()``s, so there
+    is no tripwire to install and calling the missing API crashes ``serve``.
+    """
+    register_at_fork = getattr(os, "register_at_fork", None)
+    if register_at_fork is None:
+        return
+    register_at_fork(before=_before_fork, after_in_child=_after_fork_in_child)
 
 
 def unmute_fork_warning() -> None:

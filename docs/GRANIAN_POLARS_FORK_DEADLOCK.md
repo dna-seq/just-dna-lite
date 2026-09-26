@@ -157,7 +157,9 @@ imported:
 - `unmute_fork_warning()` — restore visibility of the warning described above.
 - `install_fork_tripwire()` — `os.register_at_fork` hooks that snapshot live native
   pools in the parent and, in the child, write a loud banner naming them. A future
-  fork-after-Polars becomes a log line rather than a silent wedge.
+  fork-after-Polars becomes a log line rather than a silent wedge. The API is
+  POSIX-only; where it is missing (Windows) the tripwire is skipped, because that
+  platform never `fork()`s and calling the missing attribute crashes `serve()`.
 
 **Spawn requires a `__main__`-guarded entry point.** Spawned children re-import
 `__main__`; without a guard, multiprocessing raises the `freeze_support()`

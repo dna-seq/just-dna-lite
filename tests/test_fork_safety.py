@@ -213,6 +213,14 @@ def test_live_native_pools_detects_rayon():
     assert "rayon" in lines.get("AFTER", ""), lines.get("AFTER", "") + result.stderr
 
 
+def test_fork_tripwire_is_a_no_op_without_register_at_fork(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows has no ``os.register_at_fork``. Calling it crashed ``serve()``."""
+    monkeypatch.delattr(os, "register_at_fork", raising=False)
+    from webui.forksafety import install_fork_tripwire
+
+    install_fork_tripwire()
+
+
 @pytest.mark.skipif(
     not sys.platform.startswith("linux"), reason="thread enumeration reads /proc"
 )
