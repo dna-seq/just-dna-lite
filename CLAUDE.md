@@ -59,6 +59,9 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 - Read terminal warnings, deprecations especially; your API knowledge may be stale.
 - Versions live in `pyproject.toml`, never `__init__.py`. Avoid `__all__`.
 - `uv sync` / `uv add` only, never `uv pip install`.
+- **No paths outside this repo in this file**, except cache dirs (`~/.cache/...`). Name another repo by
+  its PyPI package or `https://github.com/dna-seq/<repo>`; a sibling `../` or absolute path resolves
+  only on the machine that wrote it.
 - **`[tool.uv.sources]` holds workspace members only.** A `path =` / `editable =` source pointing at a
   sibling checkout makes `uv sync` fail on every other machine. Test unpublished libs with an
   uncommitted override.
@@ -129,6 +132,15 @@ Full reference: **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)**. Rules that keep it
   snapshot** of `{module}_weights.parquet` (`jobs/<id>/results/<user>__<sample>/`). In a run's
   output the module's rsID is `rsid_{module}`; plain `rsid` is the VCF's ID cell, often empty.
 - **Findings stay three-valued**: `not_assessed` when a check could not run, never silence.
+- **When the stack is up, give the live UI URLs.** A reply that uses the MCP while `uv run start` is up
+  includes the web UI and Dagster addresses, read from the launcher banner or the listening ports, never
+  assumed: Reflex prints another port when 3000 is taken (a leftover `prs-ui` often holds it); Dagster
+  is `http://127.0.0.1:3005` unless `DAGSTER_PORT` / `--dagster-port` moved it. `:3006/mcp` is the
+  protocol endpoint, not a page.
+- **Seeing the tools means the MCP Inspector**: `npx @modelcontextprotocol/inspector
+  http://127.0.0.1:3006/mcp` against the running server (substitute the live port). `fastmcp dev apps`
+  lists only `@app.ui()` tools (none here), and `fastmcp dev inspector` starts a second server. Quote the
+  URL the Inspector prints, token included, and leave it running.
 
 ## Shared format libraries
 
@@ -145,11 +157,13 @@ does not call it.
 - `just_dna_pipelines.module_compiler` is a re-export shim; import from the libs in new code. The one
   local piece is `module_compiler/resolver.py::ensure_resolver_db` (HF download + DuckDB build), which
   `register_custom_module` and the pipelines `resolve_variants` wrapper use to auto-provision.
-- **Filing upstream**: never edit or commit the `just-dna-format` repo, and never touch its `ROADMAP.md`
-  or `CHANGELOG.md`. Append a `## Sn — <what happened>` section to
-  `/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`, claiming the id with
-  `.claude/triage-state.py --next`. Write a report (what you ran, expected, got, did meanwhile), not a
-  request. That note is the whole job.
+- **Filing upstream**: never edit or commit the
+  [just-dna-compiler](https://github.com/dna-seq/just-dna-compiler) repo (renamed from `just-dna-format`;
+  the PyPI names are unchanged), and never touch its `ROADMAP.md` or `CHANGELOG.md`. Append a
+  `## Sn — <what happened>` section to its `docs/CONSUMER_SUGGESTIONS.md`, claiming the id with
+  `.claude/triage-state.py --next` in that repo. Write a report (what you ran, expected, got, did
+  meanwhile), not a request. That note is the whole job. Its ROADMAP's "Not format scope" section rules
+  out diplotype *callers* (measurement is ours) and assigns RM7, the report-card schema, to us.
 
 ### Contract facts that bite
 
@@ -367,7 +381,46 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   `report`. **Glob reports as `*.html` and pick by mtime.**
 - Each rsID row has four AI prompt links (`_build_variant_ai_links`); clicking sends that genotype to a
   third party, never automatically. They are ~half the file size. Keep icons as one `<symbol>` set with
-  `<use>`.
+  `<use>`. Phenotype results get the same four (`_build_phenotype_ai_links`); the privacy note lives in
+  each button's tooltip and `aria-label`, and in full under *How to read this report*.
+- **Phenotype modules render in `phenotype_section.html.j2`, one report section per module**, like any
+  other module, so two of them never read as one. A result is an open block (plain headline, the
+  module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
+  position was read, the module's rule tables, build notes), never a card nested in a card. The module's
+  title and description come from `modules.yaml`, else its own `manifest.json` (`module_display`), and
+  its README's `## How this works` section is shown before the results (`readme_section`).
+- **Only verified link targets.** `dbsnp_url` (rsIDs) and `hgnc_url` (gene symbols, human only) build a
+  link only for a well-formed identifier; PubMed uses its canonical `/{pmid}/` form. Positions get no
+  link: Ensembl's gene/location URLs now 404 or redirect into a JS browser, and UCSC sits behind a bot
+  check, so none could be verified; an rsID's dbSNP page states its GRCh38 position. GenAge was dropped
+  because a gene it does not index renders a blank page. Before adding a target, fetch a seeded sample
+  of rendered links and check each page names the identifier (JS pages via `google-chrome --dump-dom`;
+  PubMed blocks scripts, so check PMIDs through E-utilities `esummary`).
+- The end of the report: *How to read this report* stays visible; *Modules not read* keeps one visible
+  sentence naming them with the reasons folded; module versions and data sources sit in one folded
+  *Technical details* section. All templates render through `report_environment()`, shared with tests.
+
+## Report voice (mandatory for module text and templates)
+
+Two audiences with equal weight: people without a science background, and professionals. Full guide:
+[docs/REPORT_VOICE.md](docs/REPORT_VOICE.md); the module-author twin is the `module-voice` skill in
+[just-module-creator](https://github.com/dna-seq/just-module-creator).
+
+- **Three layers, each in its place.** The result (the `phenotype` label and a conclusion's first
+  sentence), what it means (the rest of the conclusion), and **More details** (rsIDs, coordinates,
+  subtype codes, statistics: `haplotypes.csv`, `studies.csv`, `README.md`, the fold). No layer-3 codes in a
+  label or conclusion.
+- **Simple is not telegraphic.** Full sentences about the reader ("You have blood group AB"): what they
+  have, what the gene does, how common it is, the practical meaning, the main limit.
+- **Every term is explained at first mention, in that text.** Each conclusion is read alone, so ε4 or
+  C282Y is explained in the conclusion that uses it, not in another result or in *How this works*.
+- **Results first; notices at the end.** Interpretation, research-use and privacy text live once in *How
+  to read this report*; a caveat about one result is that result's last sentence.
+- Practical notes are welcome when the evidence is clear, always naming who decides anything medical;
+  never tell a reader to change a medicine, supplement, diet or treatment.
+- Same result, same label, same conclusion (the report groups candidate pairs by label).
+- Before publishing a module, two independent reviewer agents read the rendered report: a lay reader and
+  a scientific reviewer (`docs/REPORT_VOICE.md` § *Independent review before publishing*).
 
 ## Registry stores (`registries:` in `modules.yaml`)
 
@@ -420,6 +473,13 @@ disables; absent section = no filtering) is applied in `user_vcf_normalized`. A 
 - **Never bypass**: every annotation path reads the normalized parquet, never the raw VCF.
 - `RefCall` reference blocks are dropped on purpose.
 - `build_quality_filter_expr()` matches column names case-insensitively and casts DP/QUAL to numeric.
+- **The caller's verdict first; thresholds judge only what a record states** (`unstated_metrics`,
+  default `keep`). `min_depth` reads `DP`, else DRAGEN's `JDP`. A PASS record stating no depth or QUAL
+  is judged by FILTER alone: a VCF `.` is unknown, not zero. Before this, `DP >= 10` evaluated to null
+  and dropped every call of DRAGEN's RH, GBA, CYP21A2 and CYP2D6 targeted callers (116 in Livia's VCF),
+  at exactly the paralogous loci where they beat the small-variant caller. FILTER is never overridden
+  (`TargetedConflict` stays dropped). Normalization reports `kept_depth_unstated` /
+  `kept_qual_unstated`; the field is in `config_hash`. Tests: `test_quality_filters.py`.
 - `sex="Female"` logs a warning for chrY variants but never removes them.
 
 ## Dagster pipeline
