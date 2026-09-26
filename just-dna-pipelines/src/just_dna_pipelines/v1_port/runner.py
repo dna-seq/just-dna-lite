@@ -20,8 +20,9 @@ from typing import Optional
 
 from just_dna_enricher.enrich import enrich
 from just_dna_enricher.literature import enrich_literature
-from just_dna_enricher.locations import resolve_ensembl_reference
+from just_dna_enricher.locations import resolve_clinvar_reference, resolve_ensembl_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
+from just_dna_pipelines.v1_port.reanchor import reanchor_indels_to_clinvar
 from pydantic import BaseModel, Field
 
 from just_dna_pipelines.module_compiler.compiler import compile_module, validate_spec
@@ -187,6 +188,21 @@ def port_module(
             )
         if literature.doi_conflicts:
             result.warnings.append(f"{len(literature.doi_conflicts)} DOI conflict(s)")
+
+    if module.needs_ensembl:
+        # Re-anchor indel coordinates the Ensembl cache placed off the caller/ClinVar convention
+        # to ClinVar's spelling before compile, so the position join can match them. Ensembl is the
+        # only coordinate authority the enricher uses and it validates ref/alt against itself, so a
+        # systematically off-anchored insertion (S117/RM267 — measured 0/57,742 ClinVar insertions
+        # matching) ships self-consistent and silently unmatchable. Runs on the final resolution.csv,
+        # after any prune/re-enrich, and rewrites the derived genotype in lockstep. Filed upstream as
+        # S117/S120/S121; RM267 assigns this build-side re-anchor to the pipeline.
+        reanchor_report = reanchor_indels_to_clinvar(out_dir, resolve_clinvar_reference())
+        if reanchor_report:
+            result.warnings.extend(reanchor_report)
+            with (out_dir / "v1_port.log").open("a", encoding="utf-8") as handle:
+                handle.write("indel re-anchor to ClinVar (S117/RM267):\n")
+                handle.writelines(f"  - {line}\n" for line in reanchor_report)
 
     if do_compile:
         # Inject-only: the coordinates come from resolution.csv, never from a cache at compile time.

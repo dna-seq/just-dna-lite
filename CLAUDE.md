@@ -192,6 +192,22 @@ does not call it.
 - `v1_port/runner.py` clears every sidecar candidate before `enrich` so the rebuild writes
   `licensing.csv`. `clinvar_panel.py` writes no `panel:` block; its provenance (incl. `panel_genes`) is
   in `clinvar_panel.log`.
+- **`v1_port/runner.py` re-anchors indel coordinates to ClinVar before compile** (`reanchor.py`,
+  gated `module.needs_ensembl`). The enricher resolves rsID→coordinate from the Ensembl cache alone
+  (every `resolution.csv` row is `authority=ensembl`) and validates ref/alt against that same source,
+  so an Ensembl-dump insertion anchored one base off the caller/ClinVar convention ships
+  self-consistent and unmatchable — the position join silently drops real carriers (measured on
+  `superhuman`: rs72613567 `4:87310241 A>AA` where callers/ClinVar carry `4:87310240 T>TA`, +2 others).
+  Upstream: **S117** (the Ensembl anchor defect, → RM267 + RM268), **S120** (the format declares no
+  coordinate-normalization convention, so a legal respelling is a silent miss), **S121** (single-authority
+  resolution with no cross-authority discordance check). RM267 assigns the build-side re-anchor here.
+  `reanchor_indels_to_clinvar` adopts ClinVar's `(start, ref, alt)` for a single-alt indel rsID ClinVar
+  places differently (ClinVar/dbSNP is the rsID authority), clears the now-wrong VRS id, and re-derives
+  the genotype by zygosity role; **multi-allelic authored rows and rsIDs ClinVar does not carry are left
+  alone and reported, never guessed**. Reference-free on purpose — left-alignment would need the GRCh38
+  FASTA (not a guaranteed workspace asset) and would rewrite the authored genotype, and it cannot fix the
+  −1 class ClinVar simply has right. Verified: superhuman's dropped findings match again on
+  antonkulaga (+2) and newton_winter (+2). Tests: `tests/test_reanchor.py`.
 
 ### Building and releasing modules
 
