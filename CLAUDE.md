@@ -1,2219 +1,561 @@
-# Agent Guidelines
+# Agent Guidelines: just-dna-lite
 
-This document outlines the coding standards and practices for **just-dna-lite**.
+## Repository layout
 
----
+A **uv workspace** with two members: `just-dna-pipelines/` (pipeline + CLI library) and `webui/`
+(Reflex UI). Shared folders at the root: `data/`, `docs/`, `logs/`, `notebooks/`. `prepare-annotations`
+and `just-prs` are sometimes added to the workspace; both are **read-only**. Check
+`prepare-annotations/AGENTS.md` for shared Dagster patterns and adopt better ones here.
 
-## Repository Layout (uv workspace)
+### Running
 
-This repo is a **uv workspace** with two member projects:
+- `uv run start` from the repo root starts the full stack (`uv run dagster` for pipelines only).
+- **Launchers never exec a uv console-script wrapper.** Locked-down Windows (AppLocker, Smart App
+  Control) blocks the unsigned `.venv\Scripts\*.exe`. Every hop is `sys.executable -m <module>`:
+  `just_dna_lite.cli start`, `webui.run`, `just_dna_lite.dg dev` (a shim; `dagster_dg_cli` has no
+  `__main__`, and `python -m dagster dev` is deprecated). Build argv with `process.dg_dev_argv` /
+  `webui_dev_argv`. Fenced by `tests/test_cli_entrypoints.py`.
+- **Ctrl+C must kill the whole Dagster daemon tree.** `dg` is detached (`start_new_session` on POSIX,
+  `CREATE_NEW_PROCESS_GROUP` on Windows); `just_dna_lite.process` sends SIGINT then SIGKILL (POSIX) or
+  `CTRL_BREAK_EVENT` then `TerminateProcess` (Windows). Startup reaps stale Reflex processes holding
+  port 3000. A second `uv run start` is last-writer-wins. See `tests/test_process_shutdown.py`.
+- Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners`,
+  **listeners only** (a bare `lsof -ti :port` also matches a browser connected to 3000).
+- If `uv run start` resolves to a dependency's `start` (e.g. `prs-ui`'s), uv kept stale wrappers: bump
+  the root `just-dna-lite` version and `uv sync`. Never rename the command or duplicate entries.
 
-- `just-dna-pipelines/`: pipeline/CLI library (Python package: `just-dna-pipelines`)
-- `webui/`: Reflex Web UI (Python package: `webui`)
+## Dependency pins
 
-Shared, repo-level folders live at the workspace root (e.g. `data/`, `docs/`, `logs/`, `notebooks/`).
+- The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.9.12` in
+  `webui/pyproject.toml`. Everything else floats on `>=`. No `constraint-dependencies` or
+  `override-dependencies` exist anywhere.
+- Deliberate ceilings: `grpcio<1.82` and `grpcio-health-checking<1.82` in lockstep (1.82 gencode needs
+  protobuf 7.35, dagster caps `protobuf<7`); `google-genai<2.0`; `requires-python >=3.13,<3.14`.
+- `agno[mcp]>=3.0.10`: agno 3 imports the mcp 2.x names, so depend on its extra; never re-add a bare
+  `mcp<2.0` cap.
+- Format libs: `just-dna-format>=0.7.0`, `just-dna-compiler>=0.7.1`, `just-dna-enricher>=0.7.2`.
+  `just-dna-registry>=0.26.1` **moves with the format pin**: `contract_compatible` treats a `0.x`
+  format minor as breaking on either side, so a mismatched pair refuses to publish with no obvious
+  cause. Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
+- **Upgrading reflex does not upgrade `reflex-components-*`.** Upgrade them explicitly, then compare
+  `uv pip list | grep reflex` with the release notes:
+  `uv lock --upgrade-package reflex-components-core --upgrade-package reflex-components-radix && uv sync`.
+  Transitive caps shift between reflex releases (e.g. `wrapt`); either direction is expected.
+- `webui/reflex.lock/package.json` and `bun.lock` are generated; never hand-edit, regenerate both
+  together (`frozen_lockfile` fails fast on drift).
 
-We sometimes (for example purposes) add prepare-annotations to the workspace. This folder is READ-ONLY you are not allowed to make changes in it!
+## Coding standards
 
-### Running the App
+- Type hints everywhere. `pathlib` for paths. Absolute imports only. **No inline imports** (the one
+  exception: a module-level `try/except ImportError` for an optional dependency).
+- Avoid try/except unless the error is genuinely expected; never nest them.
+- Polars over pandas; lazy (`scan_parquet`) and streaming (`sink_parquet`); pre-filter before joins.
+- Typer for CLIs, Pydantic 2 for data classes, Eliot for structured logging.
+- Data lives in `data/input`, `data/interim`, `data/output`. Create missing directories in code.
+- No placeholder paths, no legacy shims: refactor aggressively.
+- Read terminal warnings, deprecations especially; your API knowledge may be stale.
+- Versions live in `pyproject.toml`, never `__init__.py`. Avoid `__all__`.
+- `uv sync` / `uv add` only, never `uv pip install`.
+- **`[tool.uv.sources]` holds workspace members only.** A `path =` / `editable =` source pointing at a
+  sibling checkout makes `uv sync` fail on every other machine. Test unpublished libs with an
+  uncommitted override.
+- **A pin that won't resolve is waited for, not rerouted.** Poll `curl -s https://pypi.org/pypi/<pkg>/json`
+  with backoff (30s, 1m, 2m, 4m, 8m, 15m), then stop and report. No path source, vendoring or downgrade.
+- When an outdated-API mistake causes a crash or major logic failure, record the correct usage in this
+  file.
 
-The recommended way to start the application is from the repo root:
+## Module configuration (`modules.yaml`)
 
-- `uv run start` - Starts the Reflex Web UI development server.
+`modules.yaml` lists module **sources** (any fsspec URL), optional **display metadata** (`title`,
+`description`, `icon`, `color`, `report_title`), the **Ensembl reference** (`ensembl_source.repo_id`),
+`quality_filters`, `registries` and `immutable_mode`. Modules are always auto-discovered; unlisted ones
+get generated defaults.
 
-**Ctrl+C must kill the Dagster daemon tree, not just `dg`.** Launchers detach `dg` (`start_new_session` on POSIX, `CREATE_NEW_PROCESS_GROUP` on Windows). Shutdown is in `just_dna_lite.process`: POSIX uses SIGINT then SIGKILL; Windows uses `CTRL_BREAK_EVENT` then `TerminateProcess`. Startup also reaps leftover Reflex UI processes for this workspace so a stale frontend cannot keep port 3000. A second `uv run start` is last-writer-wins (no pidfile); the dying instance only reaps PIDs that already existed when shutdown began. Ctrl+Z/`SIGTSTP` is POSIX-only. See `tests/test_process_shutdown.py`.
+- **Layering**: the git-tracked repo-root file holds defaults (bundled fallback:
+  `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`). Runtime writes go to the gitignored working
+  copy `data/interim/modules.yaml` via `get_config_path()`. `_load_config()` **merges** the working copy
+  over the defaults (`module_metadata` dict-merged, `sources` unioned by url, `registries` by key). Never
+  substitute one for the other: a working copy that replaced the defaults stripped every built-in
+  module's metadata.
+- **A broken working copy is recovered from; a broken default is not.** `_load_config()` runs at import
+  (`MODULES_CONFIG`), so a raise there shows up as Dagster's traceback-less `Error loading repository
+  location`. `_read_yaml_tolerant` falls back to defaults and `_warn_unusable_working_copy` reports on
+  eliot **and** as a `UserWarning`. The default keeps the raising `_read_yaml` (recovering would yield
+  zero sources and a healthy-looking app that annotates nothing). `save_config` moves an unparseable copy
+  to `modules.yaml.corrupt` instead of overwriting it. `module_registry`'s three register/unregister
+  paths read the copy alone (unmerged) through `module_config.read_config_for_update`. Tests:
+  `just-dna-pipelines/tests/test_modules_yaml_recovery.py`.
+- Never hardcode module lists, metadata, HF repo URLs or the Ensembl repo id: use `get_module_meta()`,
+  `build_module_metadata_dict()`, `MODULES_CONFIG.sources`, `MODULES_CONFIG.ensembl_source.repo_id`.
+- Source URL forms: `org/repo` or `hf://datasets/org/repo`, `github://org/repo`, `https://…`, `s3://…`,
+  `gcs://…`. A lead table at the root means a single module; subfolders with one mean a collection;
+  override with `kind: module|collection`.
+- A **lead table** is any family in `module_config.LEAD_TABLES` (`weights` for most, or `pharm_variants`,
+  `diplotypes`, `pgs`, …). Adding a family there teaches discovery and the publisher at once. Never test
+  for `weights.parquet` alone: that hid `pharm_variants`-led modules from discovery and the publish pane.
+  `module_config.has_lead_table` / `find_lead_table` are the local twin of discovery's
+  `hf_modules._find_lead_table`.
+- Key files: `module_config.py` (models, loader, helpers), `annotation/hf_modules.py` (discovery,
+  `MODULE_INFOS`, `DISCOVERED_MODULES`).
 
-**The launchers never start a child through a uv console-script wrapper.** `.venv\Scripts\start.exe`, `run.exe` and `dg.exe` are unsigned executables uv writes into a user-writable folder, which locked-down Windows laptops (AppLocker, Smart App Control) refuse to execute — a user without admin rights reported `start.exe` blocked outright. Every hop is `sys.executable -m <module>` instead: `python -m just_dna_lite.cli start` (the Windows `.bat`, and the documented fallback), `python -m webui.run` for the UI, and `python -m just_dna_lite.dg dev` for Dagster (`dagster_dg_cli` has no `__main__`, so `just_dna_lite/dg.py` is a three-line shim; `python -m dagster dev` is deprecated and warns). `dagster dev` already spawns its own children as `python -m`. Build argv with `process.dg_dev_argv` / `webui_dev_argv`, never a script name; `tests/test_cli_entrypoints.py` fences it, and the reapers match both the new and the old command lines. Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners` — `netstat` on Windows, `lsof`/`fuser` elsewhere, **listeners only** (the old `kill-ports` query `lsof -ti :port` also matched a browser connected to 3000).
+## Shared format libraries
 
-### uv Script Entry Point Collisions
+The module schema, compiler and enricher are published libraries shared with `just-dna-marketplace` and
+`just-dna-agents`. **Never vendor or fork them, and never assume a symbol is unused** because this repo
+does not call it.
 
-If `uv run start` or another project script unexpectedly resolves to a dependency's script
-(for example `prs-ui`'s `start` instead of Just-DNA-Lite's `start`), do **not** rename the
-user-facing command or duplicate script entries in workspace members. This can happen after
-dependency upgrades when uv keeps stale generated wrappers in `.venv/bin`. Bump the main
-`just-dna-lite` package version after upgrading dependencies, then run `uv sync` so uv rebuilds
-and reinstalls the root package entry points. The root package's script should own public commands
-like `start`.
+- `just_dna_format`: `spec` (authored models), `manifest`, `integrity`, `identity`, `vocab`
+  (`RSID_PATTERN` lives here, not in `spec`), `alleles`, `derive`, `layout`, `vrs`.
+- `just_dna_compiler`: import from **`just_dna_compiler.compiler`** (`validate_spec`, `compile_module`,
+  `reverse_module`); the package root exports nothing. `resolution` is table-injected only.
+- `just_dna_enricher`: enrichment and the DuckDB Ensembl `resolver` (`resolve_variants`,
+  `EnsemblReferenceError`). Inject-only: it never downloads a reference.
+- `just_dna_pipelines.module_compiler` is a re-export shim; import from the libs in new code. The one
+  local piece is `module_compiler/resolver.py::ensure_resolver_db` (HF download + DuckDB build), which
+  `register_custom_module` and the pipelines `resolve_variants` wrapper use to auto-provision.
+- **Filing upstream**: never edit or commit the `just-dna-format` repo, and never touch its `ROADMAP.md`
+  or `CHANGELOG.md`. Append a `## Sn — <what happened>` section to
+  `/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`, claiming the id with
+  `.claude/triage-state.py --next`. Write a report (what you ran, expected, got, did meanwhile), not a
+  request. That note is the whole job.
 
----
+### Contract facts that bite
 
-## Dependency Pins — Where Every Version Constraint Lives
+- **Versioning**: a new optional column is a minor. `artifact.digest` moves on every recompile across a
+  version boundary; `content_signature` (authored identity) does not. Re-pin anything that caches a
+  digest; keying on `content_signature` needs nothing. We cache neither. 1.0 will remove `state`.
+- **Three artifact generations are live**: 0.3 on HuggingFace, 0.5 (backup at
+  `data/interim/v1_port_0_5/`, gitignored) and 0.7 (the rebuilt `data/interim/v1_port/`). Every read path
+  must handle all three; classify by the columns and values present, never by family name or era.
+- `variant_key` is the authored identity: the rsid for rsid-authored rows, a `ga4gh:VA.…` id for a
+  coordinate-authored SNV, else `chrom:start:ref[:alts]`. Per-ALT VRS ids for rsid modules are in
+  `resolution.csv`. `ModuleInfo.version` is a SemVer **string**.
+- **`direction` and `clin_sig` are authored-optional and often empty.** The compiler never fills a blank
+  cell. Read through `report_logic._effective_direction` / `_effective_clin_sig`: column first, else
+  `derive.direction_from_state(state, weight)` / `derive.clin_sig_from_booleans`. Any new parquet-side
+  read must do the same. Never round-trip `clin_sig` through the booleans (they cannot say
+  `likely_pathogenic`). `direction == "contested"` is a finding, distinct from `unknown`; sign 0, no
+  colour.
+- **`locus_count > 1` marks an expansion member** (one rsid placed at N loci). Defaults to 1, so test
+  `> 1`, never truthiness. `None` (pre-0.6) and `1` render nothing; do not coalesce `None` to `1`. Keep
+  the pre-0.6 `ref`-spelling guard beside it; it only sees members disagreeing on `ref`.
+- **`ARTIFACT_PARQUETS`, `LEAD_PARQUETS`**: import, never re-list. `module_config.LEAD_TABLE_CSVS` is the
+  single lead-family to CSV map. `tests/test_format_0_6.py` asserts set equality with the compiler.
+- **Licence sidecar**: reach it through `just_dna_format.layout` (`resolve_sidecar`,
+  `sidecar_write_path`, `sidecar_candidates`), never by name. Both spellings present raises
+  `SidecarCollision`. The rename stops at the file: `licensing.csv` → `sources.parquet` →
+  `manifest.sources`; do not rename the latter two.
+- **`manifest.weighting`** says what scale `weight` is on. Absent means unstated, never comparable. We
+  never aggregate `weight` across modules; if you do, that block is the gate.
+- **`StudyRow.variant_key` may be `None`** (a citation for a bin boundary). Do not coerce it; handle the
+  null in any join on it.
+- `studies.parquet` `confidence` renders **with its `confidence_unit` or not at all**.
+  `pharm_variants.pmid` renders as *Citation* beside *Evidence level*, both or neither.
+- `clin_sig_concordance.parquet` (via `ModuleInfo.concordance_url`) is joined on
+  `(variant_key, genotype)`; `discordant` renders *Authorities disagree*. Nothing picks a winner;
+  `unchecked` renders nothing.
+- `requires_callable == True` blocks restoration; `False` and null keep the row. Write
+  `is_null() | ~col`, not `fill_null(False)`.
+- Enricher exceptions: we hold no `except` around enricher passes. If you add one, order narrow-first
+  (the unavailability type is a subclass).
+- `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes`, `categories`,
+  `study_count`, `module_name`.
 
-Audited 2026-07-28 across all nested `pyproject.toml` files in the multi-repo workspace. Consult
-this before hunting for a version pin; **do not re-derive it by grepping every repo.**
+### Build traps
 
-### Every `pyproject.toml` in the workspace (and whether it hard-pins)
+- **`compile_module(resolve_with_ensembl=False)` disables all resolution**, including an injected
+  `resolution.csv`, and compiles "successfully" with `chrom=None` everywhere. Use
+  `compile_module(spec, out, resolve_with_ensembl=True, ensembl_cache=None)`.
+- **`load_env()` before the first `resolve_*_reference()` in a process**, or the first default cache dir
+  resolves from platformdirs and returns `None`.
+- **Provision caches with `uv run pipelines prepare-caches`** (`caches.prepare_caches`), never
+  `just-dna-enricher cache pull` (removed upstream; pulled only published lanes, to the wrong dir).
+- `just_dna_pipelines.enricher_cli` mounts `just_dna_enricher.cli` behind a guarded import (it failed
+  beside dagster's protobuf before enricher 0.7.2). Do not import `just_dna_enricher.cli` anywhere else.
+  `just_dna_lite.cli` owns the installed script.
+- `draft_gene_panel` aborts on ClinVar's malformed 9-digit PMIDs; `v1_port/clinvar_panel.py` passes
+  `max_citations=0` and drafts its own filtered `studies.csv`.
+- Since format 0.6 the compiler places `pharm_variants` / `haplotypes` / `heteroplasmy` from
+  `resolution.csv` too (`manifest.compilation.positional_rows[_placed]`; `None` = not counted). Older
+  artifacts still carry null coordinates, hence value-based routing below.
+- `v1_port/runner.py` clears every sidecar candidate before `enrich` so the rebuild writes
+  `licensing.csv`. `clinvar_panel.py` writes no `panel:` block; its provenance (incl. `panel_genes`) is
+  in `clinvar_panel.log`.
 
-| File | Package | Hard `==` pins? |
-|------|---------|-----------------|
-| `pyproject.toml` (root) | `just-dna-lite` | no — but has deliberate ceilings, see below |
-| `just-dna-pipelines/pyproject.toml` | `just-dna-pipelines` | none (floors only: `just-dna-format>=0.6.6`, `just-dna-compiler>=0.6.6`, `just-dna-enricher>=0.6.6` — see the 0.6 note below) |
-| `webui/pyproject.toml` | `webui` | **yes — `reflex==X` (the only `==` pin in the whole workspace)** |
-| `../just-prs/pyproject.toml` | `just-prs-workspace` | none |
-| `../just-prs/just-prs/pyproject.toml` | `just-prs` | none |
-| `../just-prs/prs-ui/pyproject.toml` | `prs-ui` | none (`reflex>=`, `reflex-components-*>=`, `reflex-mui-datagrid>=`) |
-| `../just-prs/prs-pipeline/pyproject.toml` | `prs-pipeline` | none |
-| `../just-dna-format/pyproject.toml` | (workspace root) | none |
-| `../just-dna-format/schema/pyproject.toml` | `just-dna-format` | none |
-| `../just-dna-format/compiler/pyproject.toml` | `just-dna-compiler` | none |
-| `../just-dna-format/enricher/pyproject.toml` | `just-dna-enricher` | none |
-| `../just-dna-marketplace/pyproject.toml` | `just-dna-registry` | none |
-| `../reflex-mui-datagrid/pyproject.toml` | `reflex-mui-datagrid` | none (`reflex>=0.9.4`) |
-| `../reflex-mui-datagrid/examples/datagrid_demo/pyproject.toml` | `datagrid-demo` | none |
+### Building and releasing modules
 
-**Takeaway: the single hard `==` pin in the entire workspace is `reflex` in `webui/pyproject.toml`.**
-Everything else floats on `>=`.
-
-### Non-`==` constraints that still deliberately hold versions back
-
-All in the **root** `pyproject.toml`:
-
-- `grpcio-health-checking<1.82` and `grpcio<1.82` — 1.82.0 ships `_pb2` gencode built against
-  protobuf 7.35, but dagster caps `protobuf<7`; the resolved protobuf 6.x is then older than the
-  gencode and dagster fails to import. Keep both in lockstep. (Reason is already commented inline.)
-- `google-genai>=1.71.0,<2.0` (also repeated in `webui/pyproject.toml`)
-- `requires-python = ">=3.13, <3.14"`
-- `agno` is pinned **by git rev**, not version, in root `[tool.uv.sources]`.
-
-- `just-dna-registry>=0.18.2` in the root, and it is **coupled to the format floor rather than
-  independent**: `version.contract_compatible` compares the installed `just-dna-format` version on
-  client and server and treats a `0.x` minor as breaking. Move the two together or a publish is refused
-  with no obvious cause. See the 0.6 note under *Shared Module Format & Compiler Libraries*.
-
-There are **no** `[tool.uv] constraint-dependencies` / `override-dependencies` anywhere.
-
-### Upgrading Reflex: the `reflex-components-*` family does NOT follow
-
-`reflex` requires its siblings with `>=` only (`reflex-components-core>=`, `-radix>=`, …), so
-bumping the `reflex==` pin and running `uv sync` upgrades **only** `reflex` + `reflex-base` and
-leaves every `reflex-components-*` at its already-locked version. Each reflex release is tested
-against specific companion versions (check its release notes), so upgrade them explicitly:
+Runbook: [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md); what each module is:
+[docs/V1_PARITY.md](docs/V1_PARITY.md). Republishing is the maintainer's call.
 
 ```bash
-uv lock --upgrade-package reflex-components-core --upgrade-package reflex-components-radix
-uv sync
+uv run pipelines v1-port port --all        # six curated Gen-I ports
+uv run pipelines v1-port clinvar --all     # cardio / cancer / pathogenic
+uv run pipelines v1-port pharmgkb          # drug response (ClinPGx)
+uv run python scripts/registry_precheck.py --namespace sandbox   # publish dry run
 ```
 
-Then verify with `uv pip list | grep reflex` against the release notes. Note reflex also caps some
-transitive deps (0.9.7 added `wrapt<2.2`, which *downgraded* `wrapt`; by 0.9.11 the cap is gone and
-`wrapt` floats again, 2.3.0 as of 2026-09-22 — either direction is expected, not a mistake).
-
-### Frontend (npm) pins
-
-`webui/reflex.lock/package.json` + `bun.lock` are **generated** by reflex — never hand-edit. Reflex
-0.9.7 added `rx.Config.frozen_lockfile` (default `True`): if those two drift out of sync, bun's
-install fails fast instead of silently updating. Regenerate both together.
-
----
-
-## Coding Standards
-
-- **Avoid nested try-catch**: try catch often just hide errors, put them only when errors is what we consider unavoidable in the use-case
-- **Type hints**: Mandatory for all Python code.
-- **Pathlib**: Always use for all file paths.
-- **No relative imports**: Always use absolute imports.
-- **No inline imports**: All imports must be at the module top level. Never use `from X import Y` inside functions or methods. The only exception is guarded `try/except ImportError` for optional dependencies at module level.
-- **Polars**: Prefer over Pandas. Use lazyframes (`scan_parquet`) and streaming (`sink_parquet`) for efficiency.
-- **Memory efficient joins**: Pre-filter dataframes before joining to avoid materialization.
-- **Data Pattern**: Use `data/input`, `data/interim`, `data/output`.
-- **Typer CLI**: Mandatory for all CLI tools.
-- **Pydantic 2**: Mandatory for data classes.
-- **Eliot**: Used for structured logging and action tracking.
-- **Pay attention to terminal warnings**: Always check terminal output for warnings, especially deprecation ones. AI knowledge of APIs can be outdated; these warnings are critical hints to update code to the current version.
-- **No placeholders**: Never use `/my/custom/path/` in code.
-- **No legacy support**: Refactor aggressively; do not keep old API functions.
-- **Dependency Management**: Use `uv sync` and `uv add`. NEVER use `uv pip install`.
-- **No dependency paths outside this repo**: `[tool.uv.sources]` may only contain workspace members
-  (`{ workspace = true }`). Never add a `path =` / `editable =` entry pointing at a sibling checkout
-  (`just-dna-marketplace`, `just-prs`, `just-dna-format`, …) — the absolute path does not exist on
-  other machines, in CI, or in containers, and `uv sync` then hard-fails with
-  `Distribution not found at: file:///…` before a venv can even be created. Every shared lib we
-  consume is published. Test unpublished libs with a temporary uncommitted override only.
-- **A pin that will not resolve is something you wait for, not something you reroute**: when a needed
-  version is not on PyPI yet, poll for it with exponential backoff for up to ~30 minutes total
-  (30s, 1m, 2m, 4m, 8m, 15m) and then stop and report that it is still unpublished. Never work around
-  it with a local path source, a vendored copy, or a quiet downgrade of the pin. Poll the index
-  directly (`curl -s https://pypi.org/pypi/<pkg>/json`), not by re-running `uv sync` in a loop.
-- **Versions**: Do not hardcode versions in `__init__.py`; use `project.toml`.
-- **Avoid __all__**: Avoid `__init__.py` with `__all__` as it confuses where things are located.
-- **Cross-Project Knowledge**: We sometimes add `prepare-annotations` to the workspace. This folder is **READ-ONLY**. You MUST check `@prepare-annotations/AGENTS.md` for shared Dagster patterns, resource tracking, and best practices. If you find a superior pattern there that is applicable to `just-dna-lite`, you should adopt it and update this file.
-- **Self-Correction**: If you make an API mistake that leads to a system error (e.g. a crash or a major logic failure due to outdated knowledge), you MUST update this file (`AGENTS.md`) with the correct API usage or pattern. This ensures future agents don't repeat the same mistake.
-
----
-
-## Module Configuration (`modules.yaml`)
-
-Annotation module sources and display metadata are configured in **`modules.yaml`**. The loader checks two locations (first found wins):
-
-1. **Project root** (`./modules.yaml`) — preferred, easy for users to find and edit
-2. **Package directory** (`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) — bundled fallback
-
-This is the single source of truth for:
-
-1. **Sources** to scan for modules (any fsspec-compatible URL: HuggingFace, GitHub, HTTP, S3, etc.)
-2. **Display metadata** overrides (title, description, icon, color, report_title) for known modules
-3. **Ensembl reference dataset** (`ensembl_source.repo_id`) — the HuggingFace dataset used for Ensembl variation annotation
-
-**Modules are always auto-discovered** from the configured sources. The YAML only provides optional display overrides. Modules not listed in `module_metadata` get auto-generated defaults (titlecased name, generic icon, default color).
-
-**Read/write separation**: The repo-root `modules.yaml` is git-tracked and read-only (defaults). All runtime mutations (register/unregister custom modules) write to a working copy at `data/interim/modules.yaml` (gitignored). On first write the repo default is copied as seed. The loader checks working copy → repo root → package dir (first found wins).
-
-### Key files
-
-- **`modules.yaml`** (project root): Git-tracked defaults — sources, Ensembl reference, quality filters, metadata overrides
-- **`data/interim/modules.yaml`**: Mutable working copy (gitignored) — written by register/unregister
-- **`module_config.py`**: Pydantic models (`Source`, `ModuleMetadata`, `EnsemblSource`, `ModulesConfig`), YAML loader, helper functions (`get_module_meta()`, `build_module_metadata_dict()`, etc.)
-- **`annotation/hf_modules.py`**: Discovery logic — scans sources via fsspec, builds `MODULE_INFOS` and `DISCOVERED_MODULES`
-
-### Adding a new module source
-
-1. Upload data to any fsspec-accessible location (HF repo, GitHub, HTTP server, S3, etc.)
-2. Add the source URL to `modules.yaml` under `sources:`
-3. Optionally add display metadata under `module_metadata:`
-4. Modules are auto-discovered on next startup
-
-### Source types (auto-detected from URL)
-
-- `org/repo` (shorthand) or `hf://datasets/org/repo` → HuggingFace
-- `github://org/repo` → GitHub via fsspec
-- `https://...` → HTTP/HTTPS via fsspec
-- `s3://...`, `gcs://...` → cloud storage via fsspec
-
-### Module vs Collection
-
-Each source can be a single module or a collection:
-- **Auto-detect** (default): a *lead table* at root = single module; subfolders with one = collection.
-  The lead table is any family in `module_config.LEAD_TABLES` — `weights.parquet` for most modules,
-  or a 0.4 family (`pharm_variants`, `diplotypes`, `pgs`, …) for one that has no weights. Probing for
-  `weights.parquet` alone used to make a pharmacogenomics module undiscoverable, and therefore
-  unpublishable to HuggingFace. Add a new family to that tuple and discovery and the publisher both
-  learn it at once. A 0.4-led table has no coordinates (the compiler applies `resolution.csv` to
-  `weights.parquet` only), so annotation joins it on rsid + genotype instead of by position.
-- **Override**: `kind: module` or `kind: collection` in the YAML source entry
-
-### Important patterns
-
-- **Never write to repo-root `modules.yaml`** — use `get_config_path()` which returns the working copy at `data/interim/modules.yaml`
-- **Never hardcode module lists or metadata in Python files** — always use `get_module_meta()` or `build_module_metadata_dict()` from `module_config`
-- **Never hardcode HF repo URLs** — use `DEFAULT_REPOS` or `MODULES_CONFIG.sources` from `module_config`
-- **Never hardcode Ensembl repo ID** — `EnsemblAnnotationsConfig.repo_id` defaults to `MODULES_CONFIG.ensembl_source.repo_id`
-- `HF_DEFAULT_REPOS`, `HF_REPO_ID` in `hf_modules.py` are backward-compatible aliases sourced from the YAML
-
----
-
-## Shared Module Format & Compiler Libraries (`just-dna-format` / `just-dna-compiler`)
-
-The annotation-module **schema** (authored DSL spec + `manifest.json` contract + integrity/identity)
-and the **reference compiler** (spec directory → parquet artifact + manifest) were extracted out of
-this repo into two published libraries. **Do not re-vendor or fork them here.**
-
-- **`just-dna-format`** (`just_dna_format`, Pydantic + stdlib only):
-  - `spec` — authored DSL: `ModuleSpecConfig`, `VariantRow`, `StudyRow`, `ModuleInfo` (+ `VALID_STATES`, `VALID_CHROMOSOMES`, `RSID_PATTERN`, `ALLELE_PATTERN`, `SCHEMA_VERSION`)
-  - `manifest` — `ModuleManifest` + `Identity`/`Display`/`Stats`/`Compilation`/`FileEntry`/`Artifact`, `read_manifest`/`write_manifest`
-  - `integrity` — `sha256_file`, `artifact_digest` (Merkle root), `build_artifact`, `verify_manifest`
-  - `identity` — name/namespace rules, SemVer `Version`, `canonical_id`, legacy `vN → N.0.0`
-- **`just-dna-compiler`** (`just_dna_compiler`, adds polars/duckdb): `validate_spec`,
-  `compile_module` (emits `manifest.json` with input/artifact hashes + digest), `reverse_module`.
-  **Import these from `just_dna_compiler.compiler`, not from the package root** — as of 0.6.6
-  `just_dna_compiler/__init__.py` exports nothing at all (`dir(just_dna_compiler)` is empty), so
-  `from just_dna_compiler import validate_spec` raises `ImportError`. The other submodules are
-  `cli`, `draft`, `hints`, `models`, `resolution`, `scaffold`.
-- **`just-dna-enricher`** (`just_dna_enricher`, added in the 0.5 line): the network/reference tier —
-  Ensembl/ClinVar/gnomAD/PGx enrichment, and the Ensembl `resolver` (`EnsemblReferenceError`,
-  `resolve_variants`). Still **inject-only**: it never downloads a reference.
-
-These libraries are **shared by three repos**: `just-dna-lite` (this one), `just-dna-marketplace`,
-and `just-dna-agents`. Treat them as an external contract; **do not assume a symbol is unused** just
-because grep finds no consumer in this repo — the other repos may use it.
-
-### How they're wired into this repo
-- `just_dna_pipelines.module_compiler` is now a **thin re-export shim** over the libs
-  (`models.py` → `just_dna_format.spec` + `just_dna_compiler.models`; `compiler.py` →
-  `just_dna_compiler.compiler`). Prefer importing from the libs directly in new code.
-- **Ensembl provisioning stays local** (the only non-shim piece): `module_compiler/resolver.py`
-  keeps `ensure_resolver_db` (HF download + DuckDB build) because the libs are inject-only.
-  `register_custom_module` and the pipelines `resolve_variants` wrapper auto-provision the cache and
-  inject it; the bare `compile_module` re-export and the `pipelines module compile` CLI stay
-  inject-only (skip resolution with a warning if no cache is present).
-
-### Where things moved in the 0.5 line (format 0.5.0 / compiler 0.5.1 / enricher 0.5.1)
-
-Two import sites in this repo had to move; both are one-liners, but neither is greppable from the
-old name, so check here first:
-
-- `RSID_PATTERN` left `just_dna_format.spec` for **`just_dna_format.vocab`** (0.4.0), where the
-  identifier grammars now live shared across the authored models. `ALLELE_PATTERN` is still
-  re-exported from `spec` for backwards compatibility — `RSID_PATTERN` is not.
-- `just_dna_compiler.resolver` is **gone**. The DuckDB-backed lookup moved to
-  **`just_dna_enricher.resolver`** (same `resolve_variants(variants, ensembl_cache=...)` signature
-  and `EnsemblReferenceError`). What remains in the compiler is `just_dna_compiler.resolution`,
-  which is purely table-injected (`resolve_from_table`) and takes no DuckDB path at all.
-
-*(Floors as of 2026-09-26: format `>=0.7.0`, compiler `>=0.7.1`, **enricher `>=0.7.2`** (bumped from
-0.7.1 for RM254, the S107 CLI-beside-dagster fix — enricher-only patch, format/compiler unchanged),
-registry `>=0.26.1`. **We are on the 0.7 line** — see "What 0.7 changed on our side" below. The 0.6 reasoning that follows
-is kept because every module we have published is still a 0.5 or 0.6 artifact and the mixed-era read
-paths it describes are all still live; only the pinned numbers moved. Both servers answer
-`registry 0.25.2 / format 0.7.0 / compiler 0.7.0`, so `contract_compatible` holds.)*
-
-**We are on 0.6 (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2, adopted 2026-08-18), and the digest
-window is not what the 0.5 note said it was.** That note claimed any new column was a 1.0. Principle 3
-as amended says the opposite and is what actually governs: **a new optional or stamped column is
-additive and lands in a minor** — `content_signature` (the authored identity) does not move, and only a
-recompile's `artifact.digest` does, which Principle 4 already scopes to a fixed `compiler_version`.
-0.6 exercised exactly that: `weights.parquet` went 37 → 39 columns and `artifact.digest` moved on
-**every** module while `content_signature` moved on **none** (upstream measured 0/11 over the 0.5.4
-corpus, 0/16 over its own).
-
-So: **if you cache, gate on, or compare a stored `artifact.digest`, re-pin it at a version boundary.**
-If you key on `content_signature`, do nothing. What *is* reserved for 1.0 is removing a column,
-promoting one to required, retyping one, or changing what an identity key means — `state`'s removal and
-RM81's genotype unification are the two already scheduled.
-
-The three packages version independently, and 0.6 is the case that proves it: the enricher is one patch
-ahead (0.6.2, RM101) while format and compiler stay at 0.6.1. Take 0.6.1 over 0.6.0 — 0.6.0 shipped
-eight defects fixed the next day, one of which (RM95) let a non-vocabulary spelling into
-`content_signature`, the one identity that cannot be withdrawn.
-
-**Registry pins move with the format pin, not separately.** `just_dna_registry.version.contract_compatible`
-compares the *installed `just-dna-format` version* on client and server and treats a `0.x` minor as
-breaking, so a 0.5-format client and a 0.6-format server refuse each other. Registry `0.17.0` is the
-format-0.6 cut and floors at `just-dna-format>=0.6.1`. **The deployed server crossed with us: prod
-answers `registry 0.17.0 / format 0.6.1 / compiler 0.6.1` as of 2026-08-18, so the mismatch window is
-closed and `scripts/registry_precheck.py` rehearses against prod again.** While a window like that is
-open, every publish / download / check fails with a contract-mismatch `VersionMismatchError`, which
-`webui/state.py` surfaces at six call sites as a clear message rather than a crash — expected during
-the window, not a defect to work around. Check what is actually deployed before assuming either way:
-`curl -s $REGISTRY_URL/api/v1/version`.
-
-**From the 0.4.0 schema change:** compiled artifacts gained ~14 columns (`variant_key`,
-`effect_size`, `clin_sig`, `acmg_sf`, …), so freshly compiled modules no longer match the modules
-published on HuggingFace under 0.3.x. `VariantRow.variant_key` is frozen at load, so the resolver no
-longer backfills `chrom`/`start` onto a keyed row. **But `variant_key` is the *authored identity*, not
-always a VRS id** (`derive_variant_key`, format `base.py`): an rsid-authored row keeps its **rsid**
-(case 1 — which is why every Gen-I port shows `variant_key=rsid`, not `ga4gh:…`), a coordinate-authored
-single-base substitution mints a `ga4gh:VA.…` VRS id (case 2), and everything else is
-`chrom:start:ref[:alts]` (case 3). The per-ALT VRS ids for an rsid-authored module live in
-`resolution.csv`'s `vrs_id` column, not in `weights.parquet`. `ModuleInfo.version` is a SemVer
-**string** (an unquoted `1` in YAML loads as an int and is rejected) — the AI module creator's
-template already emits it correctly.
-
-**`direction`/`stat_significance` are authored-optional 0.3 axes and are empty on every Gen-I port**
-(those modules were authored against 0.2, when only `state` existed). `weights.parquet` carries the
-**authored** value verbatim — the compiler never fills a cell the author left blank (report-never-
-repair), so a legacy module's empty `direction` is *correct*, not missing. The mapping
-`direction ← state`(+`weight` sign) is a **Python read-time accessor only**
-(`VariantRow.effective_direction` / `derive.direction_from_state`), unreachable from a SQL/polars read
-of the parquet. **Format 1.0 removes `state` — consumers must key on `direction`.** `report_logic`
-is already ready: `_effective_direction(direction, state, weight)` returns the `direction` column when
-present, else `direction_from_state(state, weight)` (the format's pure leaf), and
-`_variant_sign`/`_variant_color` go through it — so benefit colouring behaves identically on 0.5
-(empty `direction` → derived from `state`) and survives the 1.0 `state` removal (populated `direction`
-→ used directly). **Any new parquet-side read of `direction`/`stat_significance` must do the same** —
-derive with `just_dna_format.derive.direction_from_state(state, weight)`; never treat the empty 0.5
-column as directionless. Whether the artifact itself should carry the derived axes is a format-0.6
-question tracked in just-dna-format's ROADMAP.
-
-**Status (updated 2026-09-26):** the tests are re-baselined and green, and all ten modules have now
-been **rebuilt under 0.7** in `data/interim/v1_port/` (the 0.5 build this line used to describe is
-preserved at `data/interim/v1_port_0_5/`). What is left is **republishing**, which is the maintainer's
-call — see [docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md).
-
-### What 0.6 changed on our side (adopted 2026-08-18)
-
-`just-dna-format/docs/INTEGRATION_0_6.md` is the upstream delta and § 3 is our own change list; our
-field notes back are **S40** in that repo's `CONSUMER_SUGGESTIONS.md`. What actually changed here:
-
-- **`locus_count > 1` is the predicate for "this row is an expansion member"** (RM87), and it replaced
-  our `ref`-spelling guard as the primary test in `restoration.hom_ref_rows`. An rsID resolving onto N
-  loci becomes N rows, at most one of which is the variant the author meant, and nothing else on the
-  row says so. The old guard **stays beside it as the pre-0.6 fallback** — every module we have
-  published predates the column — and it is partial by construction: it groups by `(chrom, start)` and
-  can only see members that disagree about `ref` at one position (the ClinVar dup/del shape). A
-  **same-`ref`** expansion is invisible to it and is real. Measured on a compiled fixture (`shox_par1`
-  with `resolution.csv` twinned onto chrY): two rows, `ref="C"` on both, `locus_count=2`, and the
-  grouped test passes both through. **`locus_count` defaults to `1`, so `> 1` is the test** — a
-  truthiness or `> 0` test would disable restoration on every 0.6 artifact. No `expanded_keys` gate is
-  needed in `hom_ref_rows` (a module compiled without resolution has null coordinates and `placed`
-  already dropped it), but anything that *counts or classifies* rows does need it: `locus_count=1` on
-  such a module means "nothing was checked", not "nothing expanded".
-
-  **Restoration withholds; the report labels — and the asymmetry is the point.** An unobserved
-  hom-ref row at N loci fabricates N results, so it is dropped. A *called* row was really sequenced
-  and really carries that genotype, so dropping it would discard an observation; it renders with a
-  "Position ambiguous" caveat naming N instead. The engine's `ref`-agreement filter already removes
-  the members whose reference allele contradicts the call, so what reaches the report is the
-  same-`ref` case, where every member matches equally well and the ambiguity is genuine. `None`
-  (pre-0.6) and `1` both render nothing — do not coalesce `None` to `1`.
-- **`just_dna_format.alleles.split_genotype` is the one genotype split.** `report_logic._genotype_alleles`
-  now delegates its string case to it. Ours split on `/` only, so a **phased** authored cell came back
-  as one allele — `"A|G"` → `["A|G"]` — and `_zygosity` then rendered nothing. Nothing we ship authors a
-  phased genotype, so no fixture from the corpus could have caught it; that is the argument for the
-  leaf. The engine's `_normalize_lead_genotype` stays a vectorized polars expression (it cannot make a
-  Python call per row over millions of VCF rows) and `tests/test_format_0_6.py` pins both against the
-  leaf over a cell list that deliberately includes `A|G` and `G|A`. **Neither sorts.** Sorting belongs
-  only in `_genotype_join_key`, which rebuilds the *authored* key.
-- **Discovery decides what a module contains from `manifest.artifact.files`** (INTEGRATION § 2.8 — the
-  one change upstream asks a consumer to make rather than making itself). `hf_modules._attested_files`
-  reads the manifest where the source publishes one; `_find_lead_table` consults that list, and
-  `_probe_module_at_path` uses it for the three side parquets. **Falls back to probing when there is no
-  manifest**, and returns `None` rather than an empty set for exactly that reason — an empty set would
-  read as "this module contains nothing". *(That fallback used to be the only live path: this file
-  said "which is every module on HuggingFace today". Measured 2026-08-21 — **all ten modules in
-  `just-dna-seq/annotators` now publish a `manifest.json`**, so attestation is the normal path and
-  probing is the exception. Keep the fallback: a source we have not seen may still publish none.)* Why it matters:
-  the publisher's `upload_folder` adds and replaces but **never removes**, so a module whose table set
-  *shrank* between releases leaves the previous release's parquet at the path, and a probe reads the
-  module as the wrong **kind** (a re-authored PGx module still looks like a SNP core). `logo` and
-  `metadata` keep probing — neither is in `ARTIFACT_PARQUETS`, so no manifest says anything about them.
-
-  **A *partial* manifest is strictly worse than no manifest, and the two surfaces disagree about it.**
-  Attestation wins where a manifest is readable, so one whose `artifact.files` omits the lead parquet
-  makes the module **invisible** to discovery — while `list-custom`, which probes the filesystem
-  through `module_config.has_lead_table`, still lists it, and neither says why. No manifest at all
-  falls back to probing and works. Reported by just-module-creator, 2026-08-21.
-
-  **Discovery reads the whole manifest, not just the file list.** `_remote_manifest` returns it and
-  `_attested_names` projects the file set out (`_attested_files` is now a delegation kept for callers
-  that want only the names). `_probe_module_at_path` also keeps `identity.version`, `artifact.digest`
-  and the `weighting` block on `ModuleInfo` as `manifest_version` / `manifest_digest` /
-  `manifest_weighting`, which is what `read_module_provenance` falls back to when there is no local
-  `manifest.json`. Before that, every HF-discovered module rendered *Not stated* for data the same
-  function had already fetched and thrown away. All three stay tri-state, and a local manifest still
-  wins wherever it speaks. **This is not a latent fix — measured on the live source, all ten HF
-  modules state an `artifact.digest` and none of them has a local directory, so before it every
-  remotely-discovered module rendered *Not stated* in the report's "Modules in this report" table
-  and now every one states its digest.** `identity.version` and `weighting` are still absent on all
-  ten (the HF publisher does not stamp identity, and none authors a weighting block), so those stay
-  *Not stated* — correctly.
-
-  **Anything discovery calls must be defined above `MODULE_INFOS = discover_hf_modules()`**, which
-  runs at import. `discover_modules_from_source` catches per-source failures and logs them, so a
-  `NameError` from a helper defined later in the file does not raise — it makes **every** source fail
-  and discovery return nothing, with the reason only in the eliot log. That is why
-  `_weighting_summary` sits beside `_probe_module_at_path` rather than beside
-  `read_module_provenance`, and why `tests/test_consumer_handoff.py` probes a real directory over
-  `LocalFileSystem`: the tests that caught it all needed the network.
-- **`ARTIFACT_PARQUETS` and `LEAD_PARQUETS` are public now (S35); import them, never re-list them.**
-  `_OUTPUT_FILES` is **gone** — that import was the one hard break in the upgrade. Two hand-kept lists
-  here were deleted rather than updated: the HuggingFace publisher's allowlist named six side tables
-  where 0.6 has nine (a module carrying any of the three new fact tables would have published a
-  manifest attesting parquets the upload never sent — the published digest then unreproducible, which
-  is precisely the defect that broke the upstream publisher on fifteen of sixteen modules), and two
-  copies of "which authored CSV leads a module" named four of the ten families, so a `heteroplasmy`- or
-  `copynumbers`-led module counted zero authored rows. `module_config.LEAD_TABLE_CSVS` is now the single
-  mapping (`weights` → `variants.csv` is the only irregular one) and `tests/test_format_0_6.py` asserts
-  set equality with the compiler both ways.
-- **The licence sidecar is `licensing.csv`, and you reach it through `just_dna_format.layout`.** Never
-  by name. `resolve_sidecar` / `sidecar_write_path` / `sidecar_candidates` implement write-what-you-read
-  over four legal locations (two spellings × root or `derived/`), and **both spellings present is a
-  refusal** (`SidecarCollision`), not a preference — two copies of a fact-hashed, hand-editable table
-  are two claims. Our drafters' stale-file sweep unlinked `sources.csv` literally, which is fine at the
-  root and wrong under `derived/`: the sweep cannot reach `derived/sources.csv`, so the next
-  `sidecar_write_path` finds it as the existing copy and merges into the **deprecated** spelling, which
-  the module then keeps for good. Measured both ways. **The rename stops at the file:**
-  `sources.parquet` and `manifest.sources` keep their names for the whole 0.x tail, so the chain reads
-  `licensing.csv` → `sources.parquet` → `manifest.sources`. Do not "finish" it.
-- **`manifest.weighting` (RM92) is what makes a weight interpretable, and the report now shows it.**
-  `weight` is a bare float with no unit column, so nothing in a pre-0.6 artifact could say what scale it
-  runs on. `read_module_provenance` returns it as a third value and the "Modules in this report" table
-  renders it verbatim beside the version and digest. **Absent is `None` and means the module has not
-  said — never that its weights are comparable to another module's.** We do not aggregate `weight`
-  across modules anywhere (`total_weight` is per module, summed over one module's categories); if you
-  ever want to, that block is the gate, and an absent block means *do not*.
-- **`StudyRow` may now name no variant at all** (RM47), so `StudyRow.variant_key` can be `None`. This is
-  **not** in the upstream integration note (it is S40's first item). `load_studies_for_variants` groups
-  by `rsid` and a null rsid matches nothing, which is the correct outcome for a citation grounding a bin
-  boundary rather than a variant. Do not repair a null key into a string, and do not join
-  `studies.parquet` on `variant_key` without handling the null.
-- **Nothing changed for the enricher exception contract (INTEGRATION § 8).** We hold no `except` around
-  any enricher pass, so there was no handler to reorder and none that had been silently dead. If you
-  ever add one, read that section first: the trap is two separate `except` arms with the parent type
-  first, which goes silently dead because the unavailability type is now a *subclass*. Order narrow-first.
-- **Trust badging needs nothing.** We read `trusted` from the registry rather than computing it, and
-  `_trust_word` already keeps it tri-state. Registry 0.17 reads RM44's counters (`resolution_subjects`
-  beside `fully_resolved`) and keeps the `UNJOINABLE_PHRASE` match for artifacts predating them.
-- **The ten modules in `data/interim/v1_port/` were rebuilt under 0.7 on 2026-09-26** (against enricher
-  0.7.2 / compiler 0.7.1 / format 0.7.0), replacing the long-standing 0.5 artifacts. The pre-rebuild
-  0.5 corpus is preserved at `data/interim/v1_port_0_5/` (gitignored, local-only), so the mixed-era
-  read paths — `_annotations_keying`'s three generations, the pre-0.6 `ref` guard, `UNJOINABLE_PHRASE`
-  — still have live 0.5 artifacts to exercise them, now via that backup and the HuggingFace-published
-  0.3/0.5 copies rather than the working tree. Republishing remains the maintainer's call (see
-  `docs/MODULE_RELEASE_0_5.md`). The rebuild was clean (all ten compile; pharmgkb now places 1531/1531
-  and annotates — see the pharmgkb note under *0.5 traps*); the only code change it required was a
-  sidecar sweep in `v1_port/runner.py` (below).
-
-- **`v1_port/runner.py` sweeps the deprecated licence sidecar before enrich (added 2026-09-26).** The
-  enricher writes the sidecar write-what-you-read, so a port dir carrying a seeded `sources.csv` (the
-  spelling format 0.6 deprecated in favour of `licensing.csv`, RM51) had it rewritten in place — all
-  six `port` modules compiled with `sidecar_spelling_deprecated`, while `clinvar_panel`/`pharmgkb`
-  (which already swept via `sidecar_candidates`) did not. The runner now clears every sidecar
-  candidate (root + `derived/`, both spellings) before `enrich`, so the rebuild writes the preferred
-  name; verified the warning clears on thrombophilia.
-
-- **`clinvar_panel.py` no longer writes the deprecated `panel:` block (removed 2026-09-26).** Format
-  0.6 deprecated it and 1.0 removes it (RM4); its one machine reader — the enricher's ClinVar clin_sig
-  cross-check — reads the licence row's `dataset` column instead (which `draft_gene_panel` writes).
-  Nothing in this repo ever read the block. Its descriptive provenance moved into `clinvar_panel.log`
-  (hashed into `manifest.logs`, so it survives the 1.0 removal): `reference_sha256` and `significance`
-  were **already** there (`clinvar_source_sha256` / `clin_sig` lines), so only the requested gene list
-  (`panel_genes`) had to be added. `PanelBuild.panel_genes` carries the full requested set — kept even
-  for genes that matched no pathogenic variant, which `variants.csv`'s `gene` column would lose (cardio:
-  327 requested, 297 matched). Filed upstream as **S114** (the `replaced=True` branch of
-  `panel_block_deprecated` warns whether or not you need the three fields it says to keep the block for —
-  it needs a home for them or a split so it fires only on `replaced=False`).
-
-### What 0.7 changed on our side (adopted 2026-09-21)
-
-`just-dna-format/docs/INTEGRATION_0_7.md` is the upstream delta; § 3 has a per-consumer list and the
-just-dna-lite one has nine items. What actually changed here, in that order:
-
-- **Change 0 — `cache prepare` for `cache pull`**: `pipelines prepare-caches` (above). Every remedy
-  string that named `cache pull` now names it.
-- **Changes 1–3 needed nothing, and that is recorded so nobody re-derives it.** We match no warning
-  prose (`UNJOINABLE_PHRASE` is the registry's, and we read `trusted` from it rather than computing
-  it); we read no derived CSV on the consumer path (`v1_port` unlinks and regenerates `resolution.csv`
-  / `literature.csv` as the *author*, which is the side the overlay is applied for); and nothing here
-  reads `manifest.verification`, so the one old-reader break (`VerificationRecord.producer`) never
-  reached us. `warnings_summary` / `carried` are available on `Compilation` if a future reader wants
-  to classify a finding — use them, never the sentence.
-- **Check 9 — `direction` may read `contested`** (RM150). `_effective_direction` passes it through,
-  `_variant_sign` gives it 0 and `_variant_color` no colour, and the template renders the word. It is
-  a *finding* (the sources disagree about the sign) beside `unknown`'s *absence*, so never fold the two;
-  and it is authored-only — `direction_from_state` cannot produce it — so a 0.5 artifact never reads
-  it. `stat_significance` gains nothing.
-- **Check 6 — `requires_callable` is now a restoration gate.** `hom_ref_rows` never restores a row
-  whose `requires_callable` is `True`: the author has said the reference conclusion must be withheld
-  without callability proof and a flank proxy is not one. `False` and null both keep the row — a blank
-  cell is *unknown*, never `false` (CONSUMING.md). RM70 put the column on `haplotypes` and
-  `pharm_variants`, so it can arrive on any lead family once RM43's fill routes one to the position
-  join; the whole shipped corpus is null, so nothing measured moved. Written `is_null() | ~col`, not
-  `fill_null(False)`, so the tri-state stays visible at the seam.
-- **Check 4 — `studies.parquet` gains `statistical_test` and `confidence`/`confidence_unit`.**
-  `load_studies_for_variants` carries them and the study table renders each as a column only when
-  some study on that variant has it. `confidence` is the citing source's own review state in its own
-  units and renders **with its unit or not at all** — `accepted (civic_evidence_status)` is CIViC's
-  ladder, not a grade of ours.
-- **Check 5 — `pharm_variants.pmid`.** The view model carries `pmid` and the detail rows show a
-  PubMed-linked *Citation* beside *Evidence level*. Different axes — the citation points *at* the
-  evidence, the level is somebody's grading *of* it — so both rows or neither.
-- **Check 7 — `clin_sig_concordance` badges a contested clinical call.** Discovery attests
-  `clin_sig_concordance.parquet` onto `ModuleInfo.concordance_url` the way it does the other side
-  tables; `load_annotated_weights` left-joins it on `(variant_key, genotype)` through
-  `_genotype_key_expr` — the same key the 0.6 annotations join uses — and the report renders an
-  *Authorities disagree* row beside *ClinVar* when `authority_concordance == "discordant"`, naming
-  whether the split crosses the pathogenic/benign line (`opposed`). **Nothing resolves the split**:
-  no winner is read off `authority_precedence`, and `unchecked` renders nothing. No module we hold
-  carries the table yet (no reference example does either), so the test builds one from
-  `ClinSigConcordanceRow` — the model is the contract.
-- **Check 8 needed nothing**: we never read `gene_metrics.constraint_flags`.
-- **Pins**: `artifact.digest` moved on 14/15 upstream modules and `content_signature` on none, exactly
-  the 0.6 shape; we cache neither, and `read_module_provenance` renders the digest as the module's
-  *claim*, which is unaffected. `ARTIFACT_PARQUETS` went 19 → 23 and `LEAD_PARQUETS` is unchanged;
-  both are imported, never re-listed, so `tests/test_format_0_6.py`'s set-equality tests needed no
-  edit.
-
-**The dependency bump broke two things that had nothing to do with the format, and both are worth
-knowing before the next `uv lock --upgrade`.** agno floated 2.9 → 3.0.10, which imports the mcp 2.x
-names; our `mcp<2.0` cap (written for agno 2) then took the webui and the `pipelines` CLI down at
-import. The pipelines dependency is `agno[mcp]` now, so agno's own extra carries the mcp/fastmcp
-floors. Enricher 0.7.1's CLI could not import beside dagster's protobuf pin (S107); **enricher 0.7.2
-/ RM254 fixed that** — see the S107 paragraph under *0.5 traps* above.
-
-### Contract facts (0.1.0 libs)
-- `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes` (sorted list),
-  `categories` (sorted list), `study_count`, `module_name` — renamed from the old
-  `unique_genes`/`study_rows`/`unique_variants`.
-- `VALID_PRIORITIES` and `PMID_PATTERN` are intentionally **not** in `just_dna_format.spec` (dead
-  code in the old schema; the live study rule is only "pmid non-empty").
-
-### 0.5 traps that cost real time (MANDATORY reading before touching a module build)
-
-**`compile_module(resolve_with_ensembl=False)` is the master switch for resolution, not a choice of
-reference.** The name reads as "do not use Ensembl", which is what a migration to `resolution.csv`
-wants — but it also disables the injected-table path, so a module with a complete `resolution.csv`
-compiles **successfully** with `chrom=None` on every weight row. Those rows can never match a VCF.
-The 0.5 call is `compile_module(spec, out, resolve_with_ensembl=True, ensembl_cache=None)`.
-
-**Call `load_env()` before the first `resolve_*_reference()` in a process.** The enricher's resolvers
-call `load_env()` inside `_resolve_parquet_cache`, but pass `default_*_cache_dir()` as an *argument* —
-evaluated before that call. So the **first** resolve in a fresh process computes its default from
-platformdirs and returns `None` even when `$JUST_DNA_PIPELINES_CACHE_DIR` names a full cache; every
-later call is fine. `v1_port/runner.py` and `tests/test_modules_0_5.py` both `load_env()` at import
-for exactly this reason.
-
-**Provision caches with `uv run pipelines prepare-caches`, not `just-dna-enricher cache pull`.**
-Enricher 0.7 (RM176) replaced `pull` with `cache prepare`: `pull` fetched only the published snapshots
-and stopped, and several lanes are unpublished for recorded reasons, so a deployment that only pulled
-ran with those caches absent and the checks reading them skipping themselves. `prepare` pulls what is
-published, builds the rest, and leaves a present cache alone. Our command is that function
-(`caches.prepare_caches`) behind `load_env()`, which also closes the old trap where `pull` wrote to the
-platformdirs default while every resolver read `$JUST_DNA_PIPELINES_CACHE_DIR`. The enricher's own
-command line is dead in this workspace (next paragraph), which is why the command lives under
-`pipelines`.
-
-**`just-dna-enricher`'s CLI now imports beside dagster (fixed in enricher 0.7.2 / RM254; was the S107 block on 0.7.1).**
-The break: `just_dna_enricher.cli` imports its AlphaGenome Atlas bindings at module scope, protobuf
-gencode stamped 7.35 by the `grpcio-tools` RM247 pinned; dagster caps `protobuf<7`, and protobuf
-refuses a runtime older than its gencode with `google.protobuf.runtime_version.VersionError` — a bare
-`Exception` subclass that the enricher's `except (ImportError, RuntimeError)` guard did **not** catch,
-so on 0.7.1 the console script and anything mounting its Typer app died at import. **RM254 (0.7.2)
-fixed it**: `atlas_protos.ATLAS_IMPORT_FAILURES = (ImportError, RuntimeError, VersionError)` catches
-it now, and the `protobuf>=7.35.1` floor moved onto the `[atlas]` extra — so the **bare**
-`just-dna-enricher` we depend on (no extra; the lock pulls no atlas/alphagenome dep) imports cleanly,
-and only an install asking for `[atlas]` would fail to *resolve* rather than crash. Verified on our
-side 2026-09-26: `just_dna_pipelines.enricher_cli` now mounts the **real** app
-(`ENRICHER_CLI_UNAVAILABLE is None`), not the stub. The guarded import stays regardless — `[atlas]`
-would still trip it — but the fallback is now the exception, not the rule. Do not re-import
-`just_dna_enricher.cli` anywhere else. (`just_dna_lite.cli` owns the installed script;
-`just_dna_pipelines.cli` is shadowed.)
-
-**`clinvar_draft` raises on ClinVar's own citation ids.** `var_citations.txt` carries 632k
-PubMedCentral ids and a few malformed "PubMed" ones (Variation 12606 cites `168335863`, nine digits);
-`StudyRow.pmid` takes at most eight digits, and `draft_gene_panel` aborts the whole panel on the first
-one. `v1_port/clinvar_panel.py` passes `max_citations=0` and drafts its own `studies.csv` with a PMID
-filter.
-
-**`enrich()` was quadratic in module size — fixed in enricher 0.5.2, and the workarounds are gone.**
-Kept here because the symptom is so misleading: `cardio` sat at **12% CPU with no disk I/O for two
-hours**, which reads like a deadlock and was one enormous DuckDB expression tree. The ClinVar reader
-OR-chained one predicate per allele, which cannot be folded into a hash probe, so cost grew with
-`alleles × rows`. 0.5.2 joins a probe table instead. Measured here after the bump: **76,078 rows
-resolve in 13.3 s (0.17 ms/row), and the rate improves with size** — against 4.6 ms/row before.
-
-Two mitigations existed and have been **removed** rather than left dormant: `enrich_in_batches`
-(10k-row slicing with resume) and `PANEL_VERIFY_CLIN_SIG=False`. If you are reading old code or an
-old branch that still has them, they are dead weight now. The `clin_sig` skip in particular is better
-in the library than it was here: 0.5.2 compares the module's `panel:` pin against the snapshot's
-`release.json` and skips **only on an established match**, so a hand-authored module or one pinned to
-a different release still gets checked — where the local flag was unconditional. The reason travels
-on `EnrichmentResult.clin_sig_not_checked`, so an empty conflict list is no longer ambiguous.
-
-All five are filed upstream through the suggestions inbox
-(`/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`) — the single consumer entrypoint; the
-maintainers' triage spawns any `ROADMAP.md` / `RM` entries from there.
-
-**Resolution WAS scoped to `variants.csv`; RM43 shipped in 0.6 and this repo's docs did not notice
-until 2026-08-21.** Through 0.5 the compiler materialized `pharm_variants` / `haplotypes` /
-`heteroplasmy` verbatim from their authored CSV and applied `resolution.csv` to `weights.parquet`
-alone, so an rsid-authored PGx module compiled clean, validated, published, and carried a null
-`chrom`/`start` on every row; compiler 0.5.3 made that visible with `_check_positional_joinability`
-rather than filling it. **Since format 0.6 the compiler joins `resolution.csv` onto those three
-families too**, and `manifest.compilation.positional_rows` / `positional_rows_placed` state how many
-rows it placed (`None` means *not counted*, never `0`). So a 0.6-compiled PGx module qualifies for
-the position join, and the previous sentence in this file — "the fix waits on RM43" — was stale from
-0.6 onward. Reported by just-module-creator, 2026-08-20; verified against the installed compiler
-0.6.1 (`compiler.py:499`).
-
-**Both generations are live, so classify by value and never by family name.** The *old* shipped
-`pharmgkb` was a 0.5 artifact: **0 of 1482 rows placed**, `chrom` null throughout, routed to rsid.
-**Rebuilt under 0.7 on 2026-09-26 it now places 1531/1531** (`positional_rows=placed=1531`), `chrom`
-non-null throughout, and `_lead_join_strategy` routes it to **position** — the branch this file long
-said "has never run on this family" now runs. Proof it annotates: `annotate_vcf_with_module_weights`
-on the antonkulaga WGS sample returns **48 matched** drug-gene rows, matched **by position with empty
-rsID** (SLCO1B1/rosuvastatin, IFNL3/4 antivirals, atorvastatin) — the exact case the 0.5 build (rsid
-fallback) matched none of. `_lead_join_strategy` still probes values not the family name, so no
-`positional_rows` gate belongs in `hf_logic`; the shipped 0.5 corpus for testing that dual routing now
-lives in `data/interim/v1_port_0_5/` (local-only backup) and on HuggingFace.
-
-Two consequences live here. `hf_logic.annotate_vcf_with_module_weights` detects the null-coordinate
-case and downgrades a position join to **rsid + genotype**, because the alternative is annotating
-nothing at all. A VCF with no rsIDs in `ID` (DeepVariant output among them) then matches such a
-module on nothing — and that pairing is **unassessable, not a zero**: the sample may well carry the
-variant at its coordinate while the callset simply omits the dbSNP identifier. So the engine raises
-`UnsupportedLeadTable` (logging `step="vcf_has_no_rsids"`) *before* writing a parquet, rather than
-sinking an empty one. The module lands in `manifest.skipped_modules` and the report renders it under
-**Modules not read in this run** with the reason, which is the only place a reader would otherwise
-have learned anything: a run whose every other module succeeded reports success, and an absent
-section reads as "this module found nothing in you". Note the second cause this gives a *skip* —
-until now a skip meant the module carried no per-variant key, and now it can also mean the sample
-carries none the module can use. And registry **0.11.3** reads the same warning to make `trusted`
-three-valued, so `pharmgkb` publishes as `trusted: false` — correct, not a defect to work around.
-
-### The annotating engine's side of the contract (`hf_logic.py`)
-
-The engine projects **nothing** from a module's lead table — it reads five columns (`rsid`, `chrom`,
-`start`, `ref`, `genotype`) and left-joins the rest opaquely, so all 39 columns of a 0.6 artifact
-already reach the output parquet. Anything missing from a report is missing *in the report*, not
-dropped here. Three rules it does enforce, each with a failure it exists to prevent:
-
-- **A lead table is classified by the schema it has, not by its family name** (`_lead_join_strategy`
-  → `position` | `rsid` | `unsupported`). Ten families exist and the format keeps adding them;
-  `diplotypes`, `pgs`, `allele_function` and the binning families carry no per-variant key at all, and
-  used to raise `ColumnNotFoundError` **and abort every other selected module with it**. They now
-  raise `UnsupportedLeadTable`, which the per-module loop records and skips past. Adding a family to
-  `LEAD_TABLES` therefore cannot break annotation for anyone else.
-- **`_normalize_lead_genotype` puts the lead table's genotype in the representation
-  `weights.parquet` already uses**, mirroring the compiler's own `_split_genotype`: split on `/` or
-  `|`, drop empties, **never sort**. The 0.4 families are materialized verbatim and keep the authored
-  `"C/C"` string, so joining one straight to the VCF's `List(Utf8)` is a `SchemaError` — which is why
-  `pharmgkb` could not be annotated at all. **Do not sort here**: the grammar already requires an
-  unphased `A/G` to be sorted, and a phased `A|G` is held in *homolog order*
-  (`AuthoredModel._validate_genotype`: "phase encodes which allele sits on which homolog"), so
-  sorting folds `A|G` and `G|A` into one key and manufactures a match the module never stated. The
-  first version of this function sorted, and no test in the corpus could have caught it — nothing we
-  ship carries a phased genotype. **The rule this leaves standing, and the one it costs:** the VCF
-  side *does* sort, unconditionally (`io._compute_genotype_expr`), so an authored genotype held in
-  homolog order rather than sorted order matches in neither ordering, silently. Not sorting here is
-  still right — sorting would manufacture matches — so the answer is to say so, which
-  `_unmatchable_phased_rows` does before normalization strips the `|` that reveals it
-  (`step="phased_rows_cannot_match"`). Raised by just-module-creator, 2026-08-20. `report_logic._genotype_alleles` is the Python twin and now
-  **delegates to `just_dna_format.alleles.split_genotype`** (0.6, S30) rather than reimplementing the
-  rule — it had the mirror-image bug, splitting on `/` only so a phased cell read as one allele. This
-  expression cannot call the leaf (a Python call per row over millions of VCF rows), so the two are held
-  equivalent by `tests/test_format_0_6.py::TestOneGenotypeSplit` instead. Keep them documented together.
-- **The position join requires `ref` agreement where the module states one.** Genotype lists hold
-  allele *strings*, so matching them constrains the alleles the sample carries — but the module's
-  `ref` used to be dropped outright, so `G>A` matched a module's `GTGTCT>A` at the same locus. On one
-  real sample that was **6 of 9** reported `pathogenic` findings, every one a different variant whose
-  ALT happened to coincide. String equality is the wrong test for indels in general — one indel has
-  several valid spellings, which is what `just_dna_format.alleles` (`parsimony_reduce` /
-  `event_profile`) is for — but it is right on the set this filter reaches, and that is pinned by a
-  test rather than assumed: once the genotype has matched, a differing `ref` means the two records
-  delete different numbers of bases, which that algebra calls a **positive contradiction**. Verified
-  on all eight real cases (6 contradictions, 2 matches, no "unknown" residual). The genuinely lost
-  matches are elsewhere — two spellings anchored at *different* positions never meet in a position
-  join at all, and settling those needs the enricher's sequence access.
-
-- **Contig spellings go through `just_dna_format.vrs.normalize_chrom`, not a `^chr` strip.** Stripping
-  alone turns an hs38DH sample's `chrM` into `M`, which no module writes, so **every mitochondrial
-  annotation vanished silently** — one of the three samples in this repo is that case, and
-  `heteroplasmy` is a whole 0.4 family about mtDNA. Using the format's own folding is what keeps our
-  spelling and the module's identical by construction. Mapped over the *distinct* contigs and applied
-  as one vectorized replace; a per-row Python call over millions of variants is not acceptable here.
-- **The rsid join keys on each identifier a record carries.** A VCF ID is a semicolon-separated list
-  (`rs123;rs456`), and the authored side names exactly one variant per row, so the split is the
-  consumer's job (just-dna-format RM64). `_vcf_rsid_join_keys` explodes into `_rsid_join_key`, which
-  is dropped after the join so the output keeps the record's ID verbatim.
-- **A local module's URL is a bare path, never a `file:` URI** (`hf_modules._build_url`). Building
-  one by concatenation is only accidentally correct: a POSIX path opens with `/`, so `file://` + it
-  is `file:///data/…` with an empty authority, while a Windows path opens with a drive letter, so
-  `file://C:/Users/…` parses `C:` as the **hostname** and polars refuses it before touching the disk
-  (`failed to create CloudLocation: unsupported: non-empty hostname for 'file:' URI: 'C:'`). Every
-  registry install and local compile was therefore unannotatable on Windows while still being
-  discovered and listed, so the run went green with the module missing from the report. Polars reads
-  a native path on both platforms. Ask **`local_module_path` / `is_local_module_url`** whether bytes
-  are on this machine — `startswith("/")` is False for every Windows path, which is how three call
-  sites (the two logo surfaces and the source list) came to treat a local module as a remote one.
-  A legacy `file://` URL still resolves, since artifacts written before the fix carry one.
-  Tests: `just-dna-pipelines/tests/test_local_module_urls.py`, which pins the Windows case on any
-  platform because every function involved is pure string/path work.
-
-`AnnotationManifest` records `output_dir`, per-module `lead_table`, and `skipped_modules` /
-`failed_modules` by reason — do not reconstruct the output directory from `modules[0]`, which is not
-there when every module was skipped.
-
-**Both are rendered — the report's "Modules not read in this run" section.** The engine catches per
-module so one failure cannot cost the others, which means the run reports success and the report is
-the only place a reader can learn that a module they selected contributed nothing; rendering only
-what succeeded made that silence read as *this module found nothing in you*. `build_module_exclusions`
-(`report_logic.py`) keeps the two kinds apart because they mean different things: **skipped** is
-about the module (no per-variant key — retrying changes nothing), **failed** is about this run (an
-unreadable path, a schema clash) and is usually actionable. The engine's reason travels verbatim.
-
-**A run also records which module *bytes* produced it** — `ModuleOutputMapping.version` / `digest` /
-`source_url`, filled by `read_module_provenance` (`hf_modules.py`) and rendered as the report's
-"Modules in this report" table. Without it a saved report cannot be tied to the module version behind
-it and nothing can answer *which of my results are stale*, which is also the missing prerequisite
-under any later verification harness (the format tier's RM7). Three rules:
-- **All three are tri-state**: `None` means *not established*, never "unversioned". Only an
-  acquisition path that puts `manifest.json` on disk (a registry install or a local compile) can
-  answer at all — `scan_module_table` reads a remote parquet URL and never fetches a manifest, so an
-  HF-discovered module states `source_url` and nothing else. The template renders the rest as
-  *Not stated*.
-- **The digest is the module's claim, not a check.** Nothing in this repo calls
-  `just_dna_format.integrity.verify_manifest` (the verify-then-install flow in
-  `docs/MODULE_MARKETPLACE_SPEC.md` is specified and unimplemented, and marked as such), so it ties a
-  report to a *stated* identity. Do not present it to a reader as verification. If you do wire
-  verification: `require_marketplace=True` is the default and would reject every locally-compiled
-  module, whose `compiled_by` is null by design.
-- **Version falls back from `identity.version` to the authored spec** (`module_config.spec_version`),
-  because the compiler leaves identity null — the registry stamps it at publish. Six of our own
-  Gen-I ports author `version: null`, so *Not stated* is currently the common case; that is the
-  porting pipeline's gap, not the report's.
-
-**"Is this a module" is one predicate — but on a *remote* source 0.6 gave it a better input.**
-`hf_modules._find_lead_table` now takes the set `manifest.artifact.files` attests where the source
-publishes a manifest, and only probes when there is none (see the 0.6 section above: the publisher never
-removes, so a leftover parquet otherwise decides the module's *kind*). The local-filesystem twin below
-still probes, which is correct — a directory we compiled ourselves has no stale release in it.
-
-`module_config.has_lead_table` / `find_lead_table` are that local predicate — the
-local-filesystem twin of discovery's fsspec `_find_lead_table`, both keyed on `LEAD_TABLES`. Probing
-`weights.parquet` is not the test: a drug-response module carries `pharm_variants` and no weights, and
-testing for weights in `list_custom_modules`, `get_custom_module_specs` and the webui's
-`_scan_local_modules` left a `pharm_variants`-led registry install annotatable but **absent from the
-publish/edit pane**, so it could not be published or edited at all. A new 0.4 family is one edit in
-`LEAD_TABLES` for both sides.
-
-**The count the engine returns is matched rows, never the parquet's height.** A position join keeps
-every unmatched VCF row on purpose (the report needs them to tell "probed and did not match" apart
-from "never looked"), so the height is a *positions probed* number. Reporting it as variants
-annotated made `total_variants_annotated` read **567 against a real 259** on Anton's genome and told
-the user "cancer: 29 variants" for a module that annotated none. `annotate_vcf_with_module_weights`
-returns `(path, num_matched, restoration_stats)`; both numbers travel on the eliot log
-(`num_matched` / `num_written`) because they answer different questions.
-
-**`sink_parquet` is non-deterministic, so the engine sorts before it.** The streaming engine emits a
-left join's rows in a non-deterministic *multiset* — two identical runs of `longevitymap` on one
-genome produced different `qual`/`conclusion` values and a different report each time, because a
-poly-effect module fans one position into several rows and the morsel emission is not stable. A
-total-order sort immediately before `sink_parquet` is a pipeline barrier that forces the join to
-complete before emitting: it stabilises the multiset and gives the report a deterministic row order,
-without the memory cost of `collect()`. Do not remove it, and do not "optimise" it into a `collect()`
-— streaming is the point for a large module. `restoration._with_flanking_distance` sorts its
-`join_asof(by="chrom")` inputs by `(chrom, key)` for the same reason. `scripts/regression_snapshot.py`
-(Typer `snapshot` / `compare`) pins native-module output byte-for-byte across runs and is the gate to
-run after touching the engine, report or restoration; the baseline lives under
-`data/interim/regression_baseline/` (gitignored).
-
-### Compound-phenotype modules — a second engine path (`phenotype_caller.py`)
-
-A phenotype like APOE ε-status or an HFE compound-het finding is a function of several sites read
-together, not a per-position match. A module authored with `haplotypes` + a combiner (`diplotypes`,
-or `allele_function` + `activity_phenotype`) is a **phenotype module**: `hf_modules.module_kind(info)`
-classifies it, and `annotate_vcf_with_all_modules` dispatches to `phenotype_caller.call_phenotype_module`
-**before** the weights call, so the caller is reached only for such a module and native modules are
-untouched (the regression gate proves a native module's parquet is byte-identical alone vs. beside a
-phenotype module). It writes `{module}_phenotypes.parquet` (one `PhenotypeCall` per gene) and the report
-renders a "Phenotypes from combined variants" section. Phenotype calls are counted apart from the variant
-totals (`manifest.phenotype_calls` / `total_phenotypes_called`), the same reasoning as the
-restored-vs-annotated split. **v1 is enumerative, unphased and diploid** — the full contract, the four
-statuses, the authoring rules and what is deliberately out of scope are in
-[docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). The caller reuses `restoration.restorable_sites` (the
-public site-level core of hom-ref restoration) so a hom-ref site (ABO O/O, APOE ε3/ε3) is restored under
-the same gates as a weights module.
+The pre-check token must own the namespace: `REGISTRY_TOKEN` owns `test-namespace*`,
+`REGISTRY_TOKEN_SANDBOX` owns `sandbox` (on prod). Neither owns `just-dna-seq`.
+
+## Annotation engine (`hf_logic.py`)
+
+The engine reads five lead-table columns (`rsid`, `chrom`, `start`, `ref`, `genotype`) and left-joins
+the rest opaquely, so every artifact column reaches the output parquet. Anything missing from a report
+was lost in the report, not here.
+
+- **Discovery attests from `manifest.artifact.files`** where a source publishes a manifest (all ten
+  modules in `just-dna-seq/annotators` do), and probes only when there is none (`None`, never an empty
+  set). The HF publisher never deletes, so probing can find a stale parquet and misread the module's
+  kind. A partial manifest that omits the lead parquet makes the module invisible to discovery while
+  `list-custom` still lists it. `logo` and `metadata` always probe.
+- Discovery keeps `identity.version`, `artifact.digest` and `weighting` on `ModuleInfo`
+  (`manifest_version` / `manifest_digest` / `manifest_weighting`) for `read_module_provenance`.
+- **Everything discovery calls must be defined above `MODULE_INFOS = discover_hf_modules()`.** A
+  `NameError` there is caught per source, so discovery silently returns nothing.
+  `tests/test_consumer_handoff.py` probes a local directory to catch this offline.
+- **Classify a lead table by schema** (`_lead_join_strategy` → `position` | `rsid` | `unsupported`).
+  Keyless families raise `UnsupportedLeadTable`, which the per-module loop records and skips. Null
+  coordinates downgrade to an rsid + genotype join; a VCF with no rsIDs then raises
+  `UnsupportedLeadTable` (`step="vcf_has_no_rsids"`) before writing anything, because that pairing is
+  unassessable, not zero.
+- **`_normalize_lead_genotype` splits on `/` or `|` and never sorts** (sorting folds phased `A|G` and
+  `G|A` into one key). The VCF side always sorts, so a phased authored genotype in non-sorted order can
+  never match; `_unmatchable_phased_rows` logs it (`step="phased_rows_cannot_match"`).
+  `report_logic._genotype_alleles` is the Python twin via `just_dna_format.alleles.split_genotype`;
+  `tests/test_format_0_6.py::TestOneGenotypeSplit` holds them equal. `report_logic._genotype_join_key`
+  is the opposite operation (rebuilds the authored key, so it sorts unphased). Document the three
+  together.
+- **The position join requires `ref` agreement** where the module states one. Without it `G>A` matched
+  `GTGTCT>A` at the same locus (6 of 9 "pathogenic" findings on one sample were that).
+- **Contigs go through `just_dna_format.vrs.normalize_chrom`**, mapped over distinct contigs as one
+  vectorized replace. A `^chr` strip turns `chrM` into `M` and silently drops all mtDNA.
+- **The rsid join explodes semicolon-separated VCF IDs** (`_vcf_rsid_join_keys` → `_rsid_join_key`,
+  dropped after the join).
+- **A local module URL is a bare path, never `file://`** (`hf_modules._build_url`): `file://C:/…` parses
+  `C:` as a host. Ask `local_module_path` / `is_local_module_url`, never `startswith("/")`. Tests:
+  `just-dna-pipelines/tests/test_local_module_urls.py`.
+- **Return matched rows, not the parquet height** (the position join keeps unmatched rows on purpose).
+  `annotate_vcf_with_module_weights` returns `(path, num_matched, restoration_stats)`.
+- **Sort immediately before `sink_parquet`.** The streaming left join emits a non-deterministic
+  multiset; the sort is a barrier that fixes it without `collect()`. Never remove it or turn it into a
+  `collect()`. `restoration._with_flanking_distance` sorts its `join_asof` inputs for the same reason.
+  After touching the engine, report or restoration, run `scripts/regression_snapshot.py`
+  (`snapshot` / `compare`; baseline in `data/interim/regression_baseline/`).
+- `AnnotationManifest` records `output_dir`, per-module `lead_table`, `skipped_modules` and
+  `failed_modules`. Never derive the output dir from `modules[0]`.
+
+### Compound phenotypes (`phenotype_caller.py`)
+
+A module with `haplotypes` plus a combiner (`diplotypes`, or `allele_function` + `activity_phenotype`)
+is a phenotype module (`hf_modules.module_kind`). `annotate_vcf_with_all_modules` dispatches it to
+`phenotype_caller.call_phenotype_module` before the weights path, writing `{module}_phenotypes.parquet`
+and counting calls apart from variants (`manifest.phenotype_calls`). v1 is enumerative, unphased,
+diploid. Contract: [docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). Hom-ref sites reuse
+`restoration.restorable_sites`.
 
 ### Reference-genotype restoration (`restoration.py`)
 
-A module may author a row whose genotype **is** the reference genotype — `lactose_tolerance` states
-`G/G` for rs4988235 ("adult-type hypolactasia"), the most common lactose result there is. A
-variant-only callset emits no record where the sample matches the reference, so that row could never
-match and the reader was told "no variants found" instead of their result. **Whether such a row is
-reachable is a property of the callset, not of the module** — a gVCF carries the reference block, an
-array genotypes every probe, a variant-only VCF carries nothing — so the module cannot mark these
-rows and the decision lives here. Corpus-wide it is not a rarity: 193 of longevitymap's 1039 rows,
-and one row in three of every hand-curated module.
-
-The design is `just-prs`'s (`just_prs.reference_allele`, `just_prs.prs.RestorationScope`, whose
-docstring names just-dna-lite as the embedder that would inject its own position set). Three
-properties are taken directly: restoration is **scoped to a supplied position set** (a module's
-authored hom-ref sites, tiny — 2 for lactose, 193 rows for longevitymap), provenance is a
-**tri-state carried on the row** (`genotype_evidence` ∈ `called` | `restored_hom_ref`), and a case
-that cannot be established **stays unestablished** rather than being filled.
-
-Where we deliberately diverge: `compute_prs` fills hom-ref for *every* absent locus with a known
-reference allele and no locality gate — sound when one wrong locus among thousands moves a score by a
-rounding error, not sound when one restored row becomes one rendered sentence about a person. So:
-
-**There is no on/off config flag, deliberately.** Whether a hom-ref row can be inferred is a fact
-about the callset, and the callset is in front of us — `RestorationContext.enabled` measures it and
-nothing else decides. A default would only be a guess at what the two gates below already establish,
-and a wrong guess either fabricates rows on an exome or withholds real results on a genome. The one
-real parameter is `restoration_max_flank_bp`.
-
-- **Only a `variant_only` callset is restored into**, classified by `infer_genotype_input_mode` (a
-  re-derivation of just-prs's private `_infer_genotype_input_mode`: `<NON_REF>` allele or `RefCall`
-  filter). **Classify the parquet, not the raw VCF** — our own `pass_filters` drops `FILTER=RefCall`,
-  so a real gVCF arrives here already stripped of reference blocks and is variant-only *as far as
-  annotation is concerned*; classifying the raw file would disable restoration and leave those rows
-  unreportable from either direction.
-- **Only a whole-genome callset is restored into** (`detect_callset_scope` → `CallsetScope`). This is
-  the gate `GenotypeInputMode` cannot supply and the one that matters most: on an exome or panel the
-  overwhelming majority of the genome was never captured, so absence carries no information — and the
-  per-site flanking test is *actively misleading* there, because exonic calls cluster densely enough
-  that an uncaptured intronic site kilobases away still has a neighbour. Two signals:
-  `MIN_WGS_SITES` (1M; WGS carries 4.3–4.7M across every sample here, an exome ~50–100k) and
-  `MIN_WGS_BREADTH` (0.75) — the share of the callset's span lying within one flank of a call, i.e.
-  **the same question the per-site test asks, applied genome-wide**, so the two gates are one rule at
-  two scales. Measured **0.942–0.950** on all four real samples against **0.21** for a clustered
-  callset of comparable size. A gap percentile was tried first and **rejected**: 20 calls 50 bp apart
-  every 100 kb puts 95% of gaps at 50 bp, so p90 reports it dense while 79% of the span is nowhere
-  near a call. Breadth weights a gap by its length instead of counting it once.
-- **A site the caller emitted is never restored.** It was observed; whatever it says there is the
-  answer.
-- **A site needs a called variant within `restoration_max_flank_bp` (default 10 kb)**, and the
-  distance travels on `restored_flank_bp`. This is coarse and is *not* a callability proof — the
-  rigorous test is `requires_callable` / `callable_from` (RM6) against a gVCF's `MIN_DP` with
-  interval containment, and those are **unpopulated across the whole corpus**. Until they are, this
-  is the strongest honest gate, which is why the evidence column exists and why the report renders
-  restored rows with an `inferred` badge and an explicit "this can also mean the position was not
-  covered" note. **Never merge the two categories.**
-- `hom_ref_rows` returns `None` for a lead table with no `ref`/coordinates, so `pharm_variants` is
-  excluded **by schema rather than by name** — format 0.6's RM43 fill switches it on with no code
-  change here.
-- **An expansion member is never restored** — `locus_count > 1` (0.6, RM87), with the older
-  `ref`-spelling anti-join kept beside it for pre-0.6 artifacts. This is where the 3,762 false findings
-  came from and where the fix belongs: the sample was never observed at the site, so restoring one
-  authored row at N loci fabricates N results rather than reporting an ambiguous one. See the 0.6
-  section above for why both tests are needed and what each one cannot see.
-
-The restored frame is built by pouring module values into `vcf_lf.limit(0)` and `hstack`-ing, so it
-carries the annotated schema by construction rather than by a hand-maintained copy that drifts the
-first time the VCF reader gains a column. `restored_variants` / `total_variants_restored` on the
-manifest are held apart from `total_variants_annotated` for the same reason the column is: these were
-inferred, never observed. Tests: `tests/test_restoration.py` (which `load_env()`s at import — locally
-registered modules are discovered from `JUST_DNA_PIPELINES_OUTPUT_DIR`).
-
-**Read `just-dna-format/docs/PROPOSAL_0_6.md` before touching this seam again.** Its RM53–RM67 cluster
-is a VCF-4.4 audit of exactly the assumptions a consumer makes, and three of its items were live
-defects here (RM60, RM64) or corrected our reading of the contract (RM63 — the `variants.csv`
-genotype docstring's "which homolog" claim is acknowledged overreach, being reworded to "phase
-recorded but unaddressable"; do not build on it either way, since artifact self-consistency with
-`_split_genotype` is the argument that actually decides how a consumer spells a genotype).
-
-**The withholding directives are blocked on our own parquet, not merely unused.** `requires_callable`
-/ `callable_from` and `quality_from` / `min_quality` are unpopulated on every module in the corpus, so
-nothing is lost by not honouring them today — but do not implement them as a bare column lookup when
-something does populate them. `user_vcf_normalized` flattens INFO and FORMAT into **one** namespace,
-and `AF`, `DP`, `MQ` and `AD` all collide there; a bare pointer resolved against it reads a
-well-formed number of the wrong kind without error (format RM53 — `AF` as INFO is a cohort frequency,
-as FORMAT it is this person's fraction). Three prerequisites, all named upstream: keep the two
-namespaces distinguishable in the parquet and accept the qualified `INFO/DP` / `FORMAT/DP` pointer
-form (RM53); remember QUAL inverts on a reference record, which is exactly where a
-`requires_callable` row is evaluated (RM57); and for a gVCF read `MIN_DP` with interval containment
-rather than `DP` with an equality join on position (RM57's second half).
-
-### The report's side of the contract (`report_logic.py` + `longevity_report.html.j2`)
-
-The engine projects nothing, so all 39 columns of a 0.6 artifact reach the user's parquet; the report
-is where they were being lost (it read ~14 and rendered 11). Four rules now hold it to the contract.
-
-- **`annotations.parquet` is keyed per *annotation*, not per variant, so joining it on `rsid` fans a
-  poly-effect variant out into one report row each** — measured coronary **81 → 231** (×2.85),
-  lipidmetabolism ×2.73, vo2max ×2.15, inflating `total_variants` and every count derived from it.
-  `_join_annotations` detects the key from the columns present (`_annotations_keying`) because three
-  artifact generations are live at once, and **all three still are**: 0.3 on HuggingFace (rsid only),
-  0.5 in `data/interim/v1_port/` (`variant_key`, no genotype), and 0.6 as we compile today
-  (`genotype`, per format **RM80**). Dedup-on-`variant_key` is used **only** in the 0.5 era, where the
-  artifact offers no finer key — the RM80 reply rejects it as the general answer, since a genuine
-  poly-effect variant is one locus with two real annotations.
-
-  The `genotype` branch was written before 0.6 shipped and is now **verified against a real artifact**:
-  `tests/test_module_roundtrip.py` compiles the four HF modules under 0.6 and asserts that
-  `_genotype_key_expr` — the production expression, which rebuilds the authored cell from the allele
-  list `weights.parquet` stores — reproduces every `(variant_key, genotype)` the compiler actually
-  wrote. Measured on `coronary`: 81 annotation rows under the 0.6 key against the 77 the 0.5 key
-  collapsed them to, and zero keys our rebuild fails to produce. That test is the fence: if the rebuild
-  ever stops agreeing with the compiler, the join silently matches a larger set.
-- **`_effective_clin_sig` is the exact counterpart of `_effective_direction`** — authored column
-  first, else `derive.clin_sig_from_booleans`. COMPILER.md: the fallback "lives in Python and does
-  not travel with the parquet", so a polars-side consumer applies it itself. Prefer the column and
-  never round-trip: the booleans cannot express `likely_pathogenic`, and reading them rendered
-  **214,827 `likely_pathogenic` rows identically to 402,174 `pathogenic`** ones.
-- **`_genotype_join_key` sorts an unphased genotype; the engine's `_normalize_lead_genotype` must
-  not.** They look like the same operation and are opposites: this rebuilds the *authored* key the
-  module wrote (COMPILER.md § Reverse — phased keeps order and joins on `|`, unphased sorts and joins
-  on `/`), whereas the engine matches a sample's call against the artifact's own representation and
-  sorting there would fold `A|G` and `G|A` into one key. Keep the two documented together, as with
-  `_genotype_alleles`, which this is the inverse of.
-- **Render-if-present, never a fixed field list.** `_AUTHORED_AXES` is carried into the view model
-  and each axis gets an `{% if %}` row in the template macro, so a module that populates
-  `effect_size` or `negatives` shows it the day it publishes. Most are empty across our whole corpus,
-  but **that is a property of the corpus, not the format** — every module we hold is a Gen-I port
-  authored against 0.2 and mechanically uplifted, and the compiler correctly never fills a cell an
-  author left blank. A fixed field list is exactly how the template came to render 11 of 37;
-  `test_a_populated_0_5_axis_reaches_the_html` fails the day one is dropped again, and its converse
-  pins that an absent value emits no row rather than a blank one.
-
-Two structural changes go with them. Report routing dispatches on **`lead_table`** (read from the
-run's `manifest.json` through `AnnotationManifest`, whose default supplies `"weights"` for manifests
-written before the engine knew about lead tables) instead of a hardcoded `== "longevitymap"`, so a
-`pharm_variants`-led module gets a drug-keyed section ranked by ClinPGx evidence — the right shape
-for a module whose every weight is `0.0`. And the report now credits its sources: discovery gained
-`sources_url` / `ModuleTable.SOURCES`, and the footer lists distinct terms across the modules
-rendered, **restricted to `layer == "annotation"`** (SCHEMAS.md § SourceRow — only that layer carries
-the derivative-work obligation; Ensembl at layer `resolution` is recorded without tainting).
-Permission booleans stay **tri-state**: `None` means the terms could not be established, which the
-footer renders as "Not stated" and never as permission.
-
-The variant tables were near-duplicate copies that had already drifted; they are now one Jinja macro
-(`variant_rows` / `variant_table`), shared by the pathway path, the per-module path and the per-drug
-path. Four constraints the inline JS imposes on it: the detail row must be the **immediate next
-sibling** (no wrapper); `directPreviewRows` selects preview rows by the **`data-preview-row`
-attribute** on a direct `<tbody>` child (the old `children.length > 3` heuristic is gone, so cell
-counts no longer matter, but the attribute does — and the detail row must not carry it); the initial
-`preview-overflow` class and the JS `TABLE_PREVIEW_ROWS` must agree, which is why both read
-`preview_row_limit` from `report_logic.TABLE_PREVIEW_ROWS` rather than a literal; and the detail
-cell's `colspan` must equal the header's `<th>` count (9).
-
-**The report's identity is derived, not fixed.** A single-module run takes that module's curated
-`report_title` for the heading and a two-word, lower-cased slug of it for the filename
-(`report_title_for_modules` / `report_filename_stem`); a multi-module run has no honest single title,
-so it uses `Genomic Annotation Report` and the stem `report`. The old `longevity_report_*.html` name
-is therefore gone — **anything globbing reports must match `*.html` and pick by mtime**, not by name
-(`.ci/verify_annotation.py`, `cli_annotate`, and the webui's `report_files` sort all do).
-
-**Each rsID row carries four prompt-prefill links** (ChatGPT, Claude, Perplexity, Grok — the same set
-`prs-ui` uses), built by `_build_variant_ai_links` and rendered only when the row has an rsID. The
-prompt embeds the row's own facts and the variant's PMIDs, so **clicking one sends that variant's
-genotype to a third party**; it is per-click and never automatic, and nothing is sent by opening the
-report. The links are the report's largest single cost — measured on a real 206-variant run, 1.0 MB
-of the 2.1 MB file is those four URLs, since the same ~1.2 kB prompt is encoded once per assistant
-per row. The icons are *not* part of that: they are one `<symbol>` set referenced by `<use>`, which
-is worth keeping — inlining the paths per row added another 1.0 MB for four copies of four glyphs.
-
-### Building and releasing the modules
-
-See **[docs/MODULE_RELEASE_0_5.md](docs/MODULE_RELEASE_0_5.md)** for the full runbook and
-**[docs/V1_PARITY.md](docs/V1_PARITY.md)** for what each module is.
-
-```bash
-uv run pipelines v1-port port --all        # the six curated Gen-I ports (enrich → literature → compile)
-uv run pipelines v1-port clinvar --all     # cardio / cancer / pathogenic, from the ClinVar snapshot
-uv run pipelines v1-port pharmgkb          # drug response, from the ClinPGx clinical annotations
-uv run python scripts/registry_precheck.py --namespace sandbox   # live pre-publish check
-```
-
-The pre-check posts the authored spec to the registry's `POST /api/v1/modules/{ns}/{name}/check` —
-the full publish dry run, returning `would_publish`. **The token must own the namespace being
-checked**; `REGISTRY_TOKEN` in `.env` currently owns `test-namespace`/`test-namespace2` and
-`REGISTRY_TOKEN_SANDBOX` owns `sandbox`, not `just-dna-seq`, so rehearse under `--namespace sandbox`.
-
-### `modules.yaml`: the working copy is *merged* over the defaults, never substituted
-
-`_load_config()` layers `data/interim/modules.yaml` (or the `JUST_DNA_PIPELINES_OUTPUT_DIR`-derived
-runtime copy) on top of the repo-root file, dict-merging `module_metadata` and unioning `sources`.
-It used to be first-found-wins, which meant that once `register_custom_module` wrote a working copy
-naming one custom module, **every built-in module silently lost its display metadata** — in the app
-and in every spec a port wrote. Keep the merge; `save_config` patches only those two keys for the
-same reason.
-
-**A broken working copy is recovered from; a broken *default* is not, and the asymmetry is the
-point.** `_load_config()` runs at module scope (`MODULES_CONFIG`) and every Dagster asset module
-imports it transitively, so anything it raises surfaces as `Error loading repository location
-definitions.py` — a warning that carries **no traceback**, with the real stack only in the code
-server's stdout. Both halves of the file used to be read with a bare `yaml.safe_load` and validated
-unguarded, so malformed YAML (`ScannerError`) or a well-formed file that breaks the schema
-(`quality_filters.min_depth: "ten"` → pydantic `ValidationError`) took the whole pipeline down. The
-working copy is gitignored and rewritten at runtime by register/unregister, so a bad one is a
-runtime accident: `_read_yaml_tolerant` returns the reason instead of raising, the load falls back
-to the shipped defaults, and `_warn_unusable_working_copy` reports it on **both** channels — eliot
-for structure and a `UserWarning` for visibility, because an eliot message lands in a log nobody
-opens while the symptom the operator sees is that bare location error. The repo-root default keeps
-the raising `_read_yaml`: it is git-tracked, so a bad one is a build error, and recovering would
-hand back an empty `ModulesConfig()` — zero sources, zero modules discovered, an app that looks
-healthy while annotating nothing. `save_config` has the same guard on the read side and **moves an
-unparseable working copy to `modules.yaml.corrupt` rather than overwriting it** — those bytes are the only record of whatever
-registrations it held (a second corruption overwrites that backup — one deterministic name,
-deliberately). **`module_registry` reads the same file and needed the same guard**: `register_custom_module`,
-`unregister_custom_module` and `register_compiled_module` each read the working copy *alone* (not
-merged — `save_config` writes the result straight back, so the merged mapping would bake every
-shipped default into the copy), and all three used a bare `safe_load` + `model_validate`. They now
-go through `module_config.read_config_for_update`, which returns `None` for "absent or unusable" so
-each keeps its own fallback and the write repairs the file. Guarding `_load_config` alone would only
-have moved the crash from import time to the next register. Tests: `just-dna-pipelines/tests/test_modules_yaml_recovery.py`, which
-derives its baseline by running the loader with no working copy rather than reading `modules.yaml`,
-since `_drop_project_runtime_sources` strips the two repo-local absolute sources whenever
-`JUST_DNA_PIPELINES_OUTPUT_DIR` is set — which another test module's `load_env()` does session-wide.
-
-### Working agreement: the suggestions inbox is the single entrypoint (don't manage that repo)
-
-When you find something that belongs in the shared schema/compiler (a bug, a missing field, a
-tightening, a parity gap) — or want to record a consumer-side integration fact — **do not edit or
-commit the `just-dna-format` repo** — we consume it, we don't own it. There is **one** place to write:
-
-- **`/data/sources/just-dna-format/docs/CONSUMER_SUGGESTIONS.md`** — the suggestions **inbox**, and the
-  only file a consumer writes to. Append a `## Sn — <what happened>` section (claim the next id with
-  `.claude/triage-state.py --next`, which scans the inbox *and* the history file — never number from
-  what the inbox shows). Write the report, not a request: what you ran, what you expected, what
-  happened, what you did meanwhile; a candidate fix, or an argument against your own first one, is
-  welcome.
-
-**Do not write to `ROADMAP.md` or `CHANGELOG.md`** — those are the format repo's own, maintained by its
-owners. The maintainers' triage loop reads the inbox, replies with a `**Status —**`, moves the item to
-`CONSUMER_SUGGESTIONS_HISTORY.md`, and spawns any `RM` / roadmap / changelog entries itself. A consumer
-who writes to `CHANGELOG.md` leaves a dangling edit in a repo the maintainers commit to; put the same
-content in an inbox item instead. Writing the inbox note is the whole job on that side — do not follow
-it up with commits or PRs there.
-
----
-
-## Module Registry Stores (`registries:` in modules.yaml)
-
-The Catalog talks to **one registry server at a time**, chosen in the store selector above the
-Browse/Publication tabs. Two are shipped:
-
-| key | URL | `/api/v1/version` `mode` | token variable |
-|-----|-----|--------------------------|----------------|
-| `prod` | `https://module-registry.just-dna.life` | `prod` | `REGISTRY_TOKEN` |
-| `polygon` | `https://module-polygon.just-dna.life` | `test` | `REGISTRY_TOKEN_POLYGON` |
-
-`polygon` is the testing ground (the workshop runbook in `docs/workshops/crabs-2026.md` sends
-participants there to rehearse a claim + publish). Both answered registry 0.25.2 / format 0.7.0 /
-compiler 0.7.0 on 2026-09-21 with our client at 0.26.1, so the contract guard is satisfied on either
-— a registry patch behind the client is not a contract gap, only the format minor is.
-
-- **`RegistryStore` in `module_config.py` is the model; `modules.yaml` is the list.** Never hardcode
-  a registry URL in Python or in a component — use `get_registry_stores()` / `get_registry_store()`
-  / `default_registry_store()`. Adding a self-hosted server is one YAML entry.
-- **`$REGISTRY_URL` still decides which store opens**, because the bundled client, `pipelines
-  registry`, `registry_org_cli` and `scripts/registry_precheck.py` all read it — a checkout wired
-  to one server must not browse another. A URL that matches no configured store joins the list as
-  its own store (key `env`) rather than replacing them, so the test ground stays one click away.
-- **`registries` is merged over the defaults by `key`**, like `sources` is by url. `save_config`
-  seeds the working copy from the repo default, so without the merge a working copy written today
-  would pin today's store list forever and a store added later would be invisible.
-- **The account is per server, and so is its token.** `registry_identity.json` holds one slot per
-  store under `stores` plus a shared machine-local `install_id`; a flat pre-store file migrates
-  into the default store's slot on first read and its top-level profile keys are dropped (two
-  copies of a bearer token that no store owns is worse than none). `RegistryState._client_args()`
-  is the single choke point every `RegistryClient` call goes through, and
-  `_reset_for_store_switch()` clears catalog, selection, account and publish/precheck vars before
-  the switch reloads — a leftover account from the previous server is the failure this prevents.
-- **Never mirror a token into a shared variable.** `set_env_var` writes to the *selected store's*
-  `token_env`. A test server's token in `REGISTRY_TOKEN` breaks publishing in a way that does not
-  read as auth at all: the public server answers `403 insufficient_capability`, which looks like a
-  namespace-permissions bug. (`REGISTRY_TOKEN_SANDBOX` is unrelated — it is the `sandbox`
-  *namespace on prod*, not polygon's key.)
-- **And never read one back.** `_ensure_identity` takes the token from the store's slot only —
-  `$REGISTRY_TOKEN` is the CLI's publishing credential, so honouring it would sign the UI in as
-  that account with no user action, and `_refresh_account` persists whatever it finds, leaving a
-  second copy that shadows `.env` on every later read. Mirroring out is one-way on purpose.
-- **Known limitation: an install is not keyed by store.** A downloaded module lands at
-  `CUSTOM_MODULES_DIR/{namespace}__{name}` whichever server it came from, so the same
-  namespace/name from prod and from polygon overwrite each other. Left as is — namespaces are
-  claimed per server and a real collision needs the same handle on both.
-- **Store selection is per session, not persisted.** The store decides where a publish lands, and a
-  sticky "polygon" from last week is exactly the setting nobody thinks to check. It defaults to
-  `$REGISTRY_URL`'s store on every page load.
-
-- **A failed registry call must name the server it tried.** Every Catalog call is caught so an
-  outage cannot blank the page, which makes the message the *entire* report — there is no
-  traceback on screen and no log file behind it. `Could not reach the registry: [Errno 101]
-  Network is unreachable` named neither the host nor whose side the fault was on, and a user on a
-  fresh install could not tell an IPv6-only network from a typo'd `$REGISTRY_URL`. Go through
-  `webui.registry_errors.report_registry_failure(action, url, exc)`, which logs the traceback
-  (`exc_info`, not `logger.exception` — it is not always called from inside the `except`) and
-  returns text naming the URL and, where the OS said why, the remedy. Note the public registry is
-  **IPv4-only**, so an IPv6-only client gets ENETUNREACH against it while `huggingface.co` (which
-  has AAAA) still works — the Module Manager listing modules while the Catalog fails *is* that
-  diagnosis. `_refresh_local`'s offline degradation logs a warning for the same outage and stays
-  silent on screen, which is right: those modules are on disk and usable.
-
-- **A contract refusal says which side is behind, judged on the contract.** A
-  `VersionMismatchError` carries both `VersionInfo`s; `describe_contract_mismatch(url, e.server,
-  e.client)` reads direction from the API version, then `just-dna-format`, and never from the
-  registry package version (path-versioned, not part of compatibility). The banner used to say
-  "Catalog server is newer than this app" for every mismatch, so a user whose app was the newer
-  side was told to update it. `RegistryState.contract_mismatch` holds that text ("" = none) and the
-  banner renders it verbatim.
-
-Tests: `tests/test_registry_stores.py` (config parse, working-copy merge, `$REGISTRY_URL`
-resolution, identity migration, `_client_args` routing, switch reset). All network-free.
-`tests/test_registry_error_messages.py` pins the failure text against **real** httpx chains
-(the errno sits three links down, `httpx.ConnectError` → `httpcore.ConnectError` → `OSError`);
-every address it uses is reserved or undelegated, so nothing leaves the machine.
-
-## Immutable (Public Demo) Mode
-
-See **[docs/IMMUTABLE_MODE.md](docs/IMMUTABLE_MODE.md)** for full documentation.
-
-Immutable mode disables file uploads and serves only pre-configured public genomes from Zenodo. Controlled by the `JUST_DNA_IMMUTABLE_MODE=true` env var and `immutable_mode:` section in `modules.yaml`.
-
-### Key files
-
-| File | What it does |
-|------|-------------|
-| `modules.yaml` (`immutable_mode:` section) | Default samples, disclaimer, `allow_zenodo_import` flag |
-| `module_config.py` (`ImmutableModeConfig`, `DefaultSample`) | Pydantic models, `is_immutable_mode()`, `get_immutable_config()` |
-| `annotation/resources.py` | `validate_zenodo_record()`, `resolve_default_samples()` |
-| `webui/state.py` | `is_immutable_mode` var, `handle_zenodo_import()`, guards on upload/delete |
-| `webui/pages/annotate.py` | Conditional left panel (upload form vs disclaimer, Zenodo import, public genome hint) |
-| `webui/components/layout.py` | "Public Demo" topbar badge, FAQ nav tab (always visible) |
-| `webui/pages/faq.py` | FAQ page at `/faq` — loads content from `docs/FAQ.md` |
-| `docs/FAQ.md` | FAQ content (markdown) — user, scientific, legal, technical questions |
-
-### Deployment modes
-
-| Mode | File Upload | Zenodo Import | Use Case |
-|------|------------|---------------|----------|
-| Normal (default) | Yes | Yes | Local/personal |
-| Immutable + `allow_zenodo_import: true` | No | Yes | Workshop/conference |
-| Immutable + `allow_zenodo_import: false` | No | No | Strict public demo |
-
-### Important patterns
-
-- **Never hardcode Zenodo URLs in Python** — use `get_immutable_config().default_samples`
-- **Default samples should include `filename`** — startup resolves `data/input/users/public/` and the Zenodo cache before any network call; without `filename`, record URLs require a Zenodo metadata request.
-- **`is_immutable_mode()`** checks env var first, then YAML `enabled` flag
-- **`validate_zenodo_record()`** verifies open access, permissive license, and VCF presence before any download
-- **Zenodo metadata is tracked in Dagster** — `source: "zenodo"`, `zenodo_url`, `zenodo_doi`, `zenodo_license`, `zenodo_creator` on `user_vcf_source` materialization
-- **`progress_status`** state var provides phase-specific messages during downloads and normalization
-- **In immutable mode, `safe_user_id` is always `"public"`** — all users share the same data directory
-
-### Known public genomes
-
-- **Anton Kulaga** (CC-Zero): `https://zenodo.org/records/18370498` — `antonkulaga.vcf` (482 MB)
-- **Livia Zaharia** (CC-BY-4.0): `https://zenodo.org/records/19487816` — `SIMHIFQTILQ.hard-filtered.vcf.gz` (349 MB)
-
----
-
-## VCF Quality Filtering
-
-Quality filters are configured in `modules.yaml` under `quality_filters:` and applied during normalization (`user_vcf_normalized` asset). All downstream assets receive filtered data.
-
-### Configuration (`modules.yaml`)
-
-```yaml
-quality_filters:
-  pass_filters: ["PASS", "."]  # FILTER column values to keep (null to disable)
-  min_depth: 10                 # Minimum DP (null/0 to disable)
-  min_qual: 20                  # Minimum QUAL (null/0 to disable)
-```
-
-- **gVCF support**: Reference blocks (`FILTER=RefCall`, `GT=0/0`) are correctly dropped by `pass_filters` since `RefCall` is not in `["PASS", "."]`. This is intentional — ref blocks have no alt allele and would never match annotation module weights.
-- **Backward compatible**: If `quality_filters` is absent from YAML, no filtering occurs (all fields default to `None`).
-
-### Config Asset Pattern
-
-A non-partitioned `quality_filters_config` asset materializes the current filter settings from `modules.yaml`. `user_vcf_normalized` depends on it.
-
-**When `modules.yaml` changes:**
-1. Re-materialize `quality_filters_config` (its `DataVersion` is a hash of the filter config)
-2. Dagster marks `user_vcf_normalized` partitions as stale
-3. Re-materialize stale partitions to apply new filters
-
-### Key files
-
-- **`modules.yaml`**: `quality_filters` section (single source of truth)
-- **`module_config.py`**: `QualityFilters` model, `build_quality_filter_expr()` helper
-- **`annotation/assets.py`**: `quality_filters_config` asset, filter application in `user_vcf_normalized`
-
-### chrY Warning for Female Samples
-
-When `sex="Female"` is set in `NormalizeVcfConfig`, the normalization asset logs a warning if chrY variants are found (e.g., `"WARNING: 1200 chrY variants found in female-labeled sample"`) but **never removes them**. This is informational only — QC filters (FILTER, depth, qual) handle the actual cleanup. We deliberately avoid sex-based chromosome filtering to prevent data loss for XXY, XYY, and other karyotype variations.
-
-### Important patterns
-
-- **Never bypass quality filters** — all VCF annotation paths should read from the normalized (and filtered) parquet, not raw VCF
-- **Column name detection is case-tolerant** — `build_quality_filter_expr()` searches for `(filter, Filter, FILTER)`, `(DP, Dp, dp)`, `(qual, Qual, QUAL)` to handle different VCF parser conventions
-- **Cast before comparison** — DP and QUAL columns are cast to numeric types before threshold comparison to handle string-typed parquet columns
-
----
-
-## Dagster Pipeline
-
-**For any Dagster-related changes, architecture, or troubleshooting, see [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md).** The guide explains the full pipeline (VCF normalization → HF annotation + optional Ensembl → reports), output paths, jobs, and known quirks (e.g. polars-bio non-fatal Rust panic).
-
-**Shared normalization**: Both HF module annotation and Ensembl annotation read from `user_vcf_normalized` (quality-filtered, chr-stripped parquet). Ensembl assets (`user_annotated_vcf`, `user_annotated_vcf_duckdb`) depend on `user_vcf_normalized` — they do NOT re-parse the raw VCF.
-
-**Jobs:**
-- `annotate_and_report_job`: normalize → HF modules → report (default)
-- `annotate_all_job`: normalize → HF modules + Ensembl DuckDB → report (when Ensembl toggle is on in UI)
-- `annotate_ensembl_only_job`: normalize → Ensembl DuckDB only (no HF modules, no report)
-- `normalize_vcf_job`: normalize only (auto-runs on upload)
-
-### Resource Tracking (MANDATORY)
-
-**Always track CPU and RAM consumption** for all compute-heavy assets using `resource_tracker` from `just_dna_pipelines.runtime`:
+A variant-only VCF has no record where the sample is hom-ref, so an authored hom-ref row (e.g.
+lactose `G/G`) could never match. Restoration infers those rows, scoped to the module's authored
+hom-ref sites, marking them `genotype_evidence = restored_hom_ref` (vs `called`). Design follows
+`just_prs.reference_allele`, but gated far more strictly because each row becomes a sentence about a
+person. **No on/off flag**: `RestorationContext.enabled` measures the callset. Gates, all required:
+
+- **Variant-only**, per `infer_genotype_input_mode` run on the **normalized parquet** (our
+  `pass_filters` already drops `RefCall`, so a gVCF arrives variant-only).
+- **Whole-genome**, per `detect_callset_scope`: `MIN_WGS_SITES` (1M) and `MIN_WGS_BREADTH` (0.75, share
+  of span within one flank of a call; WGS measures ~0.95, a clustered callset ~0.21). Do not replace
+  breadth with a gap percentile; clustered calls fool it.
+- The site was **not emitted** by the caller.
+- A called variant within `restoration_max_flank_bp` (default 10 kb), recorded on `restored_flank_bp`.
+  Not a callability proof, so restored rows render with an `inferred` badge. Never merge the two
+  categories.
+- Not an expansion member (`locus_count > 1`, plus the pre-0.6 `ref` guard). Not `requires_callable`.
+- `hom_ref_rows` returns `None` for a lead table without `ref`/coordinates (exclusion by schema).
+
+The restored frame is built from `vcf_lf.limit(0)` + `hstack`, so it inherits the schema. Restored
+counts (`total_variants_restored`) stay apart from annotated counts. Tests: `tests/test_restoration.py`.
+
+**Do not implement `requires_callable`/`callable_from`/`quality_from`/`min_quality` as bare column
+lookups.** `user_vcf_normalized` flattens INFO and FORMAT into one namespace (`AF`, `DP`, `MQ`, `AD`
+collide). Prerequisites: keep the namespaces distinct and accept `INFO/DP` / `FORMAT/DP` (RM53); QUAL
+inverts on reference records (RM57); for gVCF use `MIN_DP` with interval containment. Read
+`just-dna-format/docs/PROPOSAL_0_6.md` (RM53–RM67) before touching this seam.
+
+## Report (`report_logic.py` + `longevity_report.html.j2`)
+
+- **Join `annotations.parquet` by the finest key present** (`_annotations_keying`): `genotype`
+  (0.6+, via `_genotype_key_expr`), else dedup on `variant_key` (0.5), else `rsid` (0.3). Joining a
+  poly-effect module on `rsid` alone multiplied rows up to ×2.85. `tests/test_module_roundtrip.py` checks
+  `_genotype_key_expr` reproduces every key the compiler wrote.
+- **Render if present, never a fixed field list.** `_AUTHORED_AXES` flows into the view model, each with
+  an `{% if %}` row. `test_a_populated_0_5_axis_reaches_the_html` guards it.
+- Routing dispatches on the manifest's `lead_table` (default `"weights"`). `pharm_variants` gets a
+  drug-keyed section ranked by ClinPGx evidence.
+- **Modules not read in this run** renders `skipped` (about the module, retry won't help) and `failed`
+  (about this run, usually actionable) separately via `build_module_exclusions`, with the engine's reason
+  verbatim. Otherwise a silent skip reads as "nothing found".
+- **Modules in this report** renders `version` / `digest` / `source_url` / `weighting` from
+  `read_module_provenance`. All tri-state: `None` renders *Not stated*. Version falls back to the spec
+  (`module_config.spec_version`). **The digest is the module's claim, not verified**: nothing calls
+  `verify_manifest` yet. If you wire it, `require_marketplace=True` rejects every local compile.
+- Source credits list terms only for `layer == "annotation"`; permission booleans are tri-state.
+- Variant tables are one macro (`variant_rows` / `variant_table`). JS constraints: the detail row is the
+  immediate next sibling; preview rows carry `data-preview-row` (the detail row must not);
+  `preview_row_limit` comes from `report_logic.TABLE_PREVIEW_ROWS`; detail `colspan` equals the header
+  `<th>` count (9).
+- Title and filename derive from the module: single-module runs use its `report_title` and a slug
+  (`report_title_for_modules` / `report_filename_stem`), multi-module runs `Genomic Annotation Report` /
+  `report`. **Glob reports as `*.html` and pick by mtime.**
+- Each rsID row has four AI prompt links (`_build_variant_ai_links`); clicking sends that genotype to a
+  third party, never automatically. They are ~half the file size. Keep icons as one `<symbol>` set with
+  `<use>`.
+
+## Registry stores (`registries:` in `modules.yaml`)
+
+The Catalog talks to one server at a time, chosen in the store selector.
+
+| key | URL | token env |
+|-----|-----|-----------|
+| `prod` | `https://module-registry.just-dna.life` | `REGISTRY_TOKEN` |
+| `polygon` (test ground) | `https://module-polygon.just-dna.life` | `REGISTRY_TOKEN_POLYGON` |
+
+- `RegistryStore` (`module_config.py`) is the model; use `get_registry_stores()` / `get_registry_store()`
+  / `default_registry_store()`. Never hardcode a registry URL.
+- `$REGISTRY_URL` picks the opening store (the CLI, `registry_org_cli` and `registry_precheck.py` read
+  it); an unknown URL joins as store `env`. Selection is per session, never persisted.
+- `registry_identity.json` holds one slot per store plus `install_id`. Every client call goes through
+  `RegistryState._client_args()`; `_reset_for_store_switch()` clears catalog, account and publish state.
+- **Tokens are per store, one-way.** `set_env_var` writes only the selected store's `token_env`, and
+  `_ensure_identity` never reads `$REGISTRY_TOKEN` back. A polygon token in `REGISTRY_TOKEN` shows up as
+  `403 insufficient_capability`. `REGISTRY_TOKEN_SANDBOX` is the `sandbox` namespace on prod.
+- Installs land at `CUSTOM_MODULES_DIR/{namespace}__{name}` regardless of store (known limitation).
+- **Failures name the server**: route through
+  `webui.registry_errors.report_registry_failure(action, url, exc)`. The public registry is IPv4-only,
+  so an IPv6-only client gets ENETUNREACH while HuggingFace works.
+- **Contract refusals say which side is behind**: `describe_contract_mismatch(url, e.server, e.client)`
+  judges by API version then format version, never the registry package version.
+  `RegistryState.contract_mismatch` holds the banner text.
+- Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`.
+
+## Immutable (public demo) mode
+
+Full docs: [docs/IMMUTABLE_MODE.md](docs/IMMUTABLE_MODE.md). `JUST_DNA_IMMUTABLE_MODE=true` (checked
+first) or `immutable_mode.enabled` disables uploads and serves `default_samples`; `allow_zenodo_import`
+toggles Zenodo import.
+
+- Never hardcode Zenodo URLs: use `get_immutable_config().default_samples`. Give each sample a
+  `filename` so startup resolves locally without a Zenodo metadata call.
+- `validate_zenodo_record()` checks open access, permissive licence and a VCF before download. Zenodo
+  metadata is recorded on the `user_vcf_source` materialization.
+- `safe_user_id` is always `"public"` in this mode.
+- Public genomes: Anton Kulaga (Zenodo 18370498, CC0, `antonkulaga.vcf`) and Livia Zaharia (Zenodo
+  19487816, CC-BY-4.0, `SIMHIFQTILQ.hard-filtered.vcf.gz`).
+- FAQ page `/faq` renders `docs/FAQ.md`.
+
+## VCF quality filtering
+
+`quality_filters` in `modules.yaml` (`pass_filters: ["PASS", "."]`, `min_depth`, `min_qual`; null or 0
+disables; absent section = no filtering) is applied in `user_vcf_normalized`. A non-partitioned
+`quality_filters_config` asset hashes it, so a change marks normalized partitions stale.
+
+- **Never bypass**: every annotation path reads the normalized parquet, never the raw VCF.
+- `RefCall` reference blocks are dropped on purpose.
+- `build_quality_filter_expr()` matches column names case-insensitively and casts DP/QUAL to numeric.
+- `sex="Female"` logs a warning for chrY variants but never removes them.
+
+## Dagster pipeline
+
+Architecture and troubleshooting: [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md); first-run config:
+[docs/CLEAN_SETUP.md](docs/CLEAN_SETUP.md).
+
+Jobs: `normalize_vcf_job` (auto on upload), `annotate_and_report_job` (default: normalize → HF modules
+→ report), `annotate_all_job` (adds Ensembl DuckDB), `annotate_ensembl_only_job`. Ensembl assets
+(`user_annotated_vcf`, `user_annotated_vcf_duckdb`) **must** depend on `user_vcf_normalized` and take
+`normalized_parquet=`; never re-read the raw VCF.
+
+**Mandatory in every asset and job:**
 
 ```python
 from just_dna_pipelines.runtime import resource_tracker
-
-@asset
-def my_asset(context: AssetExecutionContext) -> Output[Path]:
-    with resource_tracker("my_asset", context=context):
-        # ... compute-heavy code ...
-        pass
-```
-
-**Important:** Always pass `context=context` to enable Dagster UI charts. Without it, metrics only go to Eliot logs.
-This automatically logs to Dagster UI: `duration_sec`, `cpu_percent`, `peak_memory_mb`, `memory_delta_mb`.
-
-### Run-Level Resource Summaries (MANDATORY)
-
-All jobs must include the `resource_summary_hook` from `just_dna_pipelines.annotation.utils` to provide aggregated resource metrics at the run level:
-
-```python
 from just_dna_pipelines.annotation.utils import resource_summary_hook
 
-my_job = define_asset_job(
-    name="my_job",
-    selection=AssetSelection.assets(...),
-    hooks={resource_summary_hook},  # Note: must be a set, not a list
-)
+with resource_tracker("my_asset", context=context):   # context= or no UI charts
+    ...
+my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_hook})  # a set
 ```
 
-This hook logs a summary at the end of each successful run: Total Duration, Max Peak Memory, and Top memory consumers.
-
-### Dagster Version Notes (1.13.x)
-
-**API differences from newer versions (MANDATORY reference):**
-- `get_dagster_context()` does NOT exist - you must pass `context` explicitly.
-- `context.log.info()` does NOT accept a `metadata` keyword argument - use `context.add_output_metadata()` separately.
-- `EventRecordsFilter` does NOT have `run_ids` parameter - use `instance.all_logs(run_id, of_type=...)` instead.
-- For asset materializations, use `EventLogEntry.asset_materialization` (returns `Optional[AssetMaterialization]`), not `DagsterEvent.asset_materialization`.
-- `hooks` parameter in `define_asset_job` must be a `set`, not a list: `hooks={my_hook}`.
-- Use `defs.resolve_all_asset_specs()` instead of deprecated `defs.get_all_asset_specs()`.
-
-### Project-Specific Patterns
-
-- **Auto-configuration**: Dagster config is automatically created on first run. See **[docs/CLEAN_SETUP.md](docs/CLEAN_SETUP.md)**.
-- **Declarative Assets**: We prioritize Software-Defined Assets (SDA) over imperative ops.
-- **IO Managers**: Reference assets (Ensembl, ClinVar, etc.) use `annotation_cache_io_manager` → stored in `~/.cache/just-dna-pipelines/`.
-- **User assets** use `user_asset_io_manager` → stored in `data/output/users/{user_name}/`.
-- **Ensembl cache layout**: Flat chromosome parquets at `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`. Downloaded by `annotation/ensembl_download.py` (the `ensembl_annotations` asset and `pipelines download-ensembl` share it). The repo is configured in `modules.yaml` under `ensembl_source:`. DuckDB creates a single `ensembl_variations` VIEW over all files.
-- **Lazy materialization, file by file**: `ensembl_annotations` checks every cached parquet against HF's size + SHA256 and re-downloads only what does not match (`.part`, then replace). A `<file>.sha256` stamp (size, mtime, digest) means an unchanged file is hashed once; `verify-ensembl` ignores stamps. Never go back to "any parquet present, skip": that kept a damaged file forever, and the symptom was `_duckdb.Error: Out of buffer` inside the Ensembl join. Readers must glob `*.parquet`, never the bare directory, or they pick up the stamps.
-- **Start UI**: `uv run start` (full stack) or `uv run dagster` (pipelines only).
-
-### Asset Return Types
-
-| Asset Returns | IO Manager | Use Case |
-|---------------|------------|----------|
-| `pl.LazyFrame` | `polars_parquet_io_manager` | Small parquet, schema visibility |
-| `Path` | Custom IO manager | Large data, DuckDB joins, file uploads |
-| `dict` | Default | API responses, upload results |
-
-### Key Rules
-
-- **dagster-polars**: Use `PolarsParquetIOManager` for `LazyFrame` assets → automatic schema/row count in UI
-- **Path assets**: Add `"dagster/column_schema": polars_schema_to_table_schema(path)` for schema visibility
-- **Asset checks**: Use `@asset_check` for validation; include via `AssetSelection.checks_for_assets(...)`
-- **Streaming**: Use `lazy_frame.sink_parquet()`, never `.collect().write_parquet()` on large data
-- **DuckDB**: Use for large joins (out-of-core); set `memory_limit` and `temp_directory`
-- **Concurrency**: Use `op_tags={"dagster/concurrency_key": "name"}` to limit parallel execution
-
-### Dynamic Partitions Pattern
-
-1. Create partition def: `PARTS = DynamicPartitionsDefinition(name="files")`
-2. Discovery asset registers partitions: `context.instance.add_dynamic_partitions(PARTS.name, keys)`
-3. Partitioned assets use: `partitions_def=PARTS`, access `context.partition_key`
-4. Collector depends on partitioned output via `deps=[partitioned_asset]`, scans filesystem for results
-
-### Execution
-
-- **Python API only**: `defs.resolve_job_def(name)` + `job.execute_in_process(instance=instance)`
-- **Same DAGSTER_HOME** for UI and execution: `dg dev -m module.definitions`
-- **All assets in `Definitions(assets=[...])`** for lineage visibility in UI
-
-### API Gotchas
-
-**Never use `huggingface_hub.snapshot_download` for large datasets:**
-
-`snapshot_download` duplicates data into HuggingFace's own blob store (`~/.cache/huggingface/`) and then copies/links to `local_dir`. This wastes disk space and is unreliable. Instead, use **fsspec** via `HfFileSystem` for direct file-by-file downloads into our cache:
-
-```python
-# WRONG - duplicates data in HF blob store, unreliable local_dir population
-from huggingface_hub import snapshot_download
-snapshot_download(repo_id="org/repo", local_dir=cache_dir, ...)
-
-# CORRECT - direct download via fsspec, files land exactly where we want
-from huggingface_hub import HfFileSystem, get_token
-fs = HfFileSystem(token=get_token())
-for remote_path in fs.ls("datasets/org/repo/data", detail=False):
-    if remote_path.endswith(".parquet"):
-        fs.get(remote_path, str(local_path))
-```
-
-This pattern is also future-proof: swapping `HfFileSystem` for any other fsspec backend (S3, GCS, HTTP) requires minimal changes.
-
-**polars-bio `scan_vcf` API changed (0.23+):**
-
-- `IOOperations.scan_vcf()` no longer accepts `thread_num`.
-- Use `concurrent_fetches` instead.
-- In `just_dna_pipelines.io.read_vcf_file()`, keep `thread_num` only as backward-compatible API and map it to `concurrent_fetches`.
-
-**Do not use polars-bio for PGEN reads.** `scan_pgen` / `read_pgen` / `read_pgen_matrix` refuse the published PGS Catalog 1000G `.pvar.zst` (~567 MB) because of a hardcoded 512 MB `max_companion_bytes` cap ([polars-bio#453](https://github.com/biodatageeks/polars-bio/issues/453)). just-prs scoring stays on `pgenlib` (`read_pgen_genotypes`). Revisit only after the upstream cap is raised.
-
-**polars-bio `write_vcf` with custom INFO fields requires `set_source_metadata`:**
-
-Without `pb.set_source_metadata()`, extra columns on the DataFrame are silently dropped and the VCF always outputs `INFO=.`. Register INFO field definitions **before** calling `pb.write_vcf()`:
-
-```python
-import polars_bio as pb
-
-pb.set_source_metadata(df, format="vcf", header={
-    "info_fields": {
-        "AF": {"number": "A", "type": "Float", "description": "Allele Frequency"},
-        "gene": {"number": "1", "type": "String", "description": "Gene symbol"},
-    }
-})
-pb.write_vcf(df, str(out_vcf))
-```
-
-Each `info_fields` entry requires `number`, `type`, and `description`. `type` is one of `Integer`, `Float`, `String`, `Flag`, `Character`; `number` is `1`, `A`, `R`, `G`, or `.`. See https://biodatageeks.org/polars-bio/features/#setting-custom-metadata.
-
-`write_vcf` also requires all 8 core VCF columns (`chrom`, `start`, `end`, `id`, `ref`, `alt`, `qual`, `filter`) with `start`/`end` as `UInt32`. When exporting from parquets that lack some of these, fill defaults: `end = start + 1`, `qual = None`, `filter = "."`.
-
-**Timestamps are on `RunRecord`, not `DagsterRun`:**
-
-```python
-# WRONG - DagsterRun has no start_time/end_time
-runs = instance.get_runs(limit=10)
-for run in runs:
-    print(run.start_time)  # AttributeError!
-
-# CORRECT - Use get_run_records() to access timestamps
-records = instance.get_run_records(limit=10)
-for record in records:
-    run = record.dagster_run
-    # record.start_time and record.end_time are Unix timestamps (floats)
-    # record.create_timestamp is a datetime object
-    started = datetime.fromtimestamp(record.start_time) if record.start_time else None
-```
-
-**Partition keys via tags, not direct parameter:**
-
-```python
-# WRONG - create_run_for_job doesn't accept partition_key
-run = instance.create_run_for_job(job_def=job, partition_key=pk)
-
-# CORRECT - pass partition via tags
-run = instance.create_run_for_job(
-    job_def=job,
-    run_config=config,
-    tags={"dagster/partition": pk},
-)
-```
-
-**Web UI Job Execution Pattern (TRY-DAEMON-WITH-FALLBACK):**
-
-For the Reflex Web UI, we use a hybrid approach: try daemon-based execution first, but fall back to `execute_in_process` if submission fails. **Critical: Keep business logic outside exception handlers.**
-
-```python
-# RECOMMENDED PATTERN - Separate business logic from exception handling
-
-# 1. Create run
-job_def = defs.resolve_job_def(job_name)
-run = instance.create_run_for_job(
-    job_def=job_def,
-    run_config=run_config,
-    tags={"dagster/partition": partition_key},
-)
-run_id = run.run_id
-
-# 2. Try daemon submission (register failure, don't process it)
-daemon_success, daemon_error = self._try_submit_to_daemon(instance, run_id)
-
-# 3. Handle success/failure outside exception handler
-if daemon_success:
-    # Poll status asynchronously via poll_run_status()
-    yield rx.toast.info("Job started")
-else:
-    # Fall back to execute_in_process as background task (non-blocking)
-    self._add_log(f"Daemon failed: {daemon_error}")
-    yield rx.toast.info("Running in-process - please wait...")
-    
-    # Launch in thread pool without awaiting (keeps UI responsive)
-    # CRITICAL: Use run_in_executor, NOT asyncio.create_task or asyncio.to_thread
-    # Those cause pyo3 panics with Dagster objects
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(
-        None,  # Use default executor
-        self._execute_inproc_with_state_update,
-        instance, job_name, run_config, partition_key, run_id, sample_name
-    )
-    # Background task will update state when complete
-
-# Helper methods (separate concerns):
-def _try_submit_to_daemon(self, instance, run_id) -> tuple[bool, str]:
-    """Try daemon submission. Returns (success, error_message)."""
-    try:
-        instance.submit_run(run_id, workspace=None)
-        return (True, "")
-    except Exception as e:
-        return (False, str(e))
-
-def _execute_inproc_with_state_update(self, ...) -> None:
-    """Execute in-process and update state. Called from thread pool via run_in_executor."""
-    try:
-        # Execute synchronously (caller handles threading via run_in_executor)
-        result = self._execute_job_in_process(...)
-        # Update UI state with result (self.running = False, etc.)
-        self.running = False
-        self.last_run_success = result.success
-    except Exception as e:
-        # Update UI state for failure
-        self.running = False
-        self.last_run_success = False
-```
-
-**Why this pattern is better:**
-- ✅ Business logic outside exception handlers (cleaner separation of concerns)
-- ✅ Exception handlers only register failures, don't process them
-- ✅ Control flow is linear and easy to follow
-- ✅ Each method has single responsibility
-- ✅ **UI stays responsive** - Background task doesn't block event handler
-
-**Critical: UI Responsiveness and Python/Rust Thread Safety**
-
-NEVER await long-running operations in Reflex event handlers - it blocks the entire UI. Also, be careful with threading when using Dagster (which has Rust/pyo3 internals):
-
-```python
-# BAD - Blocks UI until job completes (minutes!)
-fallback_result = await self._execute_inproc_with_state_update(...)
-if fallback_result["success"]:
-    yield rx.toast.success("Done")
-
-# BAD - asyncio.to_thread() with Dagster objects causes pyo3 panic:
-# "Cannot drop pointer into Python heap without the thread being attached"
-result = await asyncio.to_thread(self._execute_job_in_process, ...)
-
-# BAD - asyncio.create_task() on sync function
-asyncio.create_task(self._execute_inproc_with_state_update(...))  # Not async!
-
-# GOOD - Use run_in_executor for thread-safe background execution
-loop = asyncio.get_event_loop()
-loop.run_in_executor(None, self._execute_inproc_with_state_update, ...)
-# UI remains responsive, thread-safe, no pyo3 panics
-```
-
-**Why run_in_executor works:** It properly manages the Python GIL when moving objects between threads, unlike `asyncio.to_thread()` which can cause pyo3 (Python/Rust bridge) panics with Dagster objects.
-
-**Why `submit_run(workspace=None)` fails in web UIs:**
-
-Daemon-based execution requires `ExternalPipelineOrigin` which needs workspace context. Web UI state doesn't have easy access to workspace context, so `submit_run(run_id, workspace=None)` fails with "Expected non-None value: External pipeline origin must be set for submitted runs". The fallback to `execute_in_process` handles this reliably.
-
-**Critical: Per-file running state (not global)**
-
-Button enable logic must check if the **selected file** is running, not if **any** job is running globally. This allows concurrent jobs on different files:
-
-```python
-# BAD - blocks ALL files when ANY file is running
-@rx.var
-def can_run_annotation(self) -> bool:
- return bool(self.selected_file) and len(self.selected_modules) > 0 and not self.running
-
-# GOOD - only blocks the selected file if it's running
-@rx.var
-def can_run_annotation(self) -> bool:
- if not self.selected_file or not self.selected_modules:
- return False
- 
- # Check if SELECTED file has a running job
- for run in self.runs:
- if run.get("filename") == self.selected_file:
- if run.get("status") in ("RUNNING", "QUEUED", "STARTING"):
- return False
- 
- return True
-
-# Helper computed var for UI elements
-@rx.var
-def selected_file_is_running(self) -> bool:
- """Check if the currently selected file has a running job."""
- if not self.selected_file:
- return False
- for run in self.runs:
- if run.get("filename") == self.selected_file:
- if run.get("status") in ("RUNNING", "QUEUED", "STARTING"):
- return True
- return False
-```
-
-Use `selected_file_is_running` for UI elements (button text, icons, spinners) instead of global `self.running` flag.
-
-**Critical: Orphaned Run Cleanup (execute_in_process survival)**
-
-When using `execute_in_process` in web UIs, runs are abandoned (stuck in STARTED status) on server restart. Implement these safeguards:
-
-1. **Startup cleanup** - Clean up NOT_STARTED runs (daemon submission failures):
-
-```python
-def _cleanup_orphaned_runs(self) -> int:
- """Clean up NOT_STARTED runs on startup (daemon submission failures)."""
- instance = get_dagster_instance()
- not_started_records = instance.get_run_records(
- filters=RunsFilter(statuses=[DagsterRunStatus.NOT_STARTED]),
- limit=100,
- )
- cleaned_count = 0
- for record in not_started_records:
- run = record.dagster_run
- instance.report_run_canceled(run, message="Orphaned run from daemon submission failure")
- cleaned_count += 1
- return cleaned_count
-
-async def on_load(self):
- """Load state and clean up orphaned runs."""
- cleaned = self._cleanup_orphaned_runs()
- if cleaned > 0:
- self._add_log(f"🧹 Cleaned up {cleaned} orphaned run(s) from previous session")
- # ... rest of on_load logic
-```
-
-2. **Track active in-process runs** - Use class variable to track which runs are executing in-process:
-
-```python
-class MyState(rx.State):
- # Class variable shared across all instances
- _active_inproc_runs: Dict[str, str] = {} # {run_id: partition_key}
- 
- def _execute_inproc_with_state_update(self, ...):
- actual_run_id = None
- try:
- result = self._execute_job_in_process(...)
- actual_run_id = result.run_id
- # Track this run
- MyState._active_inproc_runs[actual_run_id] = partition_key
- # ... process result
- finally:
- # Clean up tracker
- if actual_run_id and actual_run_id in MyState._active_inproc_runs:
- del MyState._active_inproc_runs[actual_run_id]
-```
-
-3. **SIGTERM handler** - Mark STARTED runs as CANCELED on shutdown (in app.py):
-
-```python
-import signal
-import atexit
-
-def cleanup_active_runs():
- """Mark all active in-process runs as CANCELED on shutdown."""
- try:
- from my_app.state import MyState
- from dagster import DagsterInstance
- 
- active_runs = MyState._active_inproc_runs.copy()
- if not active_runs:
- return
- 
- instance = DagsterInstance.get()
- for run_id in active_runs:
- run = instance.get_run_by_id(run_id)
- if run:
- instance.report_run_canceled(
- run,
- message="Web server shutdown - in-process execution terminated"
- )
- except Exception as e:
- print(f"Warning: Failed to cleanup active runs: {e}")
-
-# Register cleanup handlers
-signal.signal(signal.SIGTERM, lambda sig, frame: (cleanup_active_runs(), sys.exit(0)))
-signal.signal(signal.SIGINT, lambda sig, frame: (cleanup_active_runs(), sys.exit(0)))
-atexit.register(cleanup_active_runs)
-```
-
-4. **CLI cleanup command** - Manual cleanup for orphaned runs:
-
-```bash
-# Clean up NOT_STARTED runs (daemon failures)
-uv run pipelines cleanup-runs
-
-# Clean up STARTED runs (abandoned in-process executions)
-uv run pipelines cleanup-runs --status STARTED
-
-# Dry-run to see what would be cleaned
-uv run pipelines cleanup-runs --status STARTED --dry-run
-```
-
-**For CLI Tools: Direct `execute_in_process`**
-
-CLI tools can use `execute_in_process` directly (no fallback needed):
-
-```python
-# For CLI tools - execute_in_process (no daemon required, runs synchronously)
-job_def = defs.resolve_job_def(job_name)
-
-# Ensure partition exists (for dynamic partitions)
-existing = instance.get_dynamic_partitions(partition_def.name)
-if partition_key not in existing:
-    instance.add_dynamic_partitions(partition_def.name, [partition_key])
-
-result = job_def.execute_in_process(
-    run_config=run_config,
-    instance=instance,
-    tags={"dagster/partition": partition_key},
-)
-if result.success:
-    print("Job completed successfully")
-else:
-    print(f"Job failed: {result.all_events}")
-```
-
-**Trade-offs of try-daemon-with-fallback pattern:**
-
-✅ **Benefits:**
-- UI responsive when daemon works (job runs in daemon, not blocking web server)
-- Reliable when daemon fails (falls back to execute_in_process)
-- Background threading keeps execute_in_process from blocking UI
-
-❌ **Limitations:**
-- Runs created via execute_in_process fallback cannot be re-executed from Dagster UI (missing `remote_job_origin`)
-- Execute_in_process runs in web server process (mitigated by background threading via `asyncio.to_thread`)
-
-**Asset job config uses "ops" key, not "assets":**
-
-```python
-# WRONG - "assets" key causes DagsterInvalidConfigError
-run_config = {
-    "assets": {"user_hf_module_annotations": {"config": {...}}}
-}
-
-# CORRECT - use "ops" key for asset job config
-run_config = {
-    "ops": {"user_hf_module_annotations": {"config": {...}}}
-}
-```
-
-**Run logs via `all_logs`, not `EventRecordsFilter`:**
-
-```python
-# WRONG - EventRecordsFilter doesn't have run_ids
-records = instance.get_event_records(EventRecordsFilter(run_ids=[run_id]))
-
-# CORRECT - use all_logs(run_id)
-events = instance.all_logs(run_id)
-```
-
-**`submit_run()` with workspace context - use try/fallback pattern:**
-
-```python
-# Web UI pattern: Try daemon submission, fall back to execute_in_process
-try:
-    instance.submit_run(run_id, workspace=None)
-    # Success: daemon will run the job, poll status via poll_run_status()
-except Exception as e:
-    # Daemon rejected run (needs ExternalPipelineOrigin/workspace context)
-    # Fall back to execute_in_process which runs reliably without workspace context
-    result = await asyncio.to_thread(
-        self._execute_job_in_process,
-        instance, job_name, run_config, partition_key
-    )
-    # Update UI state with result immediately (no polling needed)
-```
-
-**Critical discovery:** Wrong parameter `workspace_process_context=None` caused TypeError → triggered fallback → job ran successfully via `execute_in_process`. The "correct" `workspace=None` is worse because it doesn't error immediately - daemon accepts submission but then rejects run with "External pipeline origin must be set", leaving run stuck in NOT_STARTED.
-
-### Anti-Patterns
-
-- `dagster job execute` CLI (deprecated)
-- Hardcoded asset names; use `defs.get_all_asset_specs()`
-- **Silent fallbacks when primary data is missing** — If normalized parquet does not exist (e.g. user_vcf_normalized), do NOT silently fall back to raw VCF and display it as if it were normalized. Users will not know the data source differs. Either show an explicit error ("Run normalization first") or a very prominent banner ("Using raw VCF — normalize job has not run"). See [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md) § VCF Normalization.
-- **Ensembl assets bypassing user_vcf_normalized** — `user_annotated_vcf` and `user_annotated_vcf_duckdb` MUST depend on `user_vcf_normalized` and pass the normalized parquet via `normalized_parquet=` parameter. Never read the raw VCF directly in annotation assets.
-- Config for unselected assets (validation errors)
-- Suspended jobs holding DuckDB file locks
-- **Accessing `run.start_time` on DagsterRun** - use RunRecord instead
-- **Using `submit_run(run_id, workspace=None)` without fallback in web UIs** - daemon rejects run, leaves it stuck in NOT_STARTED; always implement fallback to `execute_in_process`
-- **Using global `self.running` flag for button enable logic** - blocks ALL files when ANY file is running; use per-file running state instead
-- **Expecting Dagster UI re-execution to work for `execute_in_process` runs** - not supported, but acceptable trade-off
-
----
-
-## Test Generation Guidelines
-
-- **Real data + ground truth**: Use actual source data, auto-download if needed, and compute expected values at runtime.
-- **Deterministic coverage**: Use fixed seeds or explicit filters; include representative and edge cases.
-- **Meaningful assertions**: Prefer relationships and aggregates over existence-only checks.
-- **Verbosity**: Run `pytest -vvv`.
-- **Docs**: Put all new markdown files (except README/AGENTS) in `docs/`.
-
-### What to Validate
-
-- **Counts & aggregates**: Row counts, sums/min/max/means, distinct counts, and distributions.
-- **Joins**: Pre/post counts, key coverage, cardinality expectations, nulls introduced by outer joins, and a few spot-checks.
-- **Transformations**: Round-trip survival, subset/superset semantics, value mapping, key preservation.
-- **Data quality**: Format/range checks, outliers, malformed entries, duplicates, referential integrity.
-
-### Avoiding LLM "Reward Hacking" in Tests
-
-- **Runtime ground truth**: Query source data at test time instead of hardcoding expectations.
-- **Seeded sampling**: Validate random records with a fixed seed, not just known examples.
-- **Negative & boundary tests**: Ensure invalid inputs fail; probe min/max, empty, unicode.
-- **Derived assertions**: Test relationships (e.g., input vs output counts), not magic numbers.
-- **Allow expected failures**: Use `pytest.mark.xfail` for known data quality issues with a clear reason.
-
-### Test Structure Best Practices
-
-- **Parameterize over duplicate**: If testing the same logic on multiple outputs, use `@pytest.mark.parametrize` instead of copy-pasting tests.
-- **Set equality over counts**: Prefer `assert set_a == set_b` over `assert len(set_a) == 270` - set comparison catches both missing and extra values.
-- **Delete redundant tests**: If test A (e.g., set equality) fully covers test B (e.g., count check), keep only test A.
-- **Domain constants are OK**: Hardcoding expected enum values or well-known constants from specs is fine; hardcoding row counts or unique counts derived from data inspection is not.
-
-### Verifying Bug-Catching Claims
-
-When claiming a test "would have caught" a bug, **demonstrate it**:
-
-1. **Isolate the buggy logic** in a test or script
-2. **Run it and show failure** against correct expectations
-3. **Then show the fix passes** the same test
-
-Never claim "tests would have caught this" without running the buggy code against the test.
-
-### Anti-Patterns to Avoid
-
-- Testing only "happy path" with trivial data
-- Hardcoding expected values that drift from source (use derived ground truth)
-- Mocking data transformations instead of running real pipelines
-- Ignoring edge cases (nulls, empty strings, boundary values, unicode, malformed data)
-- **Claiming tests "would catch bugs" without demonstrating failure on buggy code**
-
-**Meaningless Tests to Avoid** (common AI-generated anti-patterns):
-
-```python
-# BAD: Existence-only checks as the sole validation
-assert "name" in df.columns
-assert len(df) > 0
-
-# BAD: Hardcoded counts derived from data inspection
-assert len(source_ids) == 270  # will break when source changes
-
-# BAD: Redundant with set equality test
-assert len(output_cats) == 12  # already covered by subset check
-
-# ACCEPTABLE: Required columns as prerequisites
-required_cols = {"id", "name", "value"}
-assert required_cols.issubset(df.columns)
-
-# GOOD: Set equality from source data
-source_ids = set(source_df["id"].unique().drop_nulls().to_list())
-output_ids = set(output_df["id"].unique().drop_nulls().to_list())
-assert source_ids == output_ids
-
-# GOOD: Domain knowledge constants (from spec, not data inspection)
-assert valid_states == {"active", "inactive", "pending"}  # from API spec
-```
-
----
-
-## Process Model & Fork Safety (MANDATORY)
-
-**Never `fork()` a process that has already used Polars, polars-bio, or DuckDB.**
-
-Polars' Rayon pool is created on the **first Polars operation**, not at import. A
-forked child inherits the pool's latches but none of its worker threads, so the first
-parallel op parks forever. It parks with the GIL released, so Python signal handlers
-never run: no traceback, SIGTERM ignored, SIGKILL only. Rayon workers are named
-`polars-<n>` in `/proc/self/task/*/comm` and are invisible to Python's `threading`
-module, which is why this ships unnoticed. CPython's own
-`DeprecationWarning: ... fork() may lead to deadlocks` is swallowed by the default
-`ignore::DeprecationWarning` filter because the fork happens outside `__main__`.
-
-Full write-up and reproductions: **[docs/GRANIAN_POLARS_FORK_DEADLOCK.md](docs/GRANIAN_POLARS_FORK_DEADLOCK.md)**.
+### Patterns
+
+- Software-defined assets over ops; every asset in `Definitions(assets=[...])`.
+- IO managers: reference data → `annotation_cache_io_manager` (`~/.cache/just-dna-pipelines/`); user
+  data → `user_asset_io_manager` (`data/output/users/{user}/`). `pl.LazyFrame` assets use
+  `PolarsParquetIOManager`; `Path` assets add `"dagster/column_schema": polars_schema_to_table_schema(path)`.
+- `sink_parquet`, never `.collect().write_parquet()` on large data. DuckDB for big joins with
+  `memory_limit` and `temp_directory`. Limit parallelism with `op_tags={"dagster/concurrency_key": …}`.
+- Validation via `@asset_check`, selected with `AssetSelection.checks_for_assets(...)`.
+- Dynamic partitions: discovery asset calls `context.instance.add_dynamic_partitions(PARTS.name, keys)`;
+  partitioned assets read `context.partition_key`.
+- **Ensembl cache**: flat `ensembl_variations/data/homo_sapiens-chr*.parquet`, downloaded by
+  `annotation/ensembl_download.py`. `ensembl_annotations` verifies each file against HF size + SHA256
+  and re-downloads only mismatches (`.part` then replace; `<file>.sha256` stamps skip rehashing). Never
+  revert to "any parquet present, skip" (a damaged file caused `Out of buffer`). Readers glob
+  `*.parquet`, never the bare directory.
+- **Never `huggingface_hub.snapshot_download`** (duplicates into the HF blob store). Use
+  `HfFileSystem(token=get_token())` and `fs.get(remote, local)` file by file.
+
+### Dagster 1.13 API facts
+
+- No `get_dagster_context()`: pass `context`. `context.log.info()` takes no `metadata=`; use
+  `context.add_output_metadata()`.
+- Run events: `instance.all_logs(run_id, of_type=...)`, not `EventRecordsFilter(run_ids=...)`. Use
+  `EventLogEntry.asset_materialization`.
+- Timestamps live on `RunRecord` (`instance.get_run_records()`: `start_time`, `end_time`), not
+  `DagsterRun`.
+- Partition via tags: `create_run_for_job(..., tags={"dagster/partition": pk})`.
+- Asset job run config uses the `"ops"` key, not `"assets"`.
+- `defs.resolve_job_def(name)`, `defs.resolve_all_asset_specs()`. The `dagster job execute` CLI is out.
+- Same `DAGSTER_HOME` for UI and execution.
+
+### Running jobs from the web UI
+
+1. Create the run, then try `instance.submit_run(run_id, workspace=None)` (`_try_submit_to_daemon`
+   returns `(ok, error)`; keep logic out of the `except`).
+2. On failure (usually "External pipeline origin must be set"), run the job in a **spawned child** via
+   `webui.compute.jobs` (`submit_job` / `await_job`, see `execute_job_with_run_discovery`). Never run
+   `execute_in_process` in the ASGI process or its threads.
+3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; startup
+   cancels orphaned `NOT_STARTED` runs. Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
+   [--dry-run]`. Fallback runs cannot be re-executed from the Dagster UI.
+4. Button state is **per file** (`selected_file_is_running`), never a global `self.running`.
+
+CLI tools may call `job_def.execute_in_process(run_config=..., instance=..., tags=...)` directly, after
+adding the dynamic partition if missing.
+
+Anti-pattern: silently falling back to the raw VCF when the normalized parquet is missing. Show an
+error or a prominent banner.
+
+## Process model and fork safety (mandatory)
+
+**Never `fork()` a process that has used Polars, polars-bio or DuckDB.** The child inherits the Rayon
+pool's latches without its threads and the next parallel op hangs forever, GIL released, SIGKILL only.
+Write-up: [docs/GRANIAN_POLARS_FORK_DEADLOCK.md](docs/GRANIAN_POLARS_FORK_DEADLOCK.md).
+
+- `serve()` calls `webui.forksafety.apply_process_model_guards()` **before importing reflex** (pins
+  Granian, forces `spawn`, unmutes the fork warning, installs a fork tripwire). Do not remove or reorder.
+- All `multiprocessing` passes `multiprocessing.get_context("spawn")` explicitly. Every entry point is
+  `__main__`-guarded.
+- `POLARS_MAX_THREADS=1` does not help. `run_in_executor` does not make native work safe (pools are
+  process-global); use it for blocking I/O only.
+- All Polars / DuckDB / polars-bio / Dagster work goes through `webui.compute` (`pool` for short queries,
+  `jobs` for runs). The ASGI process only marshals.
+- **Grid pages must be O(page)**: sort once to a temp parquet, then slice (a multi-key
+  `sort().slice()` re-sorts the whole frame per click).
+- **Ctrl+C**: importing Polars installs a SIGINT handler with `SA_RESTART`, so a blocking `proc.wait()`
+  never sees `KeyboardInterrupt`. Call `just_dna_lite.process.install_launcher_signal_handlers` before
+  any wait on a child (first signal interrupts, second force-kills; SIGTERM and Ctrl+Z share the path).
+  Tests: `tests/test_launcher_shutdown.py`, `tests/test_process_shutdown.py`.
+
+## Reflex UI
+
+Visual design: [docs/DESIGN.md](docs/DESIGN.md) ("chunky and tactile", Fomantic classes, flexbox
+layouts, icons ≥2rem, semantic colours `success`/`error`/`info` for benign/pathogenic/VUS).
+
+**Verify UI changes**: watch the running app's terminal for `ImportError`, `AttributeError`,
+`Invalid icon tag` or tracebacks during compile, wait for "Compiling: 100%", then check
+http://localhost:3000 renders and responds. `Killing worker-0 after it refused to gracefully stop`
+during hot reload is harmless. After PRS/Compare changes, restart: hot reload can pair old
+`annotate.py` with new state.
 
 ### Rules
 
-- **`serve()` calls `apply_process_model_guards()` from `webui/src/webui/forksafety.py`
-  before importing reflex.** It pins `REFLEX_USE_GRANIAN` (Reflex's `should_use_granian()`
-  is a `find_spec` heuristic that otherwise silently selects `gunicorn --preload`,
-  which forks after importing the app), forces the `spawn` start method, unmutes the
-  fork warning, and installs an `os.register_at_fork` tripwire. Do not remove or reorder.
-- **Any `multiprocessing` use must pass a `spawn` context explicitly** —
-  `mp_context=multiprocessing.get_context("spawn")`. Never rely on the platform default.
-- **Spawned children re-import `__main__`,** so every entry point must be
-  `__main__`-guarded or the worker dies with the `freeze_support()` RuntimeError.
-  uv-generated console scripts already are; bare scripts are not.
-- **`POLARS_MAX_THREADS=1` does not fix this.** Measured at 1, 4 and 16 threads, a forked
-  child hangs every time — even one Rayon worker is lost to the fork. It is the intuitive
-  mitigation and it is ineffective, while costing all Polars parallelism. Use spawn.
-- **`run_in_executor(None, ...)` does NOT make native-parallel work safe.** It moves the
-  Python frame to another thread; Rayon/Tokio/DuckDB pools are process-global. Use it for
-  blocking I/O only, never as the answer to a native deadlock or to CPU-heavy Polars work.
-- **All Polars / DuckDB / polars-bio / Dagster work goes through `webui.compute`** —
-  `compute.pool` for short queries, `compute.jobs` for Dagster runs. The ASGI process
-  marshals arguments and results and nothing else.
-- **Grid pages must be O(page), not O(rows).** `lf.sort(...).slice(offset, n)` re-sorts the
-  whole frame on every click (Polars only pushes a dynamic predicate down for single-key
-  sorts; multi-key sorts fully materialize). Sort once to a temp parquet, then slice pages
-  off that artifact.
-
-### Ctrl+C: importing Polars takes SIGINT away, with `SA_RESTART`
-
-**A blocking `proc.wait()` is not interruptible in any process that imported Polars.**
-Polars installs its own SIGINT handler through `sigaction` with `SA_RESTART` set, so the
-kernel *restarts* the interrupted `waitpid` instead of returning `EINTR`. CPython never
-reaches the bytecode loop where Python-level handlers run, so `KeyboardInterrupt` is not
-raised until the child exits by itself. Measured: a bare interpreter blocked in
-`Popen.wait()` is interrupted at once; the same code after `import polars` ignores every
-SIGINT. This is why `uv run start` sat through a dozen Ctrl+C presses with the whole stack
-still up — and because every child is started with `start_new_session=True`, the terminal's
-SIGINT does not reach them either. The launcher is the only process that can act on it.
-
-- **`install_launcher_signal_handlers` (in `just_dna_lite.process`) is what makes the wait
-  interruptible again**, and not only because it routes first/second signals: CPython's
-  `signal.signal()` registers with `sa_flags = 0`, which clears `SA_RESTART`. Call it
-  **before** blocking on any child — `start_all` inline, `start_dagster` through
-  `_run_managed_foreground`. A launcher that goes back to a bare `proc.wait()` without it is
-  silently uninterruptible again, with no symptom other than Ctrl+C doing nothing.
-- **The first signal raises `KeyboardInterrupt` into the main flow; the second force-kills**
-  the snapshotted tree and exits. SIGTERM and Ctrl+Z enter the same path, so `kill
-  <launcher>` tears the stack down instead of orphaning it.
-- Regression tests: `tests/test_launcher_shutdown.py` pins the SA_RESTART mechanism, an
-  unclaimed wait sleeping through Ctrl+C, and the claimed wait breaking within a tick.
-  `tests/test_process_shutdown.py` covers what shutdown does once it starts.
-
----
-
-## Reflex UI Framework
-
-The webui uses **Reflex** (Python-based React framework). See **[docs/DESIGN.md](docs/DESIGN.md)** for visual design.
-
-### UI Change Verification Workflow (MANDATORY)
-
-When making significant UI changes, follow this workflow:
-
-1. **Make changes** to UI code (state.py, annotate.py, layout.py, etc.)
-2. **Check terminal for compile errors**: Run `uv run start` and monitor the terminal output for:
-   - `ImportError` - Missing or renamed imports
-   - `AttributeError` - Wrong API usage (e.g., `App.api_route` doesn't exist)
-   - `Warning: Invalid icon tag` - Wrong icon names (use hyphenated Lucide names)
-   - Traceback errors during "Compiling" phase
-3. **Verify app starts successfully**: Look for "App running at: http://localhost:3000"
-4. **Check browser**: Navigate to http://localhost:3000 and verify:
-   - Page loads without blank screen
-   - Key UI elements are visible (tabs, buttons, panels)
-   - Interactive elements work (tab switching, file selection, etc.)
-5. **Fix any issues** before considering the task complete
-
-**Common compile-time errors:**
-- `ModuleNotFoundError` - Add missing dependency with `uv add <package>`
-- `ImportError: cannot import name 'X'` - Function was renamed/removed, update imports
-- `AttributeError: 'App' object has no attribute 'Y'` - Wrong Reflex API, check docs
-
-**Terminal monitoring tip**: Reflex hot-reloads on file changes. After editing, wait for "Compiling: 100%" message before checking the browser.
-
-**Note on worker warnings**: During hot reload, Reflex may show `[WARNING] Killing worker-0 after it refused to gracefully stop`. This is normal behavior when the worker is busy processing a request during reload. It does not indicate a Dagster issue or data corruption.
-
-### Critical Reflex Patterns
-
-**0. Use `@rx.event(background=True)` for heavy computation, NEVER synchronous generators:**
-
-Reflex generator event handlers (`yield`) hold the state lock for their **entire** execution. `yield` sends state deltas but does NOT release the lock — other events queue up and fire all at once when the generator finishes, making the UI completely unresponsive. This applies to both direct generators and `yield from` delegation to mixin generators.
-
-For any operation taking more than ~1 second (PRS computation, file processing, API calls), use `@rx.event(background=True)` with `async with self:` for state access:
-
-```python
-# BAD — holds state lock for entire loop, UI frozen during computation
-def compute_heavy_stuff(self) -> Any:
-    self.computing = True
-    yield  # sends update but does NOT release lock
-    for item in self.items:
-        result = expensive_function(item)  # blocks everything
-        self.progress += 1
-        yield  # UI appears frozen, events queue up
-    self.computing = False
-
-# GOOD — state lock released between iterations, UI stays responsive
-@rx.event(background=True)
-async def compute_heavy_stuff(self) -> None:
-    async with self:  # brief lock: read inputs, set computing=True
-        items = list(self.items)
-        self.computing = True
-
-    for i, item in enumerate(items):
-        async with self:  # brief lock: progress update
-            self.progress = i
-
-        # Heavy work runs WITHOUT state lock — UI responsive
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, expensive_function, item)
-
-    async with self:  # brief lock: store results
-        self.computing = False
-        self.results = results
-```
-
-Key rules:
-- `@rx.background` does NOT exist in Reflex 0.8.x — always use `@rx.event(background=True)`
-- Extract heavy work into pure functions (no `self` access) and run via `run_in_executor`
-- Snapshot all needed state vars into locals inside the first `async with self:` block
-- Keep `async with self:` blocks as brief as possible (only read/write state)
-
-**1. Use `fomantic_icon()` instead of `rx.icon()`:**
-
-Lucide icons (via `rx.icon()`) often fail to load or trigger terminal warnings in this environment. Use the `fomantic_icon()` helper from `webui.components.layout` instead. It maps common Lucide names to Fomantic UI equivalents.
-
-```python
-from webui.components.layout import fomantic_icon
-
-# GOOD - consistent and reliable
-fomantic_icon("dna", size=24, color="#2185d0")
-
-# BAD - triggers "Invalid icon tag" warnings
-fomantic_icon("dna", size=24)
-```
-
-**2. Icons require STATIC strings:**
-
-Even with `fomantic_icon()`, you cannot pass a dynamic `rx.Var` as the name. Use `rx.match` for dynamic selection.
-
-```python
-# CRASHES
-fomantic_icon(module["icon_name"], size=24)
-
-# WORKS
-rx.match(
-    module["name"],
-    ("heart", fomantic_icon("heart", size=24)),
-    ("star", fomantic_icon("star", size=24)),
-    fomantic_icon("database", size=24),  # default
-)
-```
-
-**3. Icon naming:**
-
-`fomantic_icon()` handles mapping for common names, but generally use Fomantic UI icon names (space-separated) or common hyphenated names which the helper will map.
-
-Verified icons (mapped by helper): `circle-check`, `circle-x`, `circle-alert`, `circle-play`, `cloud-upload`, `upload`, `download`, `file-text`, `files`, `dna`, `heart`, `heart-pulse`, `activity`, `zap`, `droplets`, `pill`, `loader-circle`, `refresh-cw`, `external-link`, `terminal`, `database`, `boxes`, `inbox`, `history`, `chart-bar`, `play`.
-
-**4. Use `rx.cond()` for reactive styling:**
-
-```python
-# GOOD - reactive
-class_name=rx.cond(is_active, "ui primary button", "ui button")
-
-# BAD - not reactive, evaluated once at compile time
-class_name="ui primary button" if is_active else "ui button"
-```
-
-**4. rx.foreach with dictionaries:**
-
-Values from dicts in `rx.foreach` are typed as `Any`. This can cause type errors in components that expect specific types (e.g. `rx.checkbox` expecting `bool`). Cast when needed using `.to()`:
-
-```python
-# Cast to int for text/formatting
-rx.text(item["count"].to(int))
-
-# Cast to bool for control props
-rx.checkbox(checked=item["is_checked"].to(bool))
-```
-
-**5. Use `class_name` not `class`:**
-
-Reflex uses `class_name` for CSS classes. Using `class` will cause a Python `SyntaxError` as it is a reserved keyword.
-
-```python
-# GOOD
-rx.box(class_name="ui segment")
-
-# BAD - SyntaxError
-rx.box(class="ui segment")
-```
-
-### Reflex Anti-Patterns
-
-- **Dynamic icon names** - Will crash with "Icon name must be a string"
-- **Underscore icon names** - Use hyphens: `heart-pulse` not `heart_pulse`
-- **Wrong icon order** - It's `circle-check` not `check-circle`
-- **Python conditionals for state** - Use `rx.cond()` instead
-- **Missing `.to()` casts in foreach** - Can cause type errors
-- **Comparing a global state Var to a foreach item** - `RegistryState.busy_key == card["local_key"]` compiles as one shared comparison, so every catalog Get looked clicked. Stamp a bool on the row (`card["busy"]`) and read `item["busy"].to(bool)`, the same way `installed` already works. Do not `disabled=action_busy` on every primary button either — Fomantic disabled+primary looks pressed.
-- **Awaiting long-running tasks in event handlers** - Blocks entire UI. Submit to `webui.compute`; `loop.run_in_executor()` is for blocking I/O only
-- **Treating `run_in_executor(None, ...)` as making native work safe** - It moves the Python frame to another thread, but Rayon/Tokio/DuckDB pools are process-global. It neither prevents a fork deadlock nor bounds memory. See Process Model & Fork Safety
-- **Using `asyncio.to_thread()` with Dagster objects** - Causes pyo3 panic "Cannot drop pointer into Python heap". Dagster runs belong in `webui.compute.jobs` (a spawned child), not in any thread of the ASGI process
-- **Forking after Polars/polars-bio/DuckDB has been used** - Silent, unkillable deadlock on the next parallel op. See Process Model & Fork Safety
-- **Blocking in `proc.wait()` without claiming SIGINT first** - `import polars` installs an SA_RESTART SIGINT handler, so the wait is restarted instead of interrupted and Ctrl+C does nothing at all. Call `install_launcher_signal_handlers` before the wait. See Process Model & Fork Safety
-- **Business logic in exception handlers** - Makes code hard to follow; separate concerns with dedicated methods
-- **Synchronous generator (`yield`) for CPU-heavy loops** - Generator event handlers hold the state lock for the entire execution. `yield` sends state deltas to the frontend but does NOT release the lock. All queued events (tab clicks, button presses) are blocked until the generator finishes. Use `@rx.event(background=True)` for anything that takes more than ~1 second.
-- **Underscore-prefixed state vars are backend-only** - Reflex does not send `_foo` to the client. A remount token used as `key=` on uncontrolled inputs (`default_value`) must be a public var (`form_key`, not `_form_key`), or the Add Sample fields keep the typed values after upload. Also return `rx.clear_selected_files(...)` and do not debounce those setters — a late debounce can write the old value back after reset.
-- **Using `@rx.background`** - Does NOT exist in Reflex 0.8.x. Use `@rx.event(background=True)` instead.
-
-### Fomantic UI + Reflex Gotchas
-
-**1. Fomantic UI Grid does NOT work reliably in Reflex:**
-
-```python
-# UNRELIABLE - columns may stack vertically instead of side-by-side
-rx.el.div(
-    rx.el.div(..., class_name="five wide column"),
-    rx.el.div(..., class_name="six wide column"),
-    class_name="ui grid",
-)
-
-# GOOD - use CSS flexbox for multi-column layouts
-rx.el.div(
-    rx.el.div(left, style={"flex": "0 0 30%"}),
-    rx.el.div(center, style={"flex": "0 0 40%"}),
-    rx.el.div(right, style={"flex": "1 1 30%"}),
-    style={"display": "flex", "flexDirection": "row"},
-)
-```
-
-**2. Fomantic UI Menu may not render horizontally:**
-
-Use flexbox for reliable horizontal menus instead of `ui fixed menu`.
-
-**3. Fomantic UI Checkbox requires specific HTML structure:**
-
-```python
-# BAD - rx.checkbox() doesn't use Fomantic styling
-rx.checkbox(checked=is_checked)
-
-# GOOD - proper Fomantic checkbox structure
-rx.el.div(
-    rx.el.input(type="checkbox", checked=is_checked, read_only=True),
-    rx.el.label("Label"),
-    on_click=handler,
-    class_name=rx.cond(is_checked, "ui checked checkbox", "ui checkbox"),
-)
-```
-
-**4. What DOES work from Fomantic UI in Reflex:**
-- `ui segment`, `ui raised segment` - work well
-- `ui button`, `ui primary button` - work well
-- `ui label`, `ui mini label`, `ui green label` - work well
-- `ui divider` - works well
-- `ui message` - works well
-- `ui top attached tabular menu` + `ui bottom attached segment` - works well for tabs (with state-based class toggling)
-
-**5. What does NOT work reliably:**
-- `ui grid` with column widths - use flexbox instead
-- `ui fixed menu` - use flexbox instead
-- `ui accordion` - may need JS initialization
-- Native `rx.checkbox()` styling - use Fomantic structure instead
-
-**6. Fomantic UI Tabs (state-based, no jQuery):**
-
-```python
-# Tab menu - use state-based class toggling
-def tab_menu() -> rx.Component:
-    return rx.el.div(
-        rx.el.a(
-            "Tab 1",
-            class_name=rx.cond(MyState.active_tab == "tab1", "active item", "item"),
-            on_click=lambda: MyState.switch_tab("tab1"),
-        ),
-        rx.el.a(
-            "Tab 2",
-            class_name=rx.cond(MyState.active_tab == "tab2", "active item", "item"),
-            on_click=lambda: MyState.switch_tab("tab2"),
-        ),
-        class_name="ui top attached tabular menu",
-    )
-
-# Tab content - use rx.match for dynamic content
-rx.el.div(
-    rx.match(
-        MyState.active_tab,
-        ("tab1", tab1_content()),
-        ("tab2", tab2_content()),
-        tab1_content(),  # default
-    ),
-    class_name="ui bottom attached segment",
-)
-```
-
-**7. Custom API endpoints with api_transformer:**
-
-```python
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
-
-# Create FastAPI app for custom routes
-api = FastAPI()
-
-@api.get("/api/download/{filename}")
-async def download_file(filename: str) -> FileResponse:
-    return FileResponse(path=file_path, filename=filename)
-
-# Pass to Reflex app
-app = rx.App(
-    theme=None,
-    api_transformer=api,  # Mounts custom routes
-)
-```
-
----
-
-## PRS Integration (Polygenic Risk Scores)
-
-The web UI integrates the `prs-ui` PyPI package for polygenic risk score computation using PGS Catalog data.
-
-### Dependencies
-
-- **`just-prs>=0.10.0`**: Core library — PRS computation, PGS Catalog client, scoring file parsing
-- **`prs-ui>=0.3.16`**: Reusable Reflex components — `PRSComputeStateMixin`, `prs_workbench_mode_panel()`, score grid, results table
-
-`just-prs` is pinned in the workspace root `pyproject.toml`; `prs-ui` is in `webui/pyproject.toml`.
-
-### Architecture
-
-`PRSState` is an independent `rx.State` subclass (not a substate of `UploadState`) with its own `LazyFrameGridMixin` for the PGS Catalog scores DataGrid. This parallels `OutputPreviewState`.
-
-```python
-from prs_ui import PRSComputeStateMixin
-
-class PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
-    genome_build: str = "GRCh38"
-    cache_dir: str = str(resolve_cache_dir())  # ~/.cache/just-prs/
-    status_message: str = ""
-```
-
-### Data flow
-
-1. User selects a VCF file in the left panel
-2. `UploadState.select_file()` resets Output/PRS/trait grid views first, then remounts the workspace and calls `PRSState.reset_for_genome_switch` (even if the new parquet is not ready yet), then `PRSState.initialize_prs_for_file(parquet_path, genome_build)` when it is
-3. `PRSState` creates a `pl.scan_parquet()` LazyFrame from the normalized parquet and calls `set_prs_genotypes_lf(lf)` (preferred input method — lazy, memory-efficient)
-4. PGS Catalog scores are loaded into the MUI DataGrid for selection
-5. User selects scores and clicks Compute — `PRSState.compute_selected_prs()` runs
-6. Results with quality assessment, percentiles, and effect sizes are displayed
-
-### Genome build mapping
-
-`current_reference_genome` from file metadata maps directly to PRS genome builds:
-- `"GRCh38"`, `"T2T-CHM13v2.0"` → `"GRCh38"` (default)
-- `"GRCh37"`, `"hg19"` → `"GRCh37"`
-
-### Key files
-
-| File | What it does |
-|------|-------------|
-| `webui/src/webui/state.py` (`PRSState`) | PRS computation state, inherits `PRSComputeStateMixin` + `LazyFrameGridMixin` |
-| `webui/src/webui/pages/annotate.py` | PRS tab uses the prs-ui workbench layout with a current-sample row instead of a second VCF upload. **Compare** adds other left-panel samples that share species and reference genome. |
-
-### Important patterns
-
-- **LazyFrame is the preferred input** — `set_prs_genotypes_lf(pl.scan_parquet(path))` avoids redundant I/O. The parquet path is also set as string fallback. just-dna-lite normalized parquets keep polars-bio `start`, not `pos`. Scoring and ancestry go through `_get_genotypes_lf()` / `_scan_prs_genotypes()`. Never pass a raw `scan_parquet` into `infer_sample_ancestry`.
-- **`PRSState` needs `genome_build`, `cache_dir`, `status_message`** — these are vars on the state itself (not inherited from `UploadState`), because `PRSComputeStateMixin` reads them via `self.genome_build` etc.
-- **Match the prs-ui workbench, not a second upload.** The PRS tab uses `prs_workbench_mode_panel` plus `trait_selector` / `prs_scores_selector` inside Radix By Trait / By PRS tabs. Ancestry is shown on the current-sample row; do not add a toolbar population selector or a second VCF upload. Multi-genome scoring uses **Add for comparison** below the sample rows: picking a leftover left-panel sample adds it immediately (one leftover peer is a single button click; do not add a separate Compare then Add). Labels are **sample name and filename** (`Livia Zaharia (SIMH….vcf.gz)`), matching the left-panel display names. Peers share species, reference genome, and a ready normalized parquet. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs PGS IDs. Switching the left-panel file clears the comparison. Mixed comparison rows are not checkpointed to Dagster. Do **not** pass `UploadState.vcf_preview_loading` as `normalizing` — that locks the By Trait / By PRS grids (including filters) while the Input tab pages millions of VCF rows. Pass `normalizing=False`; PRS already gates on `prs_genotypes_path`. By PRS extract (Parquet/CSV of this sample's top `|contribution|` rows) comes from the mixin via `prs_workbench_mode_panel(..., "individual")` — do not reimplement it or feed it into `compute_selected_prs`.
-- **Independent `LazyFrameGridMixin`** — `PRSState` gets its own grid vars, completely separate from `UploadState`'s VCF grid and `OutputPreviewState`'s output grid.
-- **PRS results are per-genome** — `select_file` must reset PRS sample state even when the new parquet is still normalizing. `prs_results`, the Altair/iframe chart (`selected_result_*`), and `prs_results_source_file` belong to one sample. Compute snapshots `prs_compute_token` + the parquet path and must discard writes if the user switched genomes. Never treat a leftover PGS ID as "already computed" for a different file.
-- **Remount the sample workspace, not individual widgets** — the right-panel tabs/content wrap with `key=UploadState.selected_file`. One sample = one React tree (grids, Vega charts, reports, analysis). Destroying that subtree is cheap; the cost is the parquet page. Do not keep a widget per genome, and do not reuse one MUI/Vega instance across partitions. The left file list and top nav stay mounted. Sort artifacts must include the source path, not just the state class name.
-- **Grid filters/sorts are per-sample** — `select_file` must reset Output/PRS/trait grid views *before* changing `selected_file`, then remount. MUI keeps a local `useState` filter model and can replay the previous sample's filters on unmount; `SafeGridMixin.reset_grid_view_state` clears every `lf_grid_*` filter/sort/selection field, bumps `lf_grid_view_token` (used as the grid `key`), and drops one matching remount replay. Quality-filter settings from `modules.yaml` are global and should stay the same.
-
-### Anti-patterns
-
-- **Never pass `UploadState.vcf_preview_loading` as `normalizing` to the PRS workbench** — that freezes By Trait / By PRS (including the trait filter) while the Input tab pages the VCF preview.
-- **Never `scan_parquet` a just-dna-lite genome into `infer_sample_ancestry` / `compute_prs`** — those parquets keep `start`; just-prs looks up `pos`. Use `_get_genotypes_lf()` or `_scan_prs_genotypes()`.
-- **Never make PRSState a substate of UploadState** — it needs its own `LazyFrameGridMixin` instance; mixing into UploadState would create MRO conflicts.
-- **Never pass UploadState's internal LazyFrame across states** — Reflex states are isolated; create a new `pl.scan_parquet()` LazyFrame from the shared parquet path instead.
-- **Never keep the previous genome's `prs_results` or chart spec across a file switch** — the chart panel is gated on `selected_result_spec != {}`, so an uncleared Vega spec keeps showing the old sample. Compute also skips PGS IDs already present in `prs_results`, which turns a leftover Oksana score into a no-op on Livia.
-
----
-
-## Design System
-
-For UI/frontend changes, see **[docs/DESIGN.md](docs/DESIGN.md)**.
-
-Key principles:
-- **"Chunky & Tactile"** aesthetic with high affordance
-- **Fomantic UI** component classes (segments, buttons, labels work best)
-- **CSS Flexbox** for layouts (not Fomantic grid)
-- **Oversized icons** (min 2rem), **large buttons**, **generous spacing**
-- **Semantic colors**: `success` (benign), `error` (pathogenic), `info` (VUS)
-
----
-
-## Learned User Preferences
-
-- When writing READMEs or user-facing docs: put images at the top, place caveats after Quick Start, and keep intros concise while avoiding technical jargon (e.g., "VCF", "Polars", "DuckDB"). Move deep implementation details to `docs/`.
-- Write in natural, human prose avoiding AI-typical patterns (em-dashes, filler transitions, marketing voice). Never hallucinate documentation.
-- Don't overpromise unimplemented features (like 23andMe/microarray support). Balance credibility with honesty: ROGEN results are planned/future work, not finished outcomes. Never claim the tool solves alignment or variant calling — it only handles annotation of an existing VCF.
-- Update related documentation (AGENTS.md, DAGSTER_GUIDE.md) immediately whenever code is refactored.
-- For upstream PyPI dependencies (like `prs-ui`), try to fix bugs locally or provide copy-paste prompts for upstream fixes rather than patching locally.
-- Use fsspec-based access patterns instead of symlinks. Cache HuggingFace data in the project's own cache using fsspec/HfFileSystem, never use `snapshot_download`.
-- Avoid `subprocess` complexity for CLI commands; use uv workspace `[project.scripts]` instead. Automatically create missing directories in code rather than expecting users to `mkdir`.
-- Output file names must reflect semantic content (e.g., `_ensembl_annotated.parquet`), not implementation details. Reports should be timestamped to avoid overwriting previous runs.
-- When the user gives a minimal working example or pattern, wire it in directly instead of over-exploring alternatives.
-- Use global/inclusive framing in docs and UI: avoid EU-only language; users from any country should feel welcome. Reference EHDS as one example among international open health data initiatives.
-- When describing the platform in papers/docs, frame it as a bioinformatics tool that *joins* VCF data against module databases to add annotations. Never imply the VCF already contains annotations or that the tool makes gene-disease inferences.
-- For workshop/conference proposals: primary readers are organizers, not participants. Address conference themes implicitly (don't name-drop). Use "instructor" not "facilitator". Avoid manifesto/advocacy tone, words like "neat"/"slippery"/"primer", and never leak AI instructions into document text. Clearly separate "will get" vs "will not get". Use Roman numerals for generation labels (Gen I, Gen II).
-
-## Learned Workspace Facts
-
-- This is a multi-root uv workspace: `just-dna-lite` (main) and `just-prs` (read-only reference). Never modify files in `just-prs`. `just-prs` was developed specifically for Just-DNA-Lite but released as a standalone library. Related repos: `just-dna-lite`, `just-prs`, `reflex-mui-datagrid`, `just-biomarkers`, `dna-seq`, `prepare-annotations`.
-- The annotation-module schema + compiler live in two shared published libs — `just-dna-format` (`just_dna_format`) and `just-dna-compiler` (`just_dna_compiler`) — consumed by `just-dna-lite`, `just-dna-marketplace`, and `just-dna-agents`. We consume them (do not fork/vendor); propose changes only as notes in `/data/sources/just-dna-format/docs/{ROADMAP,CHANGELOG}.md`, never by committing to that repo. See the "Shared Module Format & Compiler Libraries" section above.
-- The project runs on Linux, macOS, native Windows, and Apple Silicon Macs. Critical native deps have working wheels; Windows scripts live in `windows/`, and the Nix workflow is `nix develop` then `uv sync` then `uv run start`.
-- The AI Module Creator uses the Agno agentic framework, which allows configuring OpenAI API-compatible local models (e.g., Ollama or vLLM) for complete privacy.
-- Images for README live in `images/` at the project root. Use `<img>` tags (not markdown syntax) for images inside HTML `<div>` blocks.
-- Only GRCh38 VCF files are fully supported (GRCh37, T2T, and microarray are planned). just-dna-lite normalized parquets keep polars-bio `start` (they do **not** rename it to `pos`). PRS scoring and ancestry must alias `start` → `pos` via `_get_genotypes_lf()` / `_scan_prs_genotypes()`. PRS runs in Reflex rather than Dagster, and must clear/rebuild `prs_results_rows`, `prs_results_columns`, and `prs_results_column_groups` after updating `prs_results`. After a Compare / PRS UI change, restart `uv run start` — hot reload can compile old `annotate.py` against new `PRSState`.
-- `rx.icon()` (Lucide) icons often fail in this Reflex setup; use `fomantic_icon()` from `webui.components.layout` instead. Fomantic icon names are space-separated (e.g., `arrow up`), not hyphenated Lucide-style.
-- Backend API port is auto-resolved at startup; never hardcode port 8000. Custom API routes (via `api_transformer`) are only served by the Reflex **backend**; the frontend dev server does NOT proxy arbitrary `/api/...` paths. `webui/deployment_urls.py` builds the browser-reachable base URL: `PUBLIC_BACKEND_URL` overrides `API_URL` (needed when the image sets `API_URL=http://localhost:8000`). `webui.run` selects a free backend port and persists it in `API_URL` / `REFLEX_BACKEND_PORT`; `backend_api_url` reads those so the browser constructs direct URLs (e.g. `/api/report/...`). A leftover `API_URL=http://localhost:8000` must not win when Reflex actually bound 8002. Never return `""` from `backend_api_url` — relative URLs 404 on the frontend.
-- Always load `.env` via `load_dotenv()` or equivalent before using `os.getenv` for config paths (`JUST_DNA_PIPELINES_CACHE_DIR`, `JUST_DNA_PIPELINES_OUTPUT_DIR`, etc.).
-- Public genomes for demos: Anton Kulaga (Zenodo 18370498, CC-Zero, 482 MB) and Livia Zaharia (Zenodo 19487816, CC-BY-4.0, 349 MB). Both are configured as `default_samples` in `modules.yaml` `immutable_mode:` section. The app can also import arbitrary Zenodo records with open-access + permissive license + VCF via the "Import from Zenodo" UI.
-- 6 expert-curated annotation modules exist on HuggingFace (`just-dna-seq/annotators`): `coronary`, `lipidmetabolism`, `longevitymap`, `superhuman`, `vo2max`, and `thrombophilia` (ported from Generation-I `dna-seq/just_thrombophilia` and published 2026-07, via `pipelines v1-port`). PharmGKB (drugs) has NOT been migrated from Generation I. HuggingFace `just-dna-seq` org hosts 6 datasets and 1 model (`GenNet`).
-- The first preprint was rejected by bioRxiv ("inference drawn between gene(s) and disease(s)") and medRxiv; published on arXiv instead. To avoid repeat rejection, frame the manuscript as a bioinformatics methods/software paper, not a genomic medicine paper.
-- `ghcr.io/dna-seq/just-dna-lite:latest` container image does not exist on GHCR yet; `compose.yaml` builds locally. The `Containerfile` needs `chmod -R 777 .venv` for Podman rootless compatibility and `UV_FROZEN=1` to prevent re-syncing. Workshop materials live in `docs/workshops/`. Pytest must stay in workspace root dev dependencies for `uv run pytest`, and `uv` does NOT have a `uv bundle` command as of April 2026.
+- **Anything over ~1 s is `@rx.event(background=True)`** with brief `async with self:` blocks and the
+  work in a pure function off the state lock. A `yield` generator holds the lock for its whole run and
+  freezes the UI. `@rx.background` does not exist.
+- **Icons**: use `fomantic_icon()` from `webui.components.layout`, not `rx.icon()`. Names must be static
+  strings (switch with `rx.match`); hyphenated order is `circle-check`, `heart-pulse`.
+- Reactive styling via `rx.cond`, never a Python `if`. `class_name`, never `class`.
+- `rx.foreach` dict values are `Any`: cast with `.to(int)` / `.to(bool)`.
+- Per-row UI state (e.g. a busy button) is a bool stamped on the row (`item["busy"].to(bool)`), not a
+  comparison of a global var to the item. Don't blanket `disabled=` primary buttons (looks pressed).
+- `_underscore` vars never reach the client: a remount `key=` must be public (`form_key`). Reset uploads
+  with `rx.clear_selected_files(...)` and don't debounce those setters.
+- Fomantic: segments, buttons, labels, dividers, messages and `top attached tabular menu` +
+  `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
+  `ui fixed menu` and accordions don't: use flexbox. Checkboxes need the Fomantic
+  `div.ui.checkbox > input + label` structure, not `rx.checkbox`.
+- Custom routes: pass a FastAPI app as `rx.App(api_transformer=api)`. They are served by the **backend**
+  only. Never hardcode port 8000: `webui.run` picks a free port into `API_URL` / `REFLEX_BACKEND_PORT`;
+  `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
+  `backend_api_url` never returns `""`.
+
+## PRS (`just-prs>=0.10.0`, `prs-ui>=0.3.16`)
+
+`PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
+mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`
+itself. Genome build: `GRCh38`/`T2T-CHM13v2.0` → `GRCh38`; `GRCh37`/`hg19` → `GRCh37`. Only GRCh38 is
+fully supported.
+
+- **Genotypes**: normalized parquets keep polars-bio `start`; just-prs wants `pos`. Always go through
+  `_get_genotypes_lf()` / `_scan_prs_genotypes()`; never feed a raw `scan_parquet` to
+  `infer_sample_ancestry` or `compute_prs`. Never pass a LazyFrame between states; rescan the path.
+- **Everything PRS is per genome.** `UploadState.select_file()` resets Output/PRS/trait grid views
+  (`SafeGridMixin.reset_grid_view_state`) **before** changing `selected_file`, then calls
+  `PRSState.reset_for_genome_switch`, even while the new parquet is still normalizing. Clear
+  `prs_results`, the chart spec and `prs_results_source_file`; compute snapshots `prs_compute_token` and
+  discards stale writes. After updating `prs_results`, rebuild `prs_results_rows` / `_columns` /
+  `_column_groups`.
+- The right-panel workspace is keyed on `UploadState.selected_file`: remount the whole sample tree, never
+  keep per-genome widgets.
+- Use the prs-ui workbench (`prs_workbench_mode_panel`, `trait_selector`, `prs_scores_selector`), with
+  ancestry on the current-sample row. No second upload, no toolbar population selector. **Add for
+  comparison** adds a left-panel peer (same species, build, ready parquet) in one click, labelled
+  `Sample Name (filename)`. Comparisons are not checkpointed to Dagster.
+- Pass `normalizing=False` to the workbench, **never** `UploadState.vcf_preview_loading` (it locks the
+  grids while the Input tab pages). The By PRS extract comes from the mixin; don't reimplement it.
+
+## Tests
+
+- Real data, ground truth computed at test time; fixed seeds; run `pytest -vvv`. New markdown goes in
+  `docs/`.
+- Assert relationships: set equality over counts, input vs output counts, join cardinality and nulls,
+  round trips. Domain constants from a spec are fine; counts copied from data inspection are not.
+- Include negative, boundary, null, unicode and malformed cases. Use `xfail` with a reason for known
+  data issues.
+- Parametrize instead of copying; delete tests another test fully covers.
+- **Never claim a test would have caught a bug without running it against the buggy code** and showing
+  it fail, then pass on the fix.
+- Avoid existence-only asserts (`len(df) > 0`) as the sole check, and mocking transformations instead of
+  running them.
+
+## Writing preferences
+
+- User docs: images on top, caveats after Quick Start, short jargon-free intros; details go in `docs/`.
+- Natural prose: no em-dashes, filler transitions or marketing voice. Never invent documentation.
+- Don't overpromise: GRCh37, T2T, microarray/23andMe and ROGEN results are planned, not done. The tool
+  annotates an existing VCF by joining it against module databases; it does not call variants or draw
+  gene-disease inferences (bioRxiv/medRxiv rejected the preprint on that point; it is on arXiv, framed
+  as a methods/software paper).
+- Global framing, not EU-only; EHDS is one example among many.
+- Workshop proposals: written for organizers; "instructor", not "facilitator"; no manifesto tone; no
+  "neat"/"slippery"/"primer"; separate "will get" from "will not get"; Roman numerals for generations.
+- Update related docs (this file, `docs/DAGSTER_GUIDE.md`) in the same change as the code.
+- For upstream bugs (e.g. `prs-ui`), prefer a copy-paste upstream prompt over a local patch.
+- When given a minimal working example, wire it in directly.
+- Output filenames describe content (`_ensembl_annotated.parquet`); reports are timestamped.
+
+## Workspace facts
+
+- Related repos: `just-prs` (read-only here), `reflex-mui-datagrid`, `just-biomarkers`, `dna-seq`,
+  `prepare-annotations`.
+- Runs on Linux, macOS (incl. Apple Silicon) and native Windows (`windows/` scripts). Nix:
+  `nix develop`, `uv sync`, `uv run start`.
+- The AI Module Creator uses Agno and can target OpenAI-compatible local models (Ollama, vLLM).
+- README images live in `images/`; use `<img>` inside HTML `<div>` blocks.
+- Load `.env` (`load_dotenv()` / `load_env()`) before reading `JUST_DNA_PIPELINES_CACHE_DIR` or
+  `JUST_DNA_PIPELINES_OUTPUT_DIR`.
+- `just-dna-seq/annotators` on HuggingFace hosts ten modules, all publishing a
+  `manifest.json` (see `docs/V1_PARITY.md`).
+- Container: no GHCR image yet; `compose.yaml` builds locally. The `Containerfile` needs
+  `chmod -R 777 .venv` (rootless Podman) and `UV_FROZEN=1`. Workshops live in `docs/workshops/`. Keep
+  pytest in root dev dependencies. There is no `uv bundle`.
