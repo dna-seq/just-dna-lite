@@ -34,6 +34,7 @@ from just_dna_pipelines.annotation.restoration import (
     detect_callset_scope,
     hom_ref_rows,
     infer_genotype_input_mode,
+    restorable_sites,
     restored_rows,
 )
 
@@ -543,3 +544,58 @@ def test_the_real_lactose_module_restores_both_of_its_sites():
     assert got["start"].to_list() == [135851076, 135859184]
     assert got["genotype"].to_list() == [["G", "G"], ["C", "C"]]
     assert set(got[EVIDENCE_COLUMN].to_list()) == {EVIDENCE_RESTORED}
+
+
+class TestRestorableSites:
+    """The public site-level core the phenotype caller reuses.
+
+    ``restorable_sites`` answers, for an arbitrary set of sites, which the callset did not observe but
+    could still be inferred hom-ref for — the same question ``restored_rows`` asks of a module's
+    authored hom-ref rows, made available to the diplotype caller for a gene's *defining* sites.
+    """
+
+    def _sites_lf(self, rows: list[dict]) -> pl.LazyFrame:
+        return pl.DataFrame(rows).lazy()
+
+    def test_an_absent_nearby_site_is_returned_with_its_flank_distance(self):
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        ctx = _wgs_context(vcf)
+        sites = self._sites_lf([{"chrom": "1", "start": 1_050}])
+        got = restorable_sites(sites, ctx.called_sites, ctx).collect()
+        assert got.height == 1
+        assert got[FLANK_COLUMN].to_list() == [50]
+
+    def test_a_site_the_callset_emitted_is_not_restorable(self):
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        ctx = _wgs_context(vcf)
+        sites = self._sites_lf([{"chrom": "1", "start": 1_000}])
+        assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == 0
+
+    def test_a_disabled_context_restores_nothing(self):
+        """A callset that cannot support restoration returns an empty frame, never the input."""
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        base = _wgs_context(vcf)
+        disabled = RestorationContext(
+            called_sites=base.called_sites,
+            mode=base.mode,
+            scope=CallsetScope.TARGETED,
+            scope_reason="forced targeted",
+            max_flank_bp=base.max_flank_bp,
+        )
+        assert not disabled.enabled
+        sites = self._sites_lf([{"chrom": "1", "start": 1_050}])
+        assert restorable_sites(sites, disabled.called_sites, disabled).collect().height == 0
+
+    @pytest.mark.parametrize("requires_callable,kept", [(True, 0), (False, 1), (None, 1)])
+    def test_requires_callable_withholds_only_on_true(self, requires_callable, kept):
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        ctx = _wgs_context(vcf)
+        sites = pl.DataFrame(
+            {"chrom": ["1"], "start": [1_050], "requires_callable": [requires_callable]},
+            schema={"chrom": pl.String, "start": pl.Int64, "requires_callable": pl.Boolean},
+        ).lazy()
+        assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == kept
