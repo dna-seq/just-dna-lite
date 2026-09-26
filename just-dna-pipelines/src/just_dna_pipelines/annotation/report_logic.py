@@ -16,6 +16,8 @@ import polars as pl
 from eliot import log_message, start_action
 from just_dna_format.alleles import split_genotype
 from just_dna_format.derive import clin_sig_from_booleans, direction_from_state
+from just_dna_format.manifest import read_manifest
+from just_dna_format.vocab import RSID_PATTERN
 
 from just_dna_pipelines.annotation.analytics import umami_script_tag
 from just_dna_pipelines.annotation.hf_modules import (
@@ -25,14 +27,18 @@ from just_dna_pipelines.annotation.hf_modules import (
     ModuleOutputMapping,
     ModuleTable,
     discover_hf_modules,
+    local_module_dir,
+    module_kind,
     scan_module_table,
 )
+from just_dna_pipelines.annotation.phenotype_caller import load_phenotype_definition
 from just_dna_pipelines.annotation.restoration import (
     EVIDENCE_COLUMN,
     EVIDENCE_RESTORED,
     FLANK_COLUMN,
 )
 from just_dna_pipelines.module_config import (
+    MODULES_CONFIG,
     build_display_names_dict,
     get_module_description,
     get_module_display_name,
@@ -43,6 +49,11 @@ ANNOTATION_REPORT_COLUMNS: tuple[str, ...] = ("gene", "category", "phenotype")
 # for both the pre-collapsed markup and the inline JS constant, so the two cannot drift apart.
 TABLE_PREVIEW_ROWS: int = 10
 GENERIC_REPORT_TITLE = "Genomic Annotation Report"
+# The privacy notice for an AI button lives in its tooltip, not beside it: an inline sentence dwarfs
+# a 28 px icon and wrecks the layout, and the notice belongs to the action, so hover and screen
+# readers (aria-label) carry it. The bottom "How to read this report" section explains it in full.
+_AI_PRIVACY_NOTE = "Opens {provider} with a prompt containing your DNA letters at these positions; nothing is sent until you click."
+
 AI_EXPLAIN_ASSISTANTS: tuple[tuple[str, str], ...] = (
     ("ChatGPT", "https://chatgpt.com/?q="),
     ("Claude", "https://claude.ai/new?q="),
@@ -68,8 +79,8 @@ def report_description_for_modules(module_names: list[str]) -> str:
     if len(module_names) == 1:
         return get_module_description(module_names[0])
     return (
-        "A structured summary of variants matched by the selected annotation "
-        "modules, with supporting evidence and module provenance."
+        "What your DNA file shows for each of the modules you chose. Each section below is one "
+        "module, with its results first and the evidence under More details."
     )
 
 
@@ -779,7 +790,74 @@ def _build_variant_ai_links(variant: dict[str, object]) -> list[dict[str, str]]:
     return [
         {
             "provider": provider.lower(),
-            "label": f"Ask {provider} to explain {variant['rsid']}",
+            "label": f"Ask {provider} to explain {variant['rsid']}. {_AI_PRIVACY_NOTE.format(provider=provider)}",
+            "url": f"{base_url}{encoded_prompt}",
+        }
+        for provider, base_url in AI_EXPLAIN_ASSISTANTS
+    ]
+
+
+_EVIDENCE_WORDS = {
+    "called": "read from the file",
+    "restored_hom_ref": "not recorded; assumed to match the reference from nearby coverage",
+    "no_call": "no data",
+}
+
+
+def _build_phenotype_ai_prompt(module_title: str, gene: dict) -> str:
+    """The prompt an assistant gets for one phenotype result: the result, the rule's inputs, the ask.
+
+    A combined result is explained differently from a single variant: the reader needs how the
+    versions of the gene combine into the result, so the prompt carries every defining position as
+    read (and how it was read) plus the possibilities when the file could not decide. It asks for the
+    same plain, layered explanation our own text aims at (docs/REPORT_VOICE.md), and for the limits of
+    reading this from a DNA file.
+    """
+    status_words = {
+        "called": f"Result: {gene.get('phenotype')}",
+        "ambiguous": "Result: not fully determined; possible results: "
+        + "; ".join(r["phenotype"] for r in gene.get("readings", [])),
+        "not_assessable": "Result: could not be read from my DNA file; possible results: "
+        + "; ".join(r["phenotype"] for r in gene.get("readings", [])),
+        "no_match": "Result: my DNA shows a combination this module does not list",
+    }
+    sites = [
+        f"- {s.get('rsid') or ''} (chr{s.get('chrom')}:{s.get('start')}, GRCh38, reference {s.get('ref')}): "
+        + (f"{'/'.join(s['observed'])}, " if s.get("observed") else "")
+        + _EVIDENCE_WORDS.get(s.get("evidence"), str(s.get("evidence")))
+        for s in gene.get("sites", [])
+    ]
+    explanation = ""
+    if gene.get("status") == "called":
+        explanation = " ".join(
+            c for r in gene.get("readings", []) if r["phenotype"] == gene.get("phenotype") for c in r["conclusions"]
+        )
+    lines = [
+        "Explain this result from my DNA in plain language for someone without a science background, "
+        "then add a short section for a professional. Explain how the versions of this gene combine "
+        "into the result, what the result means in everyday life, any clear practical implications and "
+        "interesting facts, and what a DNA file can and cannot tell compared with a lab test. Do not "
+        "diagnose or recommend treatment.",
+        "",
+        f"Module: {module_title}",
+        f"Gene: {gene.get('gene')}",
+        status_words.get(gene.get("status"), f"Result status: {gene.get('status')}"),
+    ]
+    if explanation:
+        lines.append(f"The module's explanation: {explanation}")
+    lines += ["", "Positions read from my DNA file:", *sites, "",
+              "Check current reliable sources, cite direct links, and say clearly where evidence is limited."]
+    return "\n".join(lines)
+
+
+def _build_phenotype_ai_links(module_title: str, gene: dict) -> list[dict[str, str]]:
+    """Prompt-prefill links for one phenotype card, the same four assistants as a variant row."""
+    encoded_prompt = urllib.parse.quote(_build_phenotype_ai_prompt(module_title, gene), safe="")
+    topic = gene.get("phenotype") if gene.get("status") == "called" else gene.get("topic") or gene.get("gene")
+    return [
+        {
+            "provider": provider.lower(),
+            "label": f"Ask {provider} to explain: {topic}. {_AI_PRIVACY_NOTE.format(provider=provider)}",
             "url": f"{base_url}{encoded_prompt}",
         }
         for provider, base_url in AI_EXPLAIN_ASSISTANTS
@@ -1372,9 +1450,77 @@ def build_module_exclusions(manifest: Optional[AnnotationManifest]) -> list[dict
     return rows
 
 
+def phenotype_readings(candidates: list[dict]) -> list[dict]:
+    """Group a gene's candidate diplotypes into the distinct results a reader has to choose between.
+
+    A reader cares about *results* ("blood group AB"), not allele pairs: two diplotypes that give
+    the same phenotype (RHCE Ce/cE and CE/ce) are one reading, and repeating the explanation twice
+    is noise. Order is the caller's; each reading keeps its distinct conclusions (normally one) and
+    the diplotypes behind it for the technical fold. A candidate needing a structural call keeps
+    that flag, so the template can say the file cannot confirm it.
+    """
+    readings: dict[str, dict] = {}
+    for c in candidates:
+        label = c.get("phenotype") or f"{c['haplotype_a']} / {c['haplotype_b']}"
+        reading = readings.setdefault(
+            label,
+            {"phenotype": label, "conclusions": [], "diplotypes": [], "needs_structural_call": False},
+        )
+        if c.get("conclusion") and c["conclusion"] not in reading["conclusions"]:
+            reading["conclusions"].append(c["conclusion"])
+        reading["diplotypes"].append(f"{c['haplotype_a']}/{c['haplotype_b']}")
+        reading["needs_structural_call"] = reading["needs_structural_call"] or bool(c.get("not_assessable"))
+    return list(readings.values())
+
+
+_PHENOTYPE_STATUS_ORDER = {"called": 0, "ambiguous": 1, "no_match": 2, "not_assessable": 3}
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+
+
+def phenotype_topic(readings: list[dict], gene_symbol: str) -> str:
+    """What a gene's card is about, in the module's own words, for headings a lay reader can parse.
+
+    A gene symbol (``RHCE``) reads as a code. The result labels a module writes already name the
+    topic ("RhD positive" / "RhD negative", "Rh markers C+ …"), so the longest run of leading words
+    every label shares is the topic ("RhD", "Rh markers"). With one reading, or no shared words, it
+    falls back to the gene symbol, which the card also shows as a tag.
+    """
+    labels = [r["phenotype"].split() for r in readings if r.get("phenotype")]
+    if len(labels) < 2:
+        return gene_symbol
+    shared: list[str] = []
+    for words in zip(*labels):
+        if len(set(words)) != 1:
+            break
+        shared.append(words[0])
+    return " ".join(shared) if shared else gene_symbol
+
+
+def factor_shared_sentences(readings: list[dict]) -> list[str]:
+    """Pull the sentences every reading's conclusion shares out, so the report says them once.
+
+    When a file cannot settle a result the report lists every possible reading, and a module's
+    conclusions for sibling results legitimately share their general explanation ("Rh markers are
+    proteins on red blood cells…"). Printed under each reading, that paragraph repeats three times
+    and buries the one sentence that differs. This keeps each reading's distinct sentences on the
+    reading (``distinct``) and returns the shared ones, in the first reading's order, for the card
+    to print once. With fewer than two readings nothing is factored.
+    """
+    if len(readings) < 2:
+        for r in readings:
+            r["distinct"] = list(r["conclusions"])
+        return []
+    split = [[s for c in r["conclusions"] for s in _SENTENCE_SPLIT.split(c.strip()) if s] for r in readings]
+    common = set(split[0]).intersection(*map(set, split[1:]))
+    for r, sentences in zip(readings, split):
+        r["distinct"] = [" ".join(s for s in sentences if s not in common)] if any(s not in common for s in sentences) else []
+    return [s for s in split[0] if s in common]
+
+
 def build_phenotype_report_data(
     manifest: Optional[AnnotationManifest],
     modules_dir: Path,
+    module_infos: Optional[dict[str, ModuleInfo]] = None,
 ) -> list[dict]:
     """One entry per phenotype module in the run, each with its per-gene calls, for the template.
 
@@ -1410,17 +1556,171 @@ def build_phenotype_report_data(
                 "unpaired_haplotypes": row["unpaired_haplotypes"],
                 "drug_rows": row["drug_rows"],
                 "compiler_warnings": row["compiler_warnings"],
+                "readings": phenotype_readings(row["candidates"]),
             }
             for row in frame.iter_rows(named=True)
         ]
+        for gene in genes:
+            gene["shared_explanation"] = factor_shared_sentences(gene["readings"])
+            gene["topic"] = phenotype_topic(gene["readings"], gene["gene"])
+        # Firm results first, then partial ones, then what the file could not read: a reader should
+        # meet what their DNA does say before the caveats. Gene symbol breaks ties so the order is
+        # stable across runs (the caller's order is not).
+        genes.sort(key=lambda g: (_PHENOTYPE_STATUS_ORDER.get(g["status"], 9), g["gene"]))
+        info = (module_infos or {}).get(output.module)
+        rules = phenotype_rules(output.module, info)
+        display_name, description = module_display(output.module, info)
+        for gene in genes:
+            gene["rules"] = rules.get(gene["gene"], {"alleles": [], "pairs": [], "activity": [], "bins": []})
+            gene["ai_explain_links"] = _build_phenotype_ai_links(display_name, gene)
+            gene["phased_sites"] = sum(1 for s in gene["sites"] if s.get("phase_set") is not None)
         entries.append(
             {
                 "module_name": output.module,
-                "display_name": get_module_display_name(output.module),
+                "display_name": display_name,
+                "description": description,
+                "how_it_works": readme_section(local_module_dir(info), "How this works"),
                 "genes": genes,
             }
         )
     return entries
+
+
+# External links for identifiers. Each goes straight to the one human record the identifier names,
+# never to a search page that could list another species or several hits, and each is built only for
+# a well-formed identifier: a malformed one renders as plain text rather than a link to nowhere.
+# Positions get no link: every genome-browser target we tried (Ensembl's new browser, UCSC behind a
+# bot check) could not be verified to land on the right place, and a site with an rsID already links
+# to dbSNP, which states its GRCh38 position.
+_GENE_SYMBOL = re.compile(r"^[A-Z0-9][A-Za-z0-9-]*$")
+
+
+def dbsnp_url(rsid: object) -> Optional[str]:
+    """dbSNP's page for an rsID (it follows merges to the current record), or None if not an rsID."""
+    return f"https://www.ncbi.nlm.nih.gov/snp/{rsid}" if isinstance(rsid, str) and RSID_PATTERN.match(rsid) else None
+
+
+def hgnc_url(symbol: object) -> Optional[str]:
+    """HGNC's report for an approved human gene symbol. HGNC names human genes, so no other species."""
+    if not isinstance(symbol, str) or not _GENE_SYMBOL.match(symbol):
+        return None
+    return f"https://www.genenames.org/data/gene-symbol-report/#!/symbol/{symbol}"
+
+
+def report_environment() -> jinja2.Environment:
+    """The Jinja environment the report renders in, with every filter and global its templates use.
+
+    One definition for the generator and the tests: a template that gains a filter must not render
+    in production and fail in a test's hand-built environment, or the other way round.
+    """
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(Path(__file__).parent / "templates")),
+        autoescape=True,
+    )
+    env.filters["weight_color"] = _weight_color
+    env.filters["genotype_str"] = _genotype_str
+    env.filters["dbsnp_url"] = dbsnp_url
+    env.filters["hgnc_url"] = hgnc_url
+    return env
+
+
+def module_display(module_name: str, info: Optional[ModuleInfo]) -> tuple[str, str]:
+    """A module's title and description for the report: modules.yaml first, then the module's own manifest.
+
+    modules.yaml only knows the modules someone configured. An installed module states its own
+    ``display.title`` / ``display.description`` in ``manifest.json``, and without this fallback the
+    report printed "Apoe Epsilon" over "Annotation module: apoe_epsilon" for a module that says
+    "APOE ε2/ε3/ε4" about itself. A remote module has no local manifest and keeps the config defaults.
+    """
+    if module_name not in MODULES_CONFIG.module_metadata:
+        module_dir = local_module_dir(info)
+        if module_dir is not None and (module_dir / "manifest.json").exists():
+            display = read_manifest(module_dir / "manifest.json").display
+            if display is not None and display.title:
+                return display.report_title or display.title, display.description or ""
+    return get_module_display_name(module_name), get_module_description(module_name)
+
+
+def readme_section(module_dir: Optional[Path], heading: str) -> list[str]:
+    """Paragraphs of one ``## <heading>`` section of a module's README, or ``[]`` when there is none.
+
+    A phenotype result is produced by a rule ("A and B both show; O shows only when both copies are
+    O"), and a lay reader needs that rule in words before the result makes sense. The format has no
+    field for it, but the README travels with the module, so the report reads the section by name.
+    Only a module on this machine has its README at hand; a remote one simply renders no block.
+    """
+    if module_dir is None or not (module_dir / "README.md").exists():
+        return []
+    lines = (module_dir / "README.md").read_text(encoding="utf-8").splitlines()
+    wanted = f"## {heading}".lower()
+    inside, body = False, []
+    for line in lines:
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line.strip().lower() == wanted
+            continue
+        if inside:
+            body.append(line)
+    paragraphs = [" ".join(p.split()) for p in "\n".join(body).split("\n\n")]
+    return [p for p in paragraphs if p]
+
+
+def phenotype_rules(module_name: str, info: Optional[ModuleInfo]) -> dict[str, dict]:
+    """Per gene, the rule a professional checks a call against, read through the caller's own loader.
+
+    ``alleles`` lists each named version with the bases that define it. The combiner then comes in
+    one of the format's two shapes: ``pairs`` (enumerative: every allele pair the module maps and the
+    result it gives) or ``activity`` + ``bins`` (score-and-bin: each allele's activity value, and
+    the score range each result covers). This is the phenotype module's equivalent of a variant
+    row's evidence, and it lives in the professional fold. Empty when the module is not a phenotype
+    module.
+    """
+    if info is None or module_kind(info) != "phenotype":
+        return {}
+    definition = load_phenotype_definition(module_name, info)
+    rules: dict[str, dict] = {}
+    for gene, g in definition.genes.items():
+        alleles = [
+            {
+                "name": name,
+                "defined_by": [
+                    {
+                        "rsid": g.site_meta[key].get("rsid"),
+                        "chrom": key.split(":")[0],
+                        "start": int(key.split(":")[1]),
+                        "allele": base,
+                    }
+                    for key, base in sites.items()
+                ],
+            }
+            for name, sites in g.haplotype_alleles.items()
+        ]
+        pairs = [
+            {"pair": f"{d['haplotype_a']}/{d['haplotype_b']}", "phenotype": d.get("phenotype") or ""}
+            for d in g.diplotypes
+        ]
+        activity = [{"allele": allele, "value": value} for allele, value in g.activity_values.items()]
+        bins = [
+            {
+                "range": _score_range(b.get("measure_min"), b.get("measure_max")),
+                "phenotype": b.get("phenotype") or "",
+            }
+            for b in g.activity_bins
+        ]
+        rules[gene] = {"alleles": alleles, "pairs": pairs, "activity": activity, "bins": bins}
+    return rules
+
+
+def _score_range(low: Optional[float], high: Optional[float]) -> str:
+    """An activity bin's bounds as a professional reads them: ``0``, ``0.25 to 0.5``, ``at least 1``."""
+    if low is not None and high is not None:
+        return f"{low:g}" if low == high else f"{low:g} to {high:g}"
+    if low is not None:
+        return f"at least {low:g}"
+    if high is not None:
+        return f"at most {high:g}"
+    return "any"
 
 
 def build_module_provenance(
@@ -1503,7 +1803,7 @@ def generate_longevity_report(
         # `available_modules` (the variant loop below is untouched by them). Build their section here so
         # their names can reach `reported_modules` too — a single-module APOE run must take APOE's own
         # report title and filename stem, not the generic multi-module heading.
-        phenotype_modules = build_phenotype_report_data(manifest, modules_dir)
+        phenotype_modules = build_phenotype_report_data(manifest, modules_dir, module_infos)
         phenotype_names = [entry["module_name"] for entry in phenotype_modules]
 
         # Find available parquet files
@@ -1573,21 +1873,19 @@ def generate_longevity_report(
             available_modules + phenotype_names, module_outputs, module_infos
         )
 
-        # Load and render template
-        template_dir = Path(__file__).parent / "templates"
-        env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(str(template_dir)),
-            autoescape=True,
-        )
-        # Register custom filters
-        env.filters["weight_color"] = _weight_color
-        env.filters["genotype_str"] = _genotype_str
+        template = report_environment().get_template("longevity_report.html.j2")
 
-        template = env.get_template("longevity_report.html.j2")
+        report_title = report_title_for_modules(reported_modules)
+        report_description = report_description_for_modules(reported_modules)
+        # A single phenotype module names itself from its own manifest when modules.yaml does not
+        # know it (module_display), and the page header should say the same as the section would.
+        if len(reported_modules) == 1 and len(phenotype_modules) == 1:
+            report_title = phenotype_modules[0]["display_name"]
+            report_description = phenotype_modules[0]["description"] or report_description
 
         html = template.render(
-            report_title=report_title_for_modules(reported_modules),
-            report_description=report_description_for_modules(reported_modules),
+            report_title=report_title,
+            report_description=report_description,
             preview_row_limit=TABLE_PREVIEW_ROWS,
             user_name=user_name,
             sample_name=sample_name,

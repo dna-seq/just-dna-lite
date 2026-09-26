@@ -1,0 +1,280 @@
+{#-
+    Phenotype modules: results produced by a RULE over several DNA positions (a blood group, APOE
+    type), not a list of independent variant findings. Each module is its own report section, like
+    any other module, so two phenotype modules never read as one:
+
+    * no weights, scores, positive/negative counts or good/bad colours: a combined result is not a sum
+      of parts, and "blood group O" is neither better nor worse than "A";
+    * the module's "How this works" (the rule in plain words, from its README) comes before the results;
+    * each result is an open block, not a nested card: a plain headline, the module's explanation in
+      full sentences, and a "More details" fold with everything needed to check the call (the allele
+      pairs that fit, phase, how each position was read, the module's rule tables, build notes).
+
+    Voice and layering follow docs/REPORT_VOICE.md. Data comes from
+    report_logic.build_phenotype_report_data.
+-#}
+
+{% macro rsid_link(rsid) -%}
+    {%- set url = rsid|dbsnp_url -%}
+    {%- if url %}<a href="{{ url }}" target="_blank" rel="noopener" title="{{ rsid }} in dbSNP">{{ rsid }}</a>{% else %}{{ rsid }}{% endif -%}
+{%- endmacro %}
+
+{% macro gene_link(symbol, suffix="") -%}
+    {%- set url = symbol|hgnc_url -%}
+    {%- if url %}<a href="{{ url }}" target="_blank" rel="noopener" title="The {{ symbol }} gene at HGNC">{{ symbol }}{{ suffix }}</a>{% else %}{{ symbol }}{{ suffix }}{% endif -%}
+{%- endmacro %}
+
+{% macro result_headline(gene) -%}
+    {%- if gene.status == "called" -%}{{ gene.phenotype }}
+    {%- elif gene.status == "ambiguous" -%}{{ gene.topic }}: more than one result fits
+    {%- elif gene.status == "not_assessable" -%}{{ gene.topic }}: this file cannot tell
+    {%- else -%}{{ gene.topic }}: a combination this module does not list{%- endif -%}
+{%- endmacro %}
+
+{% macro site_reading(site) -%}
+    {%- if site.evidence == "called" -%}
+        Read from your file{% if site.matched_by == "rsid" %}, found by its rsID{% elif site.matched_by == "indel_window" %}. Your file writes this insertion or deletion at a nearby position, which is a common and equivalent spelling; it is shown here in the module's spelling{% endif %}.
+        {%- if site.phase_set is not none %} Phased: the letters sit on the two chromosome copies as {{ site.phased_alleles|join(" | ") }} (phase set {{ site.phase_set }}).{% endif %}
+    {%- elif site.evidence == "restored_hom_ref" -%}
+        Not in your file. Read as matching the reference because a variant {{ site.restored_flank_bp }} bp away was read, which suggests this stretch was sequenced. It can also mean this position was not covered.
+    {%- else -%}
+        No information in your file, and not inferred: either the module requires proof that this position was read, or nothing nearby was.
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro pair_line(c) -%}
+    <code>{{ c.haplotype_a }} / {{ c.haplotype_b }}</code>
+    {%- if c.activity_score is not none %}, activity score {{ c.activity_score }}{% endif %}
+    {%- if c.phenotype %}: {{ c.phenotype }}{% endif %}
+    {%- if c.not_assessable %} (needs a copy-number or structural call this file cannot make){% endif %}
+{%- endmacro %}
+
+{% macro phenotype_reading(r) %}
+    <li class="trait-reading">
+        <strong>{{ r.phenotype }}</strong>{% if r.needs_structural_call %} <span class="trait-flag">this file cannot confirm it</span>{% endif %}
+        {% for c in r.distinct %}<p>{{ c }}</p>{% endfor %}
+    </li>
+{% endmacro %}
+
+{% macro more_details(gene) %}
+<details class="trait-details">
+    <summary>More details</summary>
+    <div class="trait-details-body">
+        <p>
+            {% if gene.status == "called" %}
+            This result comes from the pair of gene versions below, the only
+            {%- if gene.candidates|length > 1 %} result{% else %} pair{% endif %} the module lists that fits every position we read.
+            {% elif gene.status == "ambiguous" %}
+            Every pair of gene versions below fits what your file shows, and they do not all give the same result.
+            {% elif gene.status == "not_assessable" %}
+            The pairs below would fit, but at least one depends on something this file cannot show.
+            {% else %}
+            No pair of gene versions the module lists fits all the positions below.
+            {% endif %}
+            {% if gene.phased_sites %}
+            Your file records which letters sit together on the same chromosome copy (phase) at
+            {{ gene.phased_sites }} of these {{ gene.sites|length }} positions.
+            {% elif gene.status == "ambiguous" and gene.phase_would_decide %}
+            These positions are not phased together in your file, so it cannot say which letters were
+            inherited together from the same parent. That is exactly what would decide between the pairs.
+            {% endif %}
+        </p>
+        {% if gene.candidates %}
+        <ul class="trait-pairs">
+            {% for c in gene.candidates %}<li>{{ pair_line(c) }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+
+        <p class="trait-subhead">What your file shows at each position (GRCh38)</p>
+        <div class="table-scroll">
+        <table class="trait-table">
+            <thead><tr><th>Position</th><th>Reference</th><th>Your letters</th><th>How it was read</th></tr></thead>
+            <tbody>
+            {% for site in gene.sites %}
+                <tr>
+                    <td>{% if site.rsid %}{{ rsid_link(site.rsid) }}<br>{% endif %}<small>chr{{ site.chrom }}:{{ site.start }}</small></td>
+                    <td>{{ site.ref }}</td>
+                    <td>{% if site.observed %}{{ site.observed|join("/") }}{% else %}none{% endif %}</td>
+                    <td class="cell-wrap">
+                        <span class="evidence evidence-{{ site.evidence }}">{% if site.evidence == "called" %}read{% elif site.evidence == "restored_hom_ref" %}assumed{% else %}no data{% endif %}</span>
+                        {{ site_reading(site) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        <p>
+            Gene versions this module knows for {{ gene_link(gene.gene) }}: {{ gene.alleles_considered|join(", ") }}.
+            {% if gene.alleles_not_assessable %}
+            Of these, {{ gene.alleles_not_assessable|join(", ") }} {% if gene.alleles_not_assessable|length == 1 %}is{% else %}are{% endif %} a missing or duplicated stretch of DNA, which a file of small differences cannot show.
+            {% endif %}
+            {% if gene.unpaired_haplotypes %}
+            {{ gene.unpaired_haplotypes|join(", ") }} {% if gene.unpaired_haplotypes|length == 1 %}is{% else %}are{% endif %} defined but not part of any pair the module lists.
+            {% endif %}
+        </p>
+
+        {% if gene.rules.alleles %}
+        <p class="trait-subhead">The module's rule</p>
+        <div class="table-scroll">
+        <table class="trait-table">
+            <thead><tr><th>Gene version</th><th>Defined by (letter on the plus strand)</th></tr></thead>
+            <tbody>
+            {% for a in gene.rules.alleles %}<tr><td><code>{{ a.name }}</code></td><td class="cell-wrap">{% for d in a.defined_by %}{% if d.rsid %}{{ rsid_link(d.rsid) }}{% else %}chr{{ d.chrom }}:{{ d.start }}{% endif %} {{ d.allele }}{% if not loop.last %}, {% endif %}{% else %}the reference at every position{% endfor %}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if gene.rules.pairs %}
+        <div class="table-scroll">
+        <table class="trait-table">
+            <thead><tr><th>Pair</th><th>Result</th></tr></thead>
+            <tbody>
+            {% for pr in gene.rules.pairs %}<tr><td><code>{{ pr.pair }}</code></td><td>{{ pr.phenotype }}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% endif %}
+        {% if gene.rules.activity %}
+        <p>Each gene version has an activity value; the two values are added, and the total picks the result.</p>
+        <div class="table-scroll trait-side-by-side">
+        <table class="trait-table">
+            <thead><tr><th>Gene version</th><th>Activity value</th></tr></thead>
+            <tbody>
+            {% for a in gene.rules.activity %}<tr><td><code>{{ a.allele }}</code></td><td>{% if a.value is not none %}{{ a.value }}{% else %}not stated{% endif %}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        <table class="trait-table">
+            <thead><tr><th>Total activity</th><th>Result</th></tr></thead>
+            <tbody>
+            {% for b in gene.rules.bins %}<tr><td>{{ b.range }}</td><td>{{ b.phenotype }}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <p class="trait-meta">
+            Caller status <code>{{ gene.status }}</code>.
+            {% if gene.compiler_warnings %}
+            Notes from the module's build, for its authors:
+            {% for w in gene.compiler_warnings %}<code>{{ w }}</code>{% if not loop.last %} {% endif %}{% endfor %}
+            {% endif %}
+        </p>
+    </div>
+</details>
+{% endmacro %}
+
+{% macro trait_result(gene) %}
+<article class="trait-result trait-{{ gene.status }}" id="phenotype-{{ gene.gene }}">
+    <header class="trait-head">
+        <h3>{{ result_headline(gene) }}</h3>
+        <span class="gene-tag">{{ gene_link(gene.gene, " gene") }}</span>
+    </header>
+
+    {% if gene.status == "called" %}
+        {% for r in gene.readings if r.phenotype == gene.phenotype and not r.needs_structural_call %}
+            {% for c in r.conclusions %}<p class="trait-text">{{ c }}</p>{% endfor %}
+        {% endfor %}
+    {% elif gene.status == "ambiguous" %}
+        <p class="trait-text">
+            Your DNA fits more than one result here, so we list each of them instead of picking one.
+            {% if gene.phase_would_decide %}
+            Your file does not record which of these DNA letters you inherited together from the same
+            parent, and that is exactly what would decide it.
+            {% else %}
+            Some of the positions that would decide it have no information in your file. That is common
+            in some parts of the genome and does not mean your file is faulty.
+            {% endif %}
+            Each possibility below is written as if it were yours; only one of them is.
+        </p>
+        <ul class="trait-readings">
+            {% for r in gene.readings %}{{ phenotype_reading(r) }}{% endfor %}
+        </ul>
+        {% if gene.shared_explanation %}<p class="trait-text">{{ gene.shared_explanation|join(" ") }}</p>{% endif %}
+    {% elif gene.status == "not_assessable" %}
+        <p class="trait-text">
+            {% if gene.alleles_not_assessable %}
+            One of the possible results comes from a whole stretch of DNA being missing. Your DNA file
+            lists only small differences from the reference genome, so it cannot see a missing stretch,
+            and we do not guess.
+            {% else %}
+            Your file has no information at the positions this result depends on, so we do not guess.
+            That is common in some parts of the genome and does not mean your file is faulty.
+            {% endif %}
+            A routine lab test settles it.
+        </p>
+        <details class="trait-possible">
+            <summary>What each possible result would mean</summary>
+            <p class="trait-text">Each possibility is written as if it were yours; only one of them is.</p>
+            <ul class="trait-readings">
+                {% for r in gene.readings %}{{ phenotype_reading(r) }}{% endfor %}
+            </ul>
+            {% if gene.shared_explanation %}<p class="trait-text">{{ gene.shared_explanation|join(" ") }}</p>{% endif %}
+        </details>
+    {% else %}
+        <p class="trait-text">
+            Your DNA shows a combination at these positions that this module does not list. It may be a
+            rarer version of the gene that the module does not cover. What was read at each position is
+            under More details.
+        </p>
+    {% endif %}
+
+    {% if gene.drug_rows %}
+    <div class="table-scroll">
+    <table class="trait-table">
+        <thead><tr><th>Drug</th><th>Expected response</th><th>Evidence</th><th>Strength</th><th>When it applies</th></tr></thead>
+        <tbody>
+        {% for d in gene.drug_rows %}
+            <tr><td>{{ d.drug }}</td><td>{{ d.response or "not stated" }}</td><td>{{ d.evidence_level or "not stated" }}</td><td>{{ d.recommendation_strength or "not stated" }}</td><td class="cell-wrap">{{ d.clinical_context or "not stated" }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+
+    {% if gene.ai_explain_links %}
+    <div class="trait-ai">
+        <span class="trait-ai-label">Ask an assistant</span>
+        <span class="ai-explain-links">
+            {% for link in gene.ai_explain_links %}
+            <a class="ai-explain-link {{ link.provider }}" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+               aria-label="{{ link.label }}" title="{{ link.label }}">{{ ai_assistant_icon(link.provider) }}</a>
+            {% endfor %}
+        </span>
+    </div>
+    {% endif %}
+
+    {{ more_details(gene) }}
+</article>
+{% endmacro %}
+
+{% for mod in phenotype_modules %}
+<section class="report-section trait-module" id="module-{{ mod.module_name }}">
+    {% if multi_section %}
+    <p class="section-kicker">Read from several DNA positions together</p>
+    <h2>{{ mod.display_name }}</h2>
+    {% if mod.description %}<p class="section-intro">{{ mod.description }}</p>{% endif %}
+    {% endif %}
+
+    {% if mod.genes|length > 1 %}
+    <div class="trait-glance">
+        <p class="trait-glance-title">Your results</p>
+        <ul>
+            {% for gene in mod.genes %}<li><a href="#phenotype-{{ gene.gene }}">{{ result_headline(gene) }}</a></li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if mod.how_it_works %}
+    <details class="trait-how" open>
+        <summary>How this works</summary>
+        {% for para in mod.how_it_works %}<p>{{ para }}</p>{% endfor %}
+    </details>
+    {% endif %}
+
+    {% for gene in mod.genes %}
+    {{ trait_result(gene) }}
+    {% endfor %}
+</section>
+{% endfor %}

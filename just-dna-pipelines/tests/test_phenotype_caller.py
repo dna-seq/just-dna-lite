@@ -371,7 +371,7 @@ class TestIndelSpellings:
         site = next(e for e in evidence if f"{e.chrom}:{e.start}" == ABO_261)
         assert (site.matched_by, site.observed) == ("position", ["T", "TC"])
         call = call_gene("abo_phenotype", abo_def, evidence)
-        assert (call.status, call.phenotype) == ("called", "B")
+        assert (call.status, call.phenotype) == ("called", "Blood group B (III)")
         assert {(c.haplotype_a, c.haplotype_b) for c in call.candidates} == {("B", "O1")}
 
     def test_the_ensembl_spelling_in_the_callset_matches_through_the_window(self, abo_def) -> None:
@@ -381,7 +381,7 @@ class TestIndelSpellings:
         assert site.matched_by == "indel_window"
         # Rewritten into the module's own spelling before any comparison.
         assert site.observed == ["T", "TC"]
-        assert call_gene("abo_phenotype", abo_def, evidence).phenotype == "B"
+        assert call_gene("abo_phenotype", abo_def, evidence).phenotype == "Blood group B (III)"
 
     def test_a_module_authored_in_the_ensembl_spelling_matches_a_dragen_callset(self, abo_def) -> None:
         ensembl_def = _respelled(abo_def, ABO_261, "9:133257520", "G", "GC")
@@ -389,7 +389,7 @@ class TestIndelSpellings:
         evidence = gather_site_evidence(vcf, ensembl_def, _wgs(vcf))
         site = next(e for e in evidence if e.start == 133257520)
         assert (site.matched_by, site.observed) == ("indel_window", ["G", "GC"])
-        assert call_gene("abo_phenotype", ensembl_def, evidence).phenotype == "B"
+        assert call_gene("abo_phenotype", ensembl_def, evidence).phenotype == "Blood group B (III)"
 
     def test_the_a2_deletion_in_a_homopolymer_matches_in_either_spelling(self, abo_def) -> None:
         # A2/O1: het insertion at 261, het A2 markers at 467 and 1061 (the latter in Ensembl's spelling).
@@ -399,7 +399,7 @@ class TestIndelSpellings:
         site = next(e for e in evidence if f"{e.chrom}:{e.start}" == ABO_1061)
         assert (site.matched_by, site.observed) == ("indel_window", ["C", "CG"])
         call = call_gene("abo_phenotype", abo_def, evidence)
-        assert (call.status, call.phenotype) == ("called", "A")
+        assert (call.status, call.phenotype) == ("called", "Blood group A (II)")
         assert {(c.haplotype_a, c.haplotype_b) for c in call.candidates} == {("A2", "O1")}
 
     def test_two_qualifying_records_in_the_window_is_a_refusal_not_a_pick(self, abo_def) -> None:
@@ -421,7 +421,7 @@ class TestIndelSpellings:
         """GRCh38 is O, so an O1/O1 sample has *no record* at any ABO site in a variant-only VCF."""
         vcf = _vcf([("9", 133256000, "A", "G", "0/1")])  # an unrelated call nearby
         on_wgs = call_gene("abo_phenotype", abo_def, gather_site_evidence(vcf, abo_def, _wgs(vcf)))
-        assert (on_wgs.status, on_wgs.phenotype) == ("called", "O")
+        assert (on_wgs.status, on_wgs.phenotype) == ("called", "Blood group O (I)")
         base = build_restoration_context(vcf, 10_000)
         exome = RestorationContext(called_sites=base.called_sites, mode=base.mode,
                                    scope=CallsetScope.TARGETED, scope_reason="forced", max_flank_bp=10_000)
@@ -616,7 +616,7 @@ class TestRealSample:
         [
             # Het at 261 (one insertion) and at both B markers, unphased: only B/O1 explains it among
             # the five defined alleles. Checked against his raw VCF records at the six sites.
-            ("abo_phenotype", "ABO", "B", {("B", "O1")}),
+            ("abo_phenotype", "ABO", "Blood group B (III)", {("B", "O1")}),
             # Het for the se428 null at rs601338: one functional copy, and secretion is dominant.
             ("fut2_secretor", "FUT2", "Secretor", {("Se", "se428")}),
         ],

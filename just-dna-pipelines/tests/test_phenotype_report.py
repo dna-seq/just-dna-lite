@@ -1,8 +1,10 @@
-"""The report's "Phenotypes from combined variants" section, rendered end to end.
+"""The report's phenotype sections, rendered end to end.
 
 A phenotype module is run through the real engine on a small synthetic callset, and the real report
 generator renders the result. The assertions are about what a reader sees: the status, the diplotype
 and its conclusion, the per-site evidence (phase, indel spelling, inference), and the coverage line.
+The layout follows docs/REPORT_VOICE.md: a plain headline and conclusion, and the evidence under
+"More details".
 """
 
 from __future__ import annotations
@@ -49,7 +51,8 @@ def _run(tmp_path: Path, monkeypatch, modules: list[str], records) -> str:
 
 
 def _card(html: str, gene: str) -> str:
-    start = html.index(f'id="phenotype-{gene}"')
+    """One result block, from its opening tag (which carries the status class) to its end."""
+    start = html.rindex("<article", 0, html.index(f'id="phenotype-{gene}"'))
     return html[start:html.index("</article>", start)]
 
 
@@ -59,15 +62,16 @@ class TestPhenotypeSection:
             ("6", 26092913, "G", "A", "0|1", 26090951),
             ("6", 26090951, "C", "G", "1|0", 26090951),
         ])
-        assert "Phenotypes from combined variants" in html
+        # A single-module report: the module is its own section and the page header names it.
+        assert 'id="module-hfe_compound_het"' in html
         card = _card(html, "HFE")
-        assert "Called" in card
+        assert "trait-called" in card
         assert "C282Y/H63D compound heterozygous" in card
-        assert "Diplotype <strong>C282Y / H63D</strong>" in card
+        assert "<code>C282Y / H63D</code>" in card
         # The authored conclusion reaches the reader, not just the phenotype label.
         assert "in trans" in card
         assert card.count("phase set 26090951") == 2
-        assert "Alleles considered: C282Y, C282Y-H63D, H63D, wt." in card
+        assert "C282Y, C282Y-H63D, H63D, wt." in card and "Gene versions this module knows for" in card
 
     def test_an_unphased_double_het_is_ambiguous_and_says_phase_would_decide(self, tmp_path, monkeypatch) -> None:
         html = _run(tmp_path, monkeypatch, ["hfe_compound_het"], [
@@ -75,9 +79,9 @@ class TestPhenotypeSection:
             ("6", 26090951, "C", "G", "0/1", None),
         ])
         card = _card(html, "HFE")
-        assert "Ambiguous" in card
-        assert "would settle this" in card
-        assert "C282Y / H63D" in card and "C282Y-H63D / wt" in card
+        assert "trait-ambiguous" in card
+        assert "exactly what would decide" in card
+        assert "<code>C282Y / H63D</code>" in card and "<code>C282Y-H63D / wt</code>" in card
         assert "phase set" not in card
 
     def test_an_indel_window_match_and_an_activity_score_are_labelled(self, tmp_path, monkeypatch) -> None:
@@ -89,10 +93,10 @@ class TestPhenotypeSection:
             ("19", 48703374, "A", "T", "0/0", None),
         ])
         abo = _card(html, "ABO")
-        assert "<strong>B</strong>" in abo
-        assert "written at a nearby position" in abo
+        assert "<h3>Blood group B (III)</h3>" in abo
+        assert "at a nearby position" in abo
         fut2 = _card(html, "FUT2")
-        assert "<strong>Non-secretor</strong>" in fut2
+        assert "<h3>Non-secretor</h3>" in fut2
         assert "activity score 0.0" in fut2
 
     def test_no_phenotype_module_means_no_section(self, tmp_path) -> None:

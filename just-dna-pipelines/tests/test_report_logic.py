@@ -363,27 +363,19 @@ def test_clin_sig_is_derived_when_only_the_legacy_booleans_are_present():
 
 import urllib.parse
 
-import jinja2
-
 from just_dna_pipelines.annotation.report_logic import (
     _AUTHORED_AXES,
     TABLE_PREVIEW_ROWS,
     build_module_report_data,
     build_pharmacogenomics_report_data,
+    report_environment,
     report_filename_stem,
     report_title_for_modules,
 )
 
-TEMPLATE_DIR = (
-    Path(__file__).resolve().parents[1]
-    / "src" / "just_dna_pipelines" / "annotation" / "templates"
-)
-
 
 def _render(**context) -> str:
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True
-    )
+    env = report_environment()
     ctx = {
         "report_title": "Synthetic Report",
         "report_description": "Synthetic report description.",
@@ -1055,3 +1047,80 @@ def test_a_stale_parquet_cannot_hide_this_runs_skipped_outcome(tmp_path, monkeyp
     assert "No annotated variants were found for this module" not in html
 
 
+
+
+# --- Phenotype readings: what a lay reader chooses between (docs/REPORT_VOICE.md) ---------------
+
+from just_dna_pipelines.annotation.report_logic import factor_shared_sentences, phenotype_readings
+
+
+def _cand(a: str, b: str, phenotype: str, conclusion: str, structural: bool = False) -> dict:
+    return {"haplotype_a": a, "haplotype_b": b, "phenotype": phenotype, "conclusion": conclusion,
+            "direction": "neutral", "clin_sig": None, "not_assessable": structural}
+
+
+def test_readings_group_allele_pairs_by_result() -> None:
+    """Two allele pairs giving one result are one reading; the pairs stay for the professional fold."""
+    shared = "You have both. Same text."
+    cands = [
+        _cand("Ce", "cE", "C+ c+ E+ e+", shared),
+        _cand("CE", "ce", "C+ c+ E+ e+", shared),
+        _cand("Ce", "ce", "C+ c+ E- e+", "Other text."),
+    ]
+    readings = phenotype_readings(cands)
+    assert [r["phenotype"] for r in readings] == ["C+ c+ E+ e+", "C+ c+ E- e+"]
+    assert readings[0]["diplotypes"] == ["Ce/cE", "CE/ce"]
+    assert readings[0]["conclusions"] == [shared]  # identical conclusions are shown once
+
+
+def test_readings_carry_the_structural_flag() -> None:
+    readings = phenotype_readings([_cand("RHD", "RHD", "RhD positive", "x."),
+                                   _cand("RHD", "RHD_deletion", "RhD positive", "x.", structural=True)])
+    assert readings[0]["needs_structural_call"] is True
+
+
+def test_shared_sentences_are_factored_out_once() -> None:
+    """Sentences every reading shares are returned once; each reading keeps only what differs."""
+    general = "Rh markers are proteins on red cells. They matter in pregnancy."
+    readings = phenotype_readings([
+        _cand("ce", "ce", "C- c+ E- e+", f"You carry c and e. {general}"),
+        _cand("Ce", "ce", "C+ c+ E- e+", f"You carry C, c and e. This is less certain. {general}"),
+    ])
+    shared = factor_shared_sentences(readings)
+    assert shared == ["Rh markers are proteins on red cells.", "They matter in pregnancy."]
+    assert [r["distinct"] for r in readings] == [
+        ["You carry c and e."],
+        ["You carry C, c and e. This is less certain."],
+    ]
+    # Nothing is lost: each reading's distinct text plus the shared text reproduces its conclusion.
+    for r in readings:
+        assert " ".join(r["distinct"] + shared) == r["conclusions"][0]
+
+
+def test_single_reading_is_not_factored() -> None:
+    readings = phenotype_readings([_cand("A", "B", "Blood group AB", "One. Two.")])
+    assert factor_shared_sentences(readings) == []
+    assert readings[0]["distinct"] == ["One. Two."]
+
+
+def test_phenotype_ai_links_carry_the_result_and_every_site() -> None:
+    """A phenotype card's AI prompt names the possibilities and every defining position as read."""
+    import urllib.parse
+
+    from just_dna_pipelines.annotation.report_logic import AI_EXPLAIN_ASSISTANTS, _build_phenotype_ai_links
+
+    readings = phenotype_readings([_cand("ce", "ce", "Rh markers C- c+ E- e+", "x."),
+                                   _cand("Ce", "ce", "Rh markers C+ c+ E- e+", "y.")])
+    gene = {
+        "gene": "RHCE", "status": "ambiguous", "phenotype": None, "topic": "Rh markers", "readings": readings,
+        "sites": [
+            {"rsid": "rs676785", "chrom": "1", "start": 25408711, "ref": "G", "observed": None, "evidence": "no_call"},
+            {"rsid": "rs609320", "chrom": "1", "start": 25390874, "ref": "C", "observed": ["C", "C"], "evidence": "restored_hom_ref"},
+        ],
+    }
+    links = _build_phenotype_ai_links("Blood Groups (ABO and Rh)", gene)
+    assert [link["provider"] for link in links] == [p.lower() for p, _ in AI_EXPLAIN_ASSISTANTS]
+    prompt = urllib.parse.unquote(links[0]["url"].split("=", 1)[1])
+    for needle in ("RHCE", "rs676785", "rs609320", "C/C", "no data", *(r["phenotype"] for r in readings)):
+        assert needle in prompt
+    assert "Do not diagnose" in prompt

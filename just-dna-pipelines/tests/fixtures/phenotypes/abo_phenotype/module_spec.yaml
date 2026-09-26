@@ -1,7 +1,7 @@
 schema_version: '1.0'
 module:
   title: ABO blood group
-  description: ABO blood group (A, B, AB or O) from six ABO variants read together.
+  description: "Your ABO blood group, read from the few DNA positions that tell the A, B and O versions of the gene apart."
   report_title: ABO blood group
   icon: tint
   icon_set: fomantic

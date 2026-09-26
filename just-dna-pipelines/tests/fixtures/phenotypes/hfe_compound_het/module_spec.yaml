@@ -1,11 +1,9 @@
 schema_version: '1.0'
 module:
   name: hfe_compound_het
-  title: HFE C282Y/H63D — phase decides the finding
-  report_title: HFE C282Y/H63D — phase decides the finding
-  description: The two common HFE alleles as haplotypes, so that carrying both in trans
-    (compound heterozygous) and carrying both in cis on one chromosome are distinct rows
-    with distinct conclusions.
+  title: Iron storage gene (HFE)
+  report_title: Iron storage gene (HFE)
+  description: "Whether you carry the two common changes in the HFE gene that are linked with hereditary haemochromatosis, where the body stores too much iron."
   icon: heartbeat
   icon_set: fomantic
   color: '#b5352b'

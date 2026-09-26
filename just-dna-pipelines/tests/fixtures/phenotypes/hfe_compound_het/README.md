@@ -104,3 +104,21 @@ this module, which is why no row here claims secondary-findings reportability.
 just-dna-enricher enrich reference_examples/hfe_compound_het
 just-dna-compiler compile reference_examples/hfe_compound_het out/hfe_compound_het
 ```
+
+## How this works
+
+The HFE gene helps control how much iron the body takes in from food. Two common changes in it, known
+on lab reports as C282Y and H63D, are linked with hereditary haemochromatosis, where iron slowly builds
+up in the body. You inherit one copy of the gene from each parent.
+
+What matters is which changes you carry and how they are arranged: two C282Y copies is the pattern
+behind most cases, while one change on each copy, or a single change, carries much less risk. Having
+both changes on the same copy leaves one normal copy, which is why the report says when your file
+cannot tell the arrangement apart.
+
+Most people with any of these patterns never develop iron overload. A blood test of iron levels shows
+what is actually happening, and that, not the DNA result, is what a doctor acts on.
+
+## About this copy
+
+The conclusions in this copy were rewritten in just-dna-lite's report voice (`docs/REPORT_VOICE.md`) on 2026-09-27; the rows, labels and rules are unchanged from the upstream reference example.

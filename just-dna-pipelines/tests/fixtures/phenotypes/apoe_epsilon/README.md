@@ -71,3 +71,20 @@ incomplete, age-dependent penetrance, not a diagnosis, and the module is not ent
 Phase matters and the module cannot supply it: unphased `rs429358 T/C` + `rs7412 C/T` is ambiguous
 between ε1/ε3 and ε2/ε4. Resolving that is the consumer's caller's job — the module states what each
 diplotype means, never which diplotype a sample has.
+
+## How this works
+
+You inherit one copy of the APOE gene from each parent, and each copy is one of three common versions,
+called ε2, ε3 and ε4. Two places in the gene tell them apart, and your result is the pair of versions
+you carry, such as ε3 and ε4.
+
+ε3 is the most common version and the usual point of comparison. ε4 is linked with a higher risk of
+Alzheimer's disease that starts late in life, and ε2 with a lower one. These are shifts in likelihood,
+not predictions: many people with ε4 never develop the disease, and many without it do.
+
+A DNA file sometimes cannot tell which of your letters came from the same parent. When that leaves two
+possible pairs, this report lists both instead of picking one.
+
+## About this copy
+
+The conclusions in this copy were rewritten in just-dna-lite's report voice (`docs/REPORT_VOICE.md`) on 2026-09-27; the rows, labels and rules are unchanged from the upstream reference example.

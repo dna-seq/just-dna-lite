@@ -34,3 +34,18 @@ nearest allele.
 
 Authored for just-dna-lite's phenotype-caller tests. Not reviewed by a blood-group
 specialist; do not publish as is.
+
+## How this works
+
+You inherit one version of the ABO blood group gene from each parent, and your blood group comes from
+how the two combine. The A and B versions each put a different sugar tag on your red blood cells, and
+the O version puts none. A and B both show when you carry them, and O shows only when both of your
+versions are O. So an A version plus an O version gives group A, A plus B gives AB, and only O plus O
+gives group O.
+
+This report reads the few DNA positions that tell the versions apart. Blood for a transfusion is always
+matched by a lab test, never by a DNA file.
+
+## About this copy
+
+The conclusions in this copy were rewritten in just-dna-lite's report voice (`docs/REPORT_VOICE.md`) on 2026-09-27; the rows, labels and rules are unchanged from the upstream reference example.

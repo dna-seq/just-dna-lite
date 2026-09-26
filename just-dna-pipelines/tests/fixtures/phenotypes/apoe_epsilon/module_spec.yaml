@@ -1,9 +1,8 @@
 schema_version: '1.0'
 module:
-  title: APOE ε2/ε3/ε4
-  description: The APOE epsilon haplotypes, defined by rs429358 and rs7412 together,
-    and the six diplotypes they form.
-  report_title: APOE ε2/ε3/ε4
+  title: APOE type (ε2, ε3, ε4)
+  description: "Which versions of the APOE gene you carry. APOE helps carry cholesterol in the body and is the best-known gene linked with Alzheimer's disease risk later in life."
+  report_title: APOE type (ε2, ε3, ε4)
   icon: brain
   icon_set: fomantic
   color: '#a333c8'

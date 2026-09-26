@@ -1,8 +1,8 @@
 schema_version: '1.0'
 module:
-  title: FUT2 secretor status
-  description: Secretor, weak secretor or non-secretor, from two FUT2 variants read together.
-  report_title: FUT2 secretor status
+  title: Secretor status (FUT2)
+  description: "Whether your saliva and other body fluids carry your blood group sugars, which depends on the FUT2 gene."
+  report_title: Secretor status (FUT2)
   icon: tint
   icon_set: fomantic
   color: '#6435c9'

@@ -119,6 +119,71 @@ h1 {
 .paper-card { padding: 1.35rem 1.5rem; }
 .paper-card p:first-child { margin-top: 0; }
 .paper-card p:last-child { margin-bottom: 0; }
+/* Phenotype results (phenotype_section.html.j2): open blocks with a status rule, not nested cards. */
+.trait-glance { margin: 0 0 1.4rem; }
+.trait-glance-title, .trait-subhead {
+    margin: 0 0 0.35rem;
+    color: #334e68;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.trait-glance ul { margin: 0; padding-left: 1.2rem; }
+.trait-glance li { font-size: 1.05rem; margin: 0.2rem 0; }
+details.trait-how { margin: 0 0 1.8rem; max-width: 76ch; }
+details.trait-how > summary, details.trait-details > summary, details.trait-possible > summary, details.appendix > summary {
+    cursor: pointer;
+    color: var(--blue-dark);
+    font-weight: 650;
+}
+details.trait-how p { line-height: 1.65; margin: 0.7rem 0 0; }
+.trait-result {
+    margin: 0 0 2.2rem;
+    padding: 0.2rem 0 0 1.3rem;
+    border-left: 4px solid var(--line-strong);
+    max-width: 80ch;
+}
+.trait-called { border-left-color: var(--teal); }
+.trait-ambiguous { border-left-color: #d9a200; }
+.trait-not_assessable, .trait-no_match { border-left-color: #9fb3c8; }
+.trait-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4rem 1rem; flex-wrap: wrap; }
+.trait-head h3 {
+    margin: 0 0 0.5rem;
+    color: #102a43;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.45rem;
+    font-weight: 500;
+    line-height: 1.25;
+}
+.gene-tag { color: var(--muted); font-size: 0.82rem; }
+.trait-text { margin: 0 0 0.8rem; font-size: 1.03rem; line-height: 1.65; }
+.trait-readings { margin: 0 0 0.8rem; padding-left: 1.2rem; }
+.trait-reading { margin-bottom: 0.8rem; }
+.trait-reading p { margin: 0.25rem 0 0; line-height: 1.6; }
+.trait-flag { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+.trait-ai { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; margin: 0.4rem 0 0.6rem; }
+.trait-ai-label { color: var(--muted); font-size: 0.85rem; }
+.trait-ai .ai-explain-links { justify-content: flex-start; }
+details.trait-details, details.trait-possible { margin: 0.4rem 0 0; }
+.trait-details-body { padding: 0.4rem 0 0; font-size: 0.93rem; }
+.trait-details-body p { line-height: 1.6; margin: 0.6rem 0; }
+.trait-pairs { margin: 0.2rem 0 0.8rem; padding-left: 1.2rem; }
+.trait-subhead { margin-top: 1rem; }
+table.trait-table { border-collapse: collapse; margin: 0.3rem 0 0.8rem; font-size: 0.88rem; }
+table.trait-table th, table.trait-table td { padding: 0.4rem 0.7rem 0.4rem 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.trait-table th { color: var(--muted); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.trait-side-by-side { display: flex; flex-wrap: wrap; gap: 0 2rem; }
+.evidence { display: inline-block; margin-right: 0.35rem; padding: 0 0.4rem; border-radius: 4px; font-size: 0.74rem; font-weight: 700; }
+.evidence-called { background: var(--soft-teal); color: var(--teal-dark); }
+.evidence-restored_hom_ref { background: var(--soft-blue); color: var(--blue-dark); }
+.evidence-no_call { background: #eef1f4; color: var(--muted); }
+.trait-meta { color: var(--muted); font-size: 0.85rem; }
+/* One module per section: a rule between sections so two modules never read as one. */
+.report-section + .report-section { padding-top: 2.6rem; border-top: 1px solid var(--line); }
+details.appendix { margin-top: 1rem; }
+details.appendix > summary { font-size: 1.05rem; }
+details.appendix h3 { margin: 1.6rem 0 0.4rem; color: #102a43; font-size: 1.1rem; }
 .scientific-note {
     padding: 1.2rem 1.35rem;
     border-left: 4px solid var(--purple);
@@ -613,8 +678,8 @@ window.addEventListener("scroll", function() {
                 onclick="toggleVariantDetails(event, this)"
             >+</button>
         </td>
-        <td><a href="https://www.ncbi.nlm.nih.gov/snp/{{ v.rsid }}">{{ v.rsid }}</a></td>
-        <td>{% if v.gene %}<a href="{{ gene_href_base }}{{ v.gene }}">{{ v.gene }}</a>{% endif %}</td>
+        <td>{% if v.rsid|dbsnp_url %}<a href="{{ v.rsid|dbsnp_url }}" target="_blank" rel="noopener">{{ v.rsid }}</a>{% else %}{{ v.rsid }}{% endif %}</td>
+        <td>{% if v.gene %}{% set gene_url = (gene_href_base ~ v.gene) if gene_href_base else v.gene|hgnc_url %}{% if gene_url %}<a href="{{ gene_url }}" target="_blank" rel="noopener">{{ v.gene }}</a>{% else %}{{ v.gene }}{% endif %}{% endif %}</td>
         <td>{{ v.genotype_str }}{% if v.restored %} <span class="restored-badge" title="Inferred from the absence of a variant call at this position, not directly observed.">inferred</span>{% endif %}</td>
         <td>{{ v.ref }}</td>
         <td>{{ v.alt }}</td>
@@ -779,40 +844,16 @@ window.addEventListener("scroll", function() {
 <button id="toTop" type="button" title="Back to top" aria-label="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
 <main class="report-main">
-    <div class="intro-grid">
-        <div class="paper-card">
-            <p>
-                This report cross-references the supplied genome data with the selected annotation
-                modules. Each result is a matched annotation, not a diagnosis; use the module
-                provenance and linked evidence when interpreting a finding.
-            </p>
-            <p>
-                Tables show {{ preview_row_limit }} rows initially for a compact overview. Use
-                <strong>Open all</strong> to inspect the full table and <strong>Close</strong> to
-                return to the first {{ preview_row_limit }}.
-                Open the <strong>+</strong> control beside a variant for its detailed evidence.
-            </p>
-            <p>
-                The buttons in the <strong>AI explain</strong> column open an external assistant with
-                a prompt about that one row already filled in. That prompt contains your genotype at
-                that position, so it leaves this file and goes to whichever assistant you pick. It is
-                sent only when you click a button; opening this report sends nothing anywhere.
-            </p>
-        </div>
-        <aside class="scientific-note">
-            <strong>Interpretation notice</strong>
-            This information is for research and informational use. Clinical decisions, medicines,
-            supplements, and lifestyle changes require review by a qualified healthcare professional
-            together with validated testing, medical history, and other clinical evidence.
-        </aside>
-    </div>
 
+    {% set result_sections = (phenotype_modules|length) + (1 if longevity else 0) + (other_modules|length) + (pgx_modules|length) %}
+    {% set multi_section = result_sections > 1 %}
+    {% if multi_section %}
     <nav class="contents" aria-label="Report contents">
         <p class="contents-title">Report contents</p>
         <ul>
-            {% if phenotype_modules %}
-            <li><a href="#phenotypes">Phenotypes from combined variants</a></li>
-            {% endif %}
+            {% for mod in phenotype_modules %}
+            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
+            {% endfor %}
             {% if longevity %}
             <li><a href="#variants">Longevity variants</a></li>
             {% endif %}
@@ -822,142 +863,20 @@ window.addEventListener("scroll", function() {
             {% for mod in pgx_modules %}
             <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
-            {% if module_provenance %}
-            <li><a href="#modules">Modules and versions</a></li>
-            {% endif %}
+            <li><a href="#about">How to read this report</a></li>
             {% if module_exclusions %}
             <li><a href="#modules-not-read">Modules not read</a></li>
             {% endif %}
-            {% if credits %}
-            <li><a href="#credits">Sources and licences</a></li>
+            {% if module_provenance or credits %}
+            <li><a href="#technical">Technical details</a></li>
             {% endif %}
         </ul>
     </nav>
-
-    {% macro phenotype_status_badge(status) %}
-        {%- if status == "called" -%}<span class="ui green label">Called</span>
-        {%- elif status == "ambiguous" -%}<span class="ui yellow label">Ambiguous</span>
-        {%- elif status == "not_assessable" -%}<span class="ui grey label">Not assessable</span>
-        {%- else -%}<span class="ui grey label">No match</span>{%- endif -%}
-    {% endmacro %}
-
-    {% macro phenotype_evidence_badge(evidence) %}
-        {%- if evidence == "called" -%}<span class="ui mini green label">observed</span>
-        {%- elif evidence == "restored_hom_ref" -%}<span class="ui mini blue label">inferred</span>
-        {%- else -%}<span class="ui mini grey label">no call</span>{%- endif -%}
-    {% endmacro %}
-
-    {% macro phenotype_card(gene) %}
-    <article class="module-panel" id="phenotype-{{ gene.gene }}">
-        <div class="module-panel-heading">
-            <h3>{{ gene.gene }} {{ phenotype_status_badge(gene.status) }}</h3>
-        </div>
-        <div class="module-panel-body">
-            {% if gene.status == "called" %}
-            <p class="phenotype-result"><strong>{{ gene.phenotype }}</strong></p>
-            <ul class="phenotype-candidates">
-                {% for c in gene.candidates %}
-                <li>Diplotype <strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.activity_score is not none %} (activity score {{ c.activity_score }}){% endif %}{% if c.conclusion %}: {{ c.conclusion }}{% endif %}</li>
-                {% endfor %}
-            </ul>
-            {% elif gene.status == "ambiguous" %}
-            <p>This genotype is consistent with more than one diplotype:</p>
-            <ul class="phenotype-candidates">
-                {% for c in gene.candidates %}
-                <li><strong>{{ c.haplotype_a }} / {{ c.haplotype_b }}</strong>{% if c.activity_score is not none %} (activity score {{ c.activity_score }}){% endif %}{% if c.phenotype %} — {{ c.phenotype }}{% endif %}{% if c.not_assessable %} <span class="ui mini grey label">needs a structural call</span>{% endif %}</li>
-                {% endfor %}
-            </ul>
-            {% if gene.phase_would_decide %}
-            <aside class="scientific-note">Knowing the <strong>phase</strong> (which allele sits on which chromosome copy) would settle this. These sites are not phased together in this callset, so every reading is reported.</aside>
-            {% endif %}
-            {% elif gene.status == "not_assessable" %}
-            <p>This phenotype could not be assessed from this callset.</p>
-            {% else %}
-            <p>No diplotype this module defines matches the observed genotype.</p>
-            {% endif %}
-
-            <table class="phenotype-sites">
-                <thead><tr><th>Variant</th><th>Position</th><th>Ref</th><th>Observed</th><th>Evidence</th></tr></thead>
-                <tbody>
-                {% for site in gene.sites %}
-                    <tr>
-                        <td>{{ site.rsid or "—" }}</td>
-                        <td>chr{{ site.chrom }}:{{ site.start }}</td>
-                        <td>{{ site.ref }}</td>
-                        <td>{% if site.observed %}{{ site.observed|join("/") }}{% else %}—{% endif %}</td>
-                        <td>
-                            {{ phenotype_evidence_badge(site.evidence) }}
-                            {% if site.evidence == "restored_hom_ref" %}
-                            <span class="phenotype-inferred-note">inferred from coverage {{ site.restored_flank_bp }} bp away; this can also mean the position was not covered</span>
-                            {% elif site.matched_by == "rsid" %}
-                            <span class="phenotype-inferred-note">matched by rsID</span>
-                            {% elif site.matched_by == "indel_window" %}
-                            <span class="phenotype-inferred-note">matched the same insertion/deletion written at a nearby position; shown in this module's spelling</span>
-                            {% endif %}
-                            {% if site.phase_set is not none %}
-                            <span class="phenotype-inferred-note">phased ({{ site.phased_alleles|join("|") }}, phase set {{ site.phase_set }})</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-
-            <p class="phenotype-coverage">
-                Alleles considered: {{ gene.alleles_considered|join(", ") }}.
-                {% if gene.alleles_not_assessable %}
-                Not assessable from an SNV VCF (structural or copy-number): {{ gene.alleles_not_assessable|join(", ") }}.
-                {% endif %}
-                {% if gene.unpaired_haplotypes %}
-                Defined but not paired by any diplotype: {{ gene.unpaired_haplotypes|join(", ") }}.
-                {% endif %}
-            </p>
-
-            {% if gene.drug_rows %}
-            <table class="phenotype-drugs">
-                <thead><tr><th>Drug</th><th>Response</th><th>Evidence</th><th>Strength</th><th>Clinical context</th></tr></thead>
-                <tbody>
-                {% for d in gene.drug_rows %}
-                    <tr><td>{{ d.drug }}</td><td>{{ d.response or "—" }}</td><td>{{ d.evidence_level or "—" }}</td><td>{{ d.recommendation_strength or "—" }}</td><td>{{ d.clinical_context or "—" }}</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-
-            {% if gene.compiler_warnings %}
-            <aside class="scientific-note">
-                <strong>Compiler notes:</strong>
-                {% for w in gene.compiler_warnings %}{{ w }}{% if not loop.last %} · {% endif %}{% endfor %}
-            </aside>
-            {% endif %}
-        </div>
-    </article>
-    {% endmacro %}
-
-    {% if phenotype_modules %}
-    <section class="report-section" id="phenotypes">
-        <p class="section-kicker">Module results</p>
-        <h2>Phenotypes from combined variants</h2>
-        <p class="section-intro">
-            These results read several positions together to name a phenotype — a blood group, an
-            APOE ε-status, a metaboliser class — rather than reporting one variant at a time. A
-            phenotype is stated only when every diplotype consistent with your genotype agrees;
-            otherwise the consistent readings are listed, and where phase would settle them that is
-            said. An <span class="ui mini blue label">inferred</span> site was not called and was read
-            as reference from nearby coverage.
-        </p>
-        {% for mod in phenotype_modules %}
-        <article class="module-panel" id="phenotype-module-{{ mod.module_name }}">
-            <div class="module-panel-heading"><h3>{{ mod.display_name }}</h3></div>
-            <div class="module-panel-body">
-                {% for gene in mod.genes %}
-                {{ phenotype_card(gene) }}
-                {% endfor %}
-            </div>
-        </article>
-        {% endfor %}
-    </section>
     {% endif %}
+
+
+
+    {% include "phenotype_section.html.j2" %}
 
     {% if longevity %}
     <section class="report-section" id="variants">
@@ -986,7 +905,7 @@ window.addEventListener("scroll", function() {
             <div class="module-panel-heading"><h3>{{ cat.title }}</h3></div>
             <div class="module-panel-body">
                 <p class="pathway-description">{{ cat.description }}</p>
-                {{ variant_table(cat.variants, cat_key ~ "TBody", "https://genomics.senescence.info/longevity/gene.php?id=") }}
+                {{ variant_table(cat.variants, cat_key ~ "TBody", none) }}
             </div>
         </article>
         {% endif %}
@@ -1025,7 +944,7 @@ window.addEventListener("scroll", function() {
             <div class="stat-box stat-inferred"><div class="number">{{ mod.summary.total_restored }}</div><div class="label">Inferred</div></div>
             {% endif %}
         </div>
-        {{ variant_table(mod.variants, mod.module_name ~ "TBody", "https://www.ncbi.nlm.nih.gov/gene/?term=") }}
+        {{ variant_table(mod.variants, mod.module_name ~ "TBody", none) }}
         {% else %}
         <p class="no-results">No annotated variants were found for this module.</p>
         {% endif %}
@@ -1056,10 +975,10 @@ window.addEventListener("scroll", function() {
             <div class="module-panel-body">
                 {% if d.genes %}
                 <p class="pathway-description">Genes:
-                    {% for g in d.genes %}<a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ g }}">{{ g }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+                    {% for g in d.genes %}{% if g|hgnc_url %}<a href="{{ g|hgnc_url }}" target="_blank" rel="noopener">{{ g }}</a>{% else %}{{ g }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
                 </p>
                 {% endif %}
-                {{ variant_table(d.variants, mod.module_name ~ loop.index ~ "TBody", "https://www.ncbi.nlm.nih.gov/gene/?term=") }}
+                {{ variant_table(d.variants, mod.module_name ~ loop.index ~ "TBody", none) }}
             </div>
         </article>
         {% endfor %}
@@ -1069,113 +988,153 @@ window.addEventListener("scroll", function() {
     </section>
     {% endfor %}
 
-    {% if module_provenance %}
-    <section class="report-section" id="modules">
-        <p class="section-kicker">Reproducibility</p>
-        <h2>Modules in this report</h2>
-        <div class="paper-card metadata-card">
-            <p>
-                Annotation modules are revised over time. These identifiers record which module
-                builds contributed to this report so that results can be compared across runs.
-            </p>
-            <div class="table-shell">
-                <div class="table-scroll">
-                <table class="ui">
-                    <thead><tr><th>Module</th><th>Version</th><th>Build</th><th>What its weights mean</th><th>Source</th></tr></thead>
-                    <tbody id="moduleProvenanceTBody">
-                        {% for m in module_provenance %}
-                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
-                            <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
-                            <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
-                            <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
-                            {# The module's own explanation, kept verbatim. An absent value must not
-                               imply that weights from different modules are comparable. #}
-                            <td class="cell-wrap">{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
-                            <td class="cell-wrap">{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {{ table_controls("moduleProvenanceTBody", module_provenance | length) }}
-            </div>
-        </div>
+    <section class="report-section" id="about">
+        <p class="section-kicker">About this report</p>
+        <h2>How to read this report</h2>
+        <p>
+            This report compares your DNA file with the modules you chose. Each result says what your
+            DNA shows at particular places and what is known about it. It is not a diagnosis. The plain
+            explanation comes first, and under each result a <strong>More details</strong> link opens the
+            evidence: the positions read, the letters found there and the module's rule.
+        </p>
+        {% if phenotype_modules %}
+        <p>
+            Some traits, like a blood group, are decided by several places in your DNA read together.
+            We name such a result only when your DNA points to one answer. When it fits more than one,
+            we list them all, and when the file cannot tell at all, we say so instead of guessing.
+        </p>
+        {% endif %}
+        {% if longevity or other_modules or pgx_modules %}
+        <p>
+            Tables show {{ preview_row_limit }} rows at first. <strong>Open all</strong> shows the full
+            table and <strong>Close</strong> returns to the first {{ preview_row_limit }}. The
+            <strong>+</strong> beside a variant opens its evidence.
+        </p>
+        {% endif %}
+        <p>
+            The assistant buttons beside a result open ChatGPT, Claude, Perplexity or Grok with a
+            question about that one result already written. The question contains your DNA letters at
+            those positions, so it leaves this file and goes to the assistant you pick. Nothing is sent
+            until you click, and opening this report sends nothing anywhere.
+        </p>
+        <aside class="scientific-note">
+            <strong>Interpretation notice</strong>
+            This information is for research and informational use. Clinical decisions, medicines,
+            supplements, and lifestyle changes require review by a qualified healthcare professional
+            together with validated testing, medical history, and other clinical evidence.
+        </aside>
     </section>
-    {% endif %}
 
     {# Modules that were selected and produced nothing. The run succeeds even when a module fails
-       — one module's failure must not cost the others — so without this the report's silence
-       about a module reads as "it found nothing" rather than "it was never read". #}
+       (one module's failure must not cost the others), so without this the report's silence about
+       a module reads as "it found nothing" rather than "it was never read". The sentence naming them
+       stays visible; the reasons are technical and sit in a fold. #}
     {% if module_exclusions %}
     <section class="report-section" id="modules-not-read">
         <p class="section-kicker">Coverage</p>
         <h2>Modules not read in this run</h2>
-        <div class="paper-card metadata-card">
-            <p>
-                These modules were selected but contributed no results. Their absence from the
-                sections above is not a finding about this sample: nothing was matched against them.
-            </p>
+        <p>
+            {% for m in module_exclusions %}<strong>{{ m.display_name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+            {% if module_exclusions|length == 1 %}was{% else %}were{% endif %} selected but could not be
+            compared with this file, so {% if module_exclusions|length == 1 %}it contributes{% else %}they contribute{% endif %}
+            no results. That is not a finding about you: nothing was matched against
+            {% if module_exclusions|length == 1 %}it{% else %}them{% endif %}.
+        </p>
+        <details class="appendix">
+            <summary>Why each module was not read</summary>
             <div class="table-shell">
-                <div class="table-scroll">
-                <table class="ui">
-                    <thead><tr><th>Module</th><th>Outcome</th><th>Reason</th></tr></thead>
-                    <tbody id="moduleExclusionsTBody">
-                        {% for m in module_exclusions %}
-                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
-                            <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
-                            <td>
-                                {% if m.kind == "failed" %}
-                                <span class="exclusion-badge failed" title="An error while reading or joining this module. Usually worth acting on.">failed</span>
-                                {% else %}
-                                <span class="exclusion-badge skipped" title="Nothing could be matched against this sample: the module carries no per-variant key, or none this sample&#39;s VCF also carries.">skipped</span>
-                                {% endif %}
-                            </td>
-                            <td class="cell-wrap"><small>{{ m.reason }}</small></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                    <div class="table-scroll">
+                    <table class="ui">
+                        <thead><tr><th>Module</th><th>Outcome</th><th>Reason</th></tr></thead>
+                        <tbody id="moduleExclusionsTBody">
+                            {% for m in module_exclusions %}
+                            <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                                <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                                <td>
+                                    {% if m.kind == "failed" %}
+                                    <span class="exclusion-badge failed" title="An error while reading or joining this module. Usually worth acting on.">failed</span>
+                                    {% else %}
+                                    <span class="exclusion-badge skipped" title="Nothing could be matched against this sample: the module carries no per-variant key, or none this sample&#39;s VCF also carries.">skipped</span>
+                                    {% endif %}
+                                </td>
+                                <td class="cell-wrap"><small>{{ m.reason }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {{ table_controls("moduleExclusionsTBody", module_exclusions | length) }}
                 </div>
-                {{ table_controls("moduleExclusionsTBody", module_exclusions | length) }}
-            </div>
-        </div>
+        </details>
     </section>
     {% endif %}
 
-    {% if credits %}
-    <section class="report-section" id="credits">
-        <p class="section-kicker">Provenance</p>
-        <h2>Data sources and licences</h2>
-        <div class="paper-card metadata-card">
+    {% if module_provenance or credits %}
+    <section class="report-section" id="technical">
+        <p class="section-kicker">For reproducing this report</p>
+        <h2>Technical details</h2>
+        <details class="appendix">
+            <summary>Module versions, data sources and licences</summary>
+            {% if module_provenance %}
+            <h3 id="modules">Modules in this report</h3>
             <p>
-                These sources contribute annotation content included in the report. Resolution-only
-                references are excluded because their terms do not apply to the redistributed content.
+                Modules are revised over time. These identifiers record which build of each module
+                produced this report, so results can be compared across runs.
             </p>
             <div class="table-shell">
-                <div class="table-scroll">
-                <table class="ui">
-                    <thead><tr><th>Source</th><th>Used by</th><th>Licence</th><th>Attribution</th><th>Terms</th></tr></thead>
-                    <tbody id="creditsTBody">
-                        {% for c in credits %}
-                        <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
-                            <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
-                            <td>{{ c.modules | join(", ") }}</td>
-                            <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>
-                            <td>{{ c.attribution }}{% if c.notice %}<br><small>{{ c.notice }}</small>{% endif %}</td>
-                            <td>
-                                {% if c.share_alike is sameas true %}<div>Share-alike required</div>{% endif %}
-                                {% if c.commercial_use is sameas false %}<div>Non-commercial use only</div>{% endif %}
-                                {% if c.redistribution is sameas false %}<div>Redistribution restricted</div>{% endif %}
-                                {% if c.share_alike is none and c.commercial_use is none and c.redistribution is none %}<div><em>Not stated</em></div>{% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                    <div class="table-scroll">
+                    <table class="ui">
+                        <thead><tr><th>Module</th><th>Version</th><th>Build</th><th>What its weights mean</th><th>Source</th></tr></thead>
+                        <tbody id="moduleProvenanceTBody">
+                            {% for m in module_provenance %}
+                            <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                                <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
+                                <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
+                                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                                {# The module's own explanation, kept verbatim. An absent value must not
+                                   imply that weights from different modules are comparable. #}
+                                <td class="cell-wrap">{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+                                <td class="cell-wrap">{% if m.source_url %}<small>{{ m.source_url }}</small>{% else %}<em>Not stated</em>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {{ table_controls("moduleProvenanceTBody", module_provenance | length) }}
                 </div>
-                {{ table_controls("creditsTBody", credits | length) }}
-            </div>
-        </div>
+            {% endif %}
+            {% if credits %}
+            <h3 id="credits">Data sources and licences</h3>
+            <p>
+                These sources contribute content shown in this report. References used only to place
+                variants on the genome are left out, because their terms do not apply to the content.
+            </p>
+            <div class="table-shell">
+                    <div class="table-scroll">
+                    <table class="ui">
+                        <thead><tr><th>Source</th><th>Used by</th><th>Licence</th><th>Attribution</th><th>Terms</th></tr></thead>
+                        <tbody id="creditsTBody">
+                            {% for c in credits %}
+                            <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                                <td>{{ c.source }}{% if c.dataset %}<br><small>{{ c.dataset }}</small>{% endif %}</td>
+                                <td>{{ c.modules | join(", ") }}</td>
+                                <td>{% if c.license_url %}<a href="{{ c.license_url }}">{{ c.license }}</a>{% else %}{{ c.license }}{% endif %}</td>
+                                <td>{{ c.attribution }}{% if c.notice %}<br><small>{{ c.notice }}</small>{% endif %}</td>
+                                <td>
+                                    {% if c.share_alike is sameas true %}<div>Share-alike required</div>{% endif %}
+                                    {% if c.commercial_use is sameas false %}<div>Non-commercial use only</div>{% endif %}
+                                    {% if c.redistribution is sameas false %}<div>Redistribution restricted</div>{% endif %}
+                                    {% if c.share_alike is none and c.commercial_use is none and c.redistribution is none %}<div><em>Not stated</em></div>{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {{ table_controls("creditsTBody", credits | length) }}
+                </div>
+            {% endif %}
+        </details>
     </section>
     {% endif %}
 </main>
