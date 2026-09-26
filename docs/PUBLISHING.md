@@ -1,5 +1,9 @@
 # Publishing a Module to the Marketplace
 
+> Never made an API token before? Start with [REGISTRY_ACCOUNT_SETUP.md](REGISTRY_ACCOUNT_SETUP.md),
+> which explains the account, the token, the namespace and where `.env` goes, using the
+> just-dna-lite `pipelines registry` commands.
+
 How to register an account, claim a namespace, and publish an annotation module to the public
 marketplace using the `marketplace-client` CLI (shipped with the `just-dna-marketplace` client
 install).
