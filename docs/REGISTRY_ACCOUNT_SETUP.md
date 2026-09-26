@@ -1,8 +1,59 @@
 # Getting a Registry Account and API Token
 
-This guide is for anyone who has built an annotation module and now wants to share it in the
-module catalog, but has never had to create an API token before. It explains what the account
-is for, how to get one, and where to save it.
+You need an account only to **publish** a module, so other people can install it from the catalog.
+Browsing the catalog, downloading modules, building a module, and annotating a genome do not need one.
+
+There is no account form in the app. Module Creator does not have one. The catalog's Publication
+tab, which would hold an Account pane, is turned off. Create the account with the command below.
+
+## The one command
+
+Open a terminal in the just-dna-lite folder. That is the folder that contains `pyproject.toml`
+and `modules.yaml`, the same folder where you run `uv run start`. Then run:
+
+```powershell
+.\.venv\Scripts\python.exe -m just_dna_lite.cli registry register your-name --url https://module-polygon.just-dna.life
+```
+
+On macOS or Linux the same command is:
+
+```bash
+uv run pipelines registry register your-name --url https://module-polygon.just-dna.life
+```
+
+Change `your-name` before you run it. Use lowercase letters, digits, and hyphens only.
+`livia-zaharia` is accepted. `Livia_Zaharia` is rejected.
+
+The command takes a few seconds, then prints two lines, once:
+
+```
+install-id: <long secret>
+API key: <long secret>
+```
+
+Copy both into a password manager before you close the terminal.
+
+- The **API key** is the token. Open `.env` in that same just-dna-lite folder (if you have no
+  `.env` yet, copy `.env.template` to `.env`) and add this line, with your key pasted in:
+
+  ```
+  REGISTRY_TOKEN_POLYGON=paste-the-api-key-here
+  ```
+
+- The **install-id** is the only way to get this account back. There is no email, no password,
+  and nobody who can reset it. If you lose the token, run the same command again with
+  `--install-id` and the saved install-id, and you get a new token for the same account.
+  If you run it again without the install-id, you create a different account.
+
+This command talks to the **test** server (`module-polygon.just-dna.life`). What you publish
+there can be deleted. It does not create an account on the public catalog. The public catalog
+is a second registration, written out below.
+
+This creates the account. It does not publish a module and it does not claim a namespace
+(the folder name modules are published under). Claiming is a later command, also below.
+
+The rest of this page is the same process with the choices written out: which server, where
+`.env` lives, and what to do when a message comes back.
 
 ## Do I need this at all?
 
@@ -16,7 +67,7 @@ Only if you want to **put something into** the catalog.
 | Claim a namespace (your own "folder" in the catalog) | **Yes** |
 | Ask the server to validate or dry-run your module before publishing | **Yes** |
 
-If you only want to use modules, stop here. Nothing below is required.
+If you only want to use modules, ignore the command above. Nothing else on this page is required.
 
 ## The four things you will get
 
@@ -104,26 +155,16 @@ the install-id into a module, a commit, an issue, a chat or a screenshot.
 > (`JMC_INSTALL_ID`, `JMC_API_KEY` for production, `JMC_TEST_API_KEY` for the test server) and
 > has its own setup. This guide covers just-dna-lite only.
 
-## Option A: create the account in the app
+## There is no account form in the app
 
-1. Start the app with `uv run start` and open the **Module Catalog** page
-   (`http://localhost:3000/registry`).
-2. Use the server selector above the tabs to choose **Polygon (test)** or
-   **Just-DNA Registry** (production).
-3. In the **Account** pane, type a display name.
-4. Under **Create a namespace**, type the namespace you want and click **Create**. The app
-   registers the account, claims the namespace and receives your token in one go.
-5. The token now appears in the Account pane under **API token**, with a copy button.
+Do not look for an Account pane in Module Creator or on the Module Catalog page. The Publication
+tab that contains that pane is switched off (`REGISTRY_PUBLICATION_ENABLED` is `False` in
+`webui/src/webui/features.py`). Browsing and installing modules still work. Creating an account
+from the screen does not, until that flag is turned back on.
 
-The app saves the account in `data/interim/registry_identity.json` inside your just-dna-lite
-folder. That file is enough for the app. It does **not** write the token into `.env`, so if you
-also want to publish from the command line, copy the token and add it to `.env` as in Step 3
-below. Back up `registry_identity.json` too, because it holds your install-id.
+Use the command at the top of this page.
 
-Your account handle is based on the display name, with a short random ending added so two
-people with the same name do not collide.
-
-## Option B: create the account from the command line
+## Create the account from the command line
 
 Run every command from the just-dna-lite root folder.
 
