@@ -10,6 +10,8 @@
 
 ![just-dna-lite interface](images/just_dna_lite_annotations.jpg)
 
+[![Watch the tutorial: Unlocking Your DNA](https://img.youtube.com/vi/NcOiEUaIpUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=NcOiEUaIpUk)
+
 <sub><i>Research Use Only (RUO): just-dna-lite is a bioinformatics research tool for academic studies, citizen science, and educational self-exploration. It is not a medical device, not intended for clinical diagnostic use, and does not provide medical advice. The software and its modules (including AI-generated content) are provided "as is" without warranties of any kind. Our philosophy is to display everything — including PRS scores and community-generated AI modules that may attempt to predict disease probabilities — but you must never use this tool to make medical, diagnostic, or health-related decisions. Always consult a qualified healthcare professional or genetic counselor for any health concerns or clinical interpretation of genomic data.</i></sub>
 
 **Runs on your laptop.** Upload your genome file, pick what you want to know, get results in minutes. Installs in four commands, runs entirely on your machine, nothing leaves your computer.
