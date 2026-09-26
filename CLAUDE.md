@@ -158,6 +158,9 @@ does not call it.
   `is_null() | ~col`, not `fill_null(False)`.
 - Enricher exceptions: we hold no `except` around enricher passes. If you add one, order narrow-first
   (the unavailability type is a subclass).
+- **Never match warning prose.** Classify a compiler finding with `Compilation.warnings_summary` /
+  `carried`. `trusted` is read from the registry (`_trust_word` keeps it tri-state); `UNJOINABLE_PHRASE`
+  is the registry's. `pharmgkb` publishing as `trusted: false` is correct, not a defect.
 - `validate_spec().stats` keys: `variant_count`, `unique_rsids`, `gene_count`, `genes`, `categories`,
   `study_count`, `module_name`.
 
@@ -401,6 +404,12 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
   and re-downloads only mismatches (`.part` then replace; `<file>.sha256` stamps skip rehashing). Never
   revert to "any parquet present, skip" (a damaged file caused `Out of buffer`). Readers glob
   `*.parquet`, never the bare directory.
+- **polars-bio**: `scan_vcf` (0.23+) has no `thread_num`; `just_dna_pipelines.io.read_vcf_file` maps it
+  to `concurrent_fetches`. Don't read PGEN with it (a hardcoded 512 MB `max_companion_bytes` cap refuses
+  the PGS Catalog `.pvar.zst`, polars-bio#453); just-prs stays on `pgenlib`. `pb.write_vcf` writes
+  `INFO=.` unless `pb.set_source_metadata(df, format="vcf", header={"info_fields": {...}})` registers each
+  field first (`number`, `type`, `description`), and it needs all 8 core columns with `start`/`end` as
+  `UInt32` (fill `end = start + 1`, `qual = None`, `filter = "."`).
 - **Never `huggingface_hub.snapshot_download`** (duplicates into the HF blob store). Use
   `HfFileSystem(token=get_token())` and `fs.get(remote, local)` file by file.
 
@@ -496,7 +505,8 @@ mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir
 itself. Genome build: `GRCh38`/`T2T-CHM13v2.0` → `GRCh38`; `GRCh37`/`hg19` → `GRCh37`. Only GRCh38 is
 fully supported.
 
-- **Genotypes**: normalized parquets keep polars-bio `start`; just-prs wants `pos`. Always go through
+- **Genotypes**: `initialize_prs_for_file(parquet_path, genome_build)` calls
+  `set_prs_genotypes_lf(pl.scan_parquet(path))`. Normalized parquets keep polars-bio `start`; just-prs wants `pos`. Always go through
   `_get_genotypes_lf()` / `_scan_prs_genotypes()`; never feed a raw `scan_parquet` to
   `infer_sample_ancestry` or `compute_prs`. Never pass a LazyFrame between states; rescan the path.
 - **Everything PRS is per genome.** `UploadState.select_file()` resets Output/PRS/trait grid views
