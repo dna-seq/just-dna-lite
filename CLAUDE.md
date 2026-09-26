@@ -718,6 +718,36 @@ the user "cancer: 29 variants" for a module that annotated none. `annotate_vcf_w
 returns `(path, num_matched, restoration_stats)`; both numbers travel on the eliot log
 (`num_matched` / `num_written`) because they answer different questions.
 
+**`sink_parquet` is non-deterministic, so the engine sorts before it.** The streaming engine emits a
+left join's rows in a non-deterministic *multiset* — two identical runs of `longevitymap` on one
+genome produced different `qual`/`conclusion` values and a different report each time, because a
+poly-effect module fans one position into several rows and the morsel emission is not stable. A
+total-order sort immediately before `sink_parquet` is a pipeline barrier that forces the join to
+complete before emitting: it stabilises the multiset and gives the report a deterministic row order,
+without the memory cost of `collect()`. Do not remove it, and do not "optimise" it into a `collect()`
+— streaming is the point for a large module. `restoration._with_flanking_distance` sorts its
+`join_asof(by="chrom")` inputs by `(chrom, key)` for the same reason. `scripts/regression_snapshot.py`
+(Typer `snapshot` / `compare`) pins native-module output byte-for-byte across runs and is the gate to
+run after touching the engine, report or restoration; the baseline lives under
+`data/interim/regression_baseline/` (gitignored).
+
+### Compound-phenotype modules — a second engine path (`phenotype_caller.py`)
+
+A phenotype like APOE ε-status or an HFE compound-het finding is a function of several sites read
+together, not a per-position match. A module authored with `haplotypes` + a combiner (`diplotypes`,
+or `allele_function` + `activity_phenotype`) is a **phenotype module**: `hf_modules.module_kind(info)`
+classifies it, and `annotate_vcf_with_all_modules` dispatches to `phenotype_caller.call_phenotype_module`
+**before** the weights call, so the caller is reached only for such a module and native modules are
+untouched (the regression gate proves a native module's parquet is byte-identical alone vs. beside a
+phenotype module). It writes `{module}_phenotypes.parquet` (one `PhenotypeCall` per gene) and the report
+renders a "Phenotypes from combined variants" section. Phenotype calls are counted apart from the variant
+totals (`manifest.phenotype_calls` / `total_phenotypes_called`), the same reasoning as the
+restored-vs-annotated split. **v1 is enumerative, unphased and diploid** — the full contract, the four
+statuses, the authoring rules and what is deliberately out of scope are in
+[docs/PHENOTYPE_CALLS.md](docs/PHENOTYPE_CALLS.md). The caller reuses `restoration.restorable_sites` (the
+public site-level core of hom-ref restoration) so a hom-ref site (ABO O/O, APOE ε3/ε3) is restored under
+the same gates as a weights module.
+
 ### Reference-genotype restoration (`restoration.py`)
 
 A module may author a row whose genotype **is** the reference genotype — `lactose_tolerance` states
