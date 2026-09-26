@@ -678,6 +678,16 @@ class ModuleTable(str, Enum):
     LEAD = "lead"
 
 
+# The lead-table families a phenotype module can be led by. `diplotypes` outranks `haplotypes` in
+# `LEAD_TABLES`, so an enumerative module leads with `diplotypes`; a score-and-bin one may lead with
+# `activity_phenotype` or `allele_function`. `haplotypes` alone (no combiner) is `"unsupported"`.
+# Defined above `module_kind` (which reads it) on purpose — a helper a discovery-time function needs
+# must be defined before it, per the pattern the rest of this module documents.
+_PHENOTYPE_LEAD_TABLES = frozenset(
+    {"diplotypes", "haplotypes", "allele_function", "activity_phenotype"}
+)
+
+
 def module_kind(info: ModuleInfo) -> str:
     """Classify a module as ``"variant"``, ``"phenotype"``, or ``"unsupported"``.
 
@@ -705,14 +715,6 @@ def module_kind(info: ModuleInfo) -> str:
     if has_haplotypes and (has_enumerative or has_score_and_bin):
         return "phenotype"
     return "unsupported"
-
-
-# The lead-table families a phenotype module can be led by. `diplotypes` outranks `haplotypes` in
-# `LEAD_TABLES`, so an enumerative module leads with `diplotypes`; a score-and-bin one may lead with
-# `activity_phenotype` or `allele_function`. `haplotypes` alone (no combiner) is `"unsupported"`.
-_PHENOTYPE_LEAD_TABLES = frozenset(
-    {"diplotypes", "haplotypes", "allele_function", "activity_phenotype"}
-)
 
 
 def get_module_info(module_name: str) -> ModuleInfo:

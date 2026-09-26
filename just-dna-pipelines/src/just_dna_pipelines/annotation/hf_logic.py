@@ -749,7 +749,22 @@ def annotate_vcf_with_all_modules(
             # engine reads one position at a time. Dispatch on `module_kind` *before* the weights
             # call — the caller is reached only here, so a weights- or pharm-led module (even a mixed
             # one that also ships haplotypes) is untouched. This is the whole of the routing change.
-            if module_kind(info) == "phenotype":
+            kind = module_kind(info)
+
+            # A phenotype-shaped module that lost its combiner table (a `haplotypes` lead whose
+            # `diplotypes`/activity attestation is incomplete — the "partial manifest" case) would
+            # otherwise fall to the weights call and be skipped with a misleading "no coordinates"
+            # reason. Say what actually happened.
+            if kind == "unsupported" and info.haplotypes_url is not None:
+                skipped[module_name] = (
+                    "phenotype-shaped module (has a haplotypes table) but no usable combiner — needs "
+                    "diplotypes, or both allele_function and activity_phenotype; the diplotypes/activity "
+                    "table may have failed to attest"
+                )
+                logger.warning(f"  Skipping {module_name}: {skipped[module_name]}")
+                continue
+
+            if kind == "phenotype":
                 phenotypes_path = output_dir / f"{module_name}_phenotypes.parquet"
                 try:
                     phenotypes_path, n_called = call_phenotype_module(

@@ -147,14 +147,37 @@ class TestDerivedFromTheModulesOwnTable:
                     for key in gene_def.site_meta
                 }
                 call = call_gene(fixture, gene_def, _evidence(gene_def, observed))
-                # The genotype may be explained by more than this one diplotype (a homozygous
-                # genotype is unambiguous, a double-het is not), but the authored phenotype must
-                # always be among the candidates, and a homozygote must resolve to exactly it.
+                # The genotype may be explained by more than this one diplotype (a homozygote is
+                # unambiguous, a double-het need not be), but the authored phenotype must always be
+                # among the candidates, and whenever exactly one diplotype is consistent the call must
+                # be `called` with that diplotype's own phenotype.
                 candidate_pairs = {(c.haplotype_a, c.haplotype_b) for c in call.candidates}
                 assert (a, b) in candidate_pairs, f"{fixture} {a}/{b} not among candidates"
-                if a == b:
-                    assert call.status == "called"
-                    assert call.phenotype == diplo["phenotype"]
+                if len(call.candidates) == 1:
+                    assert call.status == "called", f"{fixture} {a}/{b}"
+                    assert call.phenotype == diplo["phenotype"], f"{fixture} {a}/{b}"
+
+    def test_the_derived_check_fails_on_a_broken_allele_lookup(self, tmp_path: Path, monkeypatch) -> None:
+        """Demonstrate the derived test catches a real bug: make `_allele_at` always return ref.
+
+        With every haplotype reading as reference at every site, the only genotype any pair produces is
+        hom-ref, so a heterozygous-diplotype genotype resolves to the wrong diplotype (or none) — the
+        derived assertions above must then fail.
+        """
+        import just_dna_pipelines.annotation.phenotype_caller as pc
+
+        module_dir = compile_fixture("apoe_epsilon", tmp_path / "apoe")
+        info = probe_local(module_dir, "apoe_epsilon")
+        gene_def = load_phenotype_definition("apoe_epsilon", info).genes["APOE"]
+
+        monkeypatch.setattr(pc, "_allele_at", lambda gd, hap, key: gd.site_meta[key]["ref"])
+        # e2/e4 implies a het genotype under the real alleles; feed that, expect the broken lookup to
+        # NOT reproduce e2/e4 as the sole called diplotype.
+        observed = {APOE_SITE_1: ["C", "T"], APOE_SITE_2: ["C", "T"]}
+        call = call_gene("apoe_epsilon", gene_def, _evidence(gene_def, observed))
+        assert not (
+            call.status == "called" and call.phenotype == "APOE ε2/ε4"
+        ), "broken _allele_at should not still produce the correct call"
 
 
 class TestRestorationReachesAReferenceCall:
@@ -314,6 +337,7 @@ class TestEngineDispatch:
         assert manifest.total_variants_restored == 0
 
 
+@pytest.mark.integration
 class TestRealSample:
     """Anton is het at both APOE sites (0/1, no rsIDs), so this matches by position → e2/e4."""
 
