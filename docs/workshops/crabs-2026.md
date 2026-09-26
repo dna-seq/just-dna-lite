@@ -163,7 +163,7 @@ Only Claude Code can install `just-module-creator` as a plugin. The Codex catalo
 - [ ] Publish `just-dna-agents-mcp`, or drop `just-dna-agents` from all materials
 - [ ] Add Codex and Antigravity manifests to `just-module-creator` (optional but high value)
 - [ ] Test `claude plugin install just-prs@dna-seq` under Codex Desktop, or remove the claim from the marketplace README
-- [ ] Fix the two dead local paths in `modules.yaml` (`/data/sources/just-dna-lite/...` resolve nowhere on any participant machine)
+- [x] Fix the two dead local paths in `modules.yaml` — the two repo-local sources are now authored **relative** (`data/output/modules`, `data/interim/registered_modules`) and resolved against the project root at load time, so they work on any checkout instead of an absolute path that resolved nowhere on a participant machine
 - [ ] Correct "PDF report" to "HTML report" in the README and FAQ
 - [ ] Update the README module count from five to ten
 - [ ] Set the Module Manager default off Research team mode (currently `agent_use_team = True`, the 7–8 minute path)

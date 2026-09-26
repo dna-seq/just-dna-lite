@@ -23,7 +23,11 @@ from just_dna_format.layout import SOURCES_CSV, resolve_sidecar, sidecar_candida
 from just_dna_format.spec import PMID_PATTERN, StudyRow, VariantRow
 
 from just_dna_pipelines.module_compiler.models import ModuleSpecConfig
-from just_dna_pipelines.module_config import _merge_config
+from just_dna_pipelines.module_config import (
+    _drop_project_runtime_sources,
+    _merge_config,
+    _resolve_project_relative_sources,
+)
 from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.v1_port.clinvar_panel import (
     CLINVAR_RESOURCE_PMID,
@@ -119,6 +123,55 @@ class TestModulesConfigMerge:
     def test_other_keys_take_the_working_value(self) -> None:
         merged = _merge_config({"ensembl_source": {"repo_id": "a"}}, {"ensembl_source": {"repo_id": "b"}})
         assert merged["ensembl_source"] == {"repo_id": "b"}
+
+
+class TestProjectRelativeSources:
+    """The git-tracked modules.yaml names its repo-local sources relative, not as an absolute
+    `/data/sources/<user>/…` path that resolves nowhere on another checkout (the workshop bug,
+    docs/workshops/crabs-2026.md). The loader resolves them against the project root at load time."""
+
+    #: What the shipped defaults now author: one HF shorthand + two repo-local relative dirs.
+    _RAW = {
+        "sources": [
+            {"url": "just-dna-seq/annotators", "kind": "collection"},
+            {"url": "data/output/modules", "kind": "collection"},
+            {"url": "data/interim/registered_modules", "kind": "collection"},
+        ]
+    }
+
+    def test_relative_locals_resolve_to_absolute_under_project_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("JUST_DNA_PIPELINES_ROOT", str(tmp_path))
+        resolved = _resolve_project_relative_sources({**self._RAW, "sources": list(self._RAW["sources"])})
+        urls = [s["url"] for s in resolved["sources"]]
+        # HF shorthand (exactly one slash) is left untouched; the two locals become absolute under root.
+        assert urls[0] == "just-dna-seq/annotators"
+        assert urls[1] == str((tmp_path / "data/output/modules").resolve())
+        assert urls[2] == str((tmp_path / "data/interim/registered_modules").resolve())
+        assert all(Path(u).is_absolute() for u in urls[1:])
+
+    def test_env_runtime_still_strips_the_resolved_locals(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # With OUTPUT_DIR set the two repo-local dirs are dropped (modules live under OUTPUT_DIR),
+        # exactly as when they were authored absolute — the relative spelling must not change that.
+        monkeypatch.setenv("JUST_DNA_PIPELINES_ROOT", str(tmp_path))
+        monkeypatch.setenv("JUST_DNA_PIPELINES_OUTPUT_DIR", str(tmp_path / "out"))
+        dropped = _drop_project_runtime_sources({**self._RAW, "sources": list(self._RAW["sources"])})
+        assert [s["url"] for s in dropped["sources"]] == ["just-dna-seq/annotators"]
+
+    def test_hf_shorthand_is_never_rewritten_as_a_local_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: an `org/repo` shorthand has no scheme and is not absolute, the same shape as a
+        # relative path — resolving it would invent a nonexistent local dir and break HF discovery.
+        monkeypatch.setenv("JUST_DNA_PIPELINES_ROOT", str(tmp_path))
+        monkeypatch.delenv("JUST_DNA_PIPELINES_OUTPUT_DIR", raising=False)
+        resolved = _resolve_project_relative_sources(
+            {"sources": [{"url": "just-dna-seq/annotators"}, {"url": "org/repo"}]}
+        )
+        assert [s["url"] for s in resolved["sources"]] == ["just-dna-seq/annotators", "org/repo"]
 
 
 # ── the spec writer under the 0.5 models ───────────────────────────────────────

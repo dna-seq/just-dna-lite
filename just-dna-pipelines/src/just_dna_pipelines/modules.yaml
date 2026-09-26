@@ -77,7 +77,7 @@ sources:
   #   kind: module
   #   name: custom_name
 
-  # - url: /data/sources/just-dna-lite/data/output/modules
+  # - url: data/output/modules
   #   kind: collection
 
 # Optional per-module display metadata overrides.

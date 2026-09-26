@@ -32,7 +32,7 @@ import hashlib
 import json
 import os
 import warnings
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Literal, Optional
 
 import polars as pl
@@ -359,14 +359,58 @@ def _default_config_path() -> Optional[Path]:
     return None
 
 
+def _resolve_project_relative_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve a relative local source path against the project root, at load time.
+
+    The git-tracked `modules.yaml` names its repo-local generated sources **relative**
+    (`data/output/modules`, `data/interim/registered_modules`) so the file carries no
+    machine-specific path — an absolute `/data/sources/<user>/…` there resolves nowhere on any
+    other checkout (measured: it broke workshop participants, `docs/workshops/crabs-2026.md`).
+    We resolve them here, before both discovery and `_drop_project_runtime_sources`, so a relative
+    entry becomes an absolute path anchored at the project root rather than at the caller's CWD —
+    `uv run start`, the `pipelines` CLI, the Dagster daemon and the tests each run from a different
+    directory. A `scheme://` URL (HuggingFace, HTTP, S3, …) and an already-absolute path are left
+    untouched; a Windows drive path is absolute too (`PureWindowsPath`), so it is not mistaken for
+    a relative one on POSIX. With no discoverable project root we leave the value as authored.
+    """
+    project_root = _find_project_root()
+    if project_root is None:
+        return raw
+    resolved_sources = []
+    for source in raw.get("sources", []):
+        url = source.get("url") if isinstance(source, dict) else source
+        # Only a genuinely-local relative path is resolved. A `scheme://` URL and the HuggingFace
+        # `org/repo` shorthand (exactly one slash — mirror `Source.is_hf`) are left alone, or the
+        # shorthand `just-dna-seq/annotators` would be rewritten into a nonexistent local dir.
+        if (
+            isinstance(url, str)
+            and "://" not in url
+            and url.count("/") != 1
+            and not Path(url).is_absolute()
+            and not PureWindowsPath(url).is_absolute()
+        ):
+            absolute = str((project_root / url).resolve())
+            if isinstance(source, dict):
+                source = {**source, "url": absolute}
+            else:
+                source = absolute
+        resolved_sources.append(source)
+    raw = dict(raw)
+    raw["sources"] = resolved_sources
+    return raw
+
+
 def _drop_project_runtime_sources(raw: Dict[str, Any]) -> Dict[str, Any]:
     """Remove repo-local generated/interim sources in env-backed runtimes.
 
     "Is this a local path" is `Path(url).is_absolute()`, never `startswith("/")`: the latter is
     False for every Windows path, so a checkout with `JUST_DNA_PIPELINES_OUTPUT_DIR` pointed
     elsewhere went on scanning the repo's own `data/` there as well. Evaluated natively on purpose —
-    the path belongs to the machine doing the asking.
+    the path belongs to the machine doing the asking. Relative sources are resolved to absolute
+    against the project root first (`_resolve_project_relative_sources`), so this check sees the
+    same absolute-under-`data/` path whether the file authored it relative or absolute.
     """
+    raw = _resolve_project_relative_sources(raw)
     if not os.getenv("JUST_DNA_PIPELINES_OUTPUT_DIR"):
         return raw
 

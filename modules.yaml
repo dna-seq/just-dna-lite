@@ -49,9 +49,9 @@ ensembl_source:
 sources:
 - url: just-dna-seq/annotators
   kind: collection
-- url: /data/sources/just-dna-lite/data/output/modules
+- url: data/output/modules
   kind: collection
-- url: /data/sources/just-dna-lite/data/interim/registered_modules
+- url: data/interim/registered_modules
   kind: collection
 module_metadata:
   longevitymap:
