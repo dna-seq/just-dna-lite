@@ -982,7 +982,7 @@ class TestPharmVariantsAnnotation:
 
     PORT_ROOT = Path("data/interim/v1_port")
 
-    def test_join_downgrades_to_rsid_and_matches_real_rows(self, tmp_path):
+    def test_a_null_coordinate_pgx_module_downgrades_to_rsid_and_matches_real_rows(self, tmp_path):
         import fsspec
         from just_dna_pipelines.annotation.hf_modules import _probe_module_at_path
         from just_dna_pipelines.annotation.hf_logic import (
@@ -994,14 +994,27 @@ class TestPharmVariantsAnnotation:
         base = (self.PORT_ROOT / "pharmgkb").resolve()
         if not base.is_dir():
             pytest.skip(f"{base} not built")
+
+        # Derived from the shipped module with coordinates stripped: the shipped pharmgkb is placed
+        # since the 0.7 rebuild (2026-09-26), so its own strategy is now `position`. A genuinely
+        # null-coordinate PGx module (a pre-0.6 rsid-authored one) still exists in the wild and must
+        # downgrade to rsid rather than annotate nothing — so we construct that premise here instead
+        # of inheriting it from the shipped artifact's era. Dtypes are preserved so the "typed but
+        # null throughout" branch of `_lead_join_strategy` fires.
+        placed = pl.read_parquet(base / "pharm_variants.parquet")
+        table = placed.with_columns(
+            chrom=pl.lit(None, dtype=placed.schema["chrom"]),
+            start=pl.lit(None, dtype=placed.schema["start"]),
+        )
+        unplaced_dir = tmp_path / "pharmgkb_unplaced"
+        unplaced_dir.mkdir()
+        table.write_parquet(unplaced_dir / "pharm_variants.parquet")
         info = _probe_module_at_path(
-            fsspec.filesystem("file"), str(base), "file", "pharmgkb", str(base), str(base)
+            fsspec.filesystem("file"), str(unplaced_dir), "file", "pharmgkb",
+            str(unplaced_dir), str(unplaced_dir),
         )
 
-        table = pl.read_parquet(base / "pharm_variants.parquet")
-        # the compiler materialises 0.4 tables verbatim from CSV, so an rsid-authored one has no
-        # coordinates — a position join would match nothing
-        lead = _normalize_lead_genotype(pl.scan_parquet(base / "pharm_variants.parquet"))
+        lead = _normalize_lead_genotype(pl.scan_parquet(unplaced_dir / "pharm_variants.parquet"))
         assert _lead_join_strategy(lead)[0] == "rsid"
 
         picks = table.select("rsid", "genotype").unique().head(3)

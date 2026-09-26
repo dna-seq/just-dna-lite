@@ -13,6 +13,7 @@ from just_dna_format.manifest import README_CANDIDATES
 
 from just_dna_pipelines.annotation.hf_logic import (
     _lead_join_strategy,
+    _normalize_lead_genotype,
     _unmatchable_phased_rows,
 )
 from just_dna_pipelines.annotation.hf_modules import (
@@ -109,11 +110,14 @@ class TestJoinStrategyNamesTheColumnsItReads:
         )
         assert _lead_join_strategy(unplaced)[0] == "rsid"
 
-    def test_the_shipped_pharm_module_is_still_unplaced(self) -> None:
-        """Pins the measurement the triage rests on: 0 of 1482 rows placed.
+    def test_the_shipped_pharm_module_is_now_placed_and_position_joined(self) -> None:
+        """Pins the post-0.7-rebuild measurement: every pharm_variants row now carries coordinates.
 
-        If a recompile ever changes this, the position branch starts running on this family for the
-        first time and that is worth being told about rather than discovering in a report.
+        Rebuilt under format 0.7 on 2026-09-26 (was 0/1482 as a 0.5 artifact); RM43 applies
+        resolution.csv to the pharm_variants lead table, so all rows place and `_lead_join_strategy`
+        routes the module to the position join — the branch that had never run on this family. The
+        rsid-downgrade path a genuinely-unplaced PGx module still takes is covered separately by
+        `test_coordinates_typed_but_null_throughout_fall_back_to_rsid`.
         """
         table = PHARMGKB / "pharm_variants.parquet"
         if not table.is_file():
@@ -122,10 +126,11 @@ class TestJoinStrategyNamesTheColumnsItReads:
         placed = lf.select(pl.col("chrom").is_not_null().sum()).collect().item()
         total = lf.select(pl.len()).collect().item()
         assert total > 0
-        assert placed == 0, (
-            f"{placed}/{total} rows now carry coordinates — this module has been recompiled "
-            "under format 0.6 (RM43). The position join now applies to it; exercise that branch."
+        assert placed == total, (
+            f"only {placed}/{total} rows carry coordinates — expected all of them after the 0.7 "
+            "rebuild. A partial placement means resolution.csv did not cover every authored row."
         )
+        assert _lead_join_strategy(_normalize_lead_genotype(lf))[0] == "position"
 
 
 class TestPhasedRowsAreRefusedLoudly:
