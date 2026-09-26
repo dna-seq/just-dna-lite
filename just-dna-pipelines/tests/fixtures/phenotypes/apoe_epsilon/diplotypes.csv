@@ -1,0 +1,7 @@
+gene,haplotype_a,haplotype_b,phenotype,trait_efo_id,direction,conclusion
+APOE,e2,e2,APOE ε2/ε2,MONDO:0004975,protective,"Two ε2 alleles. Lowest APOE-attributable Alzheimer's risk; associated with type III hyperlipoproteinemia in a minority of carriers."
+APOE,e2,e3,APOE ε2/ε3,MONDO:0004975,protective,"One ε2 and one ε3. Slightly lower late-onset Alzheimer's risk than ε3/ε3."
+APOE,e2,e4,APOE ε2/ε4,MONDO:0004975,unknown,"One ε2 and one ε4 — opposing alleles. Risk is not the sum of its parts and is poorly resolved; report with caution."
+APOE,e3,e3,APOE ε3/ε3,MONDO:0004975,neutral,"Two ε3 alleles: the reference genotype most risk estimates are expressed relative to."
+APOE,e3,e4,APOE ε3/ε4,MONDO:0004975,risk,"One ε4 allele. Increased late-onset Alzheimer's risk relative to ε3/ε3; penetrance is incomplete and age-dependent."
+APOE,e4,e4,APOE ε4/ε4,MONDO:0004975,risk,"Two ε4 alleles. The highest APOE-attributable late-onset Alzheimer's risk; still not deterministic."

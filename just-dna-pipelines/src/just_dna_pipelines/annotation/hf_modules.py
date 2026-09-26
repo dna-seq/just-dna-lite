@@ -65,6 +65,16 @@ class ModuleInfo(BaseModel):
     # `discordant` row beside its ClinVar tier. Attested like the other side parquets; `None` when
     # the module carries no concordance record, which is every module published before 0.7.
     concordance_url: Optional[str] = None
+    # Compound-phenotype tables (format 0.7): a phenotype like APOE ε-status or an HFE compound-het
+    # finding is a function of several sites read together, not a per-position match. `haplotypes`
+    # defines the variants of each named allele; `diplotypes` enumerates allele-pair → phenotype;
+    # `allele_function` (+ `activity_phenotype`) is the score-and-bin combiner. Attested like the
+    # other side parquets. All `None` on a weights- or pharm-led module, which is every module we
+    # ship today — `module_kind()` reads these to decide a module is phenotype-shaped.
+    haplotypes_url: Optional[str] = None
+    diplotypes_url: Optional[str] = None
+    allele_function_url: Optional[str] = None
+    activity_phenotype_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
     # What the source's own `manifest.json` states about these bytes, when it publishes one.
@@ -300,6 +310,10 @@ def _probe_module_at_path(
     studies_path = f"{base_path}/studies.parquet"
     sources_path = f"{base_path}/sources.parquet"
     concordance_path = f"{base_path}/clin_sig_concordance.parquet"
+    haplotypes_path = f"{base_path}/haplotypes.parquet"
+    diplotypes_path = f"{base_path}/diplotypes.parquet"
+    allele_function_path = f"{base_path}/allele_function.parquet"
+    activity_phenotype_path = f"{base_path}/activity_phenotype.parquet"
     metadata_json_path = f"{base_path}/metadata.json"
     metadata_yaml_path = f"{base_path}/metadata.yaml"
 
@@ -335,6 +349,15 @@ def _probe_module_at_path(
         sources_url=_build_url(protocol, sources_path) if _has("sources.parquet") else None,
         concordance_url=(
             _build_url(protocol, concordance_path) if _has("clin_sig_concordance.parquet") else None
+        ),
+        # Compound-phenotype tables, attested the same way — all in ARTIFACT_PARQUETS since 0.7.
+        haplotypes_url=_build_url(protocol, haplotypes_path) if _has("haplotypes.parquet") else None,
+        diplotypes_url=_build_url(protocol, diplotypes_path) if _has("diplotypes.parquet") else None,
+        allele_function_url=(
+            _build_url(protocol, allele_function_path) if _has("allele_function.parquet") else None
+        ),
+        activity_phenotype_url=(
+            _build_url(protocol, activity_phenotype_path) if _has("activity_phenotype.parquet") else None
         ),
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
@@ -620,9 +643,51 @@ class ModuleTable(str, Enum):
     WEIGHTS = "weights"
     SOURCES = "sources"
     CONCORDANCE = "clin_sig_concordance"
+    # Compound-phenotype tables (format 0.7); read by the phenotype caller, not the weights engine.
+    HAPLOTYPES = "haplotypes"
+    DIPLOTYPES = "diplotypes"
+    ALLELE_FUNCTION = "allele_function"
+    ACTIVITY_PHENOTYPE = "activity_phenotype"
     # Whichever table family carries this module's rows — weights for most, pharm_variants for a
     # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
     LEAD = "lead"
+
+
+def module_kind(info: ModuleInfo) -> str:
+    """Classify a module as ``"variant"``, ``"phenotype"``, or ``"unsupported"``.
+
+    A **phenotype** module is one the diplotype caller (``phenotype_caller``) handles rather than
+    the per-position weights engine: its rows describe named alleles read together, not one match
+    per site. The test is deliberately about the *combiner tables*, not the family name:
+
+    * the lead table is one of the phenotype families, **and**
+    * it carries a ``haplotypes`` table (which defines each allele's variants), **and**
+    * it carries either ``diplotypes`` (enumerative combiner) or both ``allele_function`` and
+      ``activity_phenotype`` (the score-and-bin combiner).
+
+    Routing on the lead table keeps a weights- or pharm-led module — including a mixed one that
+    happens to also ship a haplotypes table — on the ``"variant"`` path. ``"unsupported"`` is a
+    phenotype-family lead with no usable combiner: it is neither the caller's job nor the weights
+    engine's, and it stays a recorded skip exactly as it is today.
+    """
+    if info.lead_table not in _PHENOTYPE_LEAD_TABLES:
+        return "variant"
+    has_haplotypes = info.haplotypes_url is not None
+    has_enumerative = info.diplotypes_url is not None
+    has_score_and_bin = (
+        info.allele_function_url is not None and info.activity_phenotype_url is not None
+    )
+    if has_haplotypes and (has_enumerative or has_score_and_bin):
+        return "phenotype"
+    return "unsupported"
+
+
+# The lead-table families a phenotype module can be led by. `diplotypes` outranks `haplotypes` in
+# `LEAD_TABLES`, so an enumerative module leads with `diplotypes`; a score-and-bin one may lead with
+# `activity_phenotype` or `allele_function`. `haplotypes` alone (no combiner) is `"unsupported"`.
+_PHENOTYPE_LEAD_TABLES = frozenset(
+    {"diplotypes", "haplotypes", "allele_function", "activity_phenotype"}
+)
 
 
 def get_module_info(module_name: str) -> ModuleInfo:
@@ -671,6 +736,22 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
         if not info.concordance_url:
             raise ValueError(f"Module {module_name} does not have a clin_sig_concordance table")
         return info.concordance_url
+    elif table_name == "haplotypes":
+        if not info.haplotypes_url:
+            raise ValueError(f"Module {module_name} does not have a haplotypes table")
+        return info.haplotypes_url
+    elif table_name == "diplotypes":
+        if not info.diplotypes_url:
+            raise ValueError(f"Module {module_name} does not have a diplotypes table")
+        return info.diplotypes_url
+    elif table_name == "allele_function":
+        if not info.allele_function_url:
+            raise ValueError(f"Module {module_name} does not have an allele_function table")
+        return info.allele_function_url
+    elif table_name == "activity_phenotype":
+        if not info.activity_phenotype_url:
+            raise ValueError(f"Module {module_name} does not have an activity_phenotype table")
+        return info.activity_phenotype_url
 
     # Fallback for unknown tables
     return f"{info.path}/{table_name}.parquet"
