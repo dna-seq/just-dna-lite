@@ -10,6 +10,8 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 ### Running
 
 - `uv run start` from the repo root starts the full stack (`uv run dagster` for pipelines only).
+  `uv run serve` is the single-process server (demos, workshops, no hot reload); it owns the Granian
+  workers and the compute pool, so it never `waitpid(-1)`s.
 - **Launchers never exec a uv console-script wrapper.** Locked-down Windows (AppLocker, Smart App
   Control) blocks the unsigned `.venv\Scripts\*.exe`. Every hop is `sys.executable -m <module>`:
   `just_dna_lite.cli start`, `webui.run`, `just_dna_lite.dg dev` (a shim; `dagster_dg_cli` has no
@@ -21,6 +23,7 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   port 3000. A second `uv run start` is last-writer-wins. See `tests/test_process_shutdown.py`.
 - Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners`,
   **listeners only** (a bare `lsof -ti :port` also matches a browser connected to 3000).
+  `JUST_DNA_START_KILL_PORTS` stays off by default: 8000/8001 may belong to unrelated tools.
 - If `uv run start` resolves to a dependency's `start` (e.g. `prs-ui`'s), uv kept stale wrappers: bump
   the root `just-dna-lite` version and `uv sync`. Never rename the command or duplicate entries.
 
@@ -84,7 +87,10 @@ get generated defaults.
   zero sources and a healthy-looking app that annotates nothing). `save_config` moves an unparseable copy
   to `modules.yaml.corrupt` instead of overwriting it. `module_registry`'s three register/unregister
   paths read the copy alone (unmerged) through `module_config.read_config_for_update`. Tests:
-  `just-dna-pipelines/tests/test_modules_yaml_recovery.py`.
+  `just-dna-pipelines/tests/test_modules_yaml_recovery.py`, which derives its baseline by running the
+  loader with no working copy, never by reading `modules.yaml`: `_drop_project_runtime_sources` strips
+  the repo-local sources whenever `JUST_DNA_PIPELINES_OUTPUT_DIR` is set, and any test module's
+  `load_env()` sets it session-wide.
 - Never hardcode module lists, metadata, HF repo URLs or the Ensembl repo id: use `get_module_meta()`,
   `build_module_metadata_dict()`, `MODULES_CONFIG.sources`, `MODULES_CONFIG.ensembl_source.repo_id`.
 - Source URL forms: `org/repo` or `hf://datasets/org/repo`, `github://org/repo`, `https://…`, `s3://…`,
@@ -138,7 +144,9 @@ does not call it.
   colour.
 - **`locus_count > 1` marks an expansion member** (one rsid placed at N loci). Defaults to 1, so test
   `> 1`, never truthiness. `None` (pre-0.6) and `1` render nothing; do not coalesce `None` to `1`. Keep
-  the pre-0.6 `ref`-spelling guard beside it; it only sees members disagreeing on `ref`.
+  the pre-0.6 `ref`-spelling guard beside it; it only sees members disagreeing on `ref`. Restoration
+  withholds an expansion member (it would fabricate N results); a *called* one is a real observation, so
+  the report keeps it with a *Position ambiguous* caveat naming N.
 - **`ARTIFACT_PARQUETS`, `LEAD_PARQUETS`**: import, never re-list. `module_config.LEAD_TABLE_CSVS` is the
   single lead-family to CSV map. `tests/test_format_0_6.py` asserts set equality with the compiler.
 - **Licence sidecar**: reach it through `just_dna_format.layout` (`resolve_sidecar`,
@@ -403,7 +411,7 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
   `annotation/ensembl_download.py`. `ensembl_annotations` verifies each file against HF size + SHA256
   and re-downloads only mismatches (`.part` then replace; `<file>.sha256` stamps skip rehashing). Never
   revert to "any parquet present, skip" (a damaged file caused `Out of buffer`). Readers glob
-  `*.parquet`, never the bare directory.
+  `*.parquet`, never the bare directory. `verify-ensembl` ignores the stamps and rehashes everything.
 - **polars-bio**: `scan_vcf` (0.23+) has no `thread_num`; `just_dna_pipelines.io.read_vcf_file` maps it
   to `concurrent_fetches`. Don't read PGEN with it (a hardcoded 512 MB `max_companion_bytes` cap refuses
   the PGS Catalog `.pvar.zst`, polars-bio#453); just-prs stays on `pgenlib`. `pb.write_vcf` writes
@@ -441,8 +449,10 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 CLI tools may call `job_def.execute_in_process(run_config=..., instance=..., tags=...)` directly, after
 adding the dynamic partition if missing.
 
-Anti-pattern: silently falling back to the raw VCF when the normalized parquet is missing. Show an
-error or a prominent banner.
+Anti-patterns: silently falling back to the raw VCF when the normalized parquet is missing (show an
+error or a prominent banner); `asyncio.to_thread` with Dagster objects (pyo3 panic `Cannot drop pointer
+into Python heap`); run config for unselected assets (validation error); suspended jobs holding DuckDB
+file locks; hardcoded asset names (use `defs.resolve_all_asset_specs()`).
 
 ## Process model and fork safety (mandatory)
 
@@ -459,7 +469,8 @@ Write-up: [docs/GRANIAN_POLARS_FORK_DEADLOCK.md](docs/GRANIAN_POLARS_FORK_DEADLO
 - All Polars / DuckDB / polars-bio / Dagster work goes through `webui.compute` (`pool` for short queries,
   `jobs` for runs). The ASGI process only marshals.
 - **Grid pages must be O(page)**: sort once to a temp parquet, then slice (a multi-key
-  `sort().slice()` re-sorts the whole frame per click).
+  `sort().slice()` re-sorts the whole frame per click). The sort artifact's name includes the source
+  path, not just the state class.
 - **Ctrl+C**: importing Polars installs a SIGINT handler with `SA_RESTART`, so a blocking `proc.wait()`
   never sees `KeyboardInterrupt`. Call `just_dna_lite.process.install_launcher_signal_handlers` before
   any wait on a child (first signal interrupts, second force-kills; SIGTERM and Ctrl+Z share the path).
@@ -479,10 +490,14 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 ### Rules
 
 - **Anything over ~1 s is `@rx.event(background=True)`** with brief `async with self:` blocks and the
-  work in a pure function off the state lock. A `yield` generator holds the lock for its whole run and
-  freezes the UI. `@rx.background` does not exist.
+  work in a pure function off the state lock; snapshot the inputs into locals in the first block. A
+  `yield` generator holds the lock for its whole run and freezes the UI. `@rx.background` does not exist.
+- **Upload / select-file handlers return `list[EventSpec]`, never `yield` them.** Reflex 0.9 marks the
+  generator's `EventFuture` done when it exhausts, and a yielded EventSpec re-dispatched after that
+  raises `Cannot add a child to an EventFuture that is already done`. Same rule as `poll_run_status`.
 - **Icons**: use `fomantic_icon()` from `webui.components.layout`, not `rx.icon()`. Names must be static
-  strings (switch with `rx.match`); hyphenated order is `circle-check`, `heart-pulse`.
+  strings (switch with `rx.match`). Fomantic names are space-separated (`arrow up`); the helper maps
+  common hyphenated Lucide names, in the order `circle-check`, `heart-pulse` (never underscores).
 - Reactive styling via `rx.cond`, never a Python `if`. `class_name`, never `class`.
 - `rx.foreach` dict values are `Any`: cast with `.to(int)` / `.to(bool)`.
 - Per-row UI state (e.g. a busy button) is a bool stamped on the row (`item["busy"].to(bool)`), not a
@@ -514,13 +529,17 @@ fully supported.
   `PRSState.reset_for_genome_switch`, even while the new parquet is still normalizing. Clear
   `prs_results`, the chart spec and `prs_results_source_file`; compute snapshots `prs_compute_token` and
   discards stale writes. After updating `prs_results`, rebuild `prs_results_rows` / `_columns` /
-  `_column_groups`.
+  `_column_groups`. Switching the file also clears the comparison.
+- **Annotations and reports are per sample** (`data/output/users/{user}/{sample}/`). `select_file`
+  clears `output_files` / `report_files` at once; the background loader publishes only when
+  `outputs_loaded_for_file == selected_file`, and tab badges and empty states read those gated lists.
 - The right-panel workspace is keyed on `UploadState.selected_file`: remount the whole sample tree, never
   keep per-genome widgets.
 - Use the prs-ui workbench (`prs_workbench_mode_panel`, `trait_selector`, `prs_scores_selector`), with
   ancestry on the current-sample row. No second upload, no toolbar population selector. **Add for
   comparison** adds a left-panel peer (same species, build, ready parquet) in one click, labelled
-  `Sample Name (filename)`. Comparisons are not checkpointed to Dagster.
+  `Sample Name (filename)`. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs
+  PGS IDs. Comparisons are not checkpointed to Dagster.
 - Pass `normalizing=False` to the workbench, **never** `UploadState.vcf_preview_loading` (it locks the
   grids while the Input tab pages). The By PRS extract comes from the mixin; don't reimplement it.
 
@@ -553,6 +572,8 @@ fully supported.
 - For upstream bugs (e.g. `prs-ui`), prefer a copy-paste upstream prompt over a local patch.
 - When given a minimal working example, wire it in directly.
 - Output filenames describe content (`_ensembl_annotated.parquet`); reports are timestamped.
+- CLI commands are uv workspace `[project.scripts]`, not `subprocess` wrappers. Data access goes through
+  fsspec, not symlinks.
 
 ## Workspace facts
 
