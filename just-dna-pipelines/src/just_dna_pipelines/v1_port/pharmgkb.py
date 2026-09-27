@@ -168,7 +168,7 @@ def _module_spec_yaml(release: dict[str, object], row_count: int) -> str:
             "report_title": meta["report_title"],
             "icon": meta["icon"],
             "color": meta["color"],
-            "version": "1.0.0",
+            "version": "1.1.0",
         },
         "license": "CC-BY-SA-4.0",
         "genome_build": "GRCh38",
