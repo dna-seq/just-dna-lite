@@ -10,5 +10,17 @@
     "content_signature": "sha256:676a811c8ddea5debbcbe07ffe059ce0815aafa25305badf85e68a0c9e6f32bf",
     "registry_url": "https://module-registry.just-dna.life",
     "published_at": "2026-09-27T01:24:00+00:00"
+  },
+  {
+    "target": "prod",
+    "canonical_id": "antonkulaga/fut2_secretor@1.1.0",
+    "namespace": "antonkulaga",
+    "name": "fut2_secretor",
+    "version": "1.1.0",
+    "owner": null,
+    "artifact_digest": "sha256:5ada86d6d62f4769e125351616c28cccaadaa5dabec356d16e7db7f352992f00",
+    "content_signature": "sha256:777b65b485121a39a5fb46f9c8ee9b6b5b4152a778159055ec7573be46b8c56a",
+    "registry_url": "https://module-registry.just-dna.life",
+    "published_at": "2026-09-27T08:31:29+00:00"
   }
 ]

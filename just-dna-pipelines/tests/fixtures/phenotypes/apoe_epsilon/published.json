@@ -10,5 +10,17 @@
     "content_signature": "sha256:40b8ae2636bd12af86ae1bb85cfe31ca196c167b1759ba4c73d618d4081d31bf",
     "registry_url": "https://module-registry.just-dna.life",
     "published_at": "2026-09-27T01:23:23+00:00"
+  },
+  {
+    "target": "prod",
+    "canonical_id": "antonkulaga/apoe_epsilon@1.1.0",
+    "namespace": "antonkulaga",
+    "name": "apoe_epsilon",
+    "version": "1.1.0",
+    "owner": null,
+    "artifact_digest": "sha256:5701a4018c05e7a99961b43ba025bf916c69ba85230712097f50f25d0348d54a",
+    "content_signature": "sha256:8445668c5b6edc11e9fd0ba9203580b8b33543188bc731befa32f238748a485e",
+    "registry_url": "https://module-registry.just-dna.life",
+    "published_at": "2026-09-27T08:30:48+00:00"
   }
 ]
