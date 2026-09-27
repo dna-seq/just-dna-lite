@@ -5775,8 +5775,10 @@ class AgentState(rx.State):
 
     # -- Slot actions ---------------------------------------------------------
 
-    async def upload_to_slot(self, files: list[rx.UploadFile]) -> None:
+    async def upload_to_slot(self, files: list[rx.UploadFile]) -> list[EventSpec] | None:
         """Upload module spec files and populate the editing slot."""
+        if _is_immutable_mode():
+            return [rx.toast.warning("File uploads are disabled in public demo mode.")]
         import zipfile as _zipfile
 
         if not files:
@@ -5954,8 +5956,10 @@ class AgentState(rx.State):
 
     # -- Agent file attachment ------------------------------------------------
 
-    async def upload_agent_file(self, files: list[rx.UploadFile]) -> None:
+    async def upload_agent_file(self, files: list[rx.UploadFile]) -> list[EventSpec] | None:
         """Save uploaded context files for the agent (up to 5 total)."""
+        if _is_immutable_mode():
+            return [rx.toast.warning("File uploads are disabled in public demo mode.")]
         if not files:
             return
         _AGENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -7247,6 +7251,8 @@ class RegistryState(rx.State):
         Upload handlers cannot be ``background=True``, so this only does the quick file save +
         gate decision; the heavy compile happens in ``start_import``.
         """
+        if _is_immutable_mode():
+            return [rx.toast.warning("Module import is disabled in public demo mode.")]
         tmp = Path(tempfile.mkdtemp(prefix="mp_import_"))
         for f in files:
             data = await f.read()
@@ -7416,6 +7422,8 @@ class RegistryState(rx.State):
     @rx.event
     async def set_avatar(self, files: list[rx.UploadFile]):
         """Store a local-only avatar as a data URI (never uploaded to the server)."""
+        if _is_immutable_mode():
+            return [rx.toast.warning("File uploads are disabled in public demo mode.")]
         if not files:
             return
         f = files[0]
@@ -7925,6 +7933,8 @@ class RegistryState(rx.State):
 
     @rx.event
     async def update_logo(self, files: list[rx.UploadFile]):
+        if _is_immutable_mode():
+            return [rx.toast.warning("File uploads are disabled in public demo mode.")]
         if not files:
             return
         f = files[0]
