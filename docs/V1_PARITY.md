@@ -173,6 +173,6 @@ Things the new surfaces caught that the old route did not:
 1. ✅ `thrombophilia` published. 2. ✅ `longevitymap` full parity. 3. ✅ `superhuman` v2 curated
 (publish as 2.0.0). 4. ✅ `cardio`/`cancer`/`pathogenic` rebuilt on the 0.5 ClinVar route.
 5. ✅ `pharmgkb` built. 6. ✅ All ten published under 0.7 to the registry on 2026-09-27, with logos and
-card subtitles set — see [MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md). 7. ⏸ Remaining: mirror the ten
-to HuggingFace, and build `lnewco` on the diplotype tables (item 5 — the only Gen-I module with no
-Gen-II counterpart).
+card subtitles set — see [MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md). 7. ✅ All ten mirrored to the
+HuggingFace collection (`just-dna-seq/annotators`) on 2026-09-27. 8. ⏸ Remaining: build `lnewco` on the
+diplotype tables (item 5 — the only Gen-I module with no Gen-II counterpart).

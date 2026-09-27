@@ -127,7 +127,10 @@ Each is the text passed to `--changelog` at publish, continuing the 0.5 entries 
 
 The HuggingFace collection (`just-dna-seq/annotators`) is the legacy mirror, kept in sync via
 `pipelines v1-port publish <name>` (uploads the compiled parquets + `logo.png` directly, so no separate
-logo step is needed there). Run the mirror after the registry publish:
+logo step is needed there — unlike the registry panels, which needed `amend-logo`).
+
+**Done 2026-09-27**: all ten mirrored, no errors (9 files each for the ports, 8 for the ClinVar panels,
+6 for pharmgkb — lead table + side parquets + `manifest.json` + `logo.png`). To re-run:
 
 ```bash
 for m in coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman \
