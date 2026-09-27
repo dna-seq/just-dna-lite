@@ -43,6 +43,7 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
 | `candidates` | the consistent diplotypes: `{haplotype_a, haplotype_b, phenotype, conclusion, direction, clin_sig, not_assessable, activity_score}` (`activity_score` only on a score-and-bin module) |
 | `sites` | per defining site: `{rsid, chrom, start, ref, observed, evidence, matched_by, restored_flank_bp, phased_alleles, phase_set}`. `observed` is sorted; `phased_alleles` keeps homolog order and is set only for a phased call |
 | `phase_would_decide` | true when the ambiguity is pure cis/trans — knowing the phase would settle it |
+| `structural_evidence` | per `<DEL:length>` allele: `{haplotype, allele, chrom, start, end, calls_in_span, largest_gap_bp, hard_region_fraction, reading, reason}`; `reading` is `copy_present`, `both_deleted` or null |
 | `alleles_considered` | the haplotypes the module defines (a coverage statement) |
 | `alleles_not_assessable` | alleles needing a structural/copy-number call an SNV VCF cannot make |
 | `unpaired_haplotypes` | defined haplotypes no diplotype row pairs |
@@ -64,10 +65,30 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
      `step="indel_window_not_unique"`, and that site is `no_call` — it is **never** restored, because
      the callset demonstrably carries an event of that shape there;
    - otherwise `restoration.restorable_sites`, which restores the site to hom-ref only where the
-     callset's coverage supports it (the same gates the weights engine uses). Everything else is
-     `no_call`.
+     callset's coverage supports it (the same gates the weights engine uses): a whole-genome,
+     variant-only callset, a call within the flank, and the site **outside** GIAB's low-mappability +
+     segdup mask (`hard_regions.py`). Outside the mask a `requires_callable` site restores too; inside
+     it nothing does. Everything else is `no_call`.
 
    Each site records its `evidence` (`called` / `restored_hom_ref` / `no_call`) and `matched_by`.
+
+   **Deletion alleles are read from coverage** (`gather_structural_evidence`). A small-variant VCF
+   never lists a large deletion, so a missing `<DEL>` record says nothing; the calls inside the span
+   (VCF convention: the `length` bases after the site) do, on a whole-genome callset only:
+   - calls inside and no call-free stretch longer than the flank → `copy_present`: the homozygous
+     deletion is excluded. One deleted copy cannot be told from none, so that pair stays flagged
+     `not_assessable`;
+   - no call inside, calls within the flank on both sides, span under 50% in the mask →
+     `both_deleted`: only the homozygous deletion fits, and it counts as confirmed (rendered as
+     inferred);
+   - anything else → no reading, with the reason. A long hole inside an otherwise covered span is the
+     case to know: on Anton's genome 51.6 kb of the RHD span `blood_groups` authors has no calls. That
+     can be a deletion of part of the span, an imprecise span, or unplaceable reads, and "any call
+     inside" would have misread it as RhD positive.
+
+   At its own site a deleted copy contributes no allele: one deleted copy leaves the site hemizygous,
+   which a diploid caller writes as a homozygote, so the pair compares as the set of surviving alleles;
+   two deleted copies are contradicted by any call there.
 2. **Read phase where the callset states it.** A called site is *phased* when its `GT` uses `|` **and**
    it carries a non-null `PS`; its alleles are then kept in homolog order on `phased_alleles` with the
    `phase_set`. The alleles come from the `GT` indices, not from the `genotype` column, which the reader
@@ -105,7 +126,13 @@ Written to `{module}_phenotypes.parquet` (one row per gene, nested list/struct c
   `*1`) is skipped rather than assumed all-reference. Every module we hold defines every allele
   explicitly, so this does not arise; a module relying on an implicit `*1` needs that rule added.
 - **Structural alleles** are detected from the `allele` spelling (there is no `sv_type` column on
-  `haplotypes`; a structural allele is a non-nucleotide spelling) and reported `not_assessable`.
+  `haplotypes`; a structural allele is a non-nucleotide spelling). Only `<DEL:length>` has a span a
+  callset can be read against; every other structural allele is reported `not_assessable`.
+- **The hard-region mask is first order.** A site is in or out of GIAB v3.6's low-mappability + segdup
+  union (9.9% of GRCh38). The better answer is probabilistic: the chance a variant at this base would
+  have been called, from population per-base coverage (gnomAD's genome coverage summaries), weighed
+  against the sample's own depth. The wider "all difficult" union (20%) was rejected because it switches
+  inference off at both APOE sites and FUT2, which WGS calls well.
 - **One gene at a time.** A phenotype over two genes' phenotypes (Lewis = FUT3 × FUT2, warfarin
   CYP2C9 × VKORC1) is not expressible in the format and not attempted here.
 - **The indel window is a tolerance, and it says so.** Two spellings that reduce to the same event but
