@@ -698,8 +698,13 @@ reused for annotation.
   `nix develop`, `uv sync`, `uv run start`.
 - The AI Module Creator uses Agno and can target OpenAI-compatible local models (Ollama, vLLM).
 - README images live in `images/`; use `<img>` inside HTML `<div>` blocks.
-- Load `.env` (`load_dotenv()` / `load_env()`) before reading `JUST_DNA_PIPELINES_CACHE_DIR` or
-  `JUST_DNA_PIPELINES_OUTPUT_DIR`.
+- Load `.env` with `runtime.load_env()` before reading `JUST_DNA_PIPELINES_CACHE_DIR` or
+  `JUST_DNA_PIPELINES_OUTPUT_DIR`, **never a bare `load_dotenv()`**: it climbs past the checkout and read
+  another project's `~/sources/.env` (its `DEPLOY_URL` ended up in every report link). `load_env` stops at
+  the workspace root (`find_workspace_root`, `$JUST_DNA_PIPELINES_ROOT` first) and falls back to
+  `.env.template`. just-dna-registry calls a bare `load_dotenv()` on import, so every
+  `import just_dna_registry…` sits inside `with environ_guard():`, after `load_env()`. Tests:
+  `tests/test_load_env_bounded.py`.
 - `just-dna-seq/annotators` on HuggingFace hosts ten modules, all publishing a
   `manifest.json` (see `docs/V1_PARITY.md`).
 - Container: no GHCR image yet; `compose.yaml` builds locally. The `Containerfile` needs

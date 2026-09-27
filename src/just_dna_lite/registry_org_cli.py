@@ -14,11 +14,14 @@ import os
 from typing import Optional
 
 import typer
-from dotenv import load_dotenv
 
-from just_dna_registry import RegistryClient, RegistryError
+from just_dna_pipelines.runtime import environ_guard, load_env
 
-load_dotenv()  # pick up REGISTRY_URL / REGISTRY_TOKEN from a local .env
+load_env()  # pick up REGISTRY_URL / REGISTRY_TOKEN from this checkout's .env
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    from just_dna_registry import RegistryClient, RegistryError
 
 app = typer.Typer(
     help="Organization management: create orgs, claim org namespaces, manage members and roles.",

@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
-from dotenv import load_dotenv
 from PIL import Image, ImageChops
 
 from agno.agent import Agent, RunEvent
@@ -48,8 +47,9 @@ import agno.utils.log as _agno_log_module
 from just_dna_format.identity import is_valid_version, version_from_legacy
 
 from just_dna_pipelines.module_registry import validate_module_spec
+from just_dna_pipelines.runtime import load_env
 
-load_dotenv()
+load_env()
 
 logger = logging.getLogger(__name__)
 

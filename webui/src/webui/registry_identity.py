@@ -23,7 +23,12 @@ import secrets
 from pathlib import Path
 from typing import Any, Dict
 
-from just_dna_registry import generate_install_id, validate_install_id
+from just_dna_pipelines.runtime import environ_guard
+
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    from just_dna_registry import generate_install_id, validate_install_id
 from just_dna_pipelines.module_config import default_registry_store, get_config_path
 
 _DIFFICULTY: int = 20

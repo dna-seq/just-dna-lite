@@ -8,11 +8,16 @@ from pathlib import Path
 from typing import Annotated, Dict, Optional
 
 import typer
-from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
-load_dotenv()  # Load .env from cwd or parent dirs before any command runs
+from just_dna_pipelines.runtime import environ_guard, load_env
+
+load_env()  # this checkout's .env (or .env.template), never one above it
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    import just_dna_registry.client_cli  # noqa: F401
 
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
 from just_dna_lite.process import (
@@ -48,7 +53,6 @@ from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_pipelines.enricher_cli import enricher_app
 from just_dna_pipelines.lite_mcp.server import DEFAULT_HTTP_PORT as DEFAULT_MCP_PORT
 from just_dna_pipelines.lite_mcp.server import serve as mcp_serve
-from just_dna_pipelines.runtime import load_env
 from just_dna_enricher.caches import CACHE_LANES, prepare_caches
 from just_dna_registry.client_cli import app as registry_client_app
 from just_dna_lite.registry_org_cli import app as registry_org_app

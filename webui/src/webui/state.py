@@ -57,8 +57,13 @@ from just_dna_pipelines.module_registry import (
     list_custom_modules,
     refresh_module_registry,
 )
-from just_dna_registry import RegistryClient, RegistryError
-from just_dna_registry.client import VersionMismatchError
+from just_dna_pipelines.runtime import environ_guard
+
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    from just_dna_registry import RegistryClient, RegistryError
+    from just_dna_registry.client import VersionMismatchError
 from just_dna_format.identity import is_valid_namespace
 from just_dna_compiler.compiler import ARTIFACT_PARQUETS
 from just_dna_compiler.compiler import content_signature

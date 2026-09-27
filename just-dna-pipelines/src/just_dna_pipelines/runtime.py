@@ -11,25 +11,85 @@ from typing import Dict, Optional, Any
 from just_dna_pipelines.models import ResourceReport
 
 from eliot import start_action
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
 
 from just_dna_pipelines.config import get_default_workers, get_parquet_workers
 
 
-def load_env(override: bool = False) -> Optional[str]:
-    """
-    Search for .env file in the current directory and its parents.
-    This is useful when running from subprojects (e.g. just-dna-pipelines/ or webui/)
-    to ensure the root .env is loaded.
-    
-    Returns:
-        The path to the .env file found and loaded, or None if not found.
-    """
-    env_path = find_dotenv(usecwd=True)
-    if env_path:
-        load_dotenv(env_path, override=override)
-        return env_path
+def _is_workspace_root(path: Path) -> bool:
+    pyproject = path / "pyproject.toml"
+    return pyproject.is_file() and "[tool.uv.workspace]" in pyproject.read_text(encoding="utf-8")
+
+
+def _first_workspace_root(start: Path) -> Optional[Path]:
+    for candidate in (start, *start.parents):
+        if _is_workspace_root(candidate):
+            return candidate
     return None
+
+
+def find_workspace_root() -> Optional[Path]:
+    """The just-dna-lite checkout this process belongs to, or None outside one.
+
+    ``$JUST_DNA_PIPELINES_ROOT`` wins, then the checkout this package is installed from (an editable
+    install lives inside it), then the nearest uv workspace above the working directory.
+    """
+    override = os.environ.get("JUST_DNA_PIPELINES_ROOT")
+    if override and Path(override).is_dir():
+        return Path(override).resolve()
+    return _first_workspace_root(Path(__file__).resolve().parent) or _first_workspace_root(Path.cwd().resolve())
+
+
+def load_env(override: bool = False) -> Optional[str]:
+    """Load this checkout's ``.env``, never one that lives above it.
+
+    Searches from the working directory up to the workspace root and stops there, so running from
+    ``just-dna-pipelines/`` or ``webui/`` still finds the root ``.env``. python-dotenv's own
+    ``find_dotenv`` keeps climbing: a checkout with no ``.env`` then read ``~/sources/.env`` (another
+    project's) and built every report link on its ``DEPLOY_URL``. With no ``.env``, the root's
+    ``.env.template`` supplies the defaults.
+
+    Returns:
+        The path of the file loaded, or None when there is none.
+    """
+    root = find_workspace_root()
+    if root is None:
+        return None
+    cwd = Path.cwd().resolve()
+    search = [cwd, *cwd.parents] if cwd == root or root in cwd.parents else [root]
+    for directory in search:
+        env_path = directory / ".env"
+        if env_path.is_file():
+            load_dotenv(env_path, override=override)
+            return str(env_path)
+        if directory == root:
+            break
+    template = root / ".env.template"
+    if template.is_file():
+        load_dotenv(template, override=override)
+        return str(template)
+    return None
+
+
+@contextmanager
+def environ_guard():
+    """Undo whatever the enclosed code adds to or changes in ``os.environ``.
+
+    For importing a dependency that calls a bare ``load_dotenv()`` at import time (just-dna-registry
+    does): that walks up from the dependency's own directory and can read a ``.env`` outside this
+    checkout. Inside the block the import sees whatever it loaded; afterwards ``os.environ`` is
+    exactly what it was, so only our own ``load_env`` decides the configuration. Call ``load_env``
+    first, so values from this checkout's ``.env`` are already in place and are not reverted.
+    """
+    before = dict(os.environ)
+    try:
+        yield
+    finally:
+        for key in [k for k in os.environ if k not in before]:
+            del os.environ[key]
+        for key, value in before.items():
+            if os.environ.get(key) != value:
+                os.environ[key] = value
 
 
 @contextmanager

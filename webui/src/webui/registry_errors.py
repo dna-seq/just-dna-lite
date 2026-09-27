@@ -33,7 +33,12 @@ import socket
 from urllib.parse import urlsplit
 
 from just_dna_format.identity import parse_version
-from just_dna_registry.version import VersionInfo
+from just_dna_pipelines.runtime import environ_guard
+
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    from just_dna_registry.version import VersionInfo
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,12 @@ from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
 from just_dna_pipelines.enricher_cli import enricher_app
-from just_dna_registry.client_cli import app as registry_client_app
+from just_dna_pipelines.runtime import environ_guard
+
+# just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
+# once under environ_guard so only our own load_env() decides the configuration.
+with environ_guard():
+    from just_dna_registry.client_cli import app as registry_client_app
 
 app = typer.Typer(
     name="pipelines",
