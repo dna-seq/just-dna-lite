@@ -7,6 +7,7 @@ module:
   icon_set: fomantic
   color: '#a333c8'
   name: apoe_epsilon
+  version: '1.0.0'
 defaults:
   curator: ai-module-creator
   method: literature-review

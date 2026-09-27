@@ -1,7 +1,11 @@
 """Tests for report generation logic (just_dna_pipelines.annotation.report_logic)."""
 
-import polars as pl
+import json
 
+import polars as pl
+from phenotype_fixtures import compile_fixture, probe_local
+
+from just_dna_pipelines.annotation.hf_modules import read_module_provenance
 from just_dna_pipelines.annotation.report_logic import _annotated_rows
 
 
@@ -1177,3 +1181,16 @@ def test_direction_is_a_property_of_the_whole_module(tmp_path, directions, state
     assert module_is_directional("m", info) is expected
     matched_only_neutral = [_build_variant(_trait_row("rs2", 0.3, "neutral"), {})]
     assert apply_directionality(matched_only_neutral, module_is_directional("m", info)) is expected
+
+
+def test_a_manifest_that_fails_validation_still_reports_its_stated_version(tmp_path) -> None:
+    """A registry install whose namespace breaks the format's rule (`author-A`) used to lose its whole
+    manifest, so the report said Not stated for a version and digest the file states plainly."""
+    compiled = compile_fixture("fut2_secretor", tmp_path / "fut2")
+    manifest = json.loads((compiled / "manifest.json").read_text())
+    manifest["identity"] = {"namespace": "author-A", "name": "fut2_secretor", "version": "2.1.0",
+                            "canonical_id": "author-A/fut2_secretor@2.1.0"}
+    (compiled / "manifest.json").write_text(json.dumps(manifest))
+    version, digest, _ = read_module_provenance(probe_local(compiled, "fut2_secretor"))
+    assert version == "2.1.0"
+    assert digest == manifest["artifact"]["digest"] and digest

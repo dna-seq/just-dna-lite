@@ -1821,7 +1821,7 @@ def build_module_provenance(
         rows.append(
             {
                 "name": name,
-                "display_name": get_module_display_name(name),
+                "display_name": module_display(name, info)[0],
                 "version": (output.version if output else None) or "",
                 "digest": digest,
                 # Merkle roots are 64 hex characters and the leading ones identify a build well

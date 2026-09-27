@@ -232,6 +232,14 @@ details.appendix h3 { margin: 1.6rem 0 0.4rem; color: #102a43; font-size: 1.1rem
     padding: 0;
     list-style: none;
 }
+/* A group of sections (Combined results) takes its own line, with its members listed under it. */
+.contents li.contents-group { flex-basis: 100%; }
+.contents li.contents-group ul {
+    margin: 0.3rem 0 0.2rem 1.1rem;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--line);
+    font-size: 0.95em;
+}
 
 .report-section { margin-top: 4rem; scroll-margin-top: 1rem; }
 .section-kicker {
@@ -871,7 +879,14 @@ window.addEventListener("scroll", function() {
             <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
             {% if phenotype_modules %}
-            <li><a href="#phenotypes">Combined results{% if phenotype_modules|length > 1 %} ({{ phenotype_modules|map(attribute="display_name")|join(", ") }}){% endif %}</a></li>
+            <li class="contents-group">
+                <a href="#phenotypes">Combined results</a>
+                {% if phenotype_modules|length > 1 %}
+                <ul>
+                    {% for mod in phenotype_modules %}<li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>{% endfor %}
+                </ul>
+                {% endif %}
+            </li>
             {% endif %}
             <li><a href="#about">How to read this report</a></li>
             {% if module_exclusions %}

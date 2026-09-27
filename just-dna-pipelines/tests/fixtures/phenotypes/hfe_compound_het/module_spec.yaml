@@ -1,6 +1,7 @@
 schema_version: '1.0'
 module:
   name: hfe_compound_het
+  version: '1.0.0'
   title: Iron storage gene (HFE)
   report_title: Iron storage gene (HFE)
   description: "Whether you carry the two common changes in the HFE gene that are linked with hereditary haemochromatosis, where the body stores too much iron."

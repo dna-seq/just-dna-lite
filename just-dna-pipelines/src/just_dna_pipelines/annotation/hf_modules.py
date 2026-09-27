@@ -6,6 +6,7 @@ Discovers available annotation modules by scanning configured sources
 Sources are configured in modules.yaml (see module_config.py).
 """
 
+import json
 import re
 from enum import Enum
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -897,6 +898,22 @@ def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
     return path
 
 
+def _read_manifest_or_reason(path: Path) -> tuple[Optional[ModuleManifest], str]:
+    """The validated manifest, or ``None`` and why it could not be read."""
+    try:
+        return read_manifest(path), ""
+    except (ValueError, OSError) as exc:
+        return None, str(exc)
+
+
+def _stated_version_and_digest(path: Path) -> tuple[Optional[str], Optional[str]]:
+    """``identity.version`` and ``artifact.digest`` exactly as a manifest states them, unvalidated."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    identity = raw.get("identity") or {}
+    artifact = raw.get("artifact") or {}
+    return identity.get("version") or None, artifact.get("digest") or None
+
+
 def read_module_provenance(
     info: Optional[ModuleInfo],
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -937,19 +954,23 @@ def read_module_provenance(
     digest: Optional[str] = None
     weighting: Optional[str] = None
     if manifest_path.exists():
-        try:
-            manifest = read_manifest(manifest_path)
-        except (ValueError, OSError) as exc:
+        manifest, reason = _read_manifest_or_reason(manifest_path)
+        if manifest is not None:
+            version = manifest.identity.version or None
+            digest = manifest.artifact.digest or None
+            weighting = _weighting_summary(manifest)
+        else:
             log_message(
                 message_type="warning",
                 action="unreadable_module_manifest",
                 path=str(manifest_path),
-                reason=str(exc),
+                reason=reason,
             )
-        else:
-            version = manifest.identity.version or None
-            digest = manifest.artifact.digest or None
-            weighting = _weighting_summary(manifest)
+            # One field failing strict validation (a registry install whose namespace is `author-A`,
+            # not lowercase) used to discard the whole manifest, so the report said *Not stated* for a
+            # version and digest the file states plainly. Both are the module's own claim, which is
+            # all this table records, so read them as written.
+            version, digest = _stated_version_and_digest(manifest_path)
 
     # The compiler leaves `identity.version` null — the registry stamps identity at publish time —
     # so a locally-compiled module's version lives only in the authored spec.
