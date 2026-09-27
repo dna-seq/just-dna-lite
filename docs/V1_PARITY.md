@@ -44,7 +44,7 @@ Build commands for all ten modules: **[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5
 | `just_cancer` | cancer | `genes.txt` | `v1-port clinvar` | 1.0.0 | **2.0.0** | **rebuilt on 0.5** |
 | `just_pathogenic` | pathogenic | (derived from ClinVar) | `v1-port clinvar` | 1.0.0 | **2.0.0** | **rebuilt on 0.5** — genome-wide flag |
 | `just_drugs` | **pharmgkb** | `annotation_tab.tsv` | `v1-port pharmgkb` | — | 1.0.0 | **superseded** — ClinPGx clinical annotations, 1,482 rows / 219 annotations / 55 drugs |
-| `just_lnewco` | lnewco (APOE) | `metabolic_genotype.sqlite` | — | — | ❌ | **unblocked, not built** — 0.5 has the diplotype tables (item 5) |
+| `just_lnewco` | lnewco (APOE) | `metabolic_genotype.sqlite` | — | — | 🔵 | **optional / maybe superseded** — expressible now as a compound-phenotype module (`apoe_epsilon`); a bespoke port may not be wanted (item 5) |
 
 The panels take a **major** because the rebuild changed what they contain, not just how it is
 compiled — see [MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) § The republish.
@@ -111,12 +111,15 @@ which loads `.env` before provisioning).
 three were live at 1.0.0 before the registry wipe; the rebuild makes them 2.0.0 rather than a
 re-publish of the same number, because the selection and the grounding both changed.
 
-### 5. APOE diplotype (`lnewco`) — 🟡 unblocked by 0.5, not yet built
+### 5. APOE diplotype (`lnewco`) — 🔵 optional, and may be superseded
 `lnewco` keys conclusions on an APOE diplotype spanning `rs7412`+`rs429358` (e.g. `e4/e4`), which the
-single-rsid `VariantRow` cannot express. **0.5 shipped the tables it needed** — `haplotypes.csv` +
-`diplotypes.csv`, with `reference_examples/apoe_epsilon/` as a worked example of exactly this locus.
-The remaining work is an adapter that reads `metabolic_genotype.sqlite` and emits those two tables;
-no schema decision is outstanding. This is the only Gen-I module with no Gen-II counterpart.
+single-rsid `VariantRow` cannot express. The tables it needed shipped in 0.5 (`haplotypes.csv` +
+`diplotypes.csv`), and this locus is now a worked compound-phenotype example
+(`reference_examples/apoe_epsilon/`, driven by `phenotype_caller.py`). So the APOE diplotype is already
+expressible in the current format as a phenotype module; a bespoke `lnewco` adapter reading
+`metabolic_genotype.sqlite` is **optional** and may be **superseded** by that path. It is the only Gen-I
+module with no dedicated Gen-II counterpart, but no longer a gap in what the format can represent — left
+as an optional todo pending whether a standalone port is wanted at all.
 
 ### 6. PharmGKB pharmacogenomics (`drugs`) — ✅ superseded by `pharmgkb` (2026-08-09)
 Gen-I `just_drugs` shipped 1,063 PharmGKB **variant** annotations — one row per published study
@@ -174,5 +177,7 @@ Things the new surfaces caught that the old route did not:
 (publish as 2.0.0). 4. ✅ `cardio`/`cancer`/`pathogenic` rebuilt on the 0.5 ClinVar route.
 5. ✅ `pharmgkb` built. 6. ✅ All ten published under 0.7 to the registry on 2026-09-27, with logos and
 card subtitles set — see [MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md). 7. ✅ All ten mirrored to the
-HuggingFace collection (`just-dna-seq/annotators`) on 2026-09-27. 8. ⏸ Remaining: build `lnewco` on the
-diplotype tables (item 5 — the only Gen-I module with no Gen-II counterpart).
+HuggingFace collection (`just-dna-seq/annotators`) on 2026-09-27. 8. 🔵 Optional / maybe superseded:
+`lnewco` (APOE diplotype, item 5) — its locus is now expressible as a compound-phenotype module
+(`phenotype_caller.py`, `reference_examples/apoe_epsilon`), so a bespoke `lnewco` adapter may not be
+worth building. Left as an optional todo pending that decision.
