@@ -23,6 +23,11 @@ from reflex.event import EventSpec
 from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
 from just_dna_pipelines.agents.module_creator import read_spec_meta
+from just_dna_pipelines.annotation.annotation_runner import (
+    FULL_JOB,
+    REUSE_NORMALIZED_JOB,
+    normalized_parquet_is_current,
+)
 from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.hf_logic import prepare_vcf_for_module_annotation
@@ -373,38 +378,9 @@ def _normalize_run_config_if_stale(
 
     Pure function, no Reflex state: safe to call from ``run_in_executor``.
     """
-    from just_dna_pipelines.module_config import _load_config
-
-    current_hash = _load_config().quality_filters.config_hash()
     sample_name = selected_file.replace(".vcf.gz", "").replace(".vcf", "")
     normalized_path = get_user_output_dir() / safe_user_id / sample_name / "user_vcf_normalized.parquet"
-
-    instance = get_dagster_instance()
-
-    needs_normalize = True
-    result = instance.fetch_materializations(
-        records_filter=AssetRecordsFilter(
-            asset_key=AssetKey("user_vcf_normalized"),
-            asset_partitions=[partition_key],
-        ),
-        limit=1,
-    )
-    if result.records:
-        mat = result.records[0].asset_materialization
-        if mat and mat.metadata:
-            h = mat.metadata.get("quality_filters_hash")
-            stored_hash = str(h.value) if h and hasattr(h, "value") else ""
-            if stored_hash == current_hash and normalized_path.exists():
-                needs_normalize = False
-
-    # Guard against a stale/empty cached parquet. A normalized genome is never
-    # legitimately 0 rows; an empty file is the signature of a prior buggy run
-    # whose config hash did not change (so the hash check above won't catch it).
-    # Treat it as stale so the fix self-heals without manual cache wiping.
-    if not needs_normalize and _parquet_is_empty(normalized_path):
-        needs_normalize = True
-
-    if not needs_normalize:
+    if normalized_parquet_is_current(get_dagster_instance(), partition_key, normalized_path):
         return None
 
     vcf_path = get_user_input_dir() / safe_user_id / selected_file
@@ -418,6 +394,29 @@ def _normalize_run_config_if_stale(
             }
         }
     }
+
+
+def _analysis_job_name(
+    partition_key: str, has_hf_modules: bool, has_ensembl: bool
+) -> str:
+    """The job an analysis runs: skip normalization when the normalized parquet is current.
+
+    Every analysis job used to normalize again, even right after the select-time normalization
+    had written a current parquet: minutes of work per click on a whole genome, and a second
+    writer of the same sample while that first pass was still running. The staleness test is
+    the runner's (`normalized_parquet_is_current`), so the UI, `uv run annotate` and the MCP
+    worker agree on when a parquet can be reused. The Ensembl jobs have no reuse variant.
+
+    Blocking (Dagster metadata plus a parquet footer read): call it from an executor.
+    """
+    if has_ensembl:
+        return "annotate_all_job" if has_hf_modules else "annotate_ensembl_only_job"
+    normalized_path = get_user_output_dir() / partition_key / "user_vcf_normalized.parquet"
+    if has_hf_modules and normalized_parquet_is_current(
+        get_dagster_instance(), partition_key, normalized_path
+    ):
+        return REUSE_NORMALIZED_JOB
+    return FULL_JOB
 
 
 # Canonical tab order — single source of truth used both as the default for the
@@ -1201,21 +1200,17 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         
         has_hf_modules = bool(self.selected_modules)
         has_ensembl = self.include_ensembl
-        
-        # Determine job based on what's selected
-        if has_hf_modules and has_ensembl:
-            job_name = "annotate_all_job"
-        elif has_ensembl:
-            job_name = "annotate_ensembl_only_job"
-        else:
-            job_name = "annotate_and_report_job"
-        
+
+        job_name = await asyncio.get_event_loop().run_in_executor(
+            None, _analysis_job_name, partition_key, has_hf_modules, has_ensembl
+        )
+
         modules_to_use = self.selected_modules if has_hf_modules else None
-        
+
         # Get file metadata for the selected file
         file_info = self.file_metadata.get(filename, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
-        
+
         normalize_config: dict = {
             "vcf_path": str(vcf_path.absolute()),
         }
@@ -1223,13 +1218,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         if sex_value:
             normalize_config["sex"] = sex_value
 
-        run_config: dict = {
-            "ops": {
-                "user_vcf_normalized": {
-                    "config": normalize_config,
-                },
-            }
-        }
+        # Config may only name assets in the job's selection; the reuse job has no normalization.
+        run_config: dict = {"ops": {}}
+        if job_name != REUSE_NORMALIZED_JOB:
+            run_config["ops"]["user_vcf_normalized"] = {"config": normalize_config}
 
         if has_hf_modules:
             run_config["ops"]["user_hf_module_annotations"] = {
@@ -2953,15 +2945,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self._add_log(f"User: {self.safe_user_id}")
 
         instance = get_dagster_instance()
-        
-        # Determine job based on what's selected
-        if has_hf_modules and has_ensembl:
-            job_name = "annotate_all_job"
-        elif has_ensembl:
-            job_name = "annotate_ensembl_only_job"
-        else:
-            job_name = "annotate_and_report_job"
-        
+
         modules_to_use = self.selected_modules.copy() if has_hf_modules else []
 
         # Validate: drop any selected modules no longer in the registry (deleted/renamed)
@@ -2981,6 +2965,12 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 return
             has_hf_modules = bool(modules_to_use)
 
+        job_name = await asyncio.get_event_loop().run_in_executor(
+            None, _analysis_job_name, partition_key, has_hf_modules, has_ensembl
+        )
+        if job_name == REUSE_NORMALIZED_JOB:
+            self._add_log("Normalized VCF is current: skipping normalization")
+
         file_info = self.file_metadata.get(self.selected_file, {})
         custom_metadata = file_info.get("custom_fields", {}) or {}
 
@@ -2991,13 +2981,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         if sex_value_async:
             normalize_config_async["sex"] = sex_value_async
 
-        run_config: dict = {
-            "ops": {
-                "user_vcf_normalized": {
-                    "config": normalize_config_async,
-                },
-            }
-        }
+        # Config may only name assets in the job's selection; the reuse job has no normalization.
+        run_config: dict = {"ops": {}}
+        if job_name != REUSE_NORMALIZED_JOB:
+            run_config["ops"]["user_vcf_normalized"] = {"config": normalize_config_async}
 
         if has_hf_modules:
             run_config["ops"]["user_hf_module_annotations"] = {

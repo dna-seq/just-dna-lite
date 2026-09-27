@@ -128,7 +128,13 @@ Full reference: **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)**. Rules that keep it
   `normalized_parquet_is_current` says the parquet matches the quality-filter hash in force, else
   `annotate_and_report_job`. Config for a job must only name assets in its selection;
   `test_the_runner_config_validates_against_the_job_it_is_for` fences that for all three jobs.
-  `webui.state._normalize_run_config_if_stale` still carries its own copy of the staleness test.
+  The web UI asks the same `normalized_parquet_is_current`, both at select time
+  (`_normalize_run_config_if_stale`) and on Start Analysis (`_analysis_job_name`, which picks the
+  reuse job and drops `user_vcf_normalized` from the config). Tests:
+  `tests/test_analysis_reuses_normalized.py`. `user_vcf_normalized` writes a per-run temp file
+  (`…<run_id>.tmp.parquet`) because two runs of one sample can still overlap while the first
+  normalization is in flight; a shared name made one read the other's half-written file (`must end
+  with PAR1`).
 - **`install_module` copies, never recompiles or symlinks,** and only replaces what its own ledger
   (`data/interim/lite_mcp/installs.json`) says it installed: a registry install under the same name
   is refused, as is a name another source already supplies (discovery would shadow it).

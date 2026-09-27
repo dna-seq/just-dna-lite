@@ -104,9 +104,9 @@ class AnnotationRequest(BaseModel):
     reference_genome: str = "GRCh38"
     species: str = "Homo sapiens"
     subject_id: Optional[str] = None
-    # Reuse a current normalized parquet instead of re-reading the VCF. The web UI always
-    # re-normalizes; for an author re-running one module over several genomes that is most of
-    # the wall-clock, and the staleness test above is the same one the UI uses to decide.
+    # Reuse a current normalized parquet instead of re-reading the VCF. For an author re-running
+    # one module over several genomes that is most of the wall-clock; the web UI's Start Analysis
+    # makes the same choice through the staleness test above.
     reuse_normalized: bool = True
     source_tag: str = "cli"
 
