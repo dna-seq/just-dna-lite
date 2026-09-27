@@ -187,16 +187,19 @@ They do not fit, and are out of scope here:
 | G6PD | X-linked; a male's hemizygous call has no diplotype spelling (`haplotype_b` is required) |
 | HIrisPlex eye colour | a fitted multinomial model, not a rule; this is where "not PRS" ends |
 
-## Upstream notes not yet filed
+## Upstream notes
 
 Found while building the pilots, meant for the `just-dna-compiler` consumer inbox
-(`docs/CONSUMER_SUGGESTIONS.md`, id from `.claude/triage-state.py --next`). None is filed as of
-2026-09-27; measure before filing, and file each as a report with a reproducer.
+(`docs/CONSUMER_SUGGESTIONS.md`, id from `.claude/triage-state.py --next`). Measure before filing, and
+file each as a report with a reproducer.
 
-1. **The enricher places the rs8176719 insertion at `9:133257520 G>GC`**; dbSNP, gnomAD and DRAGEN use
-   `133257521 T>TC` (gnomAD shows AF 6e-7 at the Ensembl spelling). Possibly an off-by-one on Ensembl
-   insertions generally: count how many insertion rsIDs in the cache disagree with gnomAD first. The
-   indel window hides it here; nothing else does.
+1. **Filed as S117** (with S120 and S121; build-side fix in `v1_port/reanchor.py`, see CLAUDE.md). The
+   enricher places the rs8176719 insertion at `9:133257520 G>GC`, where dbSNP, gnomAD and DRAGEN use
+   `133257521 T>TC`: the same Ensembl insertion-anchor defect measured on `superhuman`. The caller's
+   indel window tolerates it; the re-anchor fixes it at build time.
+
+Not yet filed as of 2026-09-27:
+
 2. **No hemizygous diplotype spelling**, which blocks G6PD and other X-linked phenotypes in males.
 3. **Cross-gene phenotypes** as corpus evidence for RM28, with the enumerative answer: a table keyed on
    the per-gene phenotypes.
