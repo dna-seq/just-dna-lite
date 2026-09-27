@@ -325,9 +325,13 @@ def user_vcf_normalized(
         output_dir = get_user_output_dir() / partition_key
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / "user_vcf_normalized.parquet"
-        temp_output_path = output_path.with_name(f"{output_path.stem}.tmp{output_path.suffix}")
-
-        temp_output_path.unlink(missing_ok=True)
+        # One temp file per run. Two runs can normalize the same sample at once (the web UI
+        # normalizes on select and every analysis job normalizes again); with a shared temp name
+        # one run deleted and rewrote the file the other was reading back, which failed as
+        # "parquet: File out of specification: The file must end with PAR1". The last replace wins.
+        temp_output_path = output_path.with_name(
+            f"{output_path.stem}.{context.run_id}.tmp{output_path.suffix}"
+        )
         lf.sink_parquet(str(temp_output_path), compression=config.compression)
         row_count = pl.scan_parquet(str(temp_output_path)).select(pl.len()).collect().item()
         temp_output_path.replace(output_path)
