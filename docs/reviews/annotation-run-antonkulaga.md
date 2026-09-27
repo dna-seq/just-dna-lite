@@ -323,3 +323,49 @@ Driver and probe scripts are in the session scratchpad
 (`run_anton.py`, `probe_truth.py`, `probe_genotype_coverage.py`, `probe_missed.py`,
 `probe_unmatched.py`, `probe_outputs.py`); none of them are needed to reproduce the run itself,
 only to re-derive the ground truth in the tables above.
+
+---
+
+## Addendum, 2026-09-27 — RhD, the hard-region mask, and `blood_groups`
+
+Two changes landed that read this genome differently (e204036, bb60578; contract in
+`docs/PHENOTYPE_CALLS.md`), and one of them turns on a feature of this genome specifically.
+
+**This genome has no calls across RHD.** Between 1:25,264,311 and 1:25,336,374 the callset emits
+nothing: a 72 kb hole covering the whole of RHD (1:25,272,393-25,330,445). The three other WGS samples
+on this machine carry 45-56 calls inside RHD each. A hole the size of the gene, in one sample only, is
+what a homozygous RHD deletion (RhD-negative) looks like. It is also what unplaceable reads look like:
+RHD and RHCE are near-identical, and the whole region is in GIAB's segmental-duplication mask. Coverage
+alone does not settle which. **If you know your Rh type, it is the real-sample test for this code:**
+RhD-negative would confirm the hole is the deletion.
+
+**What the report now says for it.** A small-variant VCF never lists a large deletion, so the caller
+reads a `<DEL:length>` allele from the calls inside its span, on a whole genome only: calls throughout
+means a copy is present, an empty span with calls on both sides means both copies are gone, anything
+else is left unsettled with the reason. On this genome RhD comes out **not assessable**, with the reason
+that 51.6 kb of the span (76%) has no calls although the rest does. The three other genomes come out
+RhD-positive. The rule that looked obvious, "any call inside the span means a copy is there", would
+have called this genome RhD-positive: see the next point.
+
+**Restoration stops at the hard-region mask.** On a whole genome a site the caller did not emit is
+reference almost everywhere, except where reads cannot be placed. GIAB v3.6's low-mappability +
+segmental-duplication union (9.9% of GRCh38) is now the line: inside it nothing is restored; outside it,
+`requires_callable` sites restore as well. On this genome that withholds **3 longevitymap and 8
+pharmgkb** hom-ref inferences (78 → 75 and 442 → 434 restored); coronary and thrombophilia are
+unchanged, and nothing observed moves. ABO, APOE, HFE, FUT2 and LCT sites are all outside the mask.
+
+**Two things in `antonkulaga/blood_groups@0.1.0` for its author:**
+
+1. **The RHD deletion span does not sit on RHD.** `RHD_deletion` is authored as `<DEL:68163>` at
+   rs1132760 (1:25,284,731), which by VCF convention covers 1:25,284,732-25,352,894. That starts about
+   12 kb inside the gene and ends about 22 kb past it. On this genome the 15 calls in that span are all
+   past the gene's end (1:25,336,374-25,351,747), which is exactly why "any call in the span" would have
+   misread it. The caller now guards against it, but the span is the author's claim, and the common
+   RhD-negative deletion's own coordinates would make the reading sharper.
+2. **The weighting note is now stale.** It says RhD is "deliberately reported as not assessable from a
+   variant-only VCF". It is still not assessable on an exome, a panel, or where the coverage is
+   ambiguous (this genome), but on a whole genome with calls across the gene the report now says
+   RhD-positive, labelled as read from coverage.
+
+RHCE stays ambiguous here for the same reason RHD was hard: its defining sites are in the segdup mask,
+so an uncalled one is not read as reference.
