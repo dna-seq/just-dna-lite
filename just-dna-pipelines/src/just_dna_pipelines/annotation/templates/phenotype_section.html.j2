@@ -140,6 +140,18 @@
         {% endif %}
         {% endif %}
 
+        {% if gene.structural_evidence %}
+        <p class="trait-subhead">Missing stretches of DNA, read from coverage</p>
+        <ul class="trait-pairs">
+            {% for s in gene.structural_evidence %}
+            <li><code>{{ s.haplotype }}</code> removes chr{{ s.chrom }}:{{ "{:,}".format(s.start) }}&ndash;{{ "{:,}".format(s.end) }}.
+                Your file has {{ s.calls_in_span }} position{% if s.calls_in_span != 1 %}s{% endif %} inside it.
+                {% if s.reading == "copy_present" %}At least one copy is there.{% elif s.reading == "both_deleted" %}Read as missing on both copies.{% else %}Not settled.{% endif %}
+                <span class="trait-meta">{{ s.reason }}</span></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
         <p class="trait-meta">
             Caller status <code>{{ gene.status }}</code>.
             {% if gene.compiler_warnings %}
@@ -162,6 +174,12 @@
         {% for r in gene.readings if r.phenotype == gene.phenotype and not r.needs_structural_call %}
             {% for c in r.conclusions %}<p class="trait-text">{{ c }}</p>{% endfor %}
         {% endfor %}
+        {% for s in gene.structural_evidence if s.reading == "both_deleted" %}
+        <p class="trait-text"><span class="ui mini blue label">inferred</span> Your file has no
+            positions at all across the stretch of DNA this result depends on, while the positions on
+            either side of it are there. We read that as the stretch being missing on both copies. A lab
+            test confirms it.</p>
+        {% endfor %}
     {% elif gene.status == "ambiguous" %}
         <p class="trait-text">
             Your DNA fits more than one result here, so we list each of them instead of picking one.
@@ -182,8 +200,9 @@
         <p class="trait-text">
             {% if gene.alleles_not_assessable %}
             One of the possible results comes from a whole stretch of DNA being missing. Your DNA file
-            lists only small differences from the reference genome, so it cannot see a missing stretch,
-            and we do not guess.
+            lists only small differences from the reference genome, so it never names a missing stretch
+            directly{% if gene.structural_evidence %}; we can only read it from where your file has
+            positions and where it has none, and here that does not settle it{% endif %}. We do not guess.
             {% else %}
             Your file has no information at the positions this result depends on, so we do not guess.
             That is common in some parts of the genome and does not mean your file is faulty.

@@ -638,3 +638,133 @@ class TestRealSample:
         row = pl.read_parquet(out).filter(pl.col("gene") == gene).to_dicts()[0]
         assert (row["status"], row["phenotype"]) == ("called", phenotype)
         assert {(c["haplotype_a"], c["haplotype_b"]) for c in row["candidates"]} == pairs
+
+
+# ---------------------------------------------------------------------------------------------
+# Deletion alleles read from coverage (RHD: RhD-negative is a whole-gene deletion no small-variant
+# caller writes down, so the only evidence is where reads were and were not placed).
+# ---------------------------------------------------------------------------------------------
+
+RHD_SPAN = (25284732, 25352894)  # rs1132760 + <DEL:68163>, as antonkulaga/blood_groups authors it
+
+
+@pytest.fixture(scope="module")
+def rhd_def(tmp_path_factory) -> GeneDefinition:
+    module_dir = compile_fixture("rhd_deletion", tmp_path_factory.mktemp("rhd"))
+    info = probe_local(module_dir, "rhd_deletion")
+    return load_phenotype_definition("rhd_deletion", info).genes["RHD"]
+
+
+def _genome_ctx(positions: list[int], mask: list[tuple[int, int]] | None = None,
+                scope: "CallsetScope" = CallsetScope.WGS) -> RestorationContext:
+    """A whole-genome context over chr1 calls at `positions`, with an optional chr1 mask."""
+    from just_prs.prs import GenotypeInputMode
+
+    called = pl.DataFrame({"chrom": ["1"] * len(positions), "start": sorted(positions)},
+                          schema={"chrom": pl.String, "start": pl.UInt32})
+    regions = None
+    if mask is not None:
+        regions = pl.DataFrame({"chrom": ["1"] * len(mask), "region_start": [m[0] for m in mask],
+                                "region_end": [m[1] for m in mask]},
+                               schema={"chrom": pl.String, "region_start": pl.Int64, "region_end": pl.Int64})
+    return RestorationContext(called_sites=called, mode=GenotypeInputMode.VARIANT_ONLY, scope=scope,
+                              scope_reason="forced", max_flank_bp=10_000, hard_regions=regions,
+                              hard_regions_reason="test mask")
+
+
+def _around_span(step: int = 5_000) -> list[int]:
+    """Calls every `step` bp from 30 kb before the span to 30 kb after it."""
+    return list(range(RHD_SPAN[0] - 30_000, RHD_SPAN[1] + 30_000, step))
+
+
+class TestDeletionAlleleFromCoverage:
+    def test_calls_across_the_span_mean_a_copy_is_present(self, rhd_def) -> None:
+        from just_dna_pipelines.annotation.phenotype_caller import gather_structural_evidence
+
+        ctx = _genome_ctx(_around_span(), mask=[(0, 1)])
+        [item] = gather_structural_evidence(rhd_def, ctx)
+        assert item.reading == "copy_present"
+        call = call_gene("rhd_deletion", rhd_def, _evidence(rhd_def, {}), [item])
+        assert (call.status, call.phenotype) == ("called", "RhD positive")
+        pairs = {(c.haplotype_a, c.haplotype_b): c.not_assessable for c in call.candidates}
+        # Homozygous deletion excluded; one deleted copy cannot be told from none, and says so.
+        assert pairs == {("RHD", "RHD"): False, ("RHD", "RHD_deletion"): True}
+
+    def test_a_long_hole_inside_a_covered_span_is_left_unsettled(self, rhd_def) -> None:
+        from just_dna_pipelines.annotation.phenotype_caller import gather_structural_evidence
+
+        # Anton's shape: calls only in the last part of the span, a 50 kb hole before it.
+        calls = [p for p in _around_span(2_000) if not (RHD_SPAN[0] <= p <= RHD_SPAN[0] + 50_000)]
+        [item] = gather_structural_evidence(rhd_def, _genome_ctx(calls, mask=[(0, 1)]))
+        assert item.reading is None
+        assert item.largest_gap_bp > 10_000
+        assert "has no calls although the rest does" in item.reason
+        call = call_gene("rhd_deletion", rhd_def, _evidence(rhd_def, {}), [item])
+        assert call.status == "not_assessable"
+
+    def test_an_empty_span_flanked_by_calls_reads_as_both_copies_deleted(self, rhd_def) -> None:
+        from just_dna_pipelines.annotation.phenotype_caller import gather_structural_evidence
+
+        calls = [p for p in _around_span() if not (RHD_SPAN[0] <= p <= RHD_SPAN[1])]
+        [item] = gather_structural_evidence(rhd_def, _genome_ctx(calls, mask=[(0, 1)]))
+        assert item.reading == "both_deleted"
+        call = call_gene("rhd_deletion", rhd_def, _evidence(rhd_def, {}), [item])
+        assert (call.status, call.phenotype) == ("called", "RhD negative")
+        assert [(c.haplotype_a, c.haplotype_b, c.not_assessable) for c in call.candidates] == [
+            ("RHD_deletion", "RHD_deletion", False)
+        ]
+
+    def test_an_empty_span_in_a_hard_region_is_not_read_as_deleted(self, rhd_def) -> None:
+        from just_dna_pipelines.annotation.phenotype_caller import gather_structural_evidence
+
+        calls = [p for p in _around_span() if not (RHD_SPAN[0] <= p <= RHD_SPAN[1])]
+        mask = [(RHD_SPAN[0] - 1, RHD_SPAN[1])]  # the whole span is duplicated sequence
+        [item] = gather_structural_evidence(rhd_def, _genome_ctx(calls, mask=mask))
+        assert item.reading is None
+        assert item.hard_region_fraction == pytest.approx(1.0)
+
+    def test_nothing_is_read_off_a_callset_that_is_not_a_genome(self, rhd_def) -> None:
+        from just_dna_pipelines.annotation.phenotype_caller import gather_structural_evidence
+
+        ctx = _genome_ctx(_around_span(), mask=[(0, 1)], scope=CallsetScope.TARGETED)
+        [item] = gather_structural_evidence(rhd_def, ctx)
+        assert item.reading is None
+
+    def test_one_deleted_copy_reads_as_a_homozygote_at_its_site(self, rhd_def) -> None:
+        """A hemizygous site is written T/T by a diploid caller, so RHD/RHD_deletion must stay
+        consistent with it; only the homozygous deletion is contradicted by any call at all."""
+        call = call_gene("rhd_deletion", rhd_def, _evidence(rhd_def, {"1:25284731": ["T", "T"]}))
+        pairs = {(c.haplotype_a, c.haplotype_b) for c in call.candidates}
+        assert pairs == {("RHD", "RHD"), ("RHD", "RHD_deletion")}
+
+
+@pytest.mark.integration
+class TestDeletionAlleleOnRealGenomes:
+    """RHD sits inside GIAB's segdup mask, so rs1132760 is never restored; coverage decides."""
+
+    @pytest.mark.parametrize(("sample", "status", "reading"), [
+        # 51.6 kb of the authored span without a call: not settled, never "positive".
+        ("antonkulaga", "not_assessable", None),
+        ("newton_winter", "called", "copy_present"),
+    ])
+    def test_rhd(self, sample: str, status: str, reading, tmp_path: Path) -> None:
+        from just_dna_pipelines.annotation.hf_logic import _normalize_vcf_contigs
+        from just_dna_pipelines.annotation.resources import get_user_output_dir
+        from just_dna_pipelines.runtime import load_env
+
+        load_env()
+        normalized = get_user_output_dir() / f"anonymous/{sample}/user_vcf_normalized.parquet"
+        if not normalized.exists():
+            pytest.skip(f"{sample} not present on this machine")
+        info = probe_local(compile_fixture("rhd_deletion", tmp_path / "rhd"), "rhd_deletion")
+        vcf = _normalize_vcf_contigs(pl.scan_parquet(normalized))
+        ctx = build_restoration_context(vcf, 10_000)
+        if ctx.hard_regions is None:
+            pytest.skip(f"hard-region mask unavailable: {ctx.hard_regions_reason}")
+        out, _ = call_phenotype_module(vcf, "rhd_deletion", info, ctx, tmp_path / "rhd.parquet")
+        row = pl.read_parquet(out).to_dicts()[0]
+        assert row["status"] == status
+        assert row["structural_evidence"][0]["reading"] == reading
+        assert row["sites"][0]["evidence"] == "no_call"  # in the mask: never restored
+        if status == "called":
+            assert row["phenotype"] == "RhD positive"

@@ -1,0 +1,13 @@
+schema_version: '1.0'
+module:
+  title: RhD status
+  description: RhD positive or negative, where negative is a whole-gene RHD deletion.
+  report_title: RhD status
+  icon: tint
+  icon_set: fomantic
+  color: '#db2828'
+  name: rhd_deletion
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+genome_build: GRCh38

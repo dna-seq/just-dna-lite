@@ -1,0 +1,3 @@
+haplotype_name,rsid,chrom,start,ref,allele,gene,requires_callable
+RHD,rs1132760,1,25284731,T,T,RHD,true
+RHD_deletion,rs1132760,1,25284731,T,<DEL:68163>,RHD,true

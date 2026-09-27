@@ -1602,6 +1602,8 @@ def build_phenotype_report_data(
                 "candidates": row["candidates"],
                 "sites": row["sites"],
                 "phase_would_decide": row["phase_would_decide"],
+                # Absent on a parquet written before deletion alleles were read from coverage.
+                "structural_evidence": row.get("structural_evidence") or [],
                 "alleles_considered": row["alleles_considered"],
                 "alleles_not_assessable": row["alleles_not_assessable"],
                 "unpaired_haplotypes": row["unpaired_haplotypes"],

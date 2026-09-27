@@ -36,7 +36,7 @@ from typing import Literal, Optional
 
 import polars as pl
 from eliot import log_message, start_action
-from just_dna_format.alleles import parsimony_reduce
+from just_dna_format.alleles import parse_symbolic_allele, parsimony_reduce
 from pydantic import BaseModel
 
 from just_dna_pipelines.annotation.hf_modules import (
@@ -44,6 +44,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     ModuleTable,
     scan_module_table,
 )
+from just_dna_pipelines.annotation.hard_regions import fraction_in_hard_regions
 from just_dna_pipelines.annotation.restoration import (
     FLANK_COLUMN,
     RestorationContext,
@@ -97,6 +98,31 @@ class SiteEvidence(BaseModel):
     phase_set: Optional[int] = None
 
 
+StructuralReading = Literal["copy_present", "both_deleted"]
+
+
+class StructuralEvidence(BaseModel):
+    """What the coverage inside a deletion allele's span says, on a whole-genome callset.
+
+    A small-variant VCF never lists a large deletion, so a missing ``<DEL>`` record says nothing. The
+    calls *inside* the span do: reads mapped there mean at least one copy is present, and a span with
+    no calls at all on a genome that has calls on both sides of it means both copies are gone.
+    ``reading`` is ``None`` when the coverage does not settle it, and ``reason`` then says why.
+    """
+
+    haplotype: str
+    allele: str
+    chrom: str
+    start: int
+    end: int
+    calls_in_span: int
+    # The longest stretch of the span with no call, counting from the span's edges.
+    largest_gap_bp: int
+    hard_region_fraction: Optional[float]
+    reading: Optional[StructuralReading]
+    reason: str
+
+
 class Candidate(BaseModel):
     """A diplotype consistent with the observed genotype, and the phenotype it maps to."""
 
@@ -137,6 +163,8 @@ class PhenotypeCall(BaseModel):
     # i.e. knowing the phase would settle the call. False when the ambiguity is a no_call site whose
     # genotype (not its phase) would decide.
     phase_would_decide: bool
+    # Coverage readings for the gene's deletion alleles (empty when it has none).
+    structural_evidence: list[StructuralEvidence] = []
     alleles_considered: list[str]
     alleles_not_assessable: list[str]
     # Haplotypes the module defines that no diplotype row pairs (measured upstream: CYP2C19 *40/*41).
@@ -166,6 +194,10 @@ class GeneDefinition(BaseModel):
     activity_bins: list[dict] = []
     # Alleles that need a structural/copy-number call an SNV VCF cannot make.
     structural_alleles: set[str]
+    # haplotype -> the span a symbolic deletion allele covers: {site, chrom, start, end, allele}.
+    # Only `<DEL:length>` alleles have a span a callset can be read against; any other symbolic
+    # allele stays not assessable.
+    deletion_spans: dict[str, dict] = {}
 
 
 class PhenotypeDefinition(BaseModel):
@@ -206,6 +238,7 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
         haplotype_alleles: dict[str, dict[str, str]] = {}
         site_meta: dict[str, dict] = {}
         structural_alleles: set[str] = set()
+        deletion_spans: dict[str, dict] = {}
         for row in gene_haps.iter_rows(named=True):
             name = row["haplotype_name"]
             key = _site_key(row["chrom"], row["start"])
@@ -222,6 +255,17 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
             meta["alleles"].add(row["allele"])
             if _is_structural_allele(row["allele"]):
                 structural_alleles.add(name)
+                symbolic = parse_symbolic_allele(row["allele"])
+                if symbolic is not None and symbolic.type == "DEL" and symbolic.length:
+                    # VCF's convention for a symbolic deletion: the record sits on the base before
+                    # the deleted sequence, which runs for `length` bases after it.
+                    deletion_spans[name] = {
+                        "site": key,
+                        "chrom": row["chrom"],
+                        "start": int(row["start"]) + 1,
+                        "end": int(row["start"]) + symbolic.length,
+                        "allele": row["allele"],
+                    }
 
         if combiner == "diplotypes":
             gene_diplos = (
@@ -234,6 +278,7 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
                 combiner="diplotypes",
                 diplotypes=[dict(r) for r in gene_diplos.iter_rows(named=True)],
                 structural_alleles=structural_alleles,
+                deletion_spans=deletion_spans,
             )
         else:
             functions = allele_function.filter(pl.col("gene") == gene)
@@ -250,6 +295,7 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
                 },
                 activity_bins=[dict(r) for r in bins.iter_rows(named=True)],
                 structural_alleles=structural_alleles,
+                deletion_spans=deletion_spans,
             )
 
     # The compiler's warnings for these bytes were kept on ModuleInfo at discovery time (the fsspec
@@ -477,6 +523,77 @@ def gather_site_evidence(
     return evidence
 
 
+def gather_structural_evidence(
+    gene_def: GeneDefinition, context: RestorationContext
+) -> list[StructuralEvidence]:
+    """Read each deletion allele's span against the callset's own call density.
+
+    Only on a callset restoration trusts (variant-only and whole-genome): anywhere else a missing
+    call carries no information and every reading is ``None``. On a genome:
+
+    * **copy_present** — calls inside the span and no call-free stretch longer than the restoration
+      flank. Reads were placed across the region, so at least one copy is there. A heterozygous
+      deletion is invisible to a small-variant caller, so this never tells one copy from two.
+    * **both_deleted** — no call inside the span, calls within the flank on both sides of it, and the
+      span mostly outside the hard-region mask. The caller covered the neighbourhood and emitted
+      nothing across the whole span.
+    * otherwise ``None``. A long call-free stretch *inside* an otherwise covered span is the telling
+      case: it can be a deletion of part of the span, a span the module anchored imprecisely, or
+      reads that could not be placed, and coverage alone cannot say which.
+    """
+    evidence: list[StructuralEvidence] = []
+    for haplotype, span in gene_def.deletion_spans.items():
+        chrom, start, end = span["chrom"], span["start"], span["end"]
+        fraction = (
+            fraction_in_hard_regions(chrom, start, end, context.hard_regions)
+            if context.hard_regions is not None
+            else None
+        )
+        base = {"haplotype": haplotype, "allele": span["allele"], "chrom": chrom, "start": start,
+                "end": end, "hard_region_fraction": fraction}
+        contig = context.called_sites.filter(pl.col("chrom") == chrom)["start"].cast(pl.Int64)
+        inside = contig.filter((contig >= start) & (contig <= end)).sort().to_list()
+        edges = [start - 1, *inside, end + 1]
+        largest_gap = max(b - a - 1 for a, b in zip(edges, edges[1:]))
+        base.update(calls_in_span=len(inside), largest_gap_bp=largest_gap)
+
+        if not context.enabled:
+            evidence.append(StructuralEvidence(**base, reading=None, reason=(
+                "coverage is only read on a whole-genome, variant-only callset; here a missing "
+                "call says nothing")))
+            continue
+        flank = context.max_flank_bp
+        if inside and largest_gap <= flank:
+            evidence.append(StructuralEvidence(**base, reading="copy_present", reason=(
+                f"{len(inside)} calls inside the span, none more than {largest_gap:,} bp apart: "
+                "reads were placed across it, so at least one copy is present")))
+            continue
+        if inside:
+            share = largest_gap / (end - start + 1)
+            evidence.append(StructuralEvidence(**base, reading=None, reason=(
+                f"{largest_gap:,} bp of the span ({share:.0%}) has no calls although the rest does: "
+                "a deletion of part of the span, an imprecise span, or reads that could not be "
+                "placed, and coverage alone cannot tell which")))
+            continue
+        if fraction is None or fraction >= 0.5:
+            evidence.append(StructuralEvidence(**base, reading=None, reason=(
+                "no calls inside the span, but "
+                + ("the hard-region mask is unavailable" if fraction is None
+                   else f"{fraction:.0%} of it lies in low-mappability or duplicated sequence, "
+                        "where a missing call is not evidence of a missing copy"))))
+            continue
+        before = contig.filter((contig < start) & (contig >= start - flank)).len()
+        after = contig.filter((contig > end) & (contig <= end + flank)).len()
+        if before and after:
+            evidence.append(StructuralEvidence(**base, reading="both_deleted", reason=(
+                "no calls inside the span, calls within "
+                f"{flank:,} bp on both sides: both copies read as deleted (inferred from coverage)")))
+        else:
+            evidence.append(StructuralEvidence(**base, reading=None, reason=(
+                "no calls inside or near the span, so the neighbourhood itself was not covered")))
+    return evidence
+
+
 def _allele_at(gene_def: GeneDefinition, haplotype: str, key: str) -> Optional[str]:
     """The base a haplotype carries at a site, applying the unlisted-site → ref convention.
 
@@ -555,13 +672,23 @@ def _consistent(
     and within one set the diplotype must fit under a *single* orientation — haplotype A on the first
     homolog at every site of the set, or on the second at every site. That is what tells the HFE
     compound heterozygote (trans) from both variants in cis.
+
+    A deletion allele contributes no allele at its site: one deleted copy leaves the site
+    hemizygous, which a diploid caller writes as a homozygote, so the pair compares as a *set* of the
+    surviving alleles; two deleted copies leave nothing to call, so any observation contradicts them.
     """
     blocks: dict[int, list[str]] = {}
     for key in observed_keys:
         site = evidence_by_key[key]
+        pair = expected[key]
+        if any(_is_structural_allele(a) for a in pair):
+            surviving = {a for a in pair if not _is_structural_allele(a)}
+            if surviving != set(site.observed):
+                return False
+            continue
         if site.phased_alleles is not None and site.phase_set is not None:
             blocks.setdefault(site.phase_set, []).append(key)
-        elif sorted(expected[key]) != sorted(site.observed):
+        elif sorted(pair) != sorted(site.observed):
             return False
     for keys in blocks.values():
         forward = all(list(expected[k]) == evidence_by_key[k].phased_alleles for k in keys)
@@ -571,10 +698,22 @@ def _consistent(
     return True
 
 
+def _fits_structural(a: str, b: str, structural: list[StructuralEvidence]) -> bool:
+    """Whether a pair agrees with the coverage readings of the gene's deletion alleles."""
+    for item in structural:
+        homozygous = a == item.haplotype and b == item.haplotype
+        if item.reading == "copy_present" and homozygous:
+            return False
+        if item.reading == "both_deleted" and not homozygous:
+            return False
+    return True
+
+
 def call_gene(
     module: str,
     gene_def: GeneDefinition,
     evidence: list[SiteEvidence],
+    structural: Optional[list[StructuralEvidence]] = None,
 ) -> PhenotypeCall:
     """Turn the site evidence into a set of consistent diplotypes and a status.
 
@@ -585,8 +724,10 @@ def call_gene(
     when none is consistent, and ``not_assessable`` when nothing could be observed at all (or the only
     consistent candidates need an allele an SNV VCF cannot confirm).
     """
+    structural = structural or []
     evidence_by_key = {_site_key(e.chrom, e.start): e for e in evidence}
     observed_keys = [k for k, e in evidence_by_key.items() if e.evidence != "no_call"]
+    decided_structural = [item for item in structural if item.reading is not None]
     no_call_keys = [k for k, e in evidence_by_key.items() if e.evidence == "no_call"]
 
     considered = sorted(gene_def.haplotype_alleles.keys())
@@ -608,17 +749,25 @@ def call_gene(
             expected[key] = (allele_a, allele_b)
         if undefined:
             continue
-        if _consistent(expected, evidence_by_key, observed_keys):
+        if _consistent(expected, evidence_by_key, observed_keys) and _fits_structural(
+            a, b, decided_structural
+        ):
             kept.append((diplo, expected))
 
     unpaired = sorted(set(gene_def.haplotype_alleles.keys()) - paired)
 
     candidates: list[Candidate] = []
     for diplo, _ in kept:
-        needs_structural = (
-            diplo["haplotype_a"] in gene_def.structural_alleles
-            or diplo["haplotype_b"] in gene_def.structural_alleles
+        a, b = diplo["haplotype_a"], diplo["haplotype_b"]
+        # A pair needing a structural allele stays unconfirmable unless coverage decided exactly it:
+        # "both copies deleted" confirms the homozygous deletion, while "a copy is present" cannot
+        # tell a heterozygous deletion from none.
+        settled_by_coverage = a == b and any(
+            item.haplotype == a and item.reading == "both_deleted" for item in decided_structural
         )
+        needs_structural = (
+            a in gene_def.structural_alleles or b in gene_def.structural_alleles
+        ) and not settled_by_coverage
         candidates.append(
             Candidate(
                 haplotype_a=diplo["haplotype_a"],
@@ -634,7 +783,7 @@ def call_gene(
 
     # Status.
     assessable = [c for c in candidates if not c.not_assessable]
-    if not observed_keys:
+    if not observed_keys and not decided_structural:
         # Nothing was seen and nothing could be restored — every candidate is trivially consistent,
         # so there is no call to make. Never fall back to a reference diplotype here.
         status: Status = "not_assessable"
@@ -682,6 +831,7 @@ def call_gene(
         candidates=candidates,
         sites=evidence,
         phase_would_decide=phase_would_decide,
+        structural_evidence=structural,
         alleles_considered=considered,
         alleles_not_assessable=not_assessable_alleles,
         unpaired_haplotypes=unpaired,
@@ -734,7 +884,8 @@ def call_phenotype_module(
         calls: list[PhenotypeCall] = []
         for gene, gene_def in definition.genes.items():
             evidence = gather_site_evidence(vcf_lf, gene_def, context)
-            call = call_gene(module_name, gene_def, evidence)
+            structural = gather_structural_evidence(gene_def, context)
+            call = call_gene(module_name, gene_def, evidence, structural)
             call.compiler_warnings = definition.compiler_warnings
             calls.append(call)
 
@@ -783,6 +934,20 @@ _DRUG_STRUCT = pl.Struct(
         "clinical_context": pl.String,
     }
 )
+_STRUCTURAL_STRUCT = pl.Struct(
+    {
+        "haplotype": pl.String,
+        "allele": pl.String,
+        "chrom": pl.String,
+        "start": pl.Int64,
+        "end": pl.Int64,
+        "calls_in_span": pl.Int64,
+        "largest_gap_bp": pl.Int64,
+        "hard_region_fraction": pl.Float64,
+        "reading": pl.String,
+        "reason": pl.String,
+    }
+)
 PHENOTYPE_CALL_SCHEMA: dict[str, pl.DataType] = {
     "module": pl.String,
     "gene": pl.String,
@@ -791,6 +956,7 @@ PHENOTYPE_CALL_SCHEMA: dict[str, pl.DataType] = {
     "candidates": pl.List(_CANDIDATE_STRUCT),
     "sites": pl.List(_SITE_STRUCT),
     "phase_would_decide": pl.Boolean,
+    "structural_evidence": pl.List(_STRUCTURAL_STRUCT),
     "alleles_considered": pl.List(pl.String),
     "alleles_not_assessable": pl.List(pl.String),
     "unpaired_haplotypes": pl.List(pl.String),

@@ -110,3 +110,41 @@ class TestPhenotypeSection:
         template = (Path(report_logic.__file__).parent / "templates" / "longevity_report.html.j2").read_text()
         assert "{% if phenotype_modules %}" in template
         assert report_logic.build_phenotype_report_data(None, tmp_path) == []
+
+
+class TestDeletionReadingOnTheCard:
+    """RHD's deletion allele, read from coverage on a (forced) whole-genome callset."""
+
+    SPAN = (25284732, 25352894)
+
+    def _run_rhd(self, tmp_path, monkeypatch, positions: list[int]) -> str:
+        from just_prs.prs import GenotypeInputMode
+
+        from just_dna_pipelines.annotation.restoration import CallsetScope, RestorationContext
+
+        def forced(vcf_lf, max_flank_bp):
+            called = vcf_lf.select("chrom", "start").unique().sort(["chrom", "start"]).collect()
+            mask = pl.DataFrame({"chrom": ["22"], "region_start": [0], "region_end": [1]},
+                                schema={"chrom": pl.String, "region_start": pl.Int64, "region_end": pl.Int64})
+            return RestorationContext(called_sites=called, mode=GenotypeInputMode.VARIANT_ONLY,
+                                      scope=CallsetScope.WGS, scope_reason="forced", max_flank_bp=max_flank_bp,
+                                      hard_regions=mask, hard_regions_reason="test mask")
+
+        monkeypatch.setattr(hf_logic, "build_restoration_context", forced)
+        records = [("1", p, "A", "G", "0/1", None) for p in positions]
+        return _run(tmp_path, monkeypatch, ["rhd_deletion"], records)
+
+    def test_calls_across_the_span_call_rhd_positive_and_say_why(self, tmp_path, monkeypatch) -> None:
+        positions = list(range(self.SPAN[0] - 20_000, self.SPAN[1] + 20_000, 4_000))
+        card = _card(self._run_rhd(tmp_path, monkeypatch, positions), "RHD")
+        assert "RhD positive" in card
+        assert "Missing stretches of DNA, read from coverage" in card
+        assert "At least one copy is there." in card
+
+    def test_an_empty_flanked_span_calls_rhd_negative_as_inferred(self, tmp_path, monkeypatch) -> None:
+        positions = [p for p in range(self.SPAN[0] - 20_000, self.SPAN[1] + 20_000, 4_000)
+                     if not (self.SPAN[0] <= p <= self.SPAN[1])]
+        card = _card(self._run_rhd(tmp_path, monkeypatch, positions), "RHD")
+        assert "RhD negative" in card
+        assert "inferred" in card
+        assert "Read as missing on both copies." in card
