@@ -4,12 +4,50 @@ from __future__ import annotations
 
 from reflex_base.utils.types import is_backend_base_variable
 
+import pytest
+
+from webui.pages.registry import _CARD_BLURB_STYLE
 from webui.state import (
     RegistryState,
+    _card_blurb,
     _cards_with_installed,
     _local_key,
     _without_local_module,
 )
+
+LONG = "GWAS-significant common variants in genes with established roles " * 8
+
+
+@pytest.mark.parametrize(
+    ("record", "blurb", "title"),
+    [
+        # Published before format 0.7 had a short description: the registry sends it empty.
+        ({"short_description": "", "description": LONG}, LONG.strip(), LONG.strip()),
+        ({"short_description": None, "description": LONG}, LONG.strip(), LONG.strip()),
+        ({"description": LONG}, LONG.strip(), LONG.strip()),
+        ({"short_description": "   ", "description": "Full text."}, "Full text.", "Full text."),
+        # A curated short description is shown, and the hover still carries the full description.
+        ({"short_description": "Curated alleles", "description": "Elite variants"}, "Curated alleles", "Elite variants"),
+        ({"short_description": "Curated alleles", "description": ""}, "Curated alleles", "Curated alleles"),
+        ({}, "", ""),
+    ],
+)
+def test_card_blurb_falls_back_to_the_description(record: dict, blurb: str, title: str) -> None:
+    assert _card_blurb(record) == {"blurb": blurb, "blurb_title": title}
+
+
+def test_card_blurb_is_clamped_with_an_ellipsis_at_a_fixed_height() -> None:
+    """A long description used to be cut at the box edge with no ellipsis, mid-sentence.
+
+    The height must stay fixed so a short blurb and a long one keep the grid aligned, and it must
+    hold exactly the clamped lines, or the clamp's last line is itself cut in half.
+    """
+    lines = int(_CARD_BLURB_STYLE["WebkitLineClamp"])
+    assert _CARD_BLURB_STYLE["display"] == "-webkit-box"
+    assert _CARD_BLURB_STYLE["overflow"] == "hidden"
+    assert float(_CARD_BLURB_STYLE["height"].removesuffix("em")) == pytest.approx(
+        lines * float(_CARD_BLURB_STYLE["lineHeight"])
+    )
 
 
 def test_catalog_get_busy_is_a_card_field_not_a_global_frontend_var() -> None:

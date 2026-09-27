@@ -6302,6 +6302,18 @@ def _local_key(namespace: str, name: str) -> str:
     return f"{safe_ns}__{name}"
 
 
+def _card_blurb(card: Dict[str, Any]) -> Dict[str, str]:
+    """A Catalog card's text and its hover text.
+
+    The card shows the registry-held ``short_description`` when the module has one, else the full
+    ``description`` (the page clamps it to a few lines with an ellipsis). The hover shows the full
+    description, so a clamped card never hides text for good.
+    """
+    short = str(card.get("short_description") or "").strip()
+    full = str(card.get("description") or "").strip()
+    return {"blurb": short or full, "blurb_title": full or short}
+
+
 def _source_tag(info: Optional[ModuleInfo]) -> Dict[str, str]:
     """The analysis picker's source tag: where this module's bytes came from.
 
@@ -6804,6 +6816,7 @@ class RegistryState(rx.State):
             card["gene_count"] = int(stats.get("gene_count") or 0)
             card["clinvar_count"] = int(stats.get("clinvar_count") or 0)
             card["pathogenic_count"] = int(stats.get("pathogenic_count") or 0)
+            card.update(_card_blurb(card))
             # Server-relative logo → absolute URL for the browser (schema 0.3.0 surfacing).
             logo = card.get("logo_url") or ""
             card["logo_full"] = (url + logo) if logo.startswith("/") else logo

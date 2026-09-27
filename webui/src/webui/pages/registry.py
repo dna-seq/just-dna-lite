@@ -20,6 +20,25 @@ from just_dna_pipelines.module_config import get_registry_stores
 from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.state import RegistryState
 
+# Card text is clamped to a fixed number of lines and ends with an ellipsis; the height is fixed
+# too, so a short blurb and a long one leave every card in the grid the same size. The full
+# description is the hover title.
+_CARD_BLURB_LINES = 3
+_CARD_BLURB_LINE_HEIGHT = 1.35
+_CARD_BLURB_STYLE: dict = {
+    "fontSize": "0.78rem",
+    "color": "#666",
+    "marginTop": "6px",
+    "lineHeight": str(_CARD_BLURB_LINE_HEIGHT),
+    "height": f"{_CARD_BLURB_LINES * _CARD_BLURB_LINE_HEIGHT:.2f}em",
+    "display": "-webkit-box",
+    "WebkitBoxOrient": "vertical",
+    "WebkitLineClamp": str(_CARD_BLURB_LINES),
+    "lineClamp": str(_CARD_BLURB_LINES),
+    "overflow": "hidden",
+    "overflowWrap": "anywhere",
+}
+
 # The manifest's ClinVar counts are per genotype row, not per variant (one row per zygosity, so a
 # panel reports roughly twice its variant count), and "pathogenic" includes likely pathogenic.
 _CLINVAR_COUNT_TITLE = (
@@ -549,9 +568,9 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
             style={"fontSize": "0.72rem", "color": "#999", "fontFamily": "monospace", "marginTop": "2px"},
         ),
         rx.el.div(
-            card["description"].to(str),
-            style={"fontSize": "0.78rem", "color": "#666", "marginTop": "6px", "lineHeight": "1.35",
-                   "height": "2.7em", "overflow": "hidden"},
+            card["blurb"].to(str),
+            title=card["blurb_title"].to(str),
+            style=_CARD_BLURB_STYLE,
         ),
         rx.el.div(
             rx.el.span(card["variant_count"].to(int), " variants", class_name="ui mini label"),
