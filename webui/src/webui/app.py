@@ -516,11 +516,17 @@ def _disable_stale_frontend_cache(asgi_app: ASGIApp) -> ASGIApp:
         disable_cache = scope["type"] == "http" and _should_disable_frontend_cache(path)
 
         async def send_with_cache_headers(message: dict[str, object]) -> None:
-            if disable_cache and message["type"] == "http.response.start":
+            if scope["type"] == "http" and message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-                headers["Pragma"] = "no-cache"
-                headers["Expires"] = "0"
+                # Any HTML shell, judged by what is served rather than by the request path:
+                # `/annotate/`, `/registry/`, … returned the shell with only Last-Modified, so
+                # browsers cached it heuristically and reloaded an old bundle after a deploy,
+                # whose websocket the version guard then closes on every click.
+                is_html = headers.get("content-type", "").startswith("text/html")
+                if disable_cache or is_html:
+                    headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                    headers["Pragma"] = "no-cache"
+                    headers["Expires"] = "0"
             await send(message)
 
         await asgi_app(scope, receive, send_with_cache_headers)
