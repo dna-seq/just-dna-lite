@@ -1378,13 +1378,20 @@ def module_card(module: rx.Var[dict]) -> rx.Component:
                     module["description"],
                     style={"fontSize": "0.94rem", "color": "#666", "lineHeight": "1.35", "marginBottom": "8px"},
                 ),
-                # Source repo badge (compact, muted)
+                # Source tag: HF / Catalog · namespace / Local, so two copies of one module are
+                # told apart. The detail (repo, namespace) is in the tooltip.
                 rx.cond(
-                    module["repo_id"].to(str) != "",
+                    module["source"].to(str) != "",
                     rx.el.span(
-                        module["repo_id"].to(str),
-                        class_name="ui mini label",
-                        style={"fontSize": "0.78rem", "fontWeight": "400", "color": "#888"},
+                        module["source_label"].to(str),
+                        class_name=rx.match(
+                            module["source"].to(str),
+                            ("hf", "ui mini basic purple label"),
+                            ("catalog", "ui mini basic teal label"),
+                            "ui mini basic grey label",
+                        ),
+                        title=module["source_title"].to(str),
+                        style={"fontSize": "0.78rem", "fontWeight": "500"},
                     ),
                     rx.fragment(),
                 ),

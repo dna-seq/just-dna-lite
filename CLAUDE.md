@@ -286,7 +286,11 @@ was lost in the report, not here.
   kind. A partial manifest that omits the lead parquet makes the module invisible to discovery while
   `list-custom` still lists it. `logo` and `metadata` always probe.
 - Discovery keeps `identity.version`, `artifact.digest` and `weighting` on `ModuleInfo`
-  (`manifest_version` / `manifest_digest` / `manifest_weighting`) for `read_module_provenance`.
+  (`manifest_version` / `manifest_digest` / `manifest_weighting`) for `read_module_provenance`, and
+  `published_at` / `identity.namespace` (`manifest_published_at` / `manifest_namespace`) for
+  `module_source` (`hf` | `catalog` | `local` | `remote`), the analysis picker's source tag. A
+  Catalog install is a local directory whose manifest carries the registry's `published_at`; never
+  infer it from the `{namespace}__{name}` install key, since `__` is legal in a module name.
 - **Everything discovery calls must be defined above `MODULE_INFOS = discover_hf_modules()`.** A
   `NameError` there is caught per source, so discovery silently returns nothing.
   `tests/test_consumer_handoff.py` probes a local directory to catch this offline.

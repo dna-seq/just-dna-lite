@@ -30,7 +30,9 @@ from just_dna_pipelines.annotation.hf_modules import (
     DISCOVERED_MODULES,
     MODULE_INFOS,
     HF_DEFAULT_REPOS,
+    ModuleInfo,
     is_local_module_url,
+    module_source,
 )
 from just_dna_pipelines.annotation.resources import (
     get_user_output_dir, get_user_input_dir, get_generated_modules_dir,
@@ -2800,6 +2802,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 "color": meta.get("color", "neutral"),
                 "logo_url": browsable_logo_url,
                 "repo_id": info.repo_id if info else "",
+                **_source_tag(info),
                 "selected": module_name in self.selected_modules,
                 "is_custom": module_name in custom_names,
             })
@@ -6297,6 +6300,29 @@ def _local_key(namespace: str, name: str) -> str:
         return name
     safe_ns = "".join(ch if ch.isalnum() else "_" for ch in namespace.lower()).strip("_")
     return f"{safe_ns}__{name}"
+
+
+def _source_tag(info: Optional[ModuleInfo]) -> Dict[str, str]:
+    """The analysis picker's source tag: where this module's bytes came from.
+
+    Two copies of one module (an HF one and a Catalog install, or a local build and its published
+    version) otherwise render as identical cards. A Catalog tag names the namespace, since two
+    namespaces can publish the same module name.
+    """
+    source = module_source(info)
+    if source is None or info is None:
+        return {"source": "", "source_label": "", "source_title": ""}
+    if source == "catalog":
+        ns = info.manifest_namespace or ""
+        label = f"Catalog · {ns}" if ns else "Catalog"
+        title = f"Installed from the Catalog{f', namespace {ns}' if ns else ''}"
+    elif source == "local":
+        label, title = "Local", "Built on this machine, not installed from the Catalog"
+    elif source == "hf":
+        label, title = "HF", f"Read from HuggingFace: {info.repo_id}"
+    else:
+        label, title = "Remote", f"Read from {info.source_url or info.repo_id}"
+    return {"source": source, "source_label": label, "source_title": title}
 
 
 def _without_local_module(modules: List[Dict[str, Any]], name: str) -> List[Dict[str, Any]]:

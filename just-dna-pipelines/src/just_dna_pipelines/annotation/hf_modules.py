@@ -93,6 +93,12 @@ class ModuleInfo(BaseModel):
     manifest_version: Optional[str] = None
     manifest_digest: Optional[str] = None
     manifest_weighting: Optional[str] = None
+    # Where a local copy came from. The registry stamps `published_at` (and fills
+    # `identity.namespace`) on the manifest it serves, so a Catalog install carries both, while a
+    # local compile has neither. The install directory's `{namespace}__{name}` key cannot answer
+    # this: `__` is legal inside a module name. Read by `module_source`.
+    manifest_published_at: Optional[str] = None
+    manifest_namespace: Optional[str] = None
     # The compiler's own warnings for these bytes (``manifest.compilation.warnings_summary``), kept
     # from the manifest discovery already fetched. The phenotype report surfaces them verbatim beside
     # a call, since a phase-ambiguity warning the compiler raised is exactly what a reader of an
@@ -390,6 +396,8 @@ def _probe_module_at_path(
         manifest_version=(manifest.identity.version or None) if manifest else None,
         manifest_digest=(manifest.artifact.digest or None) if manifest and manifest.artifact else None,
         manifest_weighting=_weighting_summary(manifest) if manifest else None,
+        manifest_published_at=(manifest.published_at or None) if manifest else None,
+        manifest_namespace=(manifest.identity.namespace or None) if manifest else None,
         manifest_compilation_warnings=_compilation_warnings(manifest) if manifest else [],
     )
 
@@ -896,6 +904,24 @@ def local_module_dir(info: Optional[ModuleInfo]) -> Optional[Path]:
     if not path.is_absolute() or not path.is_dir():
         return None
     return path
+
+
+ModuleSource = Literal["hf", "catalog", "local", "remote"]
+
+
+def module_source(info: Optional[ModuleInfo]) -> Optional[ModuleSource]:
+    """Where a discovered module's bytes came from, for the analysis UI's source tag.
+
+    ``hf`` and ``remote`` are read in place from a configured source; ``catalog`` and ``local`` are
+    directories on this machine, told apart by the manifest: a registry download carries the
+    server's ``published_at``, a local compile does not. ``None`` when discovery knows nothing
+    about the module.
+    """
+    if info is None:
+        return None
+    if local_module_dir(info) is None:
+        return "hf" if info.lead_url.startswith("hf://") else "remote"
+    return "catalog" if info.manifest_published_at else "local"
 
 
 def _read_manifest_or_reason(path: Path) -> tuple[Optional[ModuleManifest], str]:
