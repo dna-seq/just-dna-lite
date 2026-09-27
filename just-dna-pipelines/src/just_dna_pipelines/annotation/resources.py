@@ -265,9 +265,13 @@ def download_vcf_from_zenodo(
     response = requests.get(download_url, stream=True, timeout=30)
     response.raise_for_status()
 
-    with open(vcf_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
+    # Download beside the target and rename at the end: the cache check above trusts any file
+    # at `vcf_path`, so an interrupted download written in place was a truncated genome forever.
+    partial_path = vcf_path.with_name(f"{vcf_path.name}.part")
+    with open(partial_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
             f.write(chunk)
+    partial_path.replace(vcf_path)
 
     size_mb = vcf_path.stat().st_size / (1024 * 1024)
     _log.info(f"Downloaded VCF: {vcf_path} ({size_mb:.1f} MB)")
@@ -330,7 +334,10 @@ def ensure_vcf_in_user_input_dir(
 
     user_input_dir.mkdir(parents=True, exist_ok=True)
     _log.info(f"Copying VCF to user input directory: {vcf_path} -> {expected_vcf_path}")
-    shutil.copy2(vcf_path, expected_vcf_path)
+    # Same reason as the download: default-sample lookup accepts any `*.vcf[.gz]` here unchecked.
+    partial_path = expected_vcf_path.with_name(f"{expected_vcf_path.name}.part")
+    shutil.copy2(vcf_path, partial_path)
+    partial_path.replace(expected_vcf_path)
 
     return expected_vcf_path
 
