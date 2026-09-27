@@ -875,13 +875,18 @@ def file_item(filename: rx.Var[str]) -> rx.Component:
             ),
             # Status label
             file_status_label(UploadState.file_statuses[filename]),
-            # Delete button
-            rx.el.button(
-                fomantic_icon("trash-2", size=12),
-                on_click=lambda: UploadState.delete_file(filename),
-                class_name=rx.cond(is_selected, "ui small icon inverted button", "ui small icon button"),
-                title="Delete sample",
-                style={"padding": "6px 8px", "marginLeft": "6px", "flexShrink": "0"},
+            # Delete button. Not drawn in the public demo: `delete_file` refuses there, and a
+            # button that only answers with a warning reads as a working delete.
+            rx.cond(
+                UploadState.is_immutable_mode,
+                rx.fragment(),
+                rx.el.button(
+                    fomantic_icon("trash-2", size=12),
+                    on_click=lambda: UploadState.delete_file(filename),
+                    class_name=rx.cond(is_selected, "ui small icon inverted button", "ui small icon button"),
+                    title="Delete sample",
+                    style={"padding": "6px 8px", "marginLeft": "6px", "flexShrink": "0"},
+                ),
             ),
             on_click=lambda: UploadState.select_file(filename),
             role="button",
