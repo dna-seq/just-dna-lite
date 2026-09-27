@@ -50,6 +50,12 @@ def _run(tmp_path: Path, monkeypatch, modules: list[str], records) -> str:
     return report.read_text()
 
 
+def _members(html: str, module: str) -> str:
+    """A module's positions table: what the file showed at each position and how it was read."""
+    start = html.index(f'id="{module}MembersTBody"')
+    return html[start:html.index("</tbody>", start)]
+
+
 def _card(html: str, gene: str) -> str:
     """One result block, from its opening tag (which carries the status class) to its end."""
     start = html.rindex("<article", 0, html.index(f'id="phenotype-{gene}"'))
@@ -70,7 +76,8 @@ class TestPhenotypeSection:
         assert "<code>C282Y / H63D</code>" in card
         # The authored conclusion reaches the reader, not just the phenotype label.
         assert "in trans" in card
-        assert card.count("phase set 26090951") == 2
+        # Per-position evidence lives in the module's positions table, one row per defining site.
+        assert _members(html, "hfe_compound_het").count("phase set 26090951") == 2
         assert "C282Y, C282Y-H63D, H63D, wt." in card and "Gene versions this module knows for" in card
 
     def test_an_unphased_double_het_is_ambiguous_and_says_phase_would_decide(self, tmp_path, monkeypatch) -> None:
@@ -82,7 +89,7 @@ class TestPhenotypeSection:
         assert "trait-ambiguous" in card
         assert "exactly what would decide" in card
         assert "<code>C282Y / H63D</code>" in card and "<code>C282Y-H63D / wt</code>" in card
-        assert "phase set" not in card
+        assert "phase set" not in _members(html, "hfe_compound_het")
 
     def test_an_indel_window_match_and_an_activity_score_are_labelled(self, tmp_path, monkeypatch) -> None:
         html = _run(tmp_path, monkeypatch, ["abo_phenotype", "fut2_secretor"], [
@@ -93,10 +100,10 @@ class TestPhenotypeSection:
             ("19", 48703374, "A", "T", "0/0", None),
         ])
         abo = _card(html, "ABO")
-        assert "<h3>Blood group B (III)</h3>" in abo
-        assert "at a nearby position" in abo
+        assert "<h4>Blood group B (III)</h4>" in abo
+        assert "at a nearby position" in _members(html, "abo_phenotype")
         fut2 = _card(html, "FUT2")
-        assert "<h3>Non-secretor</h3>" in fut2
+        assert "<h4>Non-secretor</h4>" in fut2
         assert "activity score 0.0" in fut2
 
     def test_no_phenotype_module_means_no_section(self, tmp_path) -> None:

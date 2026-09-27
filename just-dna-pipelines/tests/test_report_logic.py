@@ -367,7 +367,9 @@ from just_dna_pipelines.annotation.report_logic import (
     _AUTHORED_AXES,
     TABLE_PREVIEW_ROWS,
     build_module_report_data,
+    apply_directionality,
     build_pharmacogenomics_report_data,
+    module_is_directional,
     report_environment,
     report_filename_stem,
     report_title_for_modules,
@@ -395,9 +397,44 @@ def _module_data(variants: list[dict]) -> dict:
     return {
         "module_name": "synthetic", "display_name": "Synthetic",
         "variants": variants,
-        "summary": {"total_variants": len(variants), "total_positive": 0,
-                    "total_negative": 0, "total_weight": 0.0},
+        "summary": {"total_variants": len(variants), "directional": apply_directionality(variants),
+                    "total_positive": 0, "total_negative": 0, "total_weight": 0.0},
     }
+
+
+# --- Direction: a signed weight is only good or bad when the module says so ---------------------
+
+def _trait_row(rsid: str, weight: float, direction: str) -> dict:
+    return {"rsid": rsid, "gene": "G", "genotype": ["A", "T"], "module": "m",
+            "weight": weight, "state": "significant", "direction": direction}
+
+
+@pytest.mark.parametrize("directions,expected", [
+    (["unknown", "neutral", "unknown"], False),   # a personality/taste module: signs mean "more of the trait"
+    (["unknown", "risk", "neutral"], True),       # one real direction makes the module evaluative
+    (["protective", "neutral"], True),
+])
+def test_a_module_is_evaluative_only_when_a_row_has_a_direction(directions, expected) -> None:
+    variants = [_build_variant(_trait_row(f"rs{i}", w, d), {})
+                for i, (w, d) in enumerate(zip([0.4, -0.3, 0.2], directions))]
+    signed_colours = [v["weight_color"] for v in variants]
+    assert apply_directionality(variants) is expected
+    if expected:
+        assert [v["weight_color"] for v in variants] == signed_colours
+    else:
+        assert {v["weight_color"] for v in variants} == {"transparent"}
+        assert any(c != "transparent" for c in signed_colours), "the fixture must carry colours to strip"
+
+
+def test_a_trait_module_renders_no_positive_or_negative_boxes() -> None:
+    trait = _module_data([_build_variant(_trait_row("rs1", 0.4, "unknown"), {}),
+                          _build_variant(_trait_row("rs2", -0.3, "neutral"), {})])
+    html = _render(other_modules=[trait])
+    assert '<div class="label">Positive</div>' not in html and '<div class="label">Net weight</div>' not in html
+    assert "not counted as positive or negative" in html
+    risky = _module_data([_build_variant(_trait_row("rs1", 0.4, "risk"), {})])
+    html = _render(other_modules=[risky])
+    assert '<div class="label">Positive</div>' in html and "not counted as positive or negative" not in html
 
 
 def test_report_identity_uses_the_curated_single_module_name():
@@ -1124,3 +1161,19 @@ def test_phenotype_ai_links_carry_the_result_and_every_site() -> None:
     for needle in ("RHCE", "rs676785", "rs609320", "C/C", "no data", *(r["phenotype"] for r in readings)):
         assert needle in prompt
     assert "Do not diagnose" in prompt
+
+
+@pytest.mark.parametrize("directions,states,expected", [
+    (["unknown", "neutral"], ["significant", "ref"], False),     # every row trait-like
+    (["neutral", "protective"], ["neutral", "protective"], True),  # one protective row anywhere in the module
+    ([None, None], ["risk", "neutral"], True),                   # a 0.5 artifact: derived from the legacy state
+])
+def test_direction_is_a_property_of_the_whole_module(tmp_path, directions, states, expected) -> None:
+    """A reader who matched only a module's neutral rows still reads a module that has a direction."""
+    lead = tmp_path / "weights.parquet"
+    pl.DataFrame({"rsid": ["rs1", "rs2"], "weight": [0.5, 0.0], "direction": directions, "state": states},
+                 schema_overrides={"direction": pl.String}).write_parquet(lead)
+    info = ModuleInfo(name="m", repo_id="r", path=str(tmp_path), lead_url=str(lead))
+    assert module_is_directional("m", info) is expected
+    matched_only_neutral = [_build_variant(_trait_row("rs2", 0.3, "neutral"), {})]
+    assert apply_directionality(matched_only_neutral, module_is_directional("m", info)) is expected

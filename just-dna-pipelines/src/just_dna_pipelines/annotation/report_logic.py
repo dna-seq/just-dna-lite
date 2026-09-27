@@ -864,6 +864,53 @@ def _build_phenotype_ai_links(module_title: str, gene: dict) -> list[dict[str, s
     ]
 
 
+_EVALUATIVE_DIRECTIONS = frozenset({"protective", "risk"})
+
+
+def module_is_directional(module_name: str, module_info: Optional[ModuleInfo]) -> Optional[bool]:
+    """Whether any row of a module's lead table has a good/bad direction; None when it cannot be read.
+
+    A property of the **module**, never of the rows one person matched: a lactose module marks its
+    persistence rows ``protective``, and a reader who matched only its neutral rows is still reading a
+    module with a direction. The effective direction is computed per distinct (direction, state, weight
+    sign) combination, which is a handful of rows even for a large module.
+    """
+    if module_info is None:
+        return None
+    lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
+    names = lf.collect_schema().names()
+    cols = [pl.col(c).cast(pl.String) if c != "weight" else pl.col(c).sign().alias(c) for c in ("direction", "state", "weight") if c in names]
+    if not cols:
+        return False
+    combos = lf.select(cols).unique().collect()
+    return any(
+        _effective_direction(row.get("direction"), row.get("state"), row.get("weight")) in _EVALUATIVE_DIRECTIONS
+        for row in combos.iter_rows(named=True)
+    )
+
+
+def apply_directionality(variants: list[dict], module_directional: Optional[bool] = None) -> bool:
+    """Whether a module's results have a good/bad direction; strips the colouring when they do not.
+
+    ``weight`` is signed and the report used to read the sign as benefit: counted as Positive or
+    Negative and coloured green or red. That is only true when the module says so. A trait module
+    (personality, taste, aggression) signs its weights by "more of the trait" and marks every row's
+    ``direction`` ``unknown`` or ``neutral``, so neither end is better, and colouring it told a reader
+    that one personality is good. A module counts as evaluative when at least one of its rows has an
+    effective direction (authored, or derived from the legacy ``state``) of ``protective`` or ``risk``:
+    ``module_directional`` from :func:`module_is_directional` when the module could be read, else the
+    rows at hand. Otherwise its weights keep their numbers and lose their colour, and the template
+    drops the Positive / Negative / Net weight boxes.
+    """
+    directional = module_directional if module_directional is not None else any(
+        v["direction"] in _EVALUATIVE_DIRECTIONS for v in variants
+    )
+    if not directional:
+        for v in variants:
+            v["weight_color"] = "transparent"
+    return directional
+
+
 def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) -> dict:
     """The view model for one annotated variant, shared by every report shape.
 
@@ -1154,6 +1201,9 @@ def build_longevity_report_data(
 
         summary = {
             "total_variants": total_variants,
+            "directional": apply_directionality(
+                [v for c in categories.values() for v in c["variants"]], module_is_directional(module_name, module_info)
+            ),
             "total_positive": total_positive,
             "total_negative": total_negative,
             "total_weight": round(total_weight, 2) if total_weight else 0.0,
@@ -1217,6 +1267,7 @@ def build_module_report_data(
 
         summary = {
             "total_variants": len(variants),
+            "directional": apply_directionality(variants, module_is_directional(module_name, module_info)),
             "total_positive": positive,
             "total_negative": negative,
             "total_weight": round(sum(v["weight"] for v in variants), 2),
@@ -1581,6 +1632,7 @@ def build_phenotype_report_data(
                 "description": description,
                 "how_it_works": readme_section(local_module_dir(info), "How this works"),
                 "genes": genes,
+                "members": phenotype_members(genes),
             }
         )
     return entries
@@ -1622,6 +1674,27 @@ def report_environment() -> jinja2.Environment:
     env.filters["dbsnp_url"] = dbsnp_url
     env.filters["hgnc_url"] = hgnc_url
     return env
+
+
+def phenotype_members(genes: list[dict]) -> list[dict]:
+    """Every DNA position a phenotype module reads, as one table, in the order the results are shown.
+
+    The phenotype counterpart of a variant module's table: per position, the gene, what the file
+    showed and how it was read, and which gene versions the module recognises by a letter other than
+    the reference there (``marks``), taken from the module's own allele definitions so the table and
+    the rule cannot disagree. A position no version marks reads as the reference for every version.
+    """
+    rows: list[dict] = []
+    for gene in genes:
+        defined = [(a["name"], d) for a in gene["rules"]["alleles"] for d in a["defined_by"]]
+        for site in gene["sites"]:
+            marks = [
+                f"{name} ({d['allele']})"
+                for name, d in defined
+                if str(d["chrom"]) == str(site["chrom"]) and d["start"] == site["start"] and d["allele"] != site["ref"]
+            ]
+            rows.append({**site, "gene": gene["gene"], "marks": marks})
+    return rows
 
 
 def module_display(module_name: str, info: Optional[ModuleInfo]) -> tuple[str, str]:

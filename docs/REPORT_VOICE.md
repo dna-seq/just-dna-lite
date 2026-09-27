@@ -109,14 +109,23 @@ sloppy.
 
 ## Writing a conclusion
 
-A conclusion is **two to six full sentences, roughly 40 to 130 words**: shorter for a simple result,
-longer when there is a *why* worth telling. Aim to leave **both audiences satisfied and a little
+A conclusion is **full sentences, as many as the idea needs**: usually three to seven, roughly 50 to
+160 words, shorter for a simple result and longer when there is a *why* worth telling. Aim to leave **both audiences satisfied and a little
 curious**: the lay reader should understand the result and learn something, the professional should
 find nothing wrong with it. In this order:
 
 1. **The result in plain words, about the reader.** Start with what they have, in the second person.
    *"You have blood group AB."* Not *"A/B diplotype"*, not *"GA variant is associated with…"*.
-2. **What it means.** One or two sentences on what this is and what it does, in everyday terms.
+2. **What you would notice, compared with most people, and how sure that is.** Say what the result
+   changes that a person could feel, see or measure, against people who carry the **most common
+   version** (often called the wild type, and not always the reference genome's: for ABO the reference
+   is O): *"you probably taste salt a little less strongly than most people"*, *"your body clears
+   caffeine more slowly than average"*. Give the size in words (*slightly*, *clearly*, *about twice as
+   often*) and the certainty from the ladder below (*well established*, *likely*, *early evidence*,
+   *not known*). When no noticeable difference is known, say that plainly instead of filling the space
+   with what the gene does: *"no difference you would notice is known"*. What the gene does is the
+   supporting sentence, never a substitute for this one.
+   Then, in a sentence or two, what the gene does, in everyday terms.
 3. **How common it is**, as a natural frequency: *"about 4 in 100 people in Europe"*. Never a bare
    percentage without a reference group, never an odds ratio. Frequencies differ a lot between
    ancestries, so name the group, or give a range across populations. When no figure can be sourced,
@@ -358,6 +367,7 @@ own nomenclature reads as a wrong result.
 
 - [ ] Every `phenotype` label reads as something a person would say, with no codes, and gives every common regional name.
 - [ ] Every conclusion starts with "You…" (or an equivalent plain statement of the result).
+- [ ] Every conclusion says what the reader would notice compared with people who carry the most common version, how big that is, and how sure (or that no noticeable difference is known).
 - [ ] Clear practical implications are stated; an interesting, sourced *why* is included where one exists; a way to check it yourself is named where one exists.
 - [ ] No rsID, HGVS, allele code, coordinate, p-value or odds ratio in any label or conclusion.
 - [ ] Every risk statement has a size and a frequency, and says it is not destiny where that is true.

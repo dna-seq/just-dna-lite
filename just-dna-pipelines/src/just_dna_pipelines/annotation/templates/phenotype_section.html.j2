@@ -1,14 +1,18 @@
 {#-
     Phenotype modules: results produced by a RULE over several DNA positions (a blood group, APOE
-    type), not a list of independent variant findings. Each module is its own report section, like
-    any other module, so two phenotype modules never read as one:
+    type), not a list of independent variant findings. They share one "Combined results" section with
+    one introduction, and each module is a subsection with its own heading, so the concept is
+    explained once and two modules never read as one:
 
     * no weights, scores, positive/negative counts or good/bad colours: a combined result is not a sum
       of parts, and "blood group O" is neither better nor worse than "A";
     * the module's "How this works" (the rule in plain words, from its README) comes before the results;
     * each result is an open block, not a nested card: a plain headline, the module's explanation in
       full sentences, and a "More details" fold with everything needed to check the call (the allele
-      pairs that fit, phase, how each position was read, the module's rule tables, build notes).
+      pairs that fit, phase, the module's rule tables, build notes);
+    * each module ends with a table of every position it reads (gene, rsID, what the file showed, how
+      it was read, which gene versions that position marks), in the same table style as a variant
+      module.
 
     Voice and layering follow docs/REPORT_VOICE.md. Data comes from
     report_logic.build_phenotype_report_data.
@@ -78,32 +82,13 @@
             These positions are not phased together in your file, so it cannot say which letters were
             inherited together from the same parent. That is exactly what would decide between the pairs.
             {% endif %}
+            What your file shows at each position is in the table at the end of this trait.
         </p>
         {% if gene.candidates %}
         <ul class="trait-pairs">
             {% for c in gene.candidates %}<li>{{ pair_line(c) }}</li>{% endfor %}
         </ul>
         {% endif %}
-
-        <p class="trait-subhead">What your file shows at each position (GRCh38)</p>
-        <div class="table-scroll">
-        <table class="trait-table">
-            <thead><tr><th>Position</th><th>Reference</th><th>Your letters</th><th>How it was read</th></tr></thead>
-            <tbody>
-            {% for site in gene.sites %}
-                <tr>
-                    <td>{% if site.rsid %}{{ rsid_link(site.rsid) }}<br>{% endif %}<small>chr{{ site.chrom }}:{{ site.start }}</small></td>
-                    <td>{{ site.ref }}</td>
-                    <td>{% if site.observed %}{{ site.observed|join("/") }}{% else %}none{% endif %}</td>
-                    <td class="cell-wrap">
-                        <span class="evidence evidence-{{ site.evidence }}">{% if site.evidence == "called" %}read{% elif site.evidence == "restored_hom_ref" %}assumed{% else %}no data{% endif %}</span>
-                        {{ site_reading(site) }}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        </div>
 
         <p>
             Gene versions this module knows for {{ gene_link(gene.gene) }}: {{ gene.alleles_considered|join(", ") }}.
@@ -168,7 +153,7 @@
 {% macro trait_result(gene) %}
 <article class="trait-result trait-{{ gene.status }}" id="phenotype-{{ gene.gene }}">
     <header class="trait-head">
-        <h3>{{ result_headline(gene) }}</h3>
+        <h4>{{ result_headline(gene) }}</h4>
         <span class="gene-tag">{{ gene_link(gene.gene, " gene") }}</span>
     </header>
 
@@ -249,32 +234,80 @@
 </article>
 {% endmacro %}
 
-{% for mod in phenotype_modules %}
-<section class="report-section trait-module" id="module-{{ mod.module_name }}">
-    {% if multi_section %}
-    <p class="section-kicker">Read from several DNA positions together</p>
-    <h2>{{ mod.display_name }}</h2>
-    {% if mod.description %}<p class="section-intro">{{ mod.description }}</p>{% endif %}
-    {% endif %}
-
-    {% if mod.genes|length > 1 %}
-    <div class="trait-glance">
-        <p class="trait-glance-title">Your results</p>
-        <ul>
-            {% for gene in mod.genes %}<li><a href="#phenotype-{{ gene.gene }}">{{ result_headline(gene) }}</a></li>{% endfor %}
-        </ul>
+{% macro members_table(mod) %}
+{% set tbody_id = mod.module_name ~ "MembersTBody" %}
+<div class="table-shell trait-members">
+    <div class="table-scroll">
+        <table class="ui">
+            <thead><tr><th>Gene</th><th>Variant</th><th>Position (GRCh38)</th><th>Reference</th><th>Your letters</th><th>Marks the version</th><th>How it was read</th></tr></thead>
+            <tbody id="{{ tbody_id }}">
+            {% for site in mod.members %}
+                <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
+                    <td>{{ gene_link(site.gene) }}</td>
+                    <td>{% if site.rsid %}{{ rsid_link(site.rsid) }}{% else %}none{% endif %}</td>
+                    <td>chr{{ site.chrom }}:{{ site.start }}</td>
+                    <td>{{ site.ref }}</td>
+                    <td>{% if site.observed %}{{ site.observed|join("/") }}{% else %}none{% endif %}</td>
+                    <td class="cell-wrap">{% if site.marks %}{{ site.marks|join(", ") }}{% else %}reference in every version{% endif %}</td>
+                    <td class="cell-wrap">
+                        <span class="evidence evidence-{{ site.evidence }}">{% if site.evidence == "called" %}read{% elif site.evidence == "restored_hom_ref" %}assumed{% else %}no data{% endif %}</span>
+                        {{ site_reading(site) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
-    {% endif %}
+    {{ table_controls(tbody_id, mod.members|length) }}
+</div>
+{% endmacro %}
 
-    {% if mod.how_it_works %}
-    <details class="trait-how" open>
-        <summary>How this works</summary>
-        {% for para in mod.how_it_works %}<p>{{ para }}</p>{% endfor %}
-    </details>
+{% if phenotype_modules %}
+<section class="report-section" id="phenotypes">
+    {% if multi_section %}
+    <p class="section-kicker">Module results</p>
+    <h2>Combined results</h2>
     {% endif %}
+    <p class="section-intro">
+        Some traits are not read from one place in your DNA but from several read together. A blood
+        group is the familiar case: you carry two versions of the gene, one from each parent, and the
+        pair decides the result. For each trait below, we name a result only when your DNA points to one
+        answer. When it fits more than one, we list them all, and when your file cannot tell, we say so
+        instead of guessing. Each trait ends with a table of the DNA positions it reads.
+    </p>
 
-    {% for gene in mod.genes %}
-    {{ trait_result(gene) }}
+    {% for mod in phenotype_modules %}
+    <article class="trait-module" id="module-{{ mod.module_name }}">
+        {% if multi_section %}
+        <h3>{{ mod.display_name }}</h3>
+        {% if mod.description %}<p class="section-intro">{{ mod.description }}</p>{% endif %}
+        {% endif %}
+
+        {% if mod.genes|length > 1 %}
+        <div class="trait-glance">
+            <p class="trait-glance-title">Your results</p>
+            <ul>
+                {% for gene in mod.genes %}<li><a href="#phenotype-{{ gene.gene }}">{{ result_headline(gene) }}</a></li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if mod.how_it_works %}
+        <details class="trait-how" open>
+            <summary>How this works</summary>
+            {% for para in mod.how_it_works %}<p>{{ para }}</p>{% endfor %}
+        </details>
+        {% endif %}
+
+        {% for gene in mod.genes %}
+        {{ trait_result(gene) }}
+        {% endfor %}
+
+        {% if mod.members %}
+        <p class="trait-glance-title">The DNA positions this trait reads</p>
+        {{ members_table(mod) }}
+        {% endif %}
+    </article>
     {% endfor %}
 </section>
-{% endfor %}
+{% endif %}

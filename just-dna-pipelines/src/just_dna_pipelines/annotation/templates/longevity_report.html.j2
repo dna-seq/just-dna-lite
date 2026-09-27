@@ -148,7 +148,7 @@ details.trait-how p { line-height: 1.65; margin: 0.7rem 0 0; }
 .trait-ambiguous { border-left-color: #d9a200; }
 .trait-not_assessable, .trait-no_match { border-left-color: #9fb3c8; }
 .trait-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4rem 1rem; flex-wrap: wrap; }
-.trait-head h3 {
+.trait-head h4 {
     margin: 0 0 0.5rem;
     color: #102a43;
     font-family: Georgia, "Times New Roman", serif;
@@ -179,6 +179,16 @@ table.trait-table th { color: var(--muted); font-size: 0.74rem; font-weight: 700
 .evidence-restored_hom_ref { background: var(--soft-blue); color: var(--blue-dark); }
 .evidence-no_call { background: #eef1f4; color: var(--muted); }
 .trait-meta { color: var(--muted); font-size: 0.85rem; }
+.trait-module { margin-top: 2.4rem; }
+.trait-module + .trait-module { padding-top: 2.2rem; border-top: 1px solid var(--line); }
+.trait-module > h3 {
+    margin: 0 0 0.4rem;
+    color: #102a43;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+    font-weight: 500;
+}
+.trait-members { margin-top: 0.4rem; }
 /* One module per section: a rule between sections so two modules never read as one. */
 .report-section + .report-section { padding-top: 2.6rem; border-top: 1px solid var(--line); }
 details.appendix { margin-top: 1rem; }
@@ -851,9 +861,6 @@ window.addEventListener("scroll", function() {
     <nav class="contents" aria-label="Report contents">
         <p class="contents-title">Report contents</p>
         <ul>
-            {% for mod in phenotype_modules %}
-            <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
-            {% endfor %}
             {% if longevity %}
             <li><a href="#variants">Longevity variants</a></li>
             {% endif %}
@@ -863,6 +870,9 @@ window.addEventListener("scroll", function() {
             {% for mod in pgx_modules %}
             <li><a href="#module-{{ mod.module_name }}">{{ mod.display_name }}</a></li>
             {% endfor %}
+            {% if phenotype_modules %}
+            <li><a href="#phenotypes">Combined results{% if phenotype_modules|length > 1 %} ({{ phenotype_modules|map(attribute="display_name")|join(", ") }}){% endif %}</a></li>
+            {% endif %}
             <li><a href="#about">How to read this report</a></li>
             {% if module_exclusions %}
             <li><a href="#modules-not-read">Modules not read</a></li>
@@ -875,8 +885,6 @@ window.addEventListener("scroll", function() {
     {% endif %}
 
 
-
-    {% include "phenotype_section.html.j2" %}
 
     {% if longevity %}
     <section class="report-section" id="variants">
@@ -891,9 +899,11 @@ window.addEventListener("scroll", function() {
 
         <div class="summary-card">
             <div class="stat-box"><div class="number">{{ longevity.summary.total_variants }}</div><div class="label">Total variants</div></div>
+            {% if longevity.summary.directional %}
             <div class="stat-box stat-positive"><div class="number">{{ longevity.summary.total_positive }}</div><div class="label">Positive</div></div>
             <div class="stat-box stat-negative"><div class="number">{{ longevity.summary.total_negative }}</div><div class="label">Negative</div></div>
             <div class="stat-box stat-weight"><div class="number">{{ longevity.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% endif %}
             {% if longevity.summary.total_restored %}
             <div class="stat-box stat-inferred"><div class="number">{{ longevity.summary.total_restored }}</div><div class="label">Inferred</div></div>
             {% endif %}
@@ -935,11 +945,14 @@ window.addEventListener("scroll", function() {
             variant{% if mod.summary.total_variants != 1 %}s{% endif %}. Expand a row to inspect the
             conclusion, evidence, and any additional authored fields.
         </p>
+        {% if not mod.summary.directional %}<p class="section-intro">These results describe traits rather than good or bad outcomes: the module marks none of them as protective or risky, so they are not counted as positive or negative and their weights are not coloured.</p>{% endif %}
         <div class="summary-card">
             <div class="stat-box"><div class="number">{{ mod.summary.total_variants }}</div><div class="label">Total variants</div></div>
+            {% if mod.summary.directional %}
             <div class="stat-box stat-positive"><div class="number">{{ mod.summary.total_positive }}</div><div class="label">Positive</div></div>
             <div class="stat-box stat-negative"><div class="number">{{ mod.summary.total_negative }}</div><div class="label">Negative</div></div>
             <div class="stat-box stat-weight"><div class="number">{{ mod.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% endif %}
             {% if mod.summary.total_restored %}
             <div class="stat-box stat-inferred"><div class="number">{{ mod.summary.total_restored }}</div><div class="label">Inferred</div></div>
             {% endif %}
@@ -988,6 +1001,8 @@ window.addEventListener("scroll", function() {
     </section>
     {% endfor %}
 
+    {% include "phenotype_section.html.j2" %}
+
     <section class="report-section" id="about">
         <p class="section-kicker">About this report</p>
         <h2>How to read this report</h2>
@@ -997,13 +1012,6 @@ window.addEventListener("scroll", function() {
             explanation comes first, and under each result a <strong>More details</strong> link opens the
             evidence: the positions read, the letters found there and the module's rule.
         </p>
-        {% if phenotype_modules %}
-        <p>
-            Some traits, like a blood group, are decided by several places in your DNA read together.
-            We name such a result only when your DNA points to one answer. When it fits more than one,
-            we list them all, and when the file cannot tell at all, we say so instead of guessing.
-        </p>
-        {% endif %}
         {% if longevity or other_modules or pgx_modules %}
         <p>
             Tables show {{ preview_row_limit }} rows at first. <strong>Open all</strong> shows the full

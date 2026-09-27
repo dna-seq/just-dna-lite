@@ -386,12 +386,20 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   third party, never automatically. They are ~half the file size. Keep icons as one `<symbol>` set with
   `<use>`. Phenotype results get the same four (`_build_phenotype_ai_links`); the privacy note lives in
   each button's tooltip and `aria-label`, and in full under *How to read this report*.
-- **Phenotype modules render in `phenotype_section.html.j2`, one report section per module**, like any
-  other module, so two of them never read as one. A result is an open block (plain headline, the
+- **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
+  never read as one. A result is an open block (plain headline, the
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
   position was read, the module's rule tables, build notes), never a card nested in a card. The module's
   title and description come from `modules.yaml`, else its own `manifest.json` (`module_display`), and
   its README's `## How this works` section is shown before the results (`readme_section`).
+- **A simple module shows Positive / Negative / Net weight and coloured weights only when it has a
+  direction** (`module_is_directional`: some row of its lead table, not just the rows this person
+  matched, has an effective direction of `protective` or `risk`). A trait module (personality, taste)
+  signs its weights by "more of the trait" and marks directions `unknown`/`neutral`; it renders plain
+  weights and one sentence saying so (`apply_directionality`).
+- **Phenotype modules share one *Combined results* section after the per-position modules**, with one
+  introduction; each module is a subsection that ends with a table of every position it reads
+  (`phenotype_members`: gene, rsID, what the file showed, how it was read, which versions it marks).
 - **Only verified link targets.** `dbsnp_url` (rsIDs) and `hgnc_url` (gene symbols, human only) build a
   link only for a well-formed identifier; PubMed uses its canonical `/{pmid}/` form. Positions get no
   link: Ensembl's gene/location URLs now 404 or redirect into a JS browser, and UCSC sits behind a bot
@@ -414,7 +422,10 @@ Two audiences with equal weight: people without a science background, and profes
   subtype codes, statistics: `haplotypes.csv`, `studies.csv`, `README.md`, the fold). No layer-3 codes in a
   label or conclusion.
 - **Simple is not telegraphic.** Full sentences about the reader ("You have blood group AB"): what they
-  have, what the gene does, how common it is, the practical meaning, the main limit.
+  have, what they would notice compared with people who carry the most common version (not always the
+  reference genome's) with its size and certainty, what the gene does, how common it is, the practical
+  meaning, the main limit. When no noticeable difference is known, say so; a description of the gene's
+  job is never a substitute.
 - **Every term is explained at first mention, in that text.** Each conclusion is read alone, so ε4 or
   C282Y is explained in the conclusion that uses it, not in another result or in *How this works*.
 - **Results first; notices at the end.** Interpretation, research-use and privacy text live once in *How
