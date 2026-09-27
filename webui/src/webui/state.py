@@ -6877,9 +6877,24 @@ class RegistryState(rx.State):
         async with self:
             if not self.store_key:
                 self.store_key = default_registry_store().key
-        await self._ensure_identity()
-        await self._refresh_local()
+        # Browsing is public, so the listing runs first and depends on neither step below. When
+        # it ran last, a raise or a stall in minting the identity or scanning local modules left
+        # the initial empty list on screen as "No modules found.", with no error: `_do_search`
+        # is the only step that writes `catalog_error`, and it never ran.
         await self._do_search()
+        problems: List[str] = []
+        for action, step in (
+            ("load this machine's registry identity", self._ensure_identity),
+            ("scan the locally installed modules", self._refresh_local),
+        ):
+            try:
+                await step()
+            except Exception as e:  # noqa: BLE001 - shown on the page, the listing already ran
+                logger.warning("Catalog load could not %s", action, exc_info=True)
+                problems.append(f"Could not {action}: {type(e).__name__}: {e}")
+        if problems:
+            async with self:
+                self.catalog_error = " ".join([self.catalog_error, *problems]).strip()
         if self.token:
             await self._refresh_account()
 
