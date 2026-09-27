@@ -548,7 +548,7 @@ def test_a_populated_0_5_axis_reaches_the_html():
     """
     populated = {
         "effect_size": "1.42", "effect_measure": "OR", "effect_allele": "T",
-        "stat_significance": "genome_wide", "negatives": "not in East Asian cohorts",
+        "stat_significance": "genome_wide", "negatives": "raised risk of inflammatory bowel disease",
         "trait_efo_id": "EFO:0001645", "flags": "low_coverage",
         "priority": "high", "population": "European", "p_value": "3e-9",
     }
@@ -563,6 +563,8 @@ def test_a_populated_0_5_axis_reaches_the_html():
     html = _render(other_modules=[_module_data([variant])])
     for axis, value in populated.items():
         assert value in html, f"{axis}={value!r} never reached the rendered report"
+    # `negatives` is the format's adverse/trade-off counterpart to `conclusion`, not a scope limit.
+    assert "Possible downsides" in html and "Does not apply to" not in html
 
 
 def test_the_0_7_study_columns_render_as_a_pair_and_only_when_present():
@@ -758,7 +760,7 @@ def test_an_empty_axis_emits_no_row_rather_than_an_empty_one():
            "weight": 0.5, "state": "risk"}
     variant = _build_variant(row, {})
     html = _render(other_modules=[_module_data([variant])])
-    for label in ("Effect size", "Effect measure", "Trait (EFO)", "Does not apply to"):
+    for label in ("Effect size", "Effect measure", "Trait (EFO)", "Possible downsides"):
         assert label not in html, f"{label} rendered a row for an absent value"
 
 
