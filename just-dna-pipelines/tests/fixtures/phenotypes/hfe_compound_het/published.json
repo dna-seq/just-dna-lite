@@ -1,0 +1,14 @@
+[
+  {
+    "target": "prod",
+    "canonical_id": "antonkulaga/hfe_compound_het@1.0.0",
+    "namespace": "antonkulaga",
+    "name": "hfe_compound_het",
+    "version": "1.0.0",
+    "owner": null,
+    "artifact_digest": "sha256:058a9bbc04a2abe66378a5a04cff9cd1b25a75fb028b9dbf86be25fdfe27a9ff",
+    "content_signature": "sha256:9a052a087ab29b3a52c926a5a40f88bbded4694620ff7c719b9d707ab797548e",
+    "registry_url": "https://module-registry.just-dna.life",
+    "published_at": "2026-09-27T01:23:42+00:00"
+  }
+]
