@@ -39,10 +39,15 @@ containment, and those columns are unpopulated across our whole corpus. Until th
 is the strongest honest gate available, which is why the evidence column exists and why the report
 must never merge the two categories.
 
-One half of that contract is honoured already: a row whose `requires_callable` is `True` is never a
-restoration candidate (`hom_ref_rows`), because the author has said the reference conclusion must be
-withheld without callability proof and a flank proxy is not one. Format 0.7 (RM70) put the column on
-`haplotypes` and `pharm_variants` beside `VariantRow`, so it can now arrive on any lead family.
+`requires_callable` is honoured through the hard-region mask (`hard_regions.py`). On a whole-genome
+callset a site the caller did not emit is homozygous reference in all but a small, mappable-in-advance
+share of the genome: segmental duplications and low-mappability sequence, where reads cannot be placed
+and the caller emits nothing whatever the sample carries. So a site is restored only when all three
+hold — the callset is WGS, the site lies **outside** GIAB's low-mappability + segdup union, and a call
+sits within the flank — and together those are the callability evidence a `requires_callable=True` row
+asks for. Inside the mask nothing is restored, flagged or not. When the mask cannot be loaded the old
+rule applies: `requires_callable=True` rows are withheld and the flank gate stands alone. This is the
+first-order version of a probabilistic answer (per-base population coverage), not the last word.
 """
 
 from __future__ import annotations
@@ -53,6 +58,12 @@ from typing import Optional
 
 import polars as pl
 from just_prs.prs import GenotypeInputMode
+
+from just_dna_pipelines.annotation.hard_regions import (
+    IN_HARD_REGION,
+    load_hard_regions,
+    mark_hard_regions,
+)
 
 # Column names added to an annotated parquet by this module. Held here so the report and the
 # manifest agree with the engine on one spelling.
@@ -121,6 +132,10 @@ class RestorationContext:
     scope: CallsetScope
     scope_reason: str
     max_flank_bp: int
+    # The GIAB low-mappability + segdup mask (hard_regions.py), or None when it was not loaded — on
+    # a callset that cannot restore anyway, or when it could not be provisioned (the reason says).
+    hard_regions: Optional[pl.DataFrame] = None
+    hard_regions_reason: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -238,7 +253,9 @@ def build_restoration_context(
     """Collect the sample-side inputs restoration needs, once per run.
 
     The sort is paid once here and reused by both the scope detection and every module's flanking
-    test — on a WGS genome that is a 4.3M-row frame and a normal run has twelve modules.
+    test — on a WGS genome that is a 4.3M-row frame and a normal run has twelve modules. The
+    hard-region mask is loaded only for a callset that can restore at all, so an exome or a test
+    frame never touches the network for it.
     """
     mode = infer_genotype_input_mode(vcf_lf)
     called_sites = (
@@ -248,12 +265,18 @@ def build_restoration_context(
         .collect()
     )
     scope, reason = detect_callset_scope(called_sites, max_flank_bp)
+    hard_regions: Optional[pl.DataFrame] = None
+    hard_regions_reason = "not loaded: this callset does not support restoration"
+    if mode == GenotypeInputMode.VARIANT_ONLY and scope == CallsetScope.WGS:
+        hard_regions, hard_regions_reason = load_hard_regions()
     return RestorationContext(
         called_sites=called_sites,
         mode=mode,
         scope=scope,
         scope_reason=reason,
         max_flank_bp=max_flank_bp,
+        hard_regions=hard_regions,
+        hard_regions_reason=hard_regions_reason,
     )
 
 
@@ -332,20 +355,8 @@ def hom_ref_rows(lead_lf: pl.LazyFrame) -> Optional[pl.LazyFrame]:
     if "locus_count" in names:
         candidates = candidates.filter(pl.col("locus_count").fill_null(1) <= 1)
 
-    # `requires_callable` (format RM6, populated on the PGx locus tables since 0.7's RM70) is the
-    # author saying that the *absence* of this variant is the informative call — CPIC's assumption
-    # that an uncalled position is reference, made explicit — and that without callability data the
-    # reference conclusion must be **withheld rather than asserted**. Restoration is exactly that
-    # assertion made from a flank proxy, so a row that requires callability is never a candidate.
-    #
-    # Three states, and only one of them withholds: `True` excludes; `False` and null both keep the
-    # row, because a blank cell is *unknown*, never `false`, and unknown means today's behaviour
-    # (CONSUMING.md § "Absence is not reference": "a blank cell is unknown, never false"). Written as
-    # `is_null() | ~col` rather than `fill_null(False)` so that reading stays visible at the seam.
-    # The column is unpopulated across every module we ship, so this changes nothing measured; it
-    # is the gate that has to exist before the first authored `True` arrives.
-    candidates = _filter_requires_callable(candidates)
-
+    # `requires_callable` is not decided here: whether a flagged row may be restored depends on the
+    # callset and on where the site lies, so it is decided with the context in `_callability_gate`.
     return candidates.filter(
         (pl.col("genotype").list.len() > 0)
         & pl.col("genotype").list.eval(pl.element() == pl.element().first()).list.all()
@@ -403,23 +414,39 @@ def _with_flanking_distance(
 
 
 def _filter_requires_callable(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Drop rows the author marked ``requires_callable`` — the reference conclusion is withheld.
+    """Drop rows the author marked ``requires_callable`` — the rule when no mask is available.
 
     ``requires_callable`` (format RM6, on the PGx locus tables since 0.7's RM70) is the author saying
-    that the *absence* of this variant is the informative call, and that without callability data the
-    reference conclusion must be **withheld rather than asserted**. Restoration is exactly that
-    assertion from a flank proxy, so a ``True`` row is never restorable.
+    that the reference conclusion must be **withheld rather than asserted** without callability
+    evidence. With no hard-region mask the only evidence left is the flank proxy, which is not enough,
+    so a ``True`` row is withheld.
 
     Three states, one of which withholds: ``True`` excludes; ``False`` and null both keep the row,
     because a blank cell is *unknown*, never ``false`` (CONSUMING.md § "Absence is not reference").
     Written as ``is_null() | ~col`` rather than ``fill_null(False)`` so the tri-state stays visible.
-    The column is unpopulated across every module we ship, so this changes nothing measured today; it
-    is the gate that has to exist before the first authored ``True`` arrives.
     """
     if "requires_callable" not in lf.collect_schema().names():
         return lf
     return lf.filter(
         pl.col("requires_callable").is_null() | ~pl.col("requires_callable").cast(pl.Boolean)
+    )
+
+
+def _callability_gate(absent: pl.LazyFrame, context: RestorationContext) -> pl.LazyFrame:
+    """Keep the absent sites whose absence can be read as reference on this callset.
+
+    With the hard-region mask: every site outside it passes, ``requires_callable`` or not, and every
+    site inside it is withheld — a WGS callset that emitted nothing at a well-mapped base covered it
+    (the flank test that follows still requires a call nearby), while inside a segdup or
+    low-mappability region the caller may emit nothing whatever the sample carries. Without the mask:
+    the old rule, ``requires_callable=True`` withheld.
+    """
+    if context.hard_regions is None:
+        return _filter_requires_callable(absent)
+    return (
+        mark_hard_regions(absent, context.hard_regions)
+        .filter(~pl.col(IN_HARD_REGION))
+        .drop(IN_HARD_REGION)
     )
 
 
@@ -434,18 +461,18 @@ def restorable_sites(
     compound-phenotype caller can ask the same question of a gene's *defining* sites (from
     ``haplotypes``) that :func:`restored_rows` asks of a module's authored hom-ref rows. It composes
     exactly the primitives ``restored_rows`` uses — :func:`_absent_sites`,
-    :func:`_filter_requires_callable`, :func:`_with_flanking_distance` — so the two paths cannot drift
+    :func:`_callability_gate`, :func:`_with_flanking_distance` — so the two paths cannot drift
     on what counts as a restorable position.
 
     ``sites_lf`` must carry ``chrom``/``start`` (and, for the callability gate, may carry
-    ``requires_callable``). Returns the surviving sites with a ``restored_flank_bp`` column giving the
+    ``requires_callable``). A site inside the hard-region mask is never restorable. Returns the surviving sites with a ``restored_flank_bp`` column giving the
     distance to the nearest call. Returns an **empty** frame — never the input unfiltered — when
     ``context.enabled`` is false, because a callset that cannot support restoration restores nothing.
     """
     if not context.enabled:
         return sites_lf.head(0)
     absent = _absent_sites(sites_lf, called_sites)
-    absent = _filter_requires_callable(absent)
+    absent = _callability_gate(absent, context)
     return _with_flanking_distance(absent, called_sites, context.max_flank_bp)
 
 
@@ -465,7 +492,7 @@ def restored_rows(
     restored rows carry exactly the annotated schema — column set, order and dtypes — rather than a
     hand-maintained copy of it that drifts the first time the VCF reader gains a column.
     """
-    stats = {"hom_ref_rows": 0, "absent": 0, "restored": 0}
+    stats = {"hom_ref_rows": 0, "absent": 0, "withheld_hard_region": 0, "restored": 0}
     if not context.enabled:
         return None, stats
 
@@ -482,7 +509,16 @@ def restored_rows(
     if not stats["absent"]:
         return None, stats
 
-    eligible = _with_flanking_distance(absent, context.called_sites, context.max_flank_bp).collect()
+    callable_sites = _callability_gate(absent, context)
+    if context.hard_regions is not None:
+        # Counted only where the mask ran; without it this number would mix in the
+        # requires_callable withholding, which is a different reason.
+        stats["withheld_hard_region"] = (
+            stats["absent"] - callable_sites.select(pl.len()).collect().item()
+        )
+    eligible = _with_flanking_distance(
+        callable_sites, context.called_sites, context.max_flank_bp
+    ).collect()
     stats["restored"] = eligible.height
     if not eligible.height:
         return None, stats

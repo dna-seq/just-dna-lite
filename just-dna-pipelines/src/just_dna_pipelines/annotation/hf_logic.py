@@ -729,6 +729,8 @@ def annotate_vcf_with_all_modules(
             f"{restoration.mode.value} / {restoration.scope.value}; {restoration.scope_reason}"
             + (f" (flank <= {config.restoration_max_flank_bp:,} bp)" if restoration.enabled else "")
         )
+        if restoration.enabled:
+            logger.info(f"Restoration hard-region mask: {restoration.hard_regions_reason}")
 
         # Process each module
         module_outputs: list[ModuleOutputMapping] = []
@@ -737,6 +739,7 @@ def annotate_vcf_with_all_modules(
         skipped: dict[str, str] = {}
         failed: dict[str, str] = {}
         restored_by_module: dict[str, int] = {}
+        withheld_by_module: dict[str, int] = {}
         phenotype_calls: dict[str, dict[str, int]] = {}
         total_phenotypes_called = 0
 
@@ -861,6 +864,9 @@ def annotate_vcf_with_all_modules(
             if restored:
                 restored_by_module[module_name] = restored
                 total_restored += restored
+            withheld = restore_stats.get("withheld_hard_region", 0)
+            if withheld:
+                withheld_by_module[module_name] = withheld
 
             suffix = (
                 f" ({restored} restored from reference, "
@@ -893,6 +899,8 @@ def annotate_vcf_with_all_modules(
         total_variants_annotated=total_annotated,
         restored_variants=restored_by_module,
         total_variants_restored=total_restored,
+        restoration_withheld_hard_region=withheld_by_module,
+        restoration_mask=restoration.hard_regions_reason if restoration.enabled else None,
         phenotype_calls=phenotype_calls,
         total_phenotypes_called=total_phenotypes_called,
         duration_sec=duration_sec,

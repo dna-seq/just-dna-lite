@@ -257,7 +257,7 @@ class TestCallsetScope:
         )
         assert ctx.enabled is False
         assert restored_rows(_vcf([]), _lead([]), "m", ctx) == (None, {
-            "hom_ref_rows": 0, "absent": 0, "restored": 0
+            "hom_ref_rows": 0, "absent": 0, "withheld_hard_region": 0, "restored": 0
         })
 
 
@@ -376,16 +376,10 @@ class TestHomRefRowSelection:
         ])
         assert hom_ref_rows(lead).collect()["rsid"].to_list() == ["rs4988235"]
 
-    @pytest.mark.parametrize(
-        "requires_callable, restored",
-        [(True, False), (False, True), (None, True)],
-        ids=["true-withholds", "false-restores", "unknown-restores"],
-    )
-    def test_a_row_that_requires_callability_is_never_restored(self, requires_callable, restored):
-        """Format RM6 / 0.7 RM70: `requires_callable=True` says the reference conclusion must be
-        withheld without callability proof, and a flank proxy is not one. Three states, one of
-        which withholds — a blank cell is *unknown*, never `false`, and unknown keeps today's
-        behaviour (CONSUMING.md § "Absence is not reference")."""
+    @pytest.mark.parametrize("requires_callable", [True, False, None])
+    def test_hom_ref_selection_does_not_decide_callability(self, requires_callable):
+        """Whether a flagged row may be restored depends on the callset and on where the site lies,
+        so `hom_ref_rows` keeps every hom-ref row and `_callability_gate` decides with the context."""
         frame = pl.DataFrame(
             [{"rsid": "rs1", "chrom": "1", "start": 10, "ref": "G", "genotype": ["G", "G"],
               "module": "m", "weight": 0.0, "state": "neutral",
@@ -394,7 +388,7 @@ class TestHomRefRowSelection:
                     "genotype": pl.List(pl.String), "module": pl.String, "weight": pl.Float64,
                     "state": pl.String, "requires_callable": pl.Boolean},
         ).lazy()
-        assert hom_ref_rows(frame).collect().height == (1 if restored else 0)
+        assert hom_ref_rows(frame).collect().height == 1
 
     def test_a_column_of_unknown_callability_changes_nothing(self):
         """The whole shipped corpus: the column exists (0.5+) and every cell is null. That must be
@@ -465,7 +459,7 @@ class TestRestorationEvidence:
                        "state": "neutral"}])
         ctx = _wgs_context(vcf)
         rows, stats = restored_rows(vcf, lead, "lactose", ctx)
-        assert stats == {"hom_ref_rows": 1, "absent": 1, "restored": 1}
+        assert stats == {"hom_ref_rows": 1, "absent": 1, "withheld_hard_region": 0, "restored": 1}
 
         got = rows.collect()
         assert got.height == 1
@@ -538,7 +532,7 @@ def test_the_real_lactose_module_restores_both_of_its_sites():
     name = "eric_mods__lactose_tolerance"
     lead = _normalize_lead_genotype(scan_module_table(name, ModuleTable.LEAD, module_info=info))
     rows, stats = restored_rows(vcf, lead, name, ctx)
-    assert stats == {"hom_ref_rows": 2, "absent": 2, "restored": 2}
+    assert stats == {"hom_ref_rows": 2, "absent": 2, "withheld_hard_region": 0, "restored": 2}
 
     got = rows.collect().sort("start")
     assert got["start"].to_list() == [135851076, 135859184]
@@ -590,7 +584,10 @@ class TestRestorableSites:
         assert restorable_sites(sites, disabled.called_sites, disabled).collect().height == 0
 
     @pytest.mark.parametrize("requires_callable,kept", [(True, 0), (False, 1), (None, 1)])
-    def test_requires_callable_withholds_only_on_true(self, requires_callable, kept):
+    def test_without_a_mask_requires_callable_withholds_only_on_true(self, requires_callable, kept):
+        """The rule when the hard-region mask is not loaded: the flank proxy alone is not the
+        callability evidence a flagged row asks for (format RM6), so `True` is withheld and a blank
+        cell is unknown, never `false`."""
         vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
                      "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
         ctx = _wgs_context(vcf)
@@ -599,3 +596,69 @@ class TestRestorableSites:
             schema={"chrom": pl.String, "start": pl.Int64, "requires_callable": pl.Boolean},
         ).lazy()
         assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == kept
+
+
+def _masked(ctx: RestorationContext, regions: list[tuple[str, int, int]]) -> RestorationContext:
+    """The same context with a hand-made hard-region mask (0-based half-open BED intervals)."""
+    mask = pl.DataFrame(
+        {"chrom": [r[0] for r in regions], "region_start": [r[1] for r in regions],
+         "region_end": [r[2] for r in regions]},
+        schema={"chrom": pl.String, "region_start": pl.Int64, "region_end": pl.Int64},
+    ).sort(["chrom", "region_start"])
+    return RestorationContext(
+        called_sites=ctx.called_sites, mode=ctx.mode, scope=ctx.scope,
+        scope_reason=ctx.scope_reason, max_flank_bp=ctx.max_flank_bp,
+        hard_regions=mask, hard_regions_reason="test mask",
+    )
+
+
+class TestHardRegionMask:
+    """On a whole genome a missing call is reference, except where reads cannot be placed."""
+
+    def _ctx(self) -> RestorationContext:
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        return _wgs_context(vcf)
+
+    def _sites(self, rows: list[dict]) -> pl.LazyFrame:
+        return pl.DataFrame(
+            rows, schema={"chrom": pl.String, "start": pl.Int64, "requires_callable": pl.Boolean}
+        ).lazy()
+
+    @pytest.mark.parametrize("requires_callable", [True, False, None])
+    def test_a_site_inside_the_mask_is_never_restored(self, requires_callable) -> None:
+        ctx = _masked(self._ctx(), [("1", 1_040, 1_060)])
+        sites = self._sites([{"chrom": "1", "start": 1_050, "requires_callable": requires_callable}])
+        assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == 0
+
+    @pytest.mark.parametrize("requires_callable", [True, False, None])
+    def test_outside_the_mask_a_flagged_site_is_restored_on_a_genome(self, requires_callable) -> None:
+        """WGS + outside the low-mappability/segdup mask + a call within the flank is the
+        callability evidence `requires_callable=True` asks for."""
+        ctx = _masked(self._ctx(), [("1", 5_000, 6_000)])
+        sites = self._sites([{"chrom": "1", "start": 1_050, "requires_callable": requires_callable}])
+        assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == 1
+
+    @pytest.mark.parametrize(("position", "inside"), [(1_040, False), (1_041, True), (1_060, True), (1_061, False)])
+    def test_bed_intervals_are_zero_based_half_open(self, position: int, inside: bool) -> None:
+        """BED [1040, 1060) holds 1-based positions 1041..1060."""
+        ctx = _masked(self._ctx(), [("1", 1_040, 1_060)])
+        sites = self._sites([{"chrom": "1", "start": position, "requires_callable": None}])
+        assert restorable_sites(sites, ctx.called_sites, ctx).collect().height == (0 if inside else 1)
+
+    def test_restored_rows_counts_what_the_mask_withheld(self) -> None:
+        ctx = _masked(self._ctx(), [("1", 1_040, 1_060)])
+        lead = _lead([
+            {"rsid": "rs_in", "chrom": "1", "start": 1_050, "ref": "G", "genotype": ["G", "G"],
+             "module": "m", "weight": 0.0, "state": "neutral"},
+            {"rsid": "rs_out", "chrom": "1", "start": 1_100, "ref": "C", "genotype": ["C", "C"],
+             "module": "m", "weight": 0.0, "state": "neutral"},
+        ])
+        vcf = _vcf([{"chrom": "1", "start": 1_000, "rsid": None, "ref": "G", "alt": "A",
+                     "filter": "PASS", "GT": "0/1", "genotype": ["A", "G"]}])
+        rows, stats = restored_rows(vcf, lead, "m", ctx)
+        assert stats["absent"] == 2
+        assert stats["withheld_hard_region"] == 1
+        assert stats["restored"] == 1
+        # The module's rsid collides with the VCF's and is suffixed with the module name.
+        assert rows.collect()["rsid_m"].to_list() == ["rs_out"]

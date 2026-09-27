@@ -1061,6 +1061,12 @@ class AnnotationManifest(BaseModel):
     # total because these were inferred, never observed, and a reader is owed that distinction.
     restored_variants: dict[str, int] = {}
     total_variants_restored: int = 0
+    # Hom-ref rows that would have been restored but sit in a region where a missing call does not
+    # mean reference (GIAB low-mappability + segmental duplications; see hard_regions.py), per module.
+    # `restoration_mask` says which mask was in force, or why none was: without it the counts are
+    # absent rather than zero, because nothing was checked.
+    restoration_withheld_hard_region: dict[str, int] = {}
+    restoration_mask: Optional[str] = None
     # Compound-phenotype calls, counted apart from the variant totals for the same reason restored
     # rows are: a phenotype call is a different kind of result from a per-variant annotation, and
     # folding it into `total_variants_annotated` would misreport both. Per-module status counts

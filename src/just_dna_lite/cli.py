@@ -35,6 +35,7 @@ from just_dna_lite.process import (
 )
 from just_dna_pipelines.annotation.cli_annotate import annotate as annotate_cmd
 from just_dna_pipelines.annotation.cli_annotate import annotate_main
+from just_dna_pipelines.annotation.hard_regions import HARD_REGIONS_DESCRIPTION, ensure_hard_regions
 from just_dna_pipelines.annotation.ensembl_download import (
     EnsemblDownloadError,
     download_ensembl_cache,
@@ -591,6 +592,16 @@ def prepare_caches_cmd(
             str(outcome.path) if outcome.path else "",
             outcome.detail or "",
         )
+    # Ours, not an enricher lane: the regions where a missing call on a genome is not read as
+    # reference (restoration and the phenotype caller). Fetched on first use otherwise; provisioning
+    # it here keeps an offline deployment from annotating without it.
+    if not lane:
+        try:
+            mask_path = ensure_hard_regions()
+            table.add_row("hard_regions", "[green]yes[/green]", "giab", str(mask_path), HARD_REGIONS_DESCRIPTION)
+        except Exception as exc:  # network or disk; reported like any failed lane
+            failed += 1
+            table.add_row("hard_regions", "[red]no[/red]", "giab", "", f"{type(exc).__name__}: {exc}")
     Console().print(table)
     if failed:
         raise typer.Exit(1)

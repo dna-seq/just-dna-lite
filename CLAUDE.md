@@ -209,7 +209,9 @@ does not call it.
 - `clin_sig_concordance.parquet` (via `ModuleInfo.concordance_url`) is joined on
   `(variant_key, genotype)`; `discordant` renders *Authorities disagree*. Nothing picks a winner;
   `unchecked` renders nothing.
-- `requires_callable == True` blocks restoration; `False` and null keep the row. Write
+- Restoration never reads a missing call as reference inside GIAB's low-mappability + segdup mask
+  (`hard_regions.py`); outside it, on WGS with a call in the flank, `requires_callable` rows restore too.
+  Mask unavailable → old rule: `requires_callable == True` blocks; `False` and null keep the row. Write
   `is_null() | ~col`, not `fill_null(False)`.
 - Enricher exceptions: we hold no `except` around enricher passes. If you add one, order narrow-first
   (the unavailability type is a subclass).
