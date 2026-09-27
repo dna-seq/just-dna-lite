@@ -69,7 +69,7 @@ REGISTRY: dict[str, V1Module] = {
         data_path="data/longevitymap.sqlite", adapter="longevitymap",
     ),
     "superhuman": V1Module(
-        name="superhuman", version="2.4.0", repo="just_superhuman",
+        name="superhuman", version="2.5.0", repo="just_superhuman",
         data_path="data/superhuman.sqlite", adapter="superhuman",
     ),
     # Gene panels: authored source is just a gene list; ClinVar supplies the pathogenic variants.

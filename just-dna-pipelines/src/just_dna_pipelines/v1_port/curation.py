@@ -18,6 +18,13 @@ so every adapter can reach it. Two tables per module, both tracked in the packag
 what changes; ``drop`` removes the row. Every correction is **reported as a warning** so a build states
 what it overrode — a silent correction is indistinguishable from a silent corruption.
 
+Corrections run in ``run_adapter`` **before** ``v1_port/reanchor.py`` re-anchors an indel to ClinVar,
+so an indel's ``genotype`` here is the *authored* allele spelling the adapter emits, not the
+post-reanchor one that reaches ``variants.csv`` and the parquet. CCR5 rs333 is authored ``A/A`` /
+``A/ACAGTCAGTATCAATTCTGGAAGAATTTCCAGA`` and only later respelled to the ClinVar-anchored ``T/…`` form;
+a correction keyed on the ``T/…`` spelling matches nothing (reported as "matched no row"). SNV rows are
+unaffected — their spelling is stable across reanchor.
+
 **A correction is a curation decision, not a repair the code inferred.** Nothing here is derived; each
 row was adjudicated against the literature and the reason column says on what basis. Where the source
 is internally contradictory and the literature does not settle it, there is deliberately **no row** —
@@ -34,8 +41,9 @@ from just_dna_pipelines.v1_port.genotype import state_from_weight
 _CURATION_DIR = Path(__file__).with_name("data") / "curation"
 
 #: What a variant correction may change. `genotype` rewrites the authored genotype (a strand flip);
-#: `drop` removes the row entirely.
-VARIANT_FIELDS = frozenset({"weight", "conclusion", "genotype", "state", "gene", "drop"})
+#: `negatives` rewrites the trade-off text a source stated awkwardly (or as a bare tag); `drop`
+#: removes the row entirely.
+VARIANT_FIELDS = frozenset({"weight", "conclusion", "genotype", "state", "gene", "negatives", "drop"})
 
 #: What a study correction may change.
 STUDY_FIELDS = frozenset({"pmid", "p_value", "conclusion", "population", "drop"})
