@@ -42,8 +42,9 @@ from just_dna_pipelines.annotation.hf_modules import (
 from just_dna_pipelines.annotation.resources import (
     get_user_output_dir, get_user_input_dir, get_generated_modules_dir,
     download_vcf_from_zenodo, ensure_vcf_in_user_input_dir,
-    validate_zenodo_record, resolve_default_samples,
+    validate_zenodo_record,
 )
+from webui.default_samples import default_samples_future
 from just_dna_pipelines.module_config import (
     build_module_metadata_dict, _load_config,
     is_immutable_mode as _is_immutable_mode,
@@ -92,6 +93,8 @@ from webui.deployment_urls import resolve_dagster_web_public_url, resolve_public
 from webui.registry_errors import describe_contract_mismatch, report_registry_failure
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SAMPLES_PREPARING = "Preparing the public genomes (the first start downloads them)..."
 
 GENERATED_MODULES_DIR: Path = get_generated_modules_dir()
 
@@ -3481,15 +3484,23 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
         user_dir = get_user_input_dir() / self.safe_user_id
 
-        # In immutable mode, ensure default samples are present
+        # In immutable mode the public genomes are fetched off the event loop, starting at server
+        # start (webui.default_samples). Never wait for them here: this handler runs on the loop,
+        # and a multi-gigabyte download inline froze every client until it finished.
         default_sample_results: list[dict] = []
-        if _is_immutable_mode():
-            config = get_immutable_config()
-            if config.default_samples:
-                default_sample_results = resolve_default_samples(user_name=self.safe_user_id, log=logger)
+        follow_up: Optional[EventSpec] = None
+        samples_future = default_samples_future() if _is_immutable_mode() else None
+        if samples_future is not None:
+            if samples_future.done():
+                default_sample_results = samples_future.result()
+                if self.progress_status == DEFAULT_SAMPLES_PREPARING:
+                    self.progress_status = ""
+            else:
+                self.progress_status = DEFAULT_SAMPLES_PREPARING
+                follow_up = UploadState.reload_when_default_samples_ready
 
         if not user_dir.exists():
-            return
+            return follow_up
 
         # Find VCF files, sorted by modification time (newest first)
         vcf_files = list(user_dir.glob("*.vcf")) + list(user_dir.glob("*.vcf.gz"))
@@ -3553,6 +3564,16 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
         # Load recent runs from Dagster
         await self._load_recent_runs()
+        return follow_up
+
+    @rx.event(background=True)
+    async def reload_when_default_samples_ready(self):
+        """Wait off the state lock for the public genomes, then list them."""
+        samples_future = default_samples_future()
+        if samples_future is None:
+            return
+        await asyncio.wrap_future(samples_future)
+        yield UploadState.on_load
 
     async def _load_recent_runs(self):
         """Load recent annotation runs from Dagster."""

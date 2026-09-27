@@ -16,6 +16,7 @@ from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.annotation.resources import get_user_output_dir
 from webui.compute.jobs import kill_all_jobs
 from webui.compute.pool import start_pool, stop_pool
+from webui.default_samples import default_samples_future
 from webui.grid import clear_grid_artifacts
 from reflex import constants
 from reflex.app import default_frontend_exception_handler
@@ -577,6 +578,16 @@ async def _compute_tier_lifespan() -> AsyncIterator[None]:
 
 
 app.register_lifespan_task(_compute_tier_lifespan)
+
+
+@contextlib.asynccontextmanager
+async def _default_samples_lifespan() -> AsyncIterator[None]:
+    """Start fetching the immutable-mode public genomes at server start, not on first visit."""
+    default_samples_future()
+    yield
+
+
+app.register_lifespan_task(_default_samples_lifespan)
 
 # Ensure pages are registered.
 app.add_page(dashboard_page)
