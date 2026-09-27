@@ -15,17 +15,20 @@ the new `pharmgkb` module on the ClinPGx surface, and `lnewco` is now *unblocked
 
 ## Where they're published
 
-The **module registry** (`https://module-registry.just-dna.life`, namespace `just-dna-seq`, server
-`just-dna-registry 0.11.0`) is the primary store; publish via `pipelines marketplace publish
-just-dna-seq <name> <version> data/interim/v1_port/<name>`. The HuggingFace collection
-(`just-dna-seq/annotators`) is **legacy** and kept in sync via `pipelines v1-port publish <name>`.
+The **module registry** (`https://module-registry.just-dna.life`, namespace `just-dna-seq`) is the
+primary store; publish via `pipelines registry publish just-dna-seq <name> <version>
+data/interim/v1_port/<name>` (large panels via `registry import-module <tar.gz>`). The HuggingFace
+collection (`just-dna-seq/annotators`) is **legacy** and kept in sync via `pipelines v1-port publish
+<name>`.
 
-**All nine were published on 2026-07-09 and the registry has since been wiped** — `marketplace list`
-now returns only `eric-mods/lactose_tolerance`. So every module below needs republishing, not just
-the rebuilt ones. The pre-wipe versions and changelogs are preserved in
-[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) so the history stays continuous.
+**All ten were published on 2026-09-27 under the 0.7 line** (format 0.7.0 / compiler 0.7.1 / enricher
+0.7.2), replacing the 2026-07-09 set the registry wipe had removed. Logos and card subtitles are set on
+all ten. The full publish record, per-version 0.7 changelogs, digests and the upstream cases filed are
+in **[MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md)**; the 0.5-era build notes, versions and changelogs
+remain in [MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md) so the history reads continuously.
 
-Build and release commands for all ten modules: **[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md)**.
+Build commands for all ten modules: **[MODULE_RELEASE_0_5.md](MODULE_RELEASE_0_5.md)** (unchanged); the
+0.7 release itself: **[MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md)**.
 
 ## Status overview
 
@@ -169,5 +172,7 @@ Things the new surfaces caught that the old route did not:
 ## Suggested sequencing
 1. ✅ `thrombophilia` published. 2. ✅ `longevitymap` full parity. 3. ✅ `superhuman` v2 curated
 (publish as 2.0.0). 4. ✅ `cardio`/`cancer`/`pathogenic` rebuilt on the 0.5 ClinVar route.
-5. ✅ `pharmgkb` built. 6. ⏸ Decisions left to the maintainer: publish the four unpublished modules,
-republish the six under 0.5 (every digest moves), and build `lnewco` on the diplotype tables.
+5. ✅ `pharmgkb` built. 6. ✅ All ten published under 0.7 to the registry on 2026-09-27, with logos and
+card subtitles set — see [MODULE_RELEASE_0_7.md](MODULE_RELEASE_0_7.md). 7. ⏸ Remaining: mirror the ten
+to HuggingFace, and build `lnewco` on the diplotype tables (item 5 — the only Gen-I module with no
+Gen-II counterpart).
