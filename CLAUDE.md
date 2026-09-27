@@ -646,6 +646,11 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
   `ui fixed menu` and accordions don't: use flexbox. Checkboxes need the Fomantic
   `div.ui.checkbox > input + label` structure, not `rx.checkbox`.
+- **SSR is on only when the prerender runs in bun** (`rxconfig._ssr_build_runs_under_bun`): bun
+  present **and no `node` on PATH**. `@mui/x-data-grid` imports its own `.css`, which Node's ESM
+  loader rejects, so a Node prerender fails every route with a 500. `react-router`'s shebang is
+  `env node`, so bun runs Node whenever Node exists; "bun installed" is not the test. `reflex export`
+  fixes SSR before loading `rxconfig`, so test the gate with `uv run serve`.
 - Custom routes: pass a FastAPI app as `rx.App(api_transformer=api)`. They are served by the **backend**
   only. Never hardcode port 8000: `webui.run` picks a free port into `API_URL` / `REFLEX_BACKEND_PORT`;
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);

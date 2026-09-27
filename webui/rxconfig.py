@@ -14,14 +14,11 @@ _IS_WINDOWS = sys.platform == "win32"
 
 
 def _bun_available() -> bool:
-    """Whether reflex can find a bun binary to run the Vite SSR pass.
+    """Whether reflex can find a bun binary to run its frontend scripts.
 
-    @mui/x-data-grid ships a bare `.css` import that bun resolves transparently
-    but Node's ESM loader cannot (``Unknown file extension ".css"``).  Reflex
-    runs SSR through bun when present and falls back to Node otherwise, so bun
-    availability — not the OS — decides whether SSR is safe here.  We mirror the
-    locations reflex searches without importing reflex (which must not happen
-    before REFLEX_SSR is set, or the setting would miss the process fork).
+    We mirror the locations reflex searches without importing reflex (which must
+    not happen before REFLEX_SSR is set, or the setting would miss the process
+    fork).
     """
     exe = "bun.exe" if _IS_WINDOWS else "bun"
     if shutil.which(exe):
@@ -42,12 +39,29 @@ def _bun_available() -> bool:
     return any((root / "bin" / exe).exists() for root in roots)
 
 
+def _ssr_build_runs_under_bun() -> bool:
+    """Whether the Vite SSR pass would execute in bun rather than Node.
+
+    @mui/x-data-grid's ``esm/DataGrid/index.js`` does ``import '../index.css'``.
+    Vite leaves node_modules external in the SSR bundle, so prerendering imports
+    that file at runtime: bun resolves it, Node's ESM loader raises
+    ``Unknown file extension ".css"`` and every route prerenders as a 500.
+
+    Bun being present is not enough. Reflex runs ``bun run export``, whose
+    ``react-router`` binary starts with ``#!/usr/bin/env node``; bun honours that
+    shebang whenever ``node`` is on PATH and only stands in for Node when it is
+    not. So a machine with both (a clean clone on a dev box) ran the prerender in
+    Node and crashed, while the container, which installs no Node, worked.
+    """
+    node = "node.exe" if _IS_WINDOWS else "node"
+    return _bun_available() and shutil.which(node) is None
+
+
 # Resolve REFLEX_SSR *before* importing reflex, so the value is in place before
-# reflex forks its frontend/backend processes.  Default SSR off when bun is not
-# available (Node would crash on the @mui/x-data-grid CSS import); leave the
-# user's / reflex's own choice untouched when bun is present or REFLEX_SSR is
-# set explicitly.  Upstream fix needed in reflex-mui-datagrid / reflex.
-if os.environ.get("REFLEX_SSR") is None and not _bun_available():
+# reflex forks its frontend/backend processes.  Default SSR off unless the SSR
+# pass would run under bun (see above); an explicit REFLEX_SSR always wins.
+# Upstream fix needed in reflex-mui-datagrid / reflex.
+if os.environ.get("REFLEX_SSR") is None and not _ssr_build_runs_under_bun():
     os.environ["REFLEX_SSR"] = "false"
 os.environ.setdefault("REFLEX_SOCKET_MAX_HTTP_BUFFER_SIZE", "50000000")
 
