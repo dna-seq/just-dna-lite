@@ -42,7 +42,7 @@ uv sync
 uv run start
 ```
 
-Open the address the terminal prints, usually `http://localhost:3000`.
+Open the address the terminal prints, usually `http://localhost:3000`. The first start writes its own settings and folders automatically; there is nothing to configure.
 
 <details>
 <summary><strong>First-time setup, and when <code>uv run start</code> complains</strong></summary>

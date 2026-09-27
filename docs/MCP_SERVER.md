@@ -83,8 +83,8 @@ While that stack is running, the other two pages are the ones the launcher print
 | `get_job` / `list_jobs` | Status, per-genome progress (live Dagster steps while running), errors, worker log tail. |
 | `wait_for_job` | Block until the job settles, sending progress notifications. |
 | `cancel_job` | Stop a job; genomes already finished keep their results. |
-| `get_results` | Per genome: report path, and per module whether it annotated, was skipped or failed, and rows matched/restored. |
-| `validate_module` | Coverage, score distribution and join health for one module over every genome in a job. |
+| `get_results` | Per genome: report path, and per module whether it annotated, was skipped or failed, and rows matched/restored. For a phenotype module, its per-gene calls instead (`phenotype_calls`: gene, status, result, the allele pairs that fit, whether phase would decide). |
+| `validate_module` | Coverage, score distribution and join health for one module over every genome in a job. Refuses a phenotype module with the reason: its checks are about per-variant weights, which such a module has none of. |
 | `get_variant_rows` | Per-genome rows: each sample's genotype at each module variant and the weight it got, or the coverage matrix filtered by status. |
 
 ## How jobs run
@@ -111,6 +111,15 @@ settles. Clients that don't do that can poll `get_job` instead. Progress also ke
 under idle timeouts (Claude Code's default is 30 minutes for stdio servers and 5 minutes for HTTP).
 The server does not use the MCP Tasks extension, because neither Claude Code nor Cursor supports
 it yet.
+
+## Phenotype modules
+
+A module with `haplotypes` plus a combiner (see [PHENOTYPE_CALLS.md](PHENOTYPE_CALLS.md)) produces one
+call per gene, written as `{module}_phenotypes.parquet`; the worker snapshots it beside the weights
+parquets. `get_results` returns those calls. `validate_module` does not score them and says so, rather
+than returning an empty report that would read as "nothing wrong". To check calls against ground truth,
+run the module on a family and use `scripts/family_check.py`, which tests every call for Mendelian
+consistency and reports anything it could not read as unchecked.
 
 ## What `validate_module` checks
 

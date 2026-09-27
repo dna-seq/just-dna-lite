@@ -132,6 +132,9 @@ Full reference: **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)**. Rules that keep it
   snapshot** of `{module}_weights.parquet` (`jobs/<id>/results/<user>__<sample>/`). In a run's
   output the module's rsID is `rsid_{module}`; plain `rsid` is the VCF's ID cell, often empty.
 - **Findings stay three-valued**: `not_assessed` when a check could not run, never silence.
+- **A phenotype module goes through `get_results`, not `validate_module`.** The worker snapshots
+  `{module}_phenotypes.parquet`, `get_results` returns its per-gene calls (`phenotype_calls`), and
+  `validate_module` refuses it with the reason, because every check there is about per-variant weights.
 - **When the stack is up, give the live UI URLs.** A reply that uses the MCP while `uv run start` is up
   includes the web UI and Dagster addresses, read from the launcher banner or the listening ports, never
   assumed: Reflex prints another port when 3000 is taken (a leftover `prs-ui` often holds it); Dagster

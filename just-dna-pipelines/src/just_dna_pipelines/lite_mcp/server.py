@@ -30,6 +30,7 @@ from fastmcp.server.lifespan import lifespan
 from pydantic import BaseModel, Field
 
 from just_dna_pipelines.annotation.annotation_runner import ensure_dagster_home
+from just_dna_pipelines.annotation.hf_modules import module_kind
 from just_dna_pipelines.annotation.resources import get_user_output_dir, get_workspace_root
 from just_dna_pipelines.lite_mcp import catalog, jobs
 from just_dna_pipelines.lite_mcp.catalog import InstallError, InstallResult, ModuleSummary, SampleListing
@@ -352,6 +353,16 @@ def cancel_job(job_id: str) -> JobView:
     return _view(record)
 
 
+class PhenotypeCallSummary(BaseModel):
+    """One gene's call from a phenotype module (see docs/PHENOTYPE_CALLS.md for the full contract)."""
+
+    gene: str
+    status: Literal["called", "ambiguous", "not_assessable", "no_match"]
+    phenotype: Optional[str] = Field(None, description="Set only when every consistent allele pair gives one result")
+    candidates: list[str] = Field(default_factory=list, description="Allele pairs consistent with the genome, as 'a/b'")
+    phase_would_decide: bool = False
+
+
 class ModuleResult(BaseModel):
     module: str
     status: Literal["annotated", "skipped", "failed", "no_output"]
@@ -359,6 +370,9 @@ class ModuleResult(BaseModel):
     rows_written: Optional[int] = None
     rows_matched: Optional[int] = None
     rows_restored: Optional[int] = None
+    phenotype_calls: Optional[list[PhenotypeCallSummary]] = Field(
+        None, description="A phenotype module's per-gene calls; None for a weights-led module"
+    )
     parquet: Optional[str] = None
 
 
@@ -376,12 +390,29 @@ def _sample_module_path(record: JobRecord, sample_id: str, module: str) -> Path:
     return results_dir(Path(record.log_path).parent, sample_id) / f"{module}_weights.parquet"
 
 
+def _sample_phenotypes_path(record: JobRecord, sample_id: str, module: str) -> Path:
+    return results_dir(Path(record.log_path).parent, sample_id) / f"{module}_phenotypes.parquet"
+
+
 def _module_result(record: JobRecord, run: jobs.SampleRun, module: str) -> ModuleResult:
     outcome = run.outcome
     if outcome is not None and module in outcome.failed_modules:
         return ModuleResult(module=module, status="failed", reason=outcome.failed_modules[module])
     if outcome is not None and module in outcome.skipped_modules:
         return ModuleResult(module=module, status="skipped", reason=outcome.skipped_modules[module])
+    phenotypes = _sample_phenotypes_path(record, run.sample_id or "", module)
+    if run.sample_id is not None and phenotypes.exists():
+        calls = [
+            PhenotypeCallSummary(
+                gene=row["gene"],
+                status=row["status"],
+                phenotype=row["phenotype"],
+                candidates=[f"{c['haplotype_a']}/{c['haplotype_b']}" for c in row["candidates"]],
+                phase_would_decide=bool(row["phase_would_decide"]),
+            )
+            for row in pl.read_parquet(phenotypes).iter_rows(named=True)
+        ]
+        return ModuleResult(module=module, status="annotated", phenotype_calls=calls, parquet=str(phenotypes))
     path = _sample_module_path(record, run.sample_id or "", module)
     if run.sample_id is None or not path.exists():
         return ModuleResult(module=module, status="no_output")
@@ -454,6 +485,14 @@ def validate_module(job_id: str, module: str) -> ValidationReport:
         raise _fail(f"Job {job_id} did not run {module!r}; it ran {', '.join(record.request.modules)}.")
     if record.status in jobs.ACTIVE:
         raise _fail(f"Job {job_id} is still {record.status}; wait_for_job first.")
+    if module_kind(_module_info(module)) == "phenotype":
+        # Every check below is about per-variant rows and weights, which a phenotype module does not
+        # have. Refusing says so; an empty report would read as "nothing wrong".
+        raise _fail(
+            f"{module!r} is a phenotype module: its result is one call per gene, not per-variant rows, so "
+            "the coverage and score checks do not apply. Read each genome's calls from get_results "
+            "(phenotype_calls). On a family, scripts/family_check.py checks the calls for Mendelian consistency."
+        )
     inputs: list[SampleInput] = []
     for run in record.samples:
         if run.sample_id is None:

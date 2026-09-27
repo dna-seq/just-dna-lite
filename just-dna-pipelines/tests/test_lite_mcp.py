@@ -22,6 +22,7 @@ import pytest
 from dagster import validate_run_config
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
+from phenotype_fixtures import compile_fixture, probe_local
 
 from just_dna_pipelines.annotation.annotation_runner import (
     ENSEMBL_JOB,
@@ -36,7 +37,9 @@ from just_dna_pipelines.annotation.hf_logic import (
     prepare_vcf_for_module_annotation,
 )
 from just_dna_pipelines.annotation.hf_modules import ModuleInfo
-from just_dna_pipelines.lite_mcp import jobs
+from just_dna_pipelines.annotation.phenotype_caller import call_phenotype_module, load_phenotype_definition
+from just_dna_pipelines.annotation.restoration import CallsetScope, RestorationContext, build_restoration_context
+from just_dna_pipelines.lite_mcp import catalog, jobs
 from just_dna_pipelines.lite_mcp.server import mcp
 from just_dna_pipelines.lite_mcp.validation import SampleInput, validate_module_run
 
@@ -322,3 +325,49 @@ def test_job_records_round_trip_through_json(tmp_path: Path, monkeypatch: pytest
     record = _write_job(tmp_path, monkeypatch, pid=None, status="queued")
     raw = json.loads(jobs.job_file(jobs.job_dir(record.job_id)).read_text())
     assert jobs.JobRecord.model_validate(raw) == record
+
+
+# --- Phenotype modules through the MCP: per-gene calls, and an explicit refusal to score them ----------
+
+
+def test_a_phenotype_module_reports_its_calls_and_is_not_scored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """get_results carries a phenotype module's per-gene calls; validate_module says why it cannot check it.
+
+    The module is the vendored HFE fixture compiled with the installed compiler, and the calls are the
+    real caller's on an unphased C282Y/H63D double heterozygote, so the expected candidates come from
+    the module's own diplotype table rather than being typed here.
+    """
+    info = probe_local(compile_fixture("hfe_compound_het", tmp_path / "compiled"), "hfe_compound_het")
+    monkeypatch.setattr(catalog, "module_infos", lambda: {"hfe_compound_het": info})
+    record = _write_job(tmp_path, monkeypatch, pid=None, status="succeeded")
+    record = record.model_copy(update={
+        "request": jobs.JobRequest(samples=["test/s"], modules=["hfe_compound_het"]),
+        "samples": [jobs.SampleRun(requested="test/s", sample_id="test/s", status="succeeded")],
+    })
+    jobs.save_job(record)
+
+    vcf = pl.DataFrame(
+        {"chrom": ["6", "6"], "start": [26092913, 26090951], "rsid": [None, None], "ref": ["G", "C"],
+         "alt": ["A", "G"], "filter": ["PASS", "PASS"], "GT": ["0/1", "0/1"], "genotype": [["A", "G"], ["C", "G"]]},
+        schema_overrides={"start": pl.UInt32, "genotype": pl.List(pl.String), "rsid": pl.String},
+    ).lazy()
+    base = build_restoration_context(vcf, 10_000)
+    context = RestorationContext(called_sites=base.called_sites, mode=base.mode, scope=CallsetScope.WGS,
+                                 scope_reason="forced for this test", max_flank_bp=10_000)
+    out = jobs.results_dir(Path(record.log_path).parent, "test/s")
+    out.mkdir(parents=True, exist_ok=True)
+    call_phenotype_module(vcf, "hfe_compound_het", info, context, out / "hfe_compound_het_phenotypes.parquet")
+
+    results = _call("get_results", {"job_id": record.job_id})
+    module = results["result"][0]["modules"][0]
+    assert module["status"] == "annotated"
+    (call,) = module["phenotype_calls"]
+    assert call["gene"] == "HFE" and call["status"] == "ambiguous" and call["phase_would_decide"] is True
+    # Every allele pair the module maps that carries one C282Y and one H63D across the two copies.
+    diplos = load_phenotype_definition("hfe_compound_het", info).genes["HFE"].diplotypes
+    expected = {f"{d['haplotype_a']}/{d['haplotype_b']}" for d in diplos
+                if {d["haplotype_a"], d["haplotype_b"]} in ({"C282Y", "H63D"}, {"C282Y-H63D", "wt"})}
+    assert set(call["candidates"]) == expected
+
+    with pytest.raises(ToolError, match="phenotype module"):
+        _call("validate_module", {"job_id": record.job_id, "module": "hfe_compound_het"})

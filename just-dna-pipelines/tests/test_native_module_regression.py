@@ -14,6 +14,7 @@ import pytest
 from just_dna_pipelines.annotation.hf_modules import (
     MODULE_INFOS,
     ModuleInfo,
+    local_module_dir,
     module_kind,
 )
 
@@ -29,14 +30,23 @@ class TestModuleKindIsPure:
             pytest.skip(f"{name} not discovered in this checkout")
         assert module_kind(MODULE_INFOS[name]) == "variant"
 
-    def test_no_currently_discovered_module_is_phenotype(self) -> None:
+    def test_no_shipped_module_is_phenotype(self) -> None:
         """None of the modules we ship carry the phenotype tables, so all classify `variant`.
 
-        This is the exhaustive half of the fence: if a future discovery starts returning a module
-        the caller would grab, this catches it rather than a report silently changing shape.
+        This is the exhaustive half of the fence: if a future discovery starts returning a shipped
+        module the caller would grab, this catches it rather than a report silently changing shape.
+        A module registered on this machine (a local directory) may legitimately be a phenotype
+        module, such as a locally built blood-group module; it then has to carry the tables that make
+        it one, and nothing else routes there.
         """
         for name, info in MODULE_INFOS.items():
-            assert module_kind(info) == "variant", f"{name} unexpectedly classified phenotype"
+            if local_module_dir(info) is None:
+                assert module_kind(info) == "variant", f"shipped module {name} unexpectedly classified phenotype"
+            elif module_kind(info) == "phenotype":
+                assert info.haplotypes_url is not None, name
+                assert info.diplotypes_url is not None or (
+                    info.allele_function_url is not None and info.activity_phenotype_url is not None
+                ), name
 
     def _info(self, **kw: object) -> ModuleInfo:
         return ModuleInfo(name="m", repo_id="r", path="p", lead_url="u", **kw)  # type: ignore[arg-type]

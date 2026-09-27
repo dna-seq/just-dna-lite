@@ -82,7 +82,9 @@ def snapshot_results(job_directory: Path, partition_key: str, modules_dir: Path,
     """
     target = results_dir(job_directory, partition_key)
     target.mkdir(parents=True, exist_ok=True)
-    for name in [*(f"{m}_weights.parquet" for m in modules), "manifest.json"]:
+    # A weights-led module writes {m}_weights.parquet; a phenotype module writes {m}_phenotypes.parquet.
+    names = [f"{m}_{kind}.parquet" for m in modules for kind in ("weights", "phenotypes")]
+    for name in [*names, "manifest.json"]:
         source = modules_dir / name
         if source.exists():
             shutil.copy2(source, target / name)
