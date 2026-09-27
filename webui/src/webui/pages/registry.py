@@ -20,6 +20,13 @@ from just_dna_pipelines.module_config import get_registry_stores
 from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
 from webui.state import RegistryState
 
+# The manifest's ClinVar counts are per genotype row, not per variant (one row per zygosity, so a
+# panel reports roughly twice its variant count), and "pathogenic" includes likely pathogenic.
+_CLINVAR_COUNT_TITLE = (
+    "Genotype rows flagged pathogenic or likely pathogenic (and benign) in ClinVar. "
+    "Each variant has one row per zygosity, so this can exceed the variant count."
+)
+
 
 # ============================================================================
 # LEFT PANEL — selected module details + local list
@@ -295,10 +302,10 @@ def _selected_card() -> rx.Component:
                     rx.cond(
                         RegistryState.selected_clinvar_count > 0,
                         rx.el.span(
-                            RegistryState.selected_pathogenic_count, " path / ",
+                            RegistryState.selected_pathogenic_count, " pathogenic / ",
                             RegistryState.selected_benign_count, " benign",
                             class_name="ui mini red label", style={"marginLeft": "4px"},
-                            title="ClinVar pathogenic / benign variants",
+                            title=_CLINVAR_COUNT_TITLE,
                         ),
                         rx.fragment(),
                     ),
@@ -552,9 +559,9 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
             rx.cond(
                 card["clinvar_count"].to(int) > 0,
                 rx.el.span(
-                    card["pathogenic_count"].to(int), " path",
+                    card["pathogenic_count"].to(int), " pathogenic",
                     class_name="ui mini red label", style={"marginLeft": "4px"},
-                    title="ClinVar pathogenic variants",
+                    title=_CLINVAR_COUNT_TITLE,
                 ),
                 rx.fragment(),
             ),
