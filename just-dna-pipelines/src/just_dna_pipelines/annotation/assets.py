@@ -330,7 +330,7 @@ def user_vcf_normalized(
         # one run deleted and rewrote the file the other was reading back, which failed as
         # "parquet: File out of specification: The file must end with PAR1". The last replace wins.
         temp_output_path = output_path.with_name(
-            f"{output_path.stem}.{context.run_id}.tmp{output_path.suffix}"
+            f"{output_path.stem}.{context.run.run_id}.tmp{output_path.suffix}"
         )
         lf.sink_parquet(str(temp_output_path), compression=config.compression)
         row_count = pl.scan_parquet(str(temp_output_path)).select(pl.len()).collect().item()
