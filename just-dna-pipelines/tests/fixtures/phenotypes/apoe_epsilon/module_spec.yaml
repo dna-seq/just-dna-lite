@@ -7,8 +7,22 @@ module:
   icon_set: fomantic
   color: '#a333c8'
   name: apoe_epsilon
-  version: '1.0.0'
+  version: '1.1.0'
 defaults:
   curator: ai-module-creator
   method: literature-review
 genome_build: GRCh38
+license: MIT
+authorship:
+  - who: Anton Kulaga <antonkulaga@gmail.com>
+    role: edited
+    kind: [human]
+    at: '2026-09-27'
+  - who: claude-opus-5-5 (Claude, via just-module-creator)
+    role: edited
+    kind: [ai, agent]
+    at: '2026-09-27'
+  - who: claude-opus-5-5 (Claude, two independent reviewer agents, a lay reader and a scientific reviewer)
+    role: reviewed
+    kind: [ai, agent]
+    at: '2026-09-27'

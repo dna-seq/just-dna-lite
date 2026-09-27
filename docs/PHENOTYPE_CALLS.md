@@ -153,7 +153,7 @@ upstream reference examples, and each README says so under *About this copy*.
 - Write labels and conclusions for a lay reader ([REPORT_VOICE.md](REPORT_VOICE.md)): the label is the
   result in words, the conclusion starts with it about the reader, and every term (ε4, C282Y) is
   explained in the conclusion that uses it. Put the rule in plain words under `## How this works` in the
-  module's `README.md`; the report shows that section before the results.
+  module's `README.md`; the report shows that section after the results, closed.
 - A structural or copy-number allele carries its symbolic spelling; the caller reports it not assessable
   from an SNV VCF rather than guessing.
 

@@ -1,14 +1,48 @@
 {
-  "module_hash": "sha256:0ae3c1b389ac0736a19dccee41ab9879163dfe858a6a1dce25c8a8c73dc94714",
-  "signature": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "module_hash": "sha256:c25a2d814f301cba4c999241c1b1715b2eb025116bacc8d9da51e229aca0d355",
+  "signature": "sha256:29d5bf13c3fac46b5c3aa729aa4159d72c69028da39054c064ffe65aeede9ca3",
   "difficulty": 20,
-  "nonce": 1618113,
-  "producer": null,
-  "produced_at": "2026-08-15T23:27:16Z",
+  "nonce": 875453,
+  "producer": "just-dna-enricher 0.7.2",
+  "produced_at": "2026-09-27T08:02:29Z",
   "closure": {
-    "closed_at": "2026-08-16T21:47:20Z",
-    "closed_by": "just-dna-format reference corpus",
+    "closed_at": "2026-09-27T08:02:51Z",
+    "closed_by": "Anton Kulaga",
     "signature": null
   },
-  "records": []
+  "records": [
+    {
+      "check": "citation_existence",
+      "subjects": 9,
+      "findings": 0,
+      "skipped": null,
+      "detail": null,
+      "source": "pubmed",
+      "release": null,
+      "checked_at": "2026-09-27T08:02:29Z",
+      "producer": "just-dna-enricher 0.7.2"
+    },
+    {
+      "check": "citation_identifier",
+      "subjects": 0,
+      "findings": 0,
+      "skipped": "nothing_to_check",
+      "detail": "none of 9 citation(s) carries an authored DOI or PMC id, so there was nothing to compare against PubMed's own",
+      "source": "pubmed",
+      "release": null,
+      "checked_at": "2026-09-27T08:02:29Z",
+      "producer": "just-dna-enricher 0.7.2"
+    },
+    {
+      "check": "provenance_quote",
+      "subjects": 10,
+      "findings": 0,
+      "skipped": null,
+      "detail": "3 further authored quote(s) outside this denominator: 3 in articles whose fulltext could not be read (or only an abstract could, where a miss is not a verdict)",
+      "source": "europepmc",
+      "release": null,
+      "checked_at": "2026-09-27T08:02:29Z",
+      "producer": "just-dna-enricher 0.7.2"
+    }
+  ]
 }

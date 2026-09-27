@@ -1,0 +1,199 @@
+{
+  "generator": "just-module-creator",
+  "items": [
+    {
+      "variant_key": "HFE C282Y-H63D/C282Y",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: rarity stated as a fact about the arrangement, not about the reader's call; blood test phrase. Source said: You have the C282Y change on both copies of the HFE gene, with an extra H63D change on one of them. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. This arrangement is very rare: expert guidelines state that the two changes arose separately in human history and are found on different copies of the gene. It is expected to work like having two C282Y copies, the pattern behind most hereditary haemochromatosis, because the extra change sits on a copy that is already affected; this has not been studied directly. By middle age most people with two C282Y copies have raised iron levels, and far fewer become ill, men much more often than women. A blood test of ferritin and transferrin saturation shows whether iron is building up, and a doctor decides what, if anything, to do. [jmc field=conclusion value_sha256=f51405ca3f62 source=PMIDs 26153218, 18199861 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "conclusion": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: rarity stated as a fact about the arrangement, not about the reader's call; blood test phrase. Source said: You have the C282Y change on both copies of the HFE gene, with an extra H63D change on one of them. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. This arrangement is very rare: expert guidelines state that the two changes arose separately in human history and are found on different copies of the gene. It is expected to work like having two C282Y copies, the pattern behind most hereditary haemochromatosis, because the extra change sits on a copy that is already affected; this has not been studied directly. By middle age most people with two C282Y copies have raised iron levels, and far fewer become ill, men much more often than women. A blood test of ferritin and transferrin saturation shows whether iron is building up, and a doctor decides what, if anything, to do."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y-H63D/C282Y",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y/H63D in cis with a second C282Y. Source said: C282Y/H63D in cis with a second C282Y. [jmc field=phenotype value_sha256=9a43412aea63 source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y/H63D in cis with a second C282Y. Source said: C282Y/H63D in cis with a second C282Y."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y-H63D/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk_factor' contradicted it; set to blank. Source said: risk_factor. [jmc field=clin_sig value_sha256=c3c513fbfaba source=PMIDs 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "clin_sig": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk_factor' contradicted it; set to blank. Source said: risk_factor."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y-H63D/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: the cis call is only made from phased data, so the closing doubt about the arrangement was removed and the rarity is stated as a fact about the arrangement; added the children note (a child inheriting this copy plus another C282Y would have two C282Y changes); limit stays the last sentence. Source said: You carry the C282Y and H63D changes on the same copy of the HFE gene, and a normal version on the other copy. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. This arrangement is very rare: expert guidelines state that the two changes arose separately in human history and are found on different copies of the gene. With one normal copy, this is expected to behave like carrying a single C282Y change, which does not raise the risk of hereditary haemochromatosis, although this arrangement has not been studied directly. If your DNA file cannot tell which arrangement you have, one change on each copy is by far the more likely one. [jmc field=conclusion value_sha256=f0f33a378317 source=PMIDs 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "conclusion": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: the cis call is only made from phased data, so the closing doubt about the arrangement was removed and the rarity is stated as a fact about the arrangement; added the children note (a child inheriting this copy plus another C282Y would have two C282Y changes); limit stays the last sentence. Source said: You carry the C282Y and H63D changes on the same copy of the HFE gene, and a normal version on the other copy. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. This arrangement is very rare: expert guidelines state that the two changes arose separately in human history and are found on different copies of the gene. With one normal copy, this is expected to behave like carrying a single C282Y change, which does not raise the risk of hereditary haemochromatosis, although this arrangement has not been studied directly. If your DNA file cannot tell which arrangement you have, one change on each copy is by far the more likely one."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y-H63D/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk' contradicted it; set to neutral. Source said: risk. [jmc field=direction value_sha256=7e2372f4115c source=PMIDs 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "direction": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk' contradicted it; set to neutral. Source said: risk."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y-H63D/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y and H63D in cis. Source said: C282Y and H63D in cis. [jmc field=phenotype value_sha256=7028bc0db151 source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y and H63D in cis. Source said: C282Y and H63D in cis."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/C282Y",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M5/C3: Allen 2008 disease definition includes raised liver enzymes, now said; added severe morbidity such as cirrhosis about 4% (5.6% in men), EMQN 2016 text located via fetch_fulltext; added siblings ~25% (EMQN) and that the usual treatment for high iron is simple and prevents damage (EMQN, AASLD), with a doctor deciding. Lay reader: blood test named as 'a blood test of iron levels (ferritin and transferrin saturation)'. Source said: You have two copies of the HFE change known as C282Y, one from each parent. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. This is the pattern found in most people diagnosed with hereditary haemochromatosis, where the body slowly stores too much iron, and about 1 in 200 people of northern European ancestry have it. It is well established that by middle age most people with it have higher iron levels in the blood than people with two normal copies. Far fewer become ill: in a large study following people from middle age for about 12 years, about 28 in 100 men and 1 in 100 women with this result developed iron-related disease, such as liver damage or joint damage in the knuckles. Women are thought to be protected partly by monthly blood loss. A blood test of ferritin and transferrin saturation shows whether iron is building up, and a doctor decides what, if anything, to do. [jmc field=conclusion value_sha256=ffa14ef5fa90 source=PMIDs 18199861, 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "conclusion": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M5/C3: Allen 2008 disease definition includes raised liver enzymes, now said; added severe morbidity such as cirrhosis about 4% (5.6% in men), EMQN 2016 text located via fetch_fulltext; added siblings ~25% (EMQN) and that the usual treatment for high iron is simple and prevents damage (EMQN, AASLD), with a doctor deciding. Lay reader: blood test named as 'a blood test of iron levels (ferritin and transferrin saturation)'. Source said: You have two copies of the HFE change known as C282Y, one from each parent. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. This is the pattern found in most people diagnosed with hereditary haemochromatosis, where the body slowly stores too much iron, and about 1 in 200 people of northern European ancestry have it. It is well established that by middle age most people with it have higher iron levels in the blood than people with two normal copies. Far fewer become ill: in a large study following people from middle age for about 12 years, about 28 in 100 men and 1 in 100 women with this result developed iron-related disease, such as liver damage or joint damage in the knuckles. Women are thought to be protected partly by monthly blood loss. A blood test of ferritin and transferrin saturation shows whether iron is building up, and a doctor decides what, if anything, to do."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/C282Y",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y homozygous. Source said: C282Y homozygous. [jmc field=phenotype value_sha256=9f7c86b7da9d source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y homozygous. Source said: C282Y homozygous."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/H63D",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M4: removed \"(in trans), so neither copy makes the usual HFE protein\" (H63D only changes the protein slightly); now says one copy carries C282Y which stops the protein working, the other H63D which changes it only slightly. Lay reader: \"copy of the gene\" not \"copy of the chromosome\"; removed the closing contrast with the cis result (planted doubt); blood test phrase. Source said: You have one C282Y change and one H63D change in the HFE gene, one on each copy of the chromosome (in trans), so neither copy makes the usual HFE protein. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. Your iron levels are likely to run somewhat higher than those of people with two normal copies, but illness from iron is rare: in a large study following people from middle age for about 12 years, 1 of 82 men and none of 95 women with this combination developed iron-related disease. When people with it do build up too much iron, it is usually mild to moderate and usually comes with something else, such as heavy drinking or a fatty liver. About 2 in 100 people of northern European ancestry have this combination. A blood test of ferritin and transferrin saturation shows how your body is handling iron, and a doctor decides what, if anything, to do. This is a different finding from carrying both changes on the same copy, which leaves one normal copy. [jmc field=conclusion value_sha256=32f5798160c3 source=PMIDs 19554541, 26153218 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "conclusion": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M4: removed \"(in trans), so neither copy makes the usual HFE protein\" (H63D only changes the protein slightly); now says one copy carries C282Y which stops the protein working, the other H63D which changes it only slightly. Lay reader: \"copy of the gene\" not \"copy of the chromosome\"; removed the closing contrast with the cis result (planted doubt); blood test phrase. Source said: You have one C282Y change and one H63D change in the HFE gene, one on each copy of the chromosome (in trans), so neither copy makes the usual HFE protein. The HFE gene helps control how much iron the body absorbs from food. C282Y is the name lab reports use for a change of one DNA letter in the HFE gene that stops the protein it makes from working properly. H63D is the name lab reports use for a common one-letter change in the HFE gene whose effect on iron is small. Your iron levels are likely to run somewhat higher than those of people with two normal copies, but illness from iron is rare: in a large study following people from middle age for about 12 years, 1 of 82 men and none of 95 women with this combination developed iron-related disease. When people with it do build up too much iron, it is usually mild to moderate and usually comes with something else, such as heavy drinking or a fatty liver. About 2 in 100 people of northern European ancestry have this combination. A blood test of ferritin and transferrin saturation shows how your body is handling iron, and a doctor decides what, if anything, to do. This is a different finding from carrying both changes on the same copy, which leaves one normal copy."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/H63D",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y/H63D compound heterozygous. Source said: C282Y/H63D compound heterozygous. [jmc field=phenotype value_sha256=a7d1bc583e05 source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y/H63D compound heterozygous. Source said: C282Y/H63D compound heterozygous."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk_factor' contradicted it; set to blank. Source said: risk_factor. [jmc field=clin_sig value_sha256=c3c513fbfaba source=PMIDs 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "clin_sig": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk_factor' contradicted it; set to blank. Source said: risk_factor."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/wt",
+      "rationale": "Carrier frequency 1 in 10 confirmed (Steinberg 2001: 9.54% non-Hispanic whites; HEIRS 10% whites), population stated as measured in North American studies. 'Usually normal iron levels' corrected to EMQN 2016: some carriers have mildly raised iron indices, complications very rare and may involve other factors; carriers not at increased risk (AASLD 2011, EMQN 2016). [jmc field=conclusion value_sha256=2ed43871dcbf source=PMIDs 11325323, 20008199, 21452290, 26153218 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "HFE C282Y/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk' contradicted it; set to neutral. Source said: risk. [jmc field=direction value_sha256=7e2372f4115c source=PMIDs 26153218, 21452290 recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "direction": "Independent review 2026-09-27 (lay reader and scientific reviewer): Scientific reviewer M-map: the conclusion says a single C282Y copy does not raise the risk (EMQN, AASLD: C282Y heterozygotes are at no increased risk), so 'risk' contradicted it; set to neutral. Source said: risk."
+      }
+    },
+    {
+      "variant_key": "HFE C282Y/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y heterozygous. Source said: C282Y heterozygous. [jmc field=phenotype value_sha256=72337a2ddb87 source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: C282Y heterozygous. Source said: C282Y heterozygous."
+      }
+    },
+    {
+      "variant_key": "HFE H63D/H63D",
+      "rationale": "Frequency widened from 'about 2 in 100' to '2 to 3 in 100' because EMQN 2016 gives about 3% in Europe while Steinberg 2001 gives 1.89% (US) and HEIRS 2.4% (whites). 'Iron levels largely overlap with everyone else's' was unsourced; replaced with EMQN/AASLD: possible slight rise in ferritin/TSAT, generally not at risk of progressive overload, significance uncertain; not classified as HFE haemochromatosis. Practical note: doctor looks for other causes (EMQN). H63D definition sentence changed in every row to 'a common one-letter change in the HFE gene whose effect on iron is small' so it reads correctly where C282Y is not mentioned; identical across rows. [jmc field=conclusion value_sha256=cdc99f3b5b5a source=PMIDs 26153218, 11325323, 20008199, 21452290 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "HFE H63D/H63D",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: H63D homozygous. Source said: H63D homozygous. [jmc field=phenotype value_sha256=634e081139ee source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: H63D homozygous. Source said: H63D homozygous."
+      }
+    },
+    {
+      "variant_key": "HFE H63D/wt",
+      "rationale": "Carrier frequency changed from 'about 1 in 5' to 'about 1 in 4': HEIRS reports H63D/+ in 24% of 44,082 white participants. Added that H63D is the most frequent HFE variant in all populations (EMQN 2016). 'Does not meaningfully affect iron levels' replaced by AASLD 2011: H63D heterozygotes are not at risk of progressive or symptomatic iron overload. H63D definition sentence changed in every row to 'a common one-letter change in the HFE gene whose effect on iron is small' so it reads correctly where C282Y is not mentioned; identical across rows. [jmc field=conclusion value_sha256=19ce90b227e3 source=PMIDs 20008199, 26153218, 21452290 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "HFE H63D/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: H63D heterozygous. Source said: H63D heterozygous. [jmc field=phenotype value_sha256=3af4da5a8d1b source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: H63D heterozygous. Source said: H63D heterozygous."
+      }
+    },
+    {
+      "variant_key": "HFE wt/wt",
+      "rationale": "Added the frequency (61% of white HEIRS participants carry neither change) and the EMQN 2016 reporting statement that such a person is at no increased risk of HFE haemochromatosis; kept the limit that rarer HFE variants and other causes are not excluded (EMQN 2016). [jmc field=conclusion value_sha256=5f4c586bee9f source=PMIDs 20008199, 26153218 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "HFE wt/wt",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: No HFE risk allele. Source said: No HFE risk allele. [jmc field=phenotype value_sha256=76aee4ff297c source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "phenotype": "Independent review 2026-09-27 (lay reader and scientific reviewer): Lay reader: technical result labels replaced with plain words; the technical name is kept in README's professional table. Old label: No HFE risk allele. Source said: No HFE risk allele."
+      }
+    },
+    {
+      "variant_key": "README.md",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): README must match the diplotypes and record the review. [jmc field=text value_sha256=e754b6a0b97a source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "licensing.csv",
+      "rationale": "Quoted article text in provenance_quote is annotation-layer content; each article's terms read with lookup_open_access. Blank rights mean unknown, never false. EMQN 26153218 is CC BY-NC-ND and is cited without a quote, so it has no annotation row. [jmc field=rows value_sha256=23633268aad7 source=lookup_open_access per article, 2026-09-27 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): record the review in the structured authorship. [jmc field=authorship value_sha256=59679ca2c770 source=author decision recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Module licence declared by the author; the rows come from the MIT-licensed just-dna-compiler reference example. The compiler's mixed-licence warning (two CC-BY article rows) is expected: CC-BY quotes are compatible with MIT given attribution. [jmc field=license value_sha256=e5dcffe836b6 source=author decision recorded=2026-09-27T01:54:08Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "New minor version: conclusions checked against and corrected to the cited literature; studies.csv and licensing.csv added. Labels, haplotypes, allele pairs and resolution unchanged. [jmc field=version value_sha256=7fbd210ebec1 source=author decision recorded=2026-09-27T01:54:08Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies.csv",
+      "rationale": "Every factual claim in the 1.1.0 conclusions needed a citation. PMIDs taken from literature_search results in this session with titles checked; population from each paper's methods; doi left empty so the literature pass compares against the registry independently. [jmc field=rows value_sha256=f9f92332d529 source=literature_search / fetch_fulltext, 2026-09-27 recorded=2026-09-27T01:51:58Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies.csv rs1800562 26153218",
+      "rationale": "Independent review 2026-09-27 (lay reader and scientific reviewer): the new C282Y homozygote claims (cirrhosis ~4%, siblings 1 in 4) needed a citation row. [jmc field=conclusion value_sha256=9707ac3d90e1 source=PMID 26153218 (literature_search title checked; text read via fetch_fulltext) recorded=2026-09-27T08:02:06Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    }
+  ]
+}

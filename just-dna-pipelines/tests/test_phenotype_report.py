@@ -72,10 +72,10 @@ class TestPhenotypeSection:
         assert 'id="module-hfe_compound_het"' in html
         card = _card(html, "HFE")
         assert "trait-called" in card
-        assert "C282Y/H63D compound heterozygous" in card
+        assert "One C282Y and one H63D change, on different copies" in card
         assert "<code>C282Y / H63D</code>" in card
         # The authored conclusion reaches the reader, not just the phenotype label.
-        assert "in trans" in card
+        assert "the other carries H63D, which changes the protein only slightly" in card
         # Per-position evidence lives in the module's positions table, one row per defining site.
         assert _members(html, "hfe_compound_het").count("phase set 26090951") == 2
         assert "C282Y, C282Y-H63D, H63D, wt." in card and "Gene versions this module knows for" in card

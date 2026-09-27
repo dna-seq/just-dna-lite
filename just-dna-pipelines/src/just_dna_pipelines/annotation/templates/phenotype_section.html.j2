@@ -6,7 +6,8 @@
 
     * no weights, scores, positive/negative counts or good/bad colours: a combined result is not a sum
       of parts, and "blood group O" is neither better nor worse than "A";
-    * the module's "How this works" (the rule in plain words, from its README) comes before the results;
+    * each result comes first; the module's "How this works" (the rule in plain words, from its README)
+      follows them, closed, since every result already explains its own terms;
     * each result is an open block, not a nested card: a plain headline, the module's explanation in
       full sentences, and a "More details" fold with everything needed to check the call (the allele
       pairs that fit, phase, the module's rule tables, build notes);
@@ -205,6 +206,17 @@
         </p>
     {% endif %}
 
+    {#- A result read from positions the file never listed is an inference, not an observation. The
+        doubt belongs to this result, so it is the result's last sentence, visible without a click
+        (docs/REPORT_VOICE.md), not only a badge inside More details. -#}
+    {% set assumed = gene.sites|selectattr("evidence", "equalto", "restored_hom_ref")|list|length %}
+    {% if assumed and gene.status in ("called", "ambiguous") %}
+    <p class="trait-text trait-assumed">
+        {% if assumed == gene.sites|length %}Your file does not list {% if assumed == 1 %}the position{% else %}any of the {{ assumed }} positions{% endif %} this result reads{% else %}Your file does not list {{ assumed }} of the {{ gene.sites|length }} positions this result reads{% endif %}.
+        We read {% if assumed == 1 %}it{% else %}them{% endif %} as the usual letters because DNA close by was read, which is very likely right but not certain: a missing entry can also mean that stretch was not read at all. A lab test can confirm the result.
+    </p>
+    {% endif %}
+
     {% if gene.drug_rows %}
     <div class="table-scroll">
     <table class="trait-table">
@@ -292,16 +304,19 @@
         </div>
         {% endif %}
 
+        {% for gene in mod.genes %}
+        {{ trait_result(gene) }}
+        {% endfor %}
+
+        {#- After the results and closed: each result already explains its own terms (it is often read
+            alone), so an open explanation above it read as the same paragraph twice. The result comes
+            first; the rule is one click away for a reader who wants it. -#}
         {% if mod.how_it_works %}
-        <details class="trait-how" open>
+        <details class="trait-how">
             <summary>How this works</summary>
             {% for para in mod.how_it_works %}<p>{{ para }}</p>{% endfor %}
         </details>
         {% endif %}
-
-        {% for gene in mod.genes %}
-        {{ trait_result(gene) }}
-        {% endfor %}
 
         {% if mod.members %}
         <p class="trait-glance-title">The DNA positions this trait reads</p>

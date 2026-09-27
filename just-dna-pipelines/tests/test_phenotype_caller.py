@@ -276,7 +276,7 @@ class TestPhaseSets:
             HFE_C282Y: (["G", "A"], 7), HFE_H63D: (["G", "C"], 7),
         }))
         assert call.status == "called"
-        assert call.phenotype == "C282Y/H63D compound heterozygous"
+        assert call.phenotype == "One C282Y and one H63D change, on different copies"
         assert call.phase_would_decide is False
 
     def test_cis_in_one_phase_set_is_the_single_chromosome_carrier(self, hfe_def: GeneDefinition) -> None:
@@ -285,7 +285,7 @@ class TestPhaseSets:
             HFE_C282Y: (["G", "A"], 7), HFE_H63D: (["C", "G"], 7),
         }))
         assert call.status == "called"
-        assert call.phenotype == "C282Y and H63D in cis"
+        assert call.phenotype == "C282Y and H63D on the same copy"
 
     def test_different_phase_sets_do_not_phase_the_pair(self, hfe_def: GeneDefinition) -> None:
         """Two `|` genotypes in different blocks say nothing about each other: still ambiguous."""
@@ -309,7 +309,7 @@ class TestPhaseSets:
 
         trans = gather_site_evidence(frame(["0|1", "1|0"], [26090951, 26090951]), hfe_def, base)
         assert {s.phase_set for s in trans} == {26090951}
-        assert call_gene("hfe_compound_het", hfe_def, trans).phenotype == "C282Y/H63D compound heterozygous"
+        assert call_gene("hfe_compound_het", hfe_def, trans).phenotype == "One C282Y and one H63D change, on different copies"
 
         no_ps = gather_site_evidence(frame(["0|1", "1|0"], [None, None]), hfe_def, base)
         assert all(s.phased_alleles is None for s in no_ps)

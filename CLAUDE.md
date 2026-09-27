@@ -398,7 +398,7 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
   position was read, the module's rule tables, build notes), never a card nested in a card. The module's
   title and description come from `modules.yaml`, else its own `manifest.json` (`module_display`), and
-  its README's `## How this works` section is shown before the results (`readme_section`).
+  its README's `## How this works` section follows the results, closed (`readme_section`): each result explains its own terms, so an open explanation above it read as repetition.
 - **A simple module shows Positive / Negative / Net weight and coloured weights only when it has a
   direction** (`module_is_directional`: some row of its lead table, not just the rows this person
   matched, has an effective direction of `protective` or `risk`). A trait module (personality, taste)
@@ -407,6 +407,10 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
 - **Phenotype modules share one *Combined results* section after the per-position modules**, with one
   introduction; each module is a subsection that ends with a table of every position it reads
   (`phenotype_members`: gene, rsID, what the file showed, how it was read, which versions it marks).
+- **A phenotype result read from assumed positions says so as its last sentence**, visible without a
+  click: `restored_hom_ref` sites are an inference from nearby coverage, and a missing call can mean the
+  stretch was never read (APOE sits in a GC-rich stretch sequencing often misses). The badge inside
+  More details alone left a definite-looking "You have two copies of ε3" on top of it.
 - **Only verified link targets.** `dbsnp_url` (rsIDs) and `hgnc_url` (gene symbols, human only) build a
   link only for a well-formed identifier; PubMed uses its canonical `/{pmid}/` form. Positions get no
   link: Ensembl's gene/location URLs now 404 or redirect into a JS browser, and UCSC sits behind a bot

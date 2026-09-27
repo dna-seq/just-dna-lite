@@ -1,0 +1,89 @@
+{
+  "generator": "just-module-creator",
+  "items": [
+    {
+      "variant_key": "README.md",
+      "rationale": "E1 mechanism in 'How this works'; the scoring paragraph rewritten in plain words with the quarter-vs-fifth mismatch explained and PMID 8981090 moved into the professional section; HGVS against NM_000511.6 (c.461G>A p.Trp154Ter; c.418A>T p.Ile140Phe, CA122797/CA122800 via lookup_allele_identity) with the legacy numbering beside it; C6: some East Asian studies class se385 homozygotes with non-secretors; and a dated review record. [jmc field=conclusion value_sha256=e4559f4cb6f3 source=independent review 2026-09-27 (scientific reviewer E1, C6, nomenclature; lay reader) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "README.md",
+      "rationale": "The previous README described the module as an unpublished, unreviewed test fixture and called the activity scale 'not a published number' without qualification; it is published as antonkulaga/fut2_secretor and the 0.25 does rest on a measurement. The limits section now names the FUT2 alleles this module cannot see (sefus, se302, se571, se685, se849, sedel) and says a true non-secretor carrying one of them can be reported as a secretor. [jmc field=file value_sha256=7e297f80ccab source=author recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "activity_phenotype.csv",
+      "rationale": "Curation to 1.1.0: every factual claim in a conclusion now rests on a paper found by literature search in this pass and read. Changes of substance: the norovirus protection is hedged to strong-rather-than-absolute after Carlsson 2009 (19440360); the non-secretor frequency now names the two studies it comes from (20% of Swedish donors, 25% of a British cohort) instead of a bare 1 in 5; the vague 'may be more prone to certain other infections' is replaced by the measured mumps figures from ALSPAC (68% against 48%) and the type 1 diabetes odds ratio from Smyth 2011; the 4-in-5 secretor figure is qualified to European ancestry; the weak bin now states that it covers one partly-working copy beside a non-working one as well as two partly-working ones. No allele activity value was changed - the Vmax measurement in 8981090 (230 against 1030) agrees with the authored 0.25. [jmc field=rows value_sha256=dc2f7063d717 source=literature (PubMed/Europe PMC, read in this pass) recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "activity_phenotype:Non-secretor",
+      "rationale": "E1: FUT2 makes the H sugar in the cells lining mucosal surfaces rather than 'releasing' sugars, and red cell ABO comes from FUT1; M3: the non-working allele was almost absent among Europe's early hunter-gatherers and arrived with Anatolian farmers ~8,000 years ago (PMID 41132048); lay reader: '68% against 48%' to 'compared with 48%'. [jmc field=conclusion value_sha256=36b71a394976 source=independent review 2026-09-27 (scientific reviewer E1, M3; lay reader) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "activity_phenotype:Secretor",
+      "rationale": "E1 mechanism as above; E2: heterozygotes are not identical to homozygous secretors - Azad 2018 reports an intermediate phenotype for asthma and arthritis (PMID 30345375); M6: rotavirus claim attributed as well established for norovirus and supported by recent work for common rotavirus strains (PMID 41132048); C2: only two non-working alleles are read, so a secretor result is less certain for East Asian, Pacific and African ancestry (PMID 15809881, PMID 11606829); lay reader: 'more open to' to 'can catch ... more easily' and the unexplained 'Lewis' dropped. [jmc field=conclusion value_sha256=203aba0edda3 source=independent review 2026-09-27 (scientific reviewer E1, E2, M6, C2; lay reader) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "activity_phenotype:Weak secretor",
+      "rationale": "E1 mechanism as above; E3: se385 is common in East Asia (~40% of gene copies, PMID 41132048; se385/se385 16.2% of 316 Chinese participants, PMID 29123975) and the Korean 7-in-100 figure moved to studies.csv and the README; lay reader: 'enzyme activity' replaced by 'about a fifth as much of the gene's work'. [jmc field=conclusion value_sha256=6bbb7a2760fa source=independent review 2026-09-27 (scientific reviewer E1, E3; lay reader) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "licensing.csv",
+      "rationale": "Terms are per article, not per source. Five of the ten cited articles are closed or free-to-read with no licence recorded, so their share_alike, commercial_use and redistribution are left blank - unknown, never false - which correctly drops the module's own commercial-use and redistribution answers to unknown on the published card. Smyth 2011 is CC-BY-NC-ND, so only the single unmodified quoted sentence is carried. [jmc field=file value_sha256=92912ba3f720 source=lookup_open_access (Unpaywall/Europe PMC) plus each article's own copyright statement recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "licensing:pmid:29123975",
+      "rationale": "Terms recorded for the new studies.csv source; the article states the Creative Commons Attribution License, so the quoted sentence is carried with attribution. [jmc field=notice value_sha256=026c52202ac0 source=PMC copy of FEBS Open Bio 2017, article copyright statement recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Records the two independent AI reviews (lay reader, scientific reviewer) as a contribution on version 1.1.0. [jmc field=conclusion value_sha256=1c898f1aa44a source=independent review 2026-09-27 recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Curation pass to 1.1.0. The AI contribution is declared as ai+agent rather than folded into the human entry, so a reviewer can route scrutiny; responsibility stays with the human author. MIT covers the module's own authored text only - quoted passages keep their own terms in licensing.csv. [jmc field=file value_sha256=ed60355dab8b source=author recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies.csv",
+      "rationale": "The module stated thresholds and activity values with no grounding evidence at all, which validate_module reported on two of three bins. Every PMID was taken from a literature_search result in this session and its title read back. Each quote was located by hand in the fetch_fulltext output for that PMID and extracted with a regex rather than retyped; curator names the agent that located it. doi is left empty so the enricher's DOI cross-check has something independent to compare. [jmc field=file value_sha256=897e1169a096 source=literature (PubMed/Europe PMC, read in this pass) recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies:rs1047781:15809881",
+      "rationale": "C2: the secretor conclusion's caveat about untested non-working alleles needs the Korean fusion-allele frequency; the two consecutive abstract sentences carrying both figures are now the provenance_quote. [jmc field=conclusion value_sha256=c6fa66407741 source=Park KU et al., Annals of Hematology 2005 (PMID 15809881) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies:rs1047781:29123975",
+      "rationale": "E3 and C6: the Chinese genotype frequencies behind the weak-secretor wording (se385 40.19%, se385/se385 16.2%, Se/se385 18.6% of 316), and the fact that this study classes se385 homozygotes with non-secretors. [jmc field=conclusion value_sha256=465112527956 source=Guo M et al., FEBS Open Bio 2017 (PMID 29123975) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies:rs601338:30345375",
+      "rationale": "E2: the row summary said heterozygotes behaved like secretors without qualification; the paper reports an intermediate phenotype for asthma and arthritis. The provenance_quote was changed to the sentence that states it, located verbatim in the Europe PMC text. [jmc field=conclusion value_sha256=b96601dee69f source=Azad MB et al., Wellcome Open Research 2018 (PMID 30345375) recorded=2026-09-27T08:02:15Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": true,
+      "outranks": {}
+    }
+  ]
+}

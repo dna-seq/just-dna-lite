@@ -1,12 +1,12 @@
 {
-  "module_hash": "sha256:e85effaa4ea5d9d1b040f155bea12ede289d37cc7b61fcae7af235029d847f3c",
-  "signature": "sha256:e320db0230252bccc2d50abb5bc1f3d9e71bb1c0c27d8633750c415f4306b397",
+  "module_hash": "sha256:f6ba4288dda61831cf3efb8ffd117a250295e3518d6758b32522536aa7a1022d",
+  "signature": "sha256:7cb3b7ee0e060261b7e3122b628c8667e40aebd3c6a8ea376ec2788bcef80788",
   "difficulty": 20,
-  "nonce": 2435350,
+  "nonce": 1016475,
   "producer": "just-dna-enricher 0.7.2",
-  "produced_at": "2026-09-27T08:02:35Z",
+  "produced_at": "2026-09-27T08:02:41Z",
   "closure": {
-    "closed_at": "2026-09-27T08:02:59Z",
+    "closed_at": "2026-09-27T08:03:08Z",
     "closed_by": "Anton Kulaga",
     "signature": null
   },
@@ -19,7 +19,7 @@
       "detail": null,
       "source": "pubmed",
       "release": null,
-      "checked_at": "2026-09-27T08:02:35Z",
+      "checked_at": "2026-09-27T08:02:41Z",
       "producer": "just-dna-enricher 0.7.2"
     },
     {
@@ -30,18 +30,18 @@
       "detail": "none of 11 citation(s) carries an authored DOI or PMC id, so there was nothing to compare against PubMed's own",
       "source": "pubmed",
       "release": null,
-      "checked_at": "2026-09-27T08:02:35Z",
+      "checked_at": "2026-09-27T08:02:41Z",
       "producer": "just-dna-enricher 0.7.2"
     },
     {
       "check": "provenance_quote",
-      "subjects": 8,
+      "subjects": 11,
       "findings": 0,
       "skipped": null,
-      "detail": "1 further authored quote(s) outside this denominator: 1 in articles whose fulltext could not be read (or only an abstract could, where a miss is not a verdict)",
+      "detail": null,
       "source": "europepmc",
       "release": null,
-      "checked_at": "2026-09-27T08:02:35Z",
+      "checked_at": "2026-09-27T08:02:41Z",
       "producer": "just-dna-enricher 0.7.2"
     }
   ]

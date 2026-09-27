@@ -1,0 +1,10 @@
+pmid,doi,pmcid,exists,is_open_access,license,share_alike,commercial_use,redistribution,quotes_authored,quotes_found,quote_source,doi_exists,doi_checked,source,status,fetched_at
+9138148,10.1136/jmg.34.4.275,PMC1050911,true,false,,,,,2,2,abstract,true,10.1136/jmg.34.4.275,pubmed,resolved,2026-09-27T01:52:08Z
+11325323,10.1001/jama.285.17.2216,,true,false,,,,,2,2,abstract,true,10.1001/jama.285.17.2216,pubmed,resolved,2026-09-27T01:52:08Z
+15858186,10.1056/NEJMoa041534,,true,false,,,,,1,1,abstract,true,10.1056/NEJMoa041534,pubmed,resolved,2026-09-27T01:52:08Z
+18199861,10.1056/NEJMoa073286,,true,false,,,,,1,1,abstract,true,10.1056/NEJMoa073286,pubmed,resolved,2026-09-27T01:52:08Z
+19554541,10.1002/hep.22972,PMC3763940,true,false,,,,,2,0,abstract,true,10.1002/hep.22972,pubmed,resolved,2026-09-27T01:52:08Z
+20008199,10.1182/asheducation-2009.1.195,PMC3829617,true,false,,,,,2,1,abstract,true,10.1182/asheducation-2009.1.195,pubmed,resolved,2026-09-27T01:52:08Z
+20471131,10.1016/j.jhep.2010.03.001,,true,false,,,,,1,1,abstract,true,10.1016/j.jhep.2010.03.001,pubmed,resolved,2026-09-27T01:52:08Z
+21452290,10.1002/hep.24330,PMC3149125,true,true,cc by,false,true,true,2,2,fulltext,true,10.1002/hep.24330,pubmed,resolved,2026-09-27T01:52:08Z
+26153218,10.1038/ejhg.2015.128,PMC4929861,true,true,cc by-nc-nd,false,false,true,0,,,true,10.1038/ejhg.2015.128,pubmed,resolved,2026-09-27T01:52:08Z

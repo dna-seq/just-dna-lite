@@ -7,7 +7,21 @@ module:
   icon_set: fomantic
   color: '#6435c9'
   name: fut2_secretor
-  version: '1.0.0'
+  version: '1.1.0'
+license: MIT
+authorship:
+  - who: Anton Kulaga (antonkulaga@gmail.com)
+    role: created
+    kind: [human]
+    at: '2026-09-27'
+  - who: Claude (Anthropic), via just-module-creator
+    role: edited
+    kind: [ai, agent]
+    at: '2026-09-27'
+  - who: Claude (Anthropic) lay reader and scientific reviewer, via just-module-creator
+    role: reviewed
+    kind: [ai, agent]
+    at: '2026-09-27'
 defaults:
   curator: ai-module-creator
   method: literature-review

@@ -1,0 +1,12 @@
+pmid,doi,pmcid,exists,is_open_access,license,share_alike,commercial_use,redistribution,quotes_authored,quotes_found,quote_source,doi_exists,doi_checked,source,status,fetched_at
+7920638,10.1038/ng0694-180,,true,false,,,,,1,1,abstract,true,10.1038/ng0694-180,pubmed,resolved,2026-09-27T01:51:01Z
+8346443,10.1126/science.8346443,,true,false,,,,,1,1,abstract,true,10.1126/science.8346443,pubmed,resolved,2026-09-27T01:51:01Z
+9343467,10.1001/jama.1997.03550160069041,,true,false,,,,,1,1,abstract,true,10.1001/jama.1997.03550160069041,pubmed,resolved,2026-09-27T01:51:01Z
+21556001,10.1038/mp.2011.52,PMC3162068,true,false,,,,,1,0,abstract,true,10.1038/mp.2011.52,pubmed,resolved,2026-09-27T01:51:01Z
+32015339,10.1038/s41467-019-14279-8,PMC6997393,true,true,cc by,false,true,true,1,1,fulltext,true,10.1038/s41467-019-14279-8,pubmed,resolved,2026-09-27T01:51:01Z
+32818802,10.1016/j.ebiom.2020.102954,PMC7452404,true,true,cc by-nc-nd,false,false,true,0,,,true,10.1016/j.ebiom.2020.102954,pubmed,resolved,2026-09-27T01:51:01Z
+35781703,10.1111/cge.14185,PMC9543580,true,true,cc by-nc-nd,false,false,true,0,,,true,10.1111/cge.14185,pubmed,resolved,2026-09-27T01:51:01Z
+37357276,10.14283/jpad.2023.30,PMC10313141,true,true,cc by,false,true,true,1,1,abstract,true,10.14283/jpad.2023.30,pubmed,resolved,2026-09-27T01:51:01Z
+37930705,10.1001/jamaneurol.2023.3599,PMC10628838,true,true,cc by,false,true,true,1,1,fulltext,true,10.1001/jamaneurol.2023.3599,pubmed,resolved,2026-09-27T01:51:01Z
+38625929,10.1210/clinem/dgae259,,true,false,,,,,1,1,abstract,true,10.1210/clinem/dgae259,pubmed,resolved,2026-09-27T01:51:01Z
+38710950,10.1038/s41591-024-02931-w,PMC13310155,true,false,,,,,1,1,abstract,true,10.1038/s41591-024-02931-w,pubmed,resolved,2026-09-27T01:51:01Z

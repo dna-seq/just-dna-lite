@@ -1,0 +1,55 @@
+{
+  "generator": "just-module-creator",
+  "items": [
+    {
+      "variant_key": "APOE:e2/e4",
+      "rationale": "Both meta-analyses report raised Alzheimer risk for e2/e4 against e3/e3 in European-ancestry participants (OR 2.23 and 2.6); the 1.1.0 conclusion says so, and the direction now agrees with it. Source said: unknown. [jmc field=direction value_sha256=2c6ef0f0d0e4 source=PMID 37930705 (Belloy 2023) and PMID 9343467 (Farrer 1997) recorded=2026-09-27T01:54:39Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {
+        "direction": "Both meta-analyses report raised Alzheimer risk for e2/e4 against e3/e3 in European-ancestry participants (OR 2.23 and 2.6); the 1.1.0 conclusion says so, and the direction now agrees with it. Source said: unknown."
+      }
+    },
+    {
+      "variant_key": "README.md",
+      "rationale": "Scientific reviewer M1, M2, C5; review record per the module-voice guide. [jmc field=text value_sha256=d1dbd3e2564c source=review findings (lay reader and scientific reviewer) recorded=2026-09-27T08:01:25Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "diplotypes.csv",
+      "rationale": "Reconciling the two independent reviews on top of the 1.1.0 rewrite; changed numbers checked against Genin 2011 PMC author manuscript (CIs 41-70 and 47-84, PAQUID 68%) and the Fortea 2024 abstract. [jmc field=rows value_sha256=0e2b24408db4 source=literature review (11 PMIDs in studies.csv) and review findings (lay reader, scientific reviewer) recorded=2026-09-27T08:02:20Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "licensing.csv",
+      "rationale": "Per-article terms from lookup_open_access; blank means unknown, never false. NC-ND articles kept at the literature layer with no text carried so the declared MIT licence is not contradicted. [jmc field=rows value_sha256=309595d0ce03 source=Unpaywall via lookup_open_access, per article recorded=2026-09-27T01:50:40Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Record the AI review as exactly that, per the module-voice guide. [jmc field=authorship value_sha256=c5a9453cadcb source=author decision recorded=2026-09-27T08:01:25Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Declared licence for the module as a whole; the rows come from the MIT-licensed just-dna-format reference example and the conclusions are original text. [jmc field=license value_sha256=e5dcffe836b6 source=author decision recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Version bump for the rewritten, sourced conclusions and the new studies and licensing tables. Title, description and report_title unchanged. [jmc field=version value_sha256=d5ab4ad48437 source=author decision recorded=2026-09-27T01:50:52Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "studies.csv",
+      "rationale": "Grounds the conclusions; summaries kept consistent with the revised text. [jmc field=rows value_sha256=5fa2f7213c7e source=PubMed / Europe PMC via literature_search and fetch_fulltext recorded=2026-09-27T08:02:20Z by=Anton Kulaga (with Claude)]",
+      "human_reviewed": false,
+      "outranks": {}
+    }
+  ]
+}

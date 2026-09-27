@@ -1,0 +1,12 @@
+pmid,doi,pmcid,exists,is_open_access,license,share_alike,commercial_use,redistribution,quotes_authored,quotes_found,quote_source,doi_exists,doi_checked,source,status,fetched_at
+7876235,10.1074/jbc.270.9.4640,,true,false,cc by,false,true,true,1,1,abstract,true,10.1074/jbc.270.9.4640,pubmed,resolved,2026-09-27T01:52:08Z
+8645240,10.1006/bbrc.1996.0293,,true,false,,,,,1,1,abstract,true,10.1006/bbrc.1996.0293,pubmed,resolved,2026-09-27T01:52:08Z
+8981090,10.1007/BF01053194,,true,false,,,,,1,1,abstract,true,10.1007/BF01053194,pubmed,resolved,2026-09-27T01:52:08Z
+11606829,10.1046/j.1537-2995.2001.41101279.x,,true,false,,,,,1,1,abstract,true,10.1046/j.1537-2995.2001.41101279.x,pubmed,resolved,2026-09-27T01:52:08Z
+15809881,10.1007/s00277-005-1041-5,,true,false,,,,,1,1,abstract,true,10.1007/s00277-005-1041-5,pubmed,resolved,2026-09-27T01:52:08Z
+16306606,10.1128/JVI.79.24.15351-15355.2005,PMC1315998,true,false,,,,,1,1,abstract,true,10.1128/JVI.79.24.15351-15355.2005,pubmed,resolved,2026-09-27T01:52:08Z
+19440360,10.1371/journal.pone.0005593,PMC2680586,true,true,cc by,false,true,true,1,1,fulltext,true,10.1371/journal.pone.0005593,pubmed,resolved,2026-09-27T01:52:08Z
+22025780,10.2337/db11-0638,PMC3198057,true,true,cc by-nc-nd,false,false,true,0,,,true,10.2337/db11-0638,pubmed,resolved,2026-09-27T01:52:08Z
+29123975,10.1002/2211-5463.12278,PMC5666394,true,true,cc by,false,true,true,1,1,fulltext,true,10.1002/2211-5463.12278,pubmed,resolved,2026-09-27T08:02:37Z
+30345375,10.12688/wellcomeopenres.14636.2,PMC6171556,true,true,cc by,false,true,true,1,1,fulltext,true,10.12688/wellcomeopenres.14636.2,pubmed,resolved,2026-09-27T01:52:08Z
+41132048,10.1093/molbev/msaf243,PMC12550361,true,true,cc by,false,true,true,2,2,fulltext,true,10.1093/molbev/msaf243,pubmed,resolved,2026-09-27T01:52:08Z
