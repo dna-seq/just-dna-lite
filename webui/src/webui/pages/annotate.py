@@ -3409,6 +3409,7 @@ def _prs_tab_content() -> rx.Component:
                 width="100%",
                 spacing="4",
             ),
+            appearance="light",
             has_background=False,
         ),
         id="segment-prs",

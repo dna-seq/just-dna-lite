@@ -352,9 +352,16 @@ def ws_watchdog() -> rx.Component:
 
 
 _LIGHT_MODE_CSS = """
+/* color-scheme only restyles native controls. It does not undo the `dark`
+   class the color-mode provider puts on <html> for a dark OS theme, and that
+   class swaps the whole Radix palette. Overriding --gray-9..12 fixed text and
+   left panel backgrounds (--gray-1, --color-background, --blue-2) black.
+   The `light` class on #just-dna-app-shell re-applies Radix's light palette
+   for every scale, including content portaled inside the shell. */
 html,
 body,
-[data-is-root-theme="true"] {
+[data-is-root-theme="true"],
+#just-dna-app-shell {
     color-scheme: light !important;
 }
 
@@ -447,6 +454,7 @@ def template(*children: rx.Component) -> rx.Component:
             "color": "#222",
             "colorScheme": "light",
         },
+        class_name="light",
         id="just-dna-app-shell",
     )
 

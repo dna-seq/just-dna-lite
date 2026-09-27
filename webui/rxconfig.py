@@ -98,7 +98,15 @@ def _head_components() -> list[rx.Component]:
 
 config = rx.Config(
     app_name="webui",
-    plugins=[rx.plugins.RadixThemesPlugin()],
+    # The UI is Fomantic and always light. "system" puts class `dark` on <html>
+    # when Windows/Firefox is in dark mode, and Radix then paints --gray-1 /
+    # --color-background / --blue-2 near black. Light stops that class.
+    default_color_mode="light",
+    plugins=[
+        rx.plugins.RadixThemesPlugin(
+            theme=rx.theme(appearance="light", accent_color="blue"),
+        ),
+    ],
     disable_plugins=[SitemapPlugin],
     vite_allowed_hosts=_vite_hosts,
     stylesheets=[
