@@ -682,6 +682,11 @@ def _superhuman_genotypes(
     return list(dict.fromkeys(out))
 
 
+#: Source `adverse_effects` cells that state no trade-off rather than a known one. They map to a blank
+#: `negatives` (unknown), never to "none" — absence of a stated downside is not evidence of none.
+_SUPERHUMAN_ADVERSE_PLACEHOLDERS = frozenset({"Not reported", "Unnoticed harm"})
+
+
 def adapt_superhuman(
     module: V1Module, db: Path, ensembl_cache: Optional[Path] = None
 ) -> AdapterResult:
@@ -741,8 +746,12 @@ def adapt_superhuman(
             continue
         superability = _clean_str(row.get("superability")) or ""
         adverse = _clean_str(row.get("adverse_effects"))
-        base = superability + (f" Adverse effects: {adverse}" if adverse else "")
-        conclusion = curation.conclusion_override.get(rsid) or base or superability or "Beneficial variant"
+        conclusion = curation.conclusion_override.get(rsid) or superability or "Beneficial variant"
+        # The adverse-effect text is the format's `negatives` axis (the protective allele's known
+        # trade-off), not part of the conclusion — jamming it in headlined the downside inside the
+        # benefit. Two source cells are not findings: "Not reported" and "Unnoticed harm" mean the
+        # trade-off is unstated, so `negatives` stays blank (unknown, never "none").
+        negatives = adverse if adverse and adverse not in _SUPERHUMAN_ADVERSE_PLACEHOLDERS else None
         for genotype in genotypes:
             variants.append(VariantRow(
                 rsid=rsid,
@@ -752,6 +761,7 @@ def adapt_superhuman(
                 # direction is carried by `state` (the report colors by it), not a fabricated weight.
                 state="protective",
                 conclusion=conclusion,
+                negatives=negatives,
                 gene=gene_norm or None,
             ))
         for pmid in study_pmids:
