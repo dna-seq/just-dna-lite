@@ -36,10 +36,14 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   protobuf 7.35, dagster caps `protobuf<7`); `google-genai<2.0`; `requires-python >=3.13,<3.14`.
 - `agno[mcp]>=3.0.10`: agno 3 imports the mcp 2.x names, so depend on its extra; never re-add a bare
   `mcp<2.0` cap.
-- Format libs: `just-dna-format>=0.7.0`, `just-dna-compiler>=0.7.1`, `just-dna-enricher>=0.7.2`.
-  `just-dna-registry>=0.26.1` **moves with the format pin**: `contract_compatible` treats a `0.x`
+- Format libs: `just-dna-format>=0.7.1`, `just-dna-compiler>=0.7.2`, `just-dna-enricher>=0.7.3` (the
+  `v0.7.3` cut, 2026-09-27; a derivation-only patch, no field/table/parameter/warning code moved, no
+  compiled module needs recompiling — corrections reach a module only via `enrich --rederive`).
+  `just-dna-registry>=0.27.0` **moves with the format pin**: `contract_compatible` treats a `0.x`
   format minor as breaking on either side, so a mismatched pair refuses to publish with no obvious
-  cause. Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
+  cause. The format minor is still `0.7`, so this bump is not contract-forced; 0.27.0's only client
+  change is an opt-in `RegistryClient.publish(pack=…)` needing a 0.27 server, which we do not pass.
+  Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
 - **Upgrading reflex does not upgrade `reflex-components-*`.** Upgrade them explicitly, then compare
   `uv pip list | grep reflex` with the release notes:
   `uv lock --upgrade-package reflex-components-core --upgrade-package reflex-components-radix && uv sync`.
@@ -243,7 +247,10 @@ does not call it.
   `superhuman`: rs72613567 `4:87310241 A>AA` where callers/ClinVar carry `4:87310240 T>TA`, +2 others).
   Upstream: **S117** (the Ensembl anchor defect, → RM267 + RM268), **S120** (the format declares no
   coordinate-normalization convention, so a legal respelling is a silent miss), **S121** (single-authority
-  resolution with no cross-authority discordance check). RM267 assigns the build-side re-anchor here.
+  resolution with no cross-authority discordance check). **RM268 shipped in enricher 0.7.3** but fixes
+  only the *live REST rung* (`ref='-'` at the interbase `start`, e.g. `rs8176719` ABO O1); **RM267 — the
+  Ensembl VCF-*dump* insertions anchored one base early, which is the class reanchor.py compensates for —
+  is still open upstream**, so this build-side re-anchor stays. RM267 assigns it here.
   `reanchor_indels_to_clinvar` adopts ClinVar's `(start, ref, alt)` for a single-alt indel rsID ClinVar
   places differently (ClinVar/dbSNP is the rsID authority), clears the now-wrong VRS id, and re-derives
   the genotype by zygosity role; **multi-allelic authored rows and rsIDs ClinVar does not carry are left
