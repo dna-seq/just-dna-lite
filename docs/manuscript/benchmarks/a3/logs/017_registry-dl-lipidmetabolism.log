@@ -1,0 +1,8 @@
+# step 17: registry-dl-lipidmetabolism
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq lipidmetabolism 1.1.0 /data/a3-bench/modules/lipidmetabolism 
+# start: 2026-10-10T23:11:51+02:00
+✓ downloaded + verified just-dna-seq/lipidmetabolism@1.1.0 → /data/a3-bench/modules/lipidmetabolism
+  digest sha256:30814dd7460d9e90f71adb61a34696a1f938cc3315db03895c8d5b0774fc6a48
+  logs: v1_port.log
+# end: 2026-10-10T23:11:56+02:00 exit=0

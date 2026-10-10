@@ -1,0 +1,8 @@
+# step 20: registry-dl-pharmgkb
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq pharmgkb 1.0.0 /data/a3-bench/modules/pharmgkb 
+# start: 2026-10-10T23:12:06+02:00
+✓ downloaded + verified just-dna-seq/pharmgkb@1.0.0 → /data/a3-bench/modules/pharmgkb
+  digest sha256:aeb2b46111d3186ff3622cc25d3376b526fa31183c65e8322d18e139e19360a7
+  logs: pharmgkb.log
+# end: 2026-10-10T23:12:11+02:00 exit=0

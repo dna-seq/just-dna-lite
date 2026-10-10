@@ -1,0 +1,8 @@
+# step 23: registry-dl-vo2max
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq vo2max 1.1.0 /data/a3-bench/modules/vo2max 
+# start: 2026-10-10T23:12:21+02:00
+✓ downloaded + verified just-dna-seq/vo2max@1.1.0 → /data/a3-bench/modules/vo2max
+  digest sha256:1a743e13710660f465d316d5163452e8695ed9ded09d82f45d1fae19b4e27c24
+  logs: v1_port.log
+# end: 2026-10-10T23:12:26+02:00 exit=0

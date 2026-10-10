@@ -1,0 +1,8 @@
+# step 21: registry-dl-superhuman
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq superhuman 2.4.0 /data/a3-bench/modules/superhuman 
+# start: 2026-10-10T23:12:11+02:00
+✓ downloaded + verified just-dna-seq/superhuman@2.4.0 → /data/a3-bench/modules/superhuman
+  digest sha256:c64102efadc92c827fe57cba08049e480c56f0d5fbe4588dcd54aafc2c437122
+  logs: v1_port.log
+# end: 2026-10-10T23:12:16+02:00 exit=0

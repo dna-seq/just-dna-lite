@@ -1,0 +1,8 @@
+# step 22: registry-dl-thrombophilia
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq thrombophilia 1.1.0 /data/a3-bench/modules/thrombophilia 
+# start: 2026-10-10T23:12:16+02:00
+✓ downloaded + verified just-dna-seq/thrombophilia@1.1.0 → /data/a3-bench/modules/thrombophilia
+  digest sha256:6bd966c7fd96cffae582794977e3fdae8bf05faf66ebc29c239a1b048c2d6c42
+  logs: v1_port.log
+# end: 2026-10-10T23:12:21+02:00 exit=0

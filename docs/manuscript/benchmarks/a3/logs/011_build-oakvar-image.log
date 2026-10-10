@@ -1,0 +1,6 @@
+# step 11: build-oakvar-image
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker build -q -t jdl-bench-oakvar:2.9.15 oakvar 
+# start: 2026-10-10T23:07:02+02:00
+sha256:41327a3b4ee94118d1d5c8f0d350b22a48b43c3d1cedd8e8e584c0c59a3b6516
+# end: 2026-10-10T23:07:03+02:00 exit=0

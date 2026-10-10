@@ -1,0 +1,8 @@
+# step 18: registry-dl-longevitymap
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq longevitymap 1.2.0 /data/a3-bench/modules/longevitymap 
+# start: 2026-10-10T23:11:56+02:00
+✓ downloaded + verified just-dna-seq/longevitymap@1.2.0 → /data/a3-bench/modules/longevitymap
+  digest sha256:2c6a4d51433e9afaf4a73b30f94045f97068ac252d02643065311809defb886c
+  logs: v1_port.log
+# end: 2026-10-10T23:12:01+02:00 exit=0

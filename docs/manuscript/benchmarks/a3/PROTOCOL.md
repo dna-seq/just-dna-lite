@@ -44,3 +44,58 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
   `21598da4…`, 6,079,744 records, `DeepVariant_version=1.1.0`; second caller DRAGEN 4.4.4,
   5,064,598 records, md5 `43afb27d…` (matches Zenodo); calibration 6,138,868 records,
   `DeepVariant_version=1.3.0`.
+
+### Generation I reconstruction (OakVar)
+
+- The 2023 runs went through the OakVar web GUI on agingkills with the `longevity2reporter` report
+  (Just-DNA-Seq docs, *Getting started*). The reporter's `requires:` list defines the module set, and
+  it changed between the runs: at 2023-05-07 it was `749a1ce` (0.4.0, which added lipidmetabolism
+  and thrombophilia), and `just_vo2max` did not exist yet. The February runs therefore had fewer
+  modules than the May run. The reconstruction targets **the May 2023 run**: the reporter and each
+  `just_*` postaggregator at its last commit on or before 2023-05-07 ([`oakvar/modules.tsv`](oakvar/modules.tsv)),
+  and OakVar **2.9.15**, the release current that day (published 2023-05-06).
+- The 8 postaggregators need these store annotators: dbsnp, clinvar, omim, ncbigene, pubmed, gnomad,
+  sift, vcfinfo. They come from the OakVar store at whatever version it serves today; each installed
+  version is recorded.
+- **8–11** `pull-base`, `pull-uv`, `build-oakvar-image`: [`oakvar/Dockerfile`](oakvar/Dockerfile), image
+  `jdl-bench-oakvar:2.9.15`. Base `python:3.10-slim-bookworm@sha256:5be5aaec…`, uv 0.12.23 by digest.
+  Dependencies resolved with `uv pip install --exclude-newer 2023-05-08`, so a rebuild gets the 2023
+  versions (polars 0.17.12, duckdb 0.7.1, numpy 1.24.3; full list in `/pip-freeze.txt` in the image
+  and in log 010). `pip`/`setuptools`/`wheel`/`packaging` come from the base image, not the 2023
+  resolution. Step 11 rebuilt it with `OV_ROOT_DIR=/oakvar/ov`, so the whole OakVar home (store
+  login, annotator data, modules, jobs) sits on the mounted volume `/data/a3-bench/oakvar/home`.
+- **12–13** `pull-alpine`, `verify-cache-drop`: the privileged drop works. buff/cache went from
+  30,194 MB to 6,654 MB; what remains is shared memory and tmpfs, which a cache drop cannot free.
+
+### Generation II module set
+
+- The worktree's default discovery reads the HuggingFace mirror, which has 9 modules (no
+  `superhuman`) and older builds of cancer, cardio and pathogenic than the registry. The plan names
+  the **S4 snapshot**, so:
+- **14–23** `registry-dl-*`: the 10 S4 module versions downloaded from
+  `https://module-registry.just-dna.life` (namespace `just-dna-seq`) into `/data/a3-bench/modules/`.
+  Each manifest's `artifact.digest` equals the one in S4 (checked by script, 10 of 10 match).
+- [`jdl/modules.yaml`](jdl/modules.yaml) is the repo's `modules.yaml` at `bb4b294` with `sources` replaced by
+  that one directory. It is placed in `/data/a3-bench/jdl-root/` with a copy of `.env.template`, and the
+  driver sets `JUST_DNA_PIPELINES_ROOT` there, so the pinned worktree itself stays unmodified.
+  `pipelines list-modules` then reports exactly the 10 modules and `Sources: /data/a3-bench/modules`.
+
+### Driver
+
+- [`scripts/bench_annotation.py`](scripts/bench_annotation.py): one row per run in `runs.csv`. Run types `warmup`
+  (excluded), `cold` (fresh instance, page cache dropped), `warm` (warm state: the normalized parquet
+  is reused, so the VCF is **not** read), `full` (fresh instance, page cache not dropped: the whole
+  pipeline with warm OS caches) and one `ensembl`. `full` was added at the user's request after a
+  review note: a warm run skips normalization while every OakVar run reads the whole VCF, so the
+  like-for-like pairs are cold or full against OakVar, and `normalize_s` from the full runs is the
+  offset that turns a warm time into a full one.
+- Order: warm-up first, then cold/warm/full shuffled with seed 20261010; `prev_run_type` is kept on
+  each row because a page-cache drop before a cold run also evicts the warm state.
+- Timing: CLI wall time, the Dagster run record (creation to end) and each step from the run's event
+  log ([`scripts/dagster_stage_times.py`](scripts/dagster_stage_times.py), read after the run). Memory: RSS
+  summed over the process tree at 10 Hz. CPU: `wait4` rusage of the command and every descendant it
+  reaped, over wall time. Each row also records the annotated-variant count.
+- Smoke test on `data/input/tests/antku_small.vcf` (792 chr1 records; outside `runs.csv`): all five run
+  types complete, the warm run uses `annotate_modules_and_report_job` (no normalize step), the cold
+  run's drop is recorded. All modules annotated 0 variants on this 792-record file; the full-genome
+  warm-up is the real check that the module set matches anything.

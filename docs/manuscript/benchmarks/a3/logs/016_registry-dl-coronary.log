@@ -1,0 +1,8 @@
+# step 16: registry-dl-coronary
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq coronary 1.1.0 /data/a3-bench/modules/coronary 
+# start: 2026-10-10T23:11:46+02:00
+✓ downloaded + verified just-dna-seq/coronary@1.1.0 → /data/a3-bench/modules/coronary
+  digest sha256:5e96a2ccbcb306de9f079b1ce11990d95c728066786897aa1b4d36bdb1c4bd3b
+  logs: v1_port.log
+# end: 2026-10-10T23:11:51+02:00 exit=0

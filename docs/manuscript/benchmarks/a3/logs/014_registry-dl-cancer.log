@@ -1,0 +1,8 @@
+# step 14: registry-dl-cancer
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq cancer 2.0.0 /data/a3-bench/modules/cancer 
+# start: 2026-10-10T23:11:36+02:00
+✓ downloaded + verified just-dna-seq/cancer@2.0.0 → /data/a3-bench/modules/cancer
+  digest sha256:f626fb73de07268ee0a0a6328842d0043d72e397dfa22a63b6797f9704f69fb6
+  logs: clinvar_panel.log
+# end: 2026-10-10T23:11:42+02:00 exit=0

@@ -1,0 +1,7 @@
+# step 13: verify-cache-drop
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: bash -c free\ -m\ \|\ sed\ -n\ 2p\;\ docker\ run\ --rm\ --privileged\ alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc\ sh\ -c\ \'sync\;\ echo\ 3\ \>\ /proc/sys/vm/drop_caches\'\;\ free\ -m\ \|\ sed\ -n\ 2p 
+# start: 2026-10-10T23:10:10+02:00
+Mem:           64241       34554        3566        3850       30194       29686
+Mem:           64241       34375       27881        3836        6654       29865
+# end: 2026-10-10T23:10:18+02:00 exit=0

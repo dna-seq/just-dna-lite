@@ -1,0 +1,8 @@
+# step 15: registry-dl-cardio
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq cardio 2.0.0 /data/a3-bench/modules/cardio 
+# start: 2026-10-10T23:11:42+02:00
+✓ downloaded + verified just-dna-seq/cardio@2.0.0 → /data/a3-bench/modules/cardio
+  digest sha256:5a80ed9951df400ebbb2f2ca7e024cdbbca339a04907f9257b5eb1852a766e55
+  logs: clinvar_panel.log
+# end: 2026-10-10T23:11:46+02:00 exit=0

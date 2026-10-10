@@ -1,0 +1,8 @@
+# step 19: registry-dl-pathogenic
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync pipelines registry download just-dna-seq pathogenic 2.0.0 /data/a3-bench/modules/pathogenic 
+# start: 2026-10-10T23:12:01+02:00
+✓ downloaded + verified just-dna-seq/pathogenic@2.0.0 → /data/a3-bench/modules/pathogenic
+  digest sha256:540a59613d80e25c873ee3c3c1c8f36005abb1b12d14165ba91f426dca750ed8
+  logs: clinvar_panel.log
+# end: 2026-10-10T23:12:06+02:00 exit=0

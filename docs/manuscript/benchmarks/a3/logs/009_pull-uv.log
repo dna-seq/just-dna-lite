@@ -1,0 +1,17 @@
+# step 9: pull-uv
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker pull ghcr.io/astral-sh/uv:0.12.23 
+# start: 2026-10-10T23:05:12+02:00
+0.12.23: Pulling from astral-sh/uv
+dcd00f4c4684: Pulling fs layer
+f3f7502ac07c: Pulling fs layer
+2b5355f69bc2: Download complete
+c844ab2e6b73: Download complete
+dcd00f4c4684: Download complete
+f3f7502ac07c: Download complete
+dcd00f4c4684: Pull complete
+f3f7502ac07c: Pull complete
+Digest: sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+Status: Downloaded newer image for ghcr.io/astral-sh/uv:0.12.23
+ghcr.io/astral-sh/uv:0.12.23
+# end: 2026-10-10T23:05:16+02:00 exit=0

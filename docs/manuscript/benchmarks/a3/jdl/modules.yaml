@@ -1,0 +1,127 @@
+quality_filters:
+  pass_filters:
+  - PASS
+  - .
+  min_depth: 10
+  min_qual: 20
+  # A record that states no DP/JDP (or no QUAL) when the caller passed it: `keep` judges it by
+  # FILTER alone, `drop` treats unstated as failing. DRAGEN's targeted callers (RH, GBA, CYP21A2,
+  # CYP2D6) emit PASS calls with no DP by design; `drop` loses all of them.
+  unstated_metrics: keep
+
+immutable_mode:
+  enabled: false
+  allow_zenodo_import: false
+  disclaimer: "This is a public demo with pre-loaded public genomes. To analyze your own genome, install just-dna-lite locally: https://github.com/dna-seq/just-dna-lite"
+  default_samples:
+  - zenodo_url: "https://zenodo.org/records/18370498"
+    filename: "antonkulaga.vcf"
+    label: "Anton Kulaga"
+    subject_id: "antonkulaga"
+    sex: "Male"
+    species: "Homo sapiens"
+    reference_genome: "GRCh38"
+    license: "CC-Zero"
+  - zenodo_url: "https://zenodo.org/records/19487816"
+    filename: "SIMHIFQTILQ.hard-filtered.vcf.gz"
+    label: "Livia Zaharia"
+    subject_id: "SIMHIFQTILQ"
+    sex: "Female"
+    species: "Homo sapiens"
+    reference_genome: "GRCh38"
+    license: "CC-BY-4.0"
+# Module registry servers the Catalog can browse, install from and publish to.
+# `prod` is the public registry; `polygon` is the testing ground, which answers "mode": "test"
+# on /api/v1/version and exists so a namespace claim or a publish can be rehearsed without
+# touching the public catalog. `token_env` is per store because an account token is minted by one
+# server and means nothing to another — never point two stores at the same variable.
+registries:
+- key: prod
+  label: Just-DNA Registry
+  url: https://module-registry.just-dna.life
+  mode: prod
+  token_env: REGISTRY_TOKEN
+  description: The public catalog. Published modules are visible to everyone.
+- key: polygon
+  label: Polygon (test)
+  url: https://module-polygon.just-dna.life
+  mode: test
+  token_env: REGISTRY_TOKEN_POLYGON
+  description: Testing ground. Publish here to rehearse; nothing here is public or permanent.
+ensembl_source:
+  repo_id: just-dna-seq/ensembl_variations
+# A3 bench: the only source is the S4 module set, downloaded from the registry and digest-checked
+# (see PROTOCOL.md). Everything else is the repo's modules.yaml at bb4b294, unchanged.
+sources:
+- url: /data/a3-bench/modules
+  kind: collection
+module_metadata:
+  longevitymap:
+    title: Longevity Map
+    description: Longevity-associated genetic variants from LongevityMap database
+    report_title: Longevity Variants
+    icon: heart-pulse
+    color: '#21ba45'
+  lipidmetabolism:
+    title: Lipid Metabolism
+    description: Lipid metabolism and cardiovascular risk variants
+    report_title: Lipid Metabolism
+    icon: droplets
+    color: '#fbbd08'
+  vo2max:
+    title: VO2 Max
+    description: Athletic performance and oxygen uptake capacity variants
+    report_title: VO2max / Athletic Performance
+    icon: activity
+    color: '#2185d0'
+  superhuman:
+    title: Superhuman
+    description: Elite performance and rare beneficial variants
+    report_title: Superhuman / Elite Performance
+    icon: zap
+    color: '#00b5ad'
+  coronary:
+    title: Coronary
+    description: Coronary artery disease risk associations
+    report_title: Coronary Artery Disease
+    icon: heart
+    color: '#db2828'
+  thrombophilia:
+    title: Thrombophilia
+    description: Inherited blood-clotting risk variants (Factor V Leiden, prothrombin, and related loci)
+    report_title: Thrombophilia Risk
+    icon: droplets
+    color: '#9f3a38'
+  cardio:
+    title: Cardio
+    description: Pathogenic variants in cardiac-disease genes (ClinVar gene panel)
+    report_title: Cardiac Pathogenic Variants
+    icon: heart-pulse
+    color: '#db2828'
+  cancer:
+    title: Cancer
+    description: Pathogenic variants in cancer-predisposition genes (ClinVar gene panel)
+    report_title: Cancer Predisposition
+    icon: circle-alert
+    color: '#e03997'
+  pathogenic:
+    title: Pathogenic
+    description: Genome-wide ClinVar pathogenic / likely-pathogenic variant flag
+    report_title: ClinVar Pathogenic Variants
+    icon: database
+    color: '#b21e1e'
+  # `drugs` was the Generation-I module name; `pharmgkb` is its 0.5 rebuild on the ClinPGx
+  # clinical annotations. Both are listed so a report of either spells the same title.
+  drugs:
+    title: Pharmacogenomics
+    description: Drug response and metabolism (PharmGKB)
+    report_title: Pharmacogenomics
+    icon: pill
+    color: '#a333c8'
+  pharmgkb:
+    title: Pharmacogenomics
+    description: Drug response by genotype, from the ClinPGx (PharmGKB) clinical annotations
+      at evidence levels 1A/1B/2A/2B
+    report_title: Drug Response
+    icon: pill
+    color: '#a333c8'

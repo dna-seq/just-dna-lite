@@ -1,0 +1,23 @@
+# step 8: pull-base
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker pull python:3.10-slim-bookworm 
+# start: 2026-10-10T23:05:07+02:00
+3.10-slim-bookworm: Pulling from library/python
+66a73b1dcbb8: Pulling fs layer
+1c59224885e4: Pulling fs layer
+7fd1ebe418b5: Pulling fs layer
+8019b7922ecc: Pulling fs layer
+66a73b1dcbb8: Download complete
+1c59224885e4: Download complete
+8019b7922ecc: Download complete
+7fd1ebe418b5: Download complete
+7ef025a38e91: Download complete
+8bf75ed8eb8d: Download complete
+7fd1ebe418b5: Pull complete
+8019b7922ecc: Pull complete
+1c59224885e4: Pull complete
+66a73b1dcbb8: Pull complete
+Digest: sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370
+Status: Downloaded newer image for python:3.10-slim-bookworm
+docker.io/library/python:3.10-slim-bookworm
+# end: 2026-10-10T23:05:12+02:00 exit=0
