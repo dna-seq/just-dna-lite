@@ -310,7 +310,7 @@ Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspec
 - **Usanov Nikolay** — co-founded the project, Just-DNA-Lite platform development, <!-- @rev D3 rounds=2 by=claude:2026-10-10,usanov:2026-10-10 -->the module system, the population ancestry discriminator (detection and algorithm), AI-assisted module authoring<!-- @/rev D3 -->, fundraising
 <!-- @/rev R25 -->
 - **Borysova Olga** — modules and report content (longevity variants, cardiovascular traits, lipid metabolism, VO2 max, athletic performance, pharmacogenomics), LongevityMap database curation and expansion, pathway categorization, report structure, data collection and analysis
-- **Karmazin Alexey** — lead architect of the Generation I report system, OakVar report modules and preparation utilities, PRS modules
+- **Karmazin Alexey** — lead architect of the <!-- @rev C37 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->report system of Generation I (the OakVar-based Just-DNA-Seq)<!-- @/rev C37 -->, OakVar report modules and preparation utilities, PRS modules
 - **Maria Koval** — report modules, report template, trait annotation modules (thrombophilia, cardiovascular)
 - **Fedorova Alina** — bioinformatic utilities, scientific literature exploration
 - **Pushkareva Malvina** — software development and testing
