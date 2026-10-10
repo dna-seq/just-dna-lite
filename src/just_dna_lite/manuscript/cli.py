@@ -20,12 +20,14 @@ from just_dna_lite.manuscript.ledger import LedgerError, ledger_app
 from just_dna_lite.manuscript.s4 import (
     BIBLIOGRAPHY_JSON,
     CITATIONS_CSV,
+    CURATION_YAML,
     MD_NAME,
     MODULES_CSV,
     check_against_snapshot,
     fetch_bibliography,
     load_bibliography,
     module_dirs,
+    read_curation,
     read_module_sources,
     read_snapshot,
     render_markdown,
@@ -157,7 +159,9 @@ def s4_render(
         write_bibliography(bib_path, bibliography)
         typer.echo(f"wrote {bib_path} ({len(bibliography)} PMIDs)")
     stamp = as_of.replace(tzinfo=timezone.utc) if as_of is not None and as_of.tzinfo is None else as_of
-    (out / MD_NAME).write_text(render_markdown(modules, snapshot, stamp, bibliography), encoding="utf-8")
+    curation_path = out / CURATION_YAML
+    curation = read_curation(curation_path, {m.name for m in modules}) if curation_path.is_file() else None
+    (out / MD_NAME).write_text(render_markdown(modules, snapshot, stamp, bibliography, curation), encoding="utf-8")
     write_modules_csv(out / MODULES_CSV, modules, snapshot, stamp)
     write_citations_csv(out / CITATIONS_CSV, modules, bibliography)
     for name in (MD_NAME, MODULES_CSV, CITATIONS_CSV):

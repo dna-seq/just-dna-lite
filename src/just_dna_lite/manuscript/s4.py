@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 import polars as pl
+import yaml
 from just_dna_enricher.eutils import EutilsClient, EutilsSettings, is_missing
 from just_dna_enricher.literature import bibliographic
 from just_dna_format.manifest import ModuleManifest, read_manifest
@@ -40,6 +41,9 @@ MD_NAME = "S4_module_sources.md"
 MODULES_CSV = "S4_module_sources.csv"
 CITATIONS_CSV = "S4_module_citations.csv"
 BIBLIOGRAPHY_JSON = "S4_bibliography.json"
+# Hand-written, cited curation notes: the one part of S4 no module file records (how a Generation I
+# literature module chose its variants). Kept beside the output and rendered as each module's Curation line.
+CURATION_YAML = "S4_curation.yaml"
 DATABASE_LAYER = "annotation"
 _LOG_SCALAR_RE = re.compile(r"^(?P<key>[a-z][a-z0-9_]*): (?P<value>\S.*)$")
 _PMID_RE = re.compile(r"^[0-9]+$")
@@ -343,7 +347,41 @@ def _cite_cell(citation: Citation, bib: dict[str, Bibliography]) -> tuple[str, s
     return author, year
 
 
-def render_markdown(modules: list[ModuleSources], snapshot: Optional[Snapshot], as_of: Optional[datetime], bib: dict[str, Bibliography]) -> str:
+class CurationNote(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    selection: str
+    references: tuple[str, ...] = ()
+
+
+class Curation(BaseModel):
+    """`S4_curation.yaml`: per-module selection notes, each citing keys of `references`."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    modules: dict[str, CurationNote]
+    references: dict[str, str]
+
+
+def read_curation(path: Path, module_names: set[str]) -> Curation:
+    curation = Curation.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    unknown_modules = sorted(set(curation.modules) - module_names)
+    if unknown_modules:
+        raise ValueError(f"{path.name}: no such module in this render: {', '.join(unknown_modules)}")
+    cited = {key for note in curation.modules.values() for key in note.references}
+    missing = sorted(cited - set(curation.references))
+    if missing:
+        raise ValueError(f"{path.name}: cited but not defined under references: {', '.join(missing)}")
+    return curation
+
+
+def render_markdown(
+    modules: list[ModuleSources],
+    snapshot: Optional[Snapshot],
+    as_of: Optional[datetime],
+    bib: dict[str, Bibliography],
+    curation: Optional[Curation] = None,
+) -> str:
     by_name = {m.name: m for m in snapshot.modules} if snapshot else {}
     lines = ["# Supplementary Table S4. Module sources", ""]
     if snapshot:
@@ -410,6 +448,10 @@ def render_markdown(modules: list[ModuleSources], snapshot: Optional[Snapshot], 
             f"- **Built from** {_built_from(m)}.",
             f"- **Databases by layer** {_databases(m)}.",
         ]
+        note = curation.modules.get(m.name) if curation else None
+        if note is not None:
+            cites = "; ".join(note.references)
+            lines.append(f"- **Curation** {note.selection.rstrip('.')}" + (f" ({cites})." if cites else "."))
         filters = _build_filters(m)
         if filters:
             lines.append(f"- **Selection recorded by the build** {'; '.join(filters)}.")
@@ -438,6 +480,10 @@ def render_markdown(modules: list[ModuleSources], snapshot: Optional[Snapshot], 
             author, year = _cite_cell(c, bib)
             lines.append(f"| {author} | {year} | {c.pmid} | {c.doi or ''} | {c.rows} |")
         lines.append("")
+    if curation:
+        used = sorted({key for name, note in curation.modules.items() for key in note.references})
+        if used:
+            lines += ["## References", "", *(f"- **{key}** {curation.references[key]}" for key in used), ""]
     return "\n".join(lines)
 
 

@@ -19,6 +19,7 @@ from just_dna_format.spec import Defaults
 from just_dna_lite.manuscript.cli import app
 from just_dna_lite.manuscript.s4 import (
     CITATIONS_CSV,
+    CURATION_YAML,
     MD_NAME,
     MODULES_CSV,
     ModuleSources,
@@ -27,7 +28,9 @@ from just_dna_lite.manuscript.s4 import (
     check_against_snapshot,
     classify_curator,
     module_dirs,
+    read_curation,
     read_module_sources,
+    render_markdown,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,3 +163,34 @@ def test_render_refuses_as_of_beside_a_snapshot(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["s4", "render", str(tmp_path), "--out", str(tmp_path / "out"), "--as-of", AS_OF])
     assert result.exit_code == 1
     assert "records its own cutoff" in result.output
+
+
+COMMITTED_CURATION = ROOT / "docs/manuscript/v0.3/supplementary" / CURATION_YAML
+
+
+def test_the_committed_curation_renders_one_line_per_noted_module(modules: list[ModuleSources]) -> None:
+    names = {m.name for m in modules}
+    curation = read_curation(COMMITTED_CURATION, names)
+    page = render_markdown(modules, None, datetime(2026, 10, 10, tzinfo=timezone.utc), {}, curation)
+    assert page.count("- **Curation** ") == len(curation.modules)
+    references = page.split("## References", 1)[1]
+    cited = {key for note in curation.modules.values() for key in note.references}
+    listed = {line.split("**")[1] for line in references.splitlines() if line.startswith("- **")}
+    assert listed == cited
+    assert "## References" not in render_markdown(modules, None, None, {}, None)
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ("modules:\n  no_such_module: {selection: x}\nreferences: {}\n", "no such module"),
+        ("modules:\n  coronary: {selection: x, references: [Missing2026]}\nreferences: {}\n", "not defined"),
+    ],
+)
+def test_curation_refuses_unknown_modules_and_undefined_references(
+    tmp_path: Path, modules: list[ModuleSources], body: str, message: str
+) -> None:
+    path = tmp_path / CURATION_YAML
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        read_curation(path, {m.name for m in modules})

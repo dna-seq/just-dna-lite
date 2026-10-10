@@ -57,6 +57,7 @@ Coronary artery disease risk associations.
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_coronary`, file `just_coronary__coronary.sqlite` (sha256:11a8fb70b48dc0b7719e4c445f29a91bacaae9ba751d4b141dd9638161c59f34).
 - **Databases by layer** Ensembl (resolution layer, Apache-2.0).
+- **Curation** Curated by hand in Generation I: SNPs chosen by p-values from meta-analyses and the number of studies across populations, with risk and protective alleles, gene function and health effects added from PubMed, SNPedia and GeneCards (Kulaga2024).
 - **Counts** 81 `weights` rows, 27 variants, 22 genes; 118 study rows citing 59 distinct PubMed IDs (56 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -129,6 +130,7 @@ Lipid metabolism and cardiovascular risk variants.
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_lipidmetabolism`, file `just_lipidmetabolism__lipid_metabolism.sqlite` (sha256:4eed07c0d2cbaeda1b868de4c83b244203f6b00819ae5e61e7eec7ddbe51eac2).
 - **Databases by layer** Ensembl (resolution layer, Apache-2.0).
+- **Curation** Curated by hand in Generation I with the same inclusion criteria as the coronary artery disease module (Kulaga2024).
 - **Counts** 45 `weights` rows, 15 variants, 12 genes; 44 study rows citing 37 distinct PubMed IDs (36 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -179,6 +181,7 @@ Longevity-associated genetic variants from LongevityMap database.
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_longevitymap`, file `just_longevitymap__longevitymap.sqlite` (sha256:f4a6439e8646b8febc6a208b198b54450f6b8e6a844c4dad50867a0887e294a7).
 - **Databases by layer** Ensembl (resolution layer, Apache-2.0).
+- **Curation** Variants from the LongevityMap database, filtered for significant associations and expanded with meta-analyses published after 2017, then weighted by study evidence in Generation I (Tacutu2017; Kulaga2024).
 - **Counts** 1,022 `weights` rows, 528 variants, 272 genes; 671 study rows citing 126 distinct PubMed IDs (124 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -344,6 +347,7 @@ Elite performance and rare beneficial variants.
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_superhuman`, file `just_superhuman__superhuman.sqlite` (sha256:88fdc4971f67695723fb668211a0c342debe76998c5aabd530299dfcabd24ddc).
 - **Databases by layer** ClinVar (resolution layer, public-domain); Ensembl (resolution layer, Apache-2.0).
+- **Curation** Rare protective and enhancing alleles taken from the Church laboratory's Protective and Enhancing Alleles list in Generation I, each variant checked against the primary literature in the 2026 revision (the papers listed below) (Church2026; JustSuperhumanGenI).
 - **Counts** 99 `weights` rows, 74 variants, 28 genes; 74 study rows citing 29 distinct PubMed IDs (28 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -386,6 +390,7 @@ Inherited blood-clotting risk variants (Factor V Leiden, prothrombin, and relate
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_thrombophilia`, file `just_thrombophilia__thrombophilia.sqlite` (sha256:6724afb711d2a8d8a9f040d9a8cdcf134ba9d73968a9142b5f1672cdb74746de).
 - **Databases by layer** Ensembl (resolution layer, Apache-2.0).
+- **Curation** Curated by hand in Generation I with the same inclusion criteria as the coronary artery disease module (Kulaga2024).
 - **Counts** 24 `weights` rows, 8 variants, 8 genes; 27 study rows citing 24 distinct PubMed IDs (24 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -423,6 +428,7 @@ Athletic performance and oxygen uptake capacity variants.
 - **Curator type** Expert (manifest curator `just-dna-seq`, method `expert-curated`).
 - **Built from** Generation-I module `dna-seq/just_vo2max`, file `just_vo2max__vo2max.sqlite` (sha256:c328c54b051c1c0fdbc0490a5a8a4c6998311da0204371755ddc50b1decd641d).
 - **Databases by layer** Ensembl (resolution layer, Apache-2.0).
+- **Curation** Curated by hand in Generation I from published studies of the oxygen-uptake (VO2max) response to exercise training, mostly candidate-gene and cohort studies; the inclusion criteria were not recorded, and the papers are those listed below.
 - **Counts** 39 `weights` rows, 13 variants, 12 genes; 19 study rows citing 7 distinct PubMed IDs (7 with a DOI).
 
 | First author | Year | PMID | DOI | Rows citing |
@@ -434,3 +440,10 @@ Athletic performance and oxygen uptake capacity variants.
 | Ghosh S | 2013 | 23990238 | 10.1152/japplphysiol.01487.2012 | 3 |
 | Yu B | 2014 | 24571688 | 10.1186/1476-511X-13-40 | 2 |
 | Zarebska A | 2014 | 25435667 | 10.5604/20831862.1120932 | 1 |
+
+## References
+
+- **Church2026** Church, G. M. (2026). Protective and Enhancing Alleles. Harvard Molecular Technologies. https://arep.med.harvard.edu/gmc/protect.html (list version of 29 March 2026, 87 genes; accessed 10 October 2026; archived at https://web.archive.org/web/20260922213032/https://arep.med.harvard.edu/gmc/protect.html).
+- **JustSuperhumanGenI** dna-seq/just_superhuman, Generation I OakVar module, README: "based on Prof. George Church's Protective and Enhancing Alleles spreadsheet". https://github.com/dna-seq/just_superhuman (accessed 10 October 2026).
+- **Kulaga2024** Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform: longevity science for everyone. arXiv:2403.19087.
+- **Tacutu2017** Tacutu, R., et al. (2017). Human Ageing Genomic Resources: new and updated databases. Nucleic Acids Research, 46(D1), D1083-D1090. doi:10.1093/nar/gkx1042.

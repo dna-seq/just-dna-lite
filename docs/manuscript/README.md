@@ -157,6 +157,11 @@ uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10  
   *Expert*; an AI-only authorship with a stated (non-default) method makes it *AI-generated*; anything
   else is *Undetermined*. A spec that states no `defaults:` block gets the format's `ai-module-creator`
   / `literature-review`, which is not a statement (pharmgkb is such a case).
+- **Curation notes** are the one hand-written part: `S4_curation.yaml`, beside the output, says how each
+  Generation I literature module chose its variants, every note citing keys of its own `references`
+  map. `render` prints them as each module's *Curation* line plus a References section, and refuses a
+  note for a module not in the render or a cited key that is not defined. The paper's text points to S4
+  for module provenance instead of citing per module.
 - **First author and year** are not in any module file. `--fetch-bibliography` asks PubMed esummary for
   the literature-curated modules' PMIDs not yet in `S4_bibliography.json` and caches them there; the
   request carries no contact email and no NCBI key. Without the flag the render is offline.
