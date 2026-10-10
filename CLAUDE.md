@@ -737,6 +737,9 @@ reused for annotation.
 - Rewritten segments of a manuscript carry `<!-- @rev C3 rounds=N by=name:YYYY-MM-DD -->` …
   `<!-- @/rev C3 -->` markers; `uv run manuscript ledger lint|strip|report|bump PATH`. Builds read the
   stripped `<stem>.clean.md` twin, never the marked source. Rules: `docs/manuscript/README.md`.
+- `uv run manuscript build PATH [--out DIR] [--no-pdf] [--template T]`: clean twin → pandoc LaTeX →
+  tectonic PDF in `build/` beside PATH (gitignored). `MANUSCRIPT_TECTONIC` overrides the binary,
+  `TECTONIC_CACHE_DIR` keeps the TeX bundle off `~/.cache`. A failed render deletes the old PDF.
 
 ## Workspace facts
 

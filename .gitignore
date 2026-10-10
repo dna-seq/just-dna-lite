@@ -248,3 +248,5 @@ windows/icon.ico
 
 # Clean twins written by `manuscript ledger strip` (docs/manuscript/README.md); derived, regenerate before a build
 *.clean.md
+# `manuscript build` outputs (clean twin, LaTeX, log, PDF), regenerated from the Markdown master
+docs/manuscript/**/build/

@@ -1,6 +1,8 @@
 # Manuscript tools
 
-`uv run manuscript` holds the tools for the manuscript sources in this folder.
+`uv run manuscript` holds the tools for the manuscript sources in this folder: the revision ledger
+(`manuscript ledger …`) and the PDF build (`manuscript build …`). The Markdown files are the master;
+the LaTeX and the PDF are derived from them and never edited by hand.
 
 ## Revision ledger
 
@@ -71,8 +73,8 @@ uv run manuscript ledger bump docs/manuscript/v0.3/paper1-just-dna-lite.md C3 --
 ### The clean twin
 
 `strip` writes `<stem>.clean.md` next to the source (`--out` to put it elsewhere). It is the source
-minus the markers and nothing else, so a downstream build (the LaTeX/tectonic pipeline lives outside
-this repository) can read it without knowing the ledger exists. It is rewritten only when its content
+minus the markers and nothing else, so a build (`manuscript build` below, or any other) can read it
+without knowing the ledger exists. It is rewritten only when its content
 changes, which keeps make-style builds from rebuilding for nothing.
 
 The twin is derived, so `*.clean.md` is gitignored: regenerate it with `strip` right before a build.
@@ -81,3 +83,41 @@ If a build ever needs it from a clone of this repository, commit it deliberately
 
 Code: `src/just_dna_lite/manuscript/ledger.py`. Tests: `tests/test_manuscript_ledger.py`, which
 inserts markers into the real paper text and checks the round trip.
+
+## Building the PDF
+
+```bash
+uv sync                                                                          # dev group: pypandoc-binary, tecto
+uv run manuscript build docs/manuscript/v0.3/paper1-just-dna-lite.md            # → docs/manuscript/v0.3/build/
+uv run manuscript build docs/manuscript/v0.3/paper1-just-dna-lite.md --no-pdf   # stop at the LaTeX
+uv run manuscript build PATH --out /tmp/paper --template venue.latex            # elsewhere, venue template
+```
+
+The chain is: ledger strip → `<stem>.clean.md` → pandoc → `<stem>.tex` → tectonic → `<stem>.pdf`, all
+in `build/` beside the source (gitignored) unless `--out` names another directory. The build stops
+with the lint errors if the ledger markers are broken, before writing anything.
+
+- **Layout.** The paper's single `#` heading becomes the title and `##` headings become sections
+  (pandoc's `--shift-heading-level-by=-1`). Pandoc's default LaTeX article is used for now.
+- **Venue template.** `--template FILE` takes a pandoc LaTeX template (start from `pandoc -D latex`),
+  which is where a journal's class (Bioinformatics/OUP and the like) goes when we pick one.
+- **Fonts.** The default is DejaVu Serif and DejaVu Sans Mono from tectonic's bundle. Pandoc's
+  default, Latin Modern, has no ≥, ↔ or superscript minus, and XeTeX leaves a blank for a missing
+  glyph with only a log line: paper 1 lost eight characters that way. The build prints a warning for
+  every character still missing, so check its output, not only the PDF.
+- **Tectonic.** The `tecto` wheel's binary needs a recent glibc. On an older host, point
+  `MANUSCRIPT_TECTONIC` at the static musllinux build of the same release. Set `TECTONIC_CACHE_DIR`
+  (for example `/data/tectonic-cache`) so the TeX bundle is not cached under `~/.cache`. Both can go
+  in `.env` (see `.env.template`); an exported value wins. The first build downloads the bundle and
+  takes a few minutes; later builds take seconds.
+- **No stale PDF.** The previous PDF is deleted before tectonic runs, so a failed render leaves the
+  LaTeX and a reported error, never an old PDF that looks current. `--no-pdf` keeps an existing PDF but
+  says when it is older than the LaTeX just written.
+- **Page count.** The build reports the pages typeset (from the TeX log). just-module-creator's
+  `page_budget.py` was not ported: it projects a page count from LaTeX source against a committed
+  anchor PDF because that host could not render. Here the Markdown is the master and the PDF builds,
+  so the count is measured directly. It is the count for pandoc's default layout, not a venue's.
+
+Code: `src/just_dna_lite/manuscript/build.py`, `cli.py`. Tests: `tests/test_manuscript_build.py`
+(the real render is skipped, with the reason, when no tectonic resolves or `TECTONIC_CACHE_DIR` is
+unset).

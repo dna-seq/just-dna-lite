@@ -2197,8 +2197,10 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
+    { name = "pypandoc-binary" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "tecto" },
 ]
 
 [package.metadata]
@@ -2218,8 +2220,10 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "ipykernel", specifier = ">=7.3.0" },
+    { name = "pypandoc-binary", specifier = ">=1.17" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
+    { name = "tecto", specifier = ">=0.17.0" },
 ]
 
 [[package]]
@@ -3349,6 +3353,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pypandoc-binary"
+version = "1.17"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/85/681a54111f0948821a5cf87ce30a88bb0a3f6848af5112c912abac4a2b77/pypandoc_binary-1.17-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:734726dc618ef276343e272e1a6b4567e59c2ef9ef41d5533042deac3b0531f1", size = 25553945, upload-time = "2026-03-14T22:38:47.91Z" },
+    { url = "https://files.pythonhosted.org/packages/15/58/8fd107c68522957868c1e785fbea7595608df118e440e424d189668294df/pypandoc_binary-1.17-py3-none-macosx_11_0_arm64.whl", hash = "sha256:fcfd28f347ed998dda28823fc6bc24f9310e7fdf3ddceaf925bf0563a100ab5b", size = 25553944, upload-time = "2026-03-14T22:38:50.74Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/27/ac1078239aae14b94c51975b7f46ad8e099e47d7ae26c175a5486b1c0099/pypandoc_binary-1.17-py3-none-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:d6b620b21c9374e3e48aabd518492bf0776b148442ee28816f6aaf52da3d4387", size = 34460960, upload-time = "2026-03-14T22:38:53.391Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/7f/1e5612b52900ebe590862dabeadf546f739b27527dcd8bfd632f8adac1be/pypandoc_binary-1.17-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9ada156cb980cd54fd6534231788e668c00dbb591cbd24f0be0bd86812eb8788", size = 36867598, upload-time = "2026-03-14T22:38:56.351Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/31/a5a867159c4080e5d368f4a53540a727501a2f31affc297dc8e0fced96a7/pypandoc_binary-1.17-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:2f439dcd211183bb3460253ca4511101df6e1acf4a01f45f5617e1fa2ad24279", size = 36867584, upload-time = "2026-03-14T22:38:59.087Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/2d/6a51cd4e54bdf132c19416801077c34bd40ba182e85d843360d36ae03a2d/pypandoc_binary-1.17-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:f6e6d3e4cfafbe23189a08db3d41f8def260bacd6e7e382bceadab7ba1f17da6", size = 34460949, upload-time = "2026-03-14T22:39:01.71Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/b9/f47b77ba75ed5d47ec85fcc2ecfbf7f78e3a73347f3a09836634d930de98/pypandoc_binary-1.17-py3-none-win_amd64.whl", hash = "sha256:76fae066cd2d7e78fb97f0ec8e9e36f437b07187b689b0b415ca18216f8f898a", size = 40891661, upload-time = "2026-03-14T22:39:04.782Z" },
+]
+
+[[package]]
 name = "pyperclip"
 version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4221,6 +4239,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]
+
+[[package]]
+name = "tecto"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/dc/933275cf4b5a152a2f27ba60ab8a0e0a56c98d6a29c15e588683115c9b3b/tecto-0.17.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:826a07916c92a5863e943c1f5cf1f267b086549b01505cf4ef23f8904ad9edc0", size = 42040339, upload-time = "2026-09-19T20:39:53.013Z" },
+    { url = "https://files.pythonhosted.org/packages/57/db/274e1c80870c0ed3fe8ece36429ac0ec68003960e28fde9df25c9b8942b0/tecto-0.17.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:016ee95f65e88a53b924d6f606c551897a4fc5d69985091582f3485879c255c3", size = 41689470, upload-time = "2026-09-19T20:39:55.897Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/ab/9fc29a57bd7fd69bcc5c8de0e16f77b280e00ae21ece425bd544ce975c5f/tecto-0.17.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:db1bb466f6b0e8e96305368fab85d472f60f0f268f7430fa85b6edb80796e061", size = 19243007, upload-time = "2026-09-19T20:39:58.419Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/b8/2be58ddd98ebe29a2814ccf68fd1416ddb6ab0e4e8fbf8079e3766af4449/tecto-0.17.0-py3-none-manylinux2014_x86_64.whl", hash = "sha256:0826cec6d30e7d4e59cb2133fbdb09c37d6a046cc4e68e94a4cd8855355dc476", size = 43894295, upload-time = "2026-09-19T20:40:01.068Z" },
+    { url = "https://files.pythonhosted.org/packages/30/8c/98bd9d59c08128ff15672c19c0fead77e8b15d46588b73b28e562085de90/tecto-0.17.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:18cd7f2f2d4dbbce2874dd78ca1848132692193ba9b423c772be03e95c0a2225", size = 19243007, upload-time = "2026-09-19T20:40:03.981Z" },
+    { url = "https://files.pythonhosted.org/packages/21/d6/3de4b4bb4e3aac5655f1897d68f824b2c1ee57076496e200661e46abaad1/tecto-0.17.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:830e64c7383e1aed3544f87c07e8ecfb498ebf2b1c1f2b6b95826dd855d3188b", size = 19767598, upload-time = "2026-09-19T20:40:06.198Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/f3/327f61d449a51d1055969613a031613759ad849e0abe3e70066d83d277c6/tecto-0.17.0-py3-none-win_amd64.whl", hash = "sha256:6f7e9760f4e0d1fff3f56334f9cd835894ee6cd31f0c5be5d4b89871a42e211d", size = 40357004, upload-time = "2026-09-19T20:40:08.658Z" },
 ]
 
 [[package]]

@@ -45,8 +45,10 @@ webui = { workspace = true }
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
+    "pypandoc-binary>=1.17",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "tecto>=0.17.0",
 ]
 
 [project.scripts]
