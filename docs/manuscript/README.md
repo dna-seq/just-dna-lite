@@ -1,7 +1,8 @@
 # Manuscript tools
 
 `uv run manuscript` holds the tools for the manuscript sources in this folder: the revision ledger
-(`manuscript ledger …`) and the PDF build (`manuscript build …`). The Markdown files are the master;
+(`manuscript ledger …`), the PDF build (`manuscript build …`) and Supplementary Table S4
+(`manuscript s4 …`). The Markdown files are the master;
 the LaTeX and the PDF are derived from them and never edited by hand.
 
 ## Revision ledger
@@ -127,3 +128,38 @@ with the lint errors if the ledger markers are broken, before writing anything.
 Code: `src/just_dna_lite/manuscript/build.py`, `cli.py`. Tests: `tests/test_manuscript_build.py`
 (the real render is skipped, with the reason, when no tectonic resolves or `TECTONIC_CACHE_DIR` is
 unset).
+
+## Supplementary Table S4 (module sources)
+
+S4 lists, for every module the project publishes in the registry, its version, publication time,
+artifact digest, curator type, source databases with their release, and every paper its rows cite. The
+registry is a live catalogue, so the table is a snapshot with a recorded cutoff. Two steps:
+
+```bash
+uv run manuscript s4 snapshot /data/s4-work                    # read-only: list, download, record the UTC time
+uv run manuscript s4 render /data/s4-work -o docs/manuscript/v0.3/supplementary --fetch-bibliography
+uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10   # local builds, no registry
+```
+
+- **`snapshot`** uses `default_registry_store()` (or `--store KEY`) and `--namespace` (default
+  `just-dna-seq`). It sends no token and makes public reads only: the namespace listing, each module's
+  versions, and a verified download of the latest non-yanked version with its build logs. It also reads
+  the legacy HuggingFace mirror's manifests (`--no-mirror` skips that). It writes `snapshot.json` beside
+  the downloads; keep the work directory outside the repo.
+- **`render`** reads every value from the module files (`manifest.json`, `sources.parquet`,
+  `studies.parquet`, the lead table, `literature.parquet`, the build log) and refuses when a directory's
+  version or digest disagrees with `snapshot.json`. It writes `S4_module_sources.md`,
+  `S4_module_sources.csv` (one row per module) and `S4_module_citations.csv` (one row per module and
+  PMID, including the database-derived panels' ClinVar links). `S4_registry_snapshot.json` is the
+  committed copy of the snapshot the current table was rendered from.
+- **Curator type** comes from provenance, never a guess: a database on the licence sidecar's
+  `annotation` layer makes it *Database-derived*; else manifest method `expert-curated` makes it
+  *Expert*; an AI-only authorship with a stated (non-default) method makes it *AI-generated*; anything
+  else is *Undetermined*. A spec that states no `defaults:` block gets the format's `ai-module-creator`
+  / `literature-review`, which is not a statement (pharmgkb is such a case).
+- **First author and year** are not in any module file. `--fetch-bibliography` asks PubMed esummary for
+  the literature-curated modules' PMIDs not yet in `S4_bibliography.json` and caches them there; the
+  request carries no contact email and no NCBI key. Without the flag the render is offline.
+
+Code: `src/just_dna_lite/manuscript/s4.py`, `s4_snapshot.py`, `cli.py`. Tests:
+`tests/test_manuscript_s4.py` (offline, on `data/interim/v1_port/`; skipped with the reason when absent).
