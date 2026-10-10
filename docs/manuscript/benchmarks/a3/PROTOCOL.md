@@ -152,3 +152,8 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
   `bench-queue.timer` → `bench-queue.service`. A test unit under the same user manager reached Docker
   (29.8.2) and uv (0.12.23). The user has `Linger=no`, so the timer needs the desktop session to stay
   logged in.
+- Two PRS jobs on purpose (agreed with the plan's session): `25-a3-prs.sh` measures the **shipped**
+  just-prs 0.10.1 (what just-dna-lite users run today, original and fixed benchmark inputs) and
+  writes to `a3/prs/results-<stamp>/`; `20-just-prs-engines.sh` (just-prs's session) measures the
+  **fixed** engines from its working tree, which the paper reports once that version is released and
+  pinned. Each records the just-prs version and commit it ran.
