@@ -1,0 +1,52 @@
+# step 28: jdl-series-primary
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool jdl --genome primary --vcf /data/a3-bench/inputs/anton/antonkulaga.vcf --series-dir /data/a3-bench/series/jdl/primary -m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic -m pharmgkb -m superhuman -m thrombophilia -m vo2max --ensembl-extra 
+# start: 2026-10-10T23:20:28+02:00
+schedule (jdl, primary, seed 20261010): warmup warm full full full cold warm full warm warm cold warm warm full warm warm warm cold warm warm ensembl
+  load 5.35 > 1.5, waiting
+  load 26.93 > 1.5, waiting
+  load 23.86 > 1.5, waiting
+  load 25.84 > 1.5, waiting
+  load 30.30 > 1.5, waiting
+  load 30.62 > 1.5, waiting
+  load 32.78 > 1.5, waiting
+  load 45.33 > 1.5, waiting
+  load 36.64 > 1.5, waiting
+  load 34.39 > 1.5, waiting
+  load 34.38 > 1.5, waiting
+  load 31.46 > 1.5, waiting
+  load 31.72 > 1.5, waiting
+  load 30.56 > 1.5, waiting
+  load 31.93 > 1.5, waiting
+  load 32.56 > 1.5, waiting
+  load 31.94 > 1.5, waiting
+  load 26.23 > 1.5, waiting
+  load 19.99 > 1.5, waiting
+  load 18.97 > 1.5, waiting
+  load 33.87 > 1.5, waiting
+  load 35.86 > 1.5, waiting
+  load 40.77 > 1.5, waiting
+  load 43.37 > 1.5, waiting
+  load 41.31 > 1.5, waiting
+  load 34.68 > 1.5, waiting
+  load 32.50 > 1.5, waiting
+  load 34.53 > 1.5, waiting
+  load 39.70 > 1.5, waiting
+  load 47.50 > 1.5, waiting
+  load 50.30 > 1.5, waiting
+  load 48.14 > 1.5, waiting
+  load 40.58 > 1.5, waiting
+  load 44.40 > 1.5, waiting
+  load 37.25 > 1.5, waiting
+  load 36.97 > 1.5, waiting
+  load 40.97 > 1.5, waiting
+  load 27.55 > 1.5, waiting
+  load 20.24 > 1.5, waiting
+  load 14.72 > 1.5, waiting
+  load 9.91 > 1.5, waiting
+  load 8.39 > 1.5, waiting
+  load 5.72 > 1.5, waiting
+  load 4.59 > 1.5, waiting
+  load 3.37 > 1.5, waiting
+  load 2.97 > 1.5, waiting
+  load 3.42 > 1.5, waiting

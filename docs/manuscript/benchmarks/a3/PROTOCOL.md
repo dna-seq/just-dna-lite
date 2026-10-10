@@ -130,3 +130,25 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
 - Smoke test, 3 IDs, both configurations: *original* reproduces the published PLINK2 scores
   (PGS000006–8: −0.0038, −0.7342, −0.7906) and *fixed* reproduces the gap report's counterfactual
   run (−0.1464, −0.797, −0.8558) exactly.
+
+### Rescheduled to the night queue (2026-10-10, 23:40)
+
+- **28** `jdl-series-primary` was launched at 23:20 and **stopped at 23:42 before timing anything**:
+  other sessions held the 1-minute load between 3 and 27 (an S5 scan with 6 workers, a just-prs test
+  suite), so the warm-up never passed the load gate. No `runs.csv` row was written; its log ends
+  without an exit line and it has no `protocol.jsonl` entry.
+- The user then ruled (relayed by the session that wrote the plan): no timed runs in the evening;
+  every benchmark goes into one queue at **03:00**, one job after another. This session owns the
+  queue runner. Copies of the queue files are in [`queue/`](queue/):
+  - `/data/bench-queue/run-queue.sh` runs every other `*.sh` there in lexical order, logs to
+    `logs/<name>.log`, and marks `done/<name>` or `failed/<name>` (holding the exit code); a failure
+    does not stop the queue.
+  - `10-jdl-annotation.sh`: refuses to run if anything listens on 3000/3005/3006 (the app stack),
+    proves the privileged page-cache drop works, then runs `scripts/run_jdl_series.sh` (each launch
+    now gets its own dated series directory).
+  - `25-a3-prs.sh`: `prs/bench_prs.py`, original then fixed, each behind the same load gate.
+  - just-prs's own session adds `20-just-prs-engines.sh`.
+- Timer: `systemd-run --user --on-calendar='2026-10-11 03:00:00' --unit=bench-queue`, so
+  `bench-queue.timer` → `bench-queue.service`. A test unit under the same user manager reached Docker
+  (29.8.2) and uv (0.12.23). The user has `Linger=no`, so the timer needs the desktop session to stay
+  logged in.
