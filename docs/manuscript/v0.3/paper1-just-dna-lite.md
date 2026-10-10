@@ -318,7 +318,7 @@ Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspec
 - **Ryangguk Kim** — created and maintained OakVar, extended it for the Generation I platform
 - **Zaharia Livia** — beta-testing, provided her whole genome for testing and benchmarking
 - **Fuellen Georg** — co-supervision, valuable suggestions and comments
-- **Tacutu Robi** — bioinformatics and ageing research advising, LongevityMap database
+- **Tacutu Robi** — <!-- @rev C38 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->co-supervision,<!-- @/rev C38 --> bioinformatics and ageing research advising, LongevityMap database
 
 **Acknowledgments:** Volodymir Semenuik for help with documentation.
 
