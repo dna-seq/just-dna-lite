@@ -26,17 +26,24 @@ The contribution of these authors is considered to be equal. \* Co-supervising a
 
 ## **Abstract**
 
-Personal genome analysis requires tools that make published variant associations accessible while allowing users to inspect the methods and retain control of their data.
+<!-- @rev C2a rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+As genome sequencing becomes increasingly available, personal genome analysis requires tools that make published variant associations accessible while allowing users to inspect the methods and retain control of their data.
+<!-- @/rev C2a -->
 
-We present Just-DNA-Lite, an open-source platform that combines local variant annotation and polygenic risk score (PRS) computation in a web interface. Annotation modules contain variant-trait tables and metadata, allowing researchers to extend the catalogue without writing executable plugins. A shared module contract, automatic source discovery, and a versioned registry connect published annotation content to local analysis and downloadable reports. The just-prs library provides scoring through web, command-line, Python, and Model Context Protocol interfaces.
+<!-- @rev C2b rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+We present Just-DNA-Lite, an open-source platform that combines local variant annotation and polygenic risk score (PRS) computation in a web interface. Annotation modules are declarative, versioned packages of variant-trait tables and their sources, allowing researchers to extend the catalogue without writing code. A registry distributes modules, and the platform applies them to the user's genome to produce downloadable reports. The just-prs library provides scoring through web, command-line, Python, and Model Context Protocol interfaces.
+<!-- @/rev C2b -->
 
-For one public whole-genome VCF, warm-run annotation averaged 38.9 seconds across 11 runs, approximately 172 times faster than the earlier OakVar-based Just-DNA-Seq configuration on the same hardware. In a separate benchmark of 100 polygenic scores on the same individual's genome, DuckDB and Polars had median per-score runtimes 12.3 and 5.7 times faster than PLINK2, respectively. Correlation with PLINK2 across the 96 scores completed by all engines was Pearson r = 0.999859. These measurements assess computational performance and numerical agreement for one genome; they do not establish predictive accuracy or agreement in rankings across individuals.
+<!-- @rev C2c rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+Reports list each matched variant with its reported effect and sources. Polygenic scores are shown as percentiles within a reference population matched to the genome's inferred ancestry, with all models for a trait shown together. New modules can also be drafted with general-purpose AI assistants through a plugin, and pass the same validation as hand-written ones.
+<!-- @/rev C2c -->
 
 Core annotation and scoring run locally, with reference datasets downloaded and cached on the user's machine. Optional external AI services introduce a separate data-sharing boundary. Just-DNA-Lite is released under AGPL v3 for research and education; it does not provide diagnoses or establish clinical validity for the associations it reports.
 
 ## **1. Introduction**
 
-Whole genome sequencing costs have fallen from billions of dollars to under a thousand since the completion of the Human Genome Project in 2003, and several companies now offer direct-to-consumer sequencing services (Whitley et al., 2020). Yet the gap between sequencing accessibility and variant annotation remains wide. Researchers and individuals receive raw variant files (VCFs) containing millions of variants but lack accessible tools to annotate them against published databases without specialized bioinformatics expertise.
+<!-- @rev C3 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+By 2025, manufacturers listed the sequencing consumables for a human genome at US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025), and studies that count the full cost, including labour, equipment and analysis, put a genome at a few thousand dollars (Mordaunt et al., 2024; Ehman et al., 2025), against an estimated $500 million to $1 billion for the first one (NHGRI, 2021). Several companies now offer direct-to-consumer sequencing services (Whitley et al., 2020; O'Daniel et al., 2025).<!-- @/rev C3 --> Yet the gap between sequencing accessibility and variant annotation remains wide. Researchers and individuals receive raw variant files (VCFs) containing millions of variants <!-- @rev C4 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->but often lack accessible means to annotate them against published databases without specialized bioinformatics expertise, a learning curve that takes time away from the questions they set out to answer (Nelson et al., 2019; Chen et al., 2023; O'Daniel et al., 2025).<!-- @/rev C4 -->
 
 <!-- @rev R3 rounds=1 by=robi:2026-09-25 -->
 Existing solutions generally belong to two extremes. Commercial platforms such as DNA Complete (formerly Nebula Genomics) and Dante Labs provide curated reports, but the curation is opaque: users cannot verify which polymorphisms contributed to a score, whether the methodology is appropriate for their ancestry, or how findings were weighted. At the other end, research-grade tools like PLINK, ANNOVAR, and VEP are powerful but demand command-line proficiency and significant setup effort. There is no open-source platform that combines comprehensive variant annotation with ease of use, transparency, and extensibility.
@@ -49,14 +56,18 @@ The recent progress in the genetics of longevity illustrates the need for such e
 A platform for personal genome annotation must therefore solve three problems simultaneously: it must be easy to use (web interface, no bioinformatics training), transparent in its methods (open-source, auditable scoring), and extensible (researchers should be able to add new annotation modules as the literature evolves, without writing code). Furthermore, privacy is a first-order concern: genomic data is among the most sensitive personal information, and uploading it to third-party servers introduces risks that many individuals and regulatory frameworks (such as the GDPR and the European Health Data Space) seek to avoid.
 
 <!-- @rev R5 rounds=1 by=robi:2026-09-25 -->
-We developed Just-DNA-Lite as a ground-up rewrite of Just-DNA-Seq, whose first generation ran on OakVar (Kulaga et al., 2024). Just-DNA-Lite removes the OakVar dependency entirely and replaces it with our own standalone annotation engine, built with Dagster for workflow orchestration, polars-bio for VCF reading, Polars for columnar processing, and DuckDB for out-of-core joins. It also replaces Python annotation plugins with declarative data modules discoverable from configured sources (Section 2.2). In the reported same-hardware comparison, mean annotation runtime fell from 6,705 seconds for Generation I (for details about Generation I, please see supplementary File S1) to 38.9 seconds for warm runs of Just-DNA-Lite (Section 5.1).
+<!-- @rev C5 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+Just-DNA-Lite is a local, open-source platform for annotating a personal genome and computing polygenic scores. We developed it as a ground-up rewrite of Just-DNA-Seq (Kulaga et al., 2024), whose first generation (Generation I) was a set of annotation and report modules for OakVar, a Python variant-analysis framework derived from OpenCRAVAT. Just-DNA-Lite removes the OakVar dependency entirely and replaces it with our own standalone annotation engine, built with Dagster for workflow orchestration, polars-bio, a genomics library with a Polars interface (Wiewiórka et al., 2025), for VCF reading, Polars for columnar processing, and DuckDB for out-of-core joins. It also replaces Python annotation plugins with declarative modules discoverable from configured sources (Section 2.2). Supplementary File S1 describes Generation I.
+<!-- @/rev C5 -->
 <!-- @/rev R5 -->
 
-This paper presents the standalone annotation engine, the reusable just-prs scoring library, the web interfaces, and MCP interfaces for calling these tools programmatically from AI assistants. Together, these components let users discover annotation content, apply it to a genome, compute published polygenic scores, and inspect reports. The contribution is computational; the reported associations come from existing databases and literature. AI-assisted module authoring is introduced in Section 4 and treated in detail in the companion paper. Section 6 discusses the intended research and educational use and its limitations.
+<!-- @rev C6 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+This paper presents the standalone annotation engine, the reusable just-prs scoring library, the web interfaces, and MCP interfaces for calling these tools programmatically from AI assistants. Together, these components let users discover annotation content, apply it to a genome, compute published polygenic scores, and inspect reports.
+<!-- @/rev C6 -->
 
 ## **2. Platform Architecture**
 
-The architecture separates local computation, annotation content, and user interfaces. The annotation pipeline reads modules as data artifacts, allowing the catalogue to change independently of the application code. Columnar storage and streaming operations limit memory use. A graphical web application provides the main interface, while typed MCP tools expose the PRS engine to AI assistants (Section 3.2.1). Local execution avoids requiring genome uploads for core analysis; optional external services have a separate privacy boundary (Section 6.2).
+The architecture separates local computation, annotation content, and user interfaces. The annotation pipeline reads modules as data artifacts, allowing the catalogue to change independently of the application code. Columnar storage and streaming operations limit memory use. A graphical web application provides the main interface, while typed MCP tools expose the PRS engine to AI assistants (Section 3.2.1). Local execution avoids requiring genome uploads for core analysis; optional external services have a separate privacy boundary (Section 5.2).
 
 Just-DNA-Lite is structured as a uv workspace containing two Python packages: just-dna-pipelines (Dagster assets, VCF processing, annotation logic, and CLI tools) and webui (a Reflex-based web interface). The platform requires Python 3.13+; from a configured checkout, `uv run serve` starts the application. Core annotation and scoring execute on the host machine.
 
@@ -64,9 +75,9 @@ Just-DNA-Lite is structured as a uv workspace containing two Python packages: ju
 
 The core annotation pipeline is built on Dagster with Software-Defined Assets, providing automatic data lineage tracking and resource monitoring (CPU usage, peak memory, and duration for every pipeline step). A typical annotation workflow proceeds as follows:
 
-1. **VCF ingestion.** The user provides a VCF or VCF.gz file through the web interface. This is the annotated variant file users typically already have — supplied by a sequencing provider, downloaded from a public genome repository, or produced by their own bioinformatic pipeline; Just-DNA-Lite starts from this VCF and does not itself perform sequencing, alignment, or variant calling. The file is read using polars-bio, a Polars-native VCF reader.
+1. **VCF ingestion.** The user provides a VCF or VCF.gz file through the web interface. This is the annotated variant file users typically already have — supplied by a sequencing provider, downloaded from a public genome repository, or produced by their own bioinformatic pipeline; Just-DNA-Lite starts from this VCF and does not itself perform sequencing, alignment, or variant calling. <!-- @rev N5 rounds=1 by=claude:2026-10-10 -->The file is read using polars-bio, "a Python library that enables fast, parallel and out-of-core operations on large genomic interval datasets", whose "main components are implemented in Rust, using the Apache DataFusion query engine and Apache Arrow for efficient data representation" (Wiewiórka et al., 2025).<!-- @/rev N5 -->
 <!-- @rev R6 rounds=1 by=robi:2026-09-25 -->
-2. **Normalization.** The raw VCF undergoes quality filtering (configurable via `modules.yaml`): only variants passing specified FILTER values (by default, PASS and ".") are retained, with optional minimum depth (DP ≥ 10) and quality (QUAL ≥ 20) thresholds. Chromosome prefixes ("chr") are stripped for consistency with annotation databases. The normalized data is written as a Parquet file, which serves as the shared input for all downstream annotations.
+2. **Normalization.** The raw VCF undergoes quality filtering (configurable via `modules.yaml`): only variants passing specified FILTER values (by default, PASS and ".") are retained, with optional minimum depth (DP ≥ 10) and quality (QUAL ≥ 20) thresholds. <!-- @rev N4 rounds=1 by=claude:2026-10-10 -->Chromosome names are normalized ("chr7" becomes "7", "chrM" becomes "MT") for consistency with annotation databases.<!-- @/rev N4 --> The normalized data is written as a Parquet file, which serves as the shared input for all downstream annotations.
 <!-- @/rev R6 -->
 3. **Module annotation.** For each selected annotation module, the pipeline performs a streaming join between the normalized VCF Parquet and the module's precomputed weights Parquet. Joins are performed by rsID (default) or genomic position. Polars streaming joins keep peak memory low; for datasets too large to fit in memory, DuckDB handles out-of-core joins with configurable memory limits.
 4. **Ensembl annotation (optional).** When enabled, the pipeline joins the normalized VCF against the Ensembl Variation database (cached locally as chromosome-level Parquet files downloaded from HuggingFace via fsspec), providing clinical significance labels, consequence types, and cross-references for each variant.
@@ -83,7 +94,7 @@ For the purpose of Just-DNA-Lite, annotation modules are viewed as data, not exe
 The `just-dna-format` library defines the authored specification and the manifest, integrity, and versioning contract for compiled artifacts. When a published module supplies a manifest, discovery uses its declared artifact files. For older Parquet modules without a manifest, the loader discovers the available tables directly.
 
 <!-- @rev R8 rounds=1 by=robi:2026-09-25 -->
-For researchers creating new modules, a separate authoring route accepts `module_spec.yaml` and CSV tables such as `variants.csv` and `studies.csv`. The `just-dna-compiler` library validates and compiles these specifications into Parquet artifacts and a manifest during custom-module registration. Documentation and thumbnails may accompany the module. This route lets authors prepare annotation content without writing Python code; it does not make CSV the runtime format or a requirement for using existing Parquet modules.
+For researchers creating new modules, a separate authoring route accepts `module_spec.yaml` and CSV tables such as `variants.csv` and `studies.csv`. The `just-dna-compiler` library validates and compiles these specifications into Parquet artifacts and a manifest during custom-module registration. Documentation and thumbnails may accompany the module. This route lets authors prepare annotation content <!-- @rev C10 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->without writing Python code. CSV files are used only for authoring: at runtime the platform reads the compiled Parquet tables, so existing Parquet modules need no CSV files.<!-- @/rev C10 -->
 <!-- @/rev R8 -->
 
 <!-- @rev R9 rounds=1 by=robi:2026-09-25 -->
@@ -100,12 +111,12 @@ The web interface is built with Reflex, a Python framework that compiles to Reac
 
 ### **2.4 Performance Characteristics**
 
-Consistent with the "runs on a laptop" principle, Just-DNA-Lite prioritizes memory efficiency over raw throughput: peak RAM stays low enough for a personal computer, and warm-run annotation of a whole genome completes in tens of seconds. Detailed speed and memory benchmarks — including the comparison against the Generation I OakVar-based system — are presented in Section 5.1.
+Consistent with the "runs on a laptop" principle, Just-DNA-Lite prioritizes memory efficiency over raw throughput: peak RAM stays low enough for a personal computer, and warm-run annotation of a whole genome completes in tens of seconds. Detailed speed and memory benchmarks — including the comparison against the Generation I OakVar-based system — are presented in Section 4.1.
 
 ## **3. Annotation Modules and Polygenic Scoring**
 
 <!-- @rev R11 rounds=1 by=robi:2026-09-25 -->
-Just-DNA-Lite ships with a set of expert-curated annotation modules, illustrating the platform's module system across several trait domains. These modules represent the default set. The platform is designed so that researchers from the scientific community (eg: bioinformaticians, geneticists, etc.) can easily add their own modules, either by hand or with AI assistance (Section 4). The modules annotate user variants against published variant-trait association databases; they do not perform clinical interpretation or generate diagnoses.
+Just-DNA-Lite ships with a set of expert-curated annotation modules, illustrating the platform's module system across several trait domains. These modules represent the default set. The platform is designed so that researchers from the scientific community (eg: bioinformaticians, geneticists, etc.) can easily add their own modules, either by hand or with AI assistance (Section 3.4). The modules annotate user variants against published variant-trait association databases; they do not perform clinical interpretation or generate diagnoses.
 <!-- @/rev R11 -->
 
 <!-- @rev R12 rounds=1 by=robi:2026-09-25 -->
@@ -138,14 +149,14 @@ Polygenic risk scores (PRS) aggregate the effects of many common variants into a
 Unlike the Generation I approach, which used Monte Carlo sampling to estimate percentile distributions, just-prs uses precomputed percentile distributions derived from the 1000 Genomes Project phase 3 dataset, against five superpopulations (AFR, AMR, EAS, EUR, SAS). Users select the reference population closest to their ancestry, and the percentile reflects their position within that distribution.
 
 <!-- @rev R13 rounds=1 by=robi:2026-09-25 -->
-just-prs provides two scoring engines: **DuckDB** (SQL-based, out-of-core scoring) and **Polars** (LazyFrame joins). Briefly, DuckDB computes the score …, while Polars computes … PLINK2 is used only as an external benchmark comparator to assess agreement with an established tool; it is not provided as a just-prs scoring engine. Section 5.2 reports runtime and numerical agreement. In the web interface, users browse the PGS Catalog in a searchable grid, select scores, and click "Compute"; results show the score sum, matched-variant count, and percentile within the selected superpopulation.
+just-prs provides two scoring engines: **DuckDB** (SQL-based, out-of-core scoring) and **Polars** (LazyFrame joins). Briefly, DuckDB computes the score …, while Polars computes … PLINK2 is used only as an external benchmark comparator to assess agreement with an established tool; it is not provided as a just-prs scoring engine. Section 4.2 reports runtime and numerical agreement. In the web interface, users browse the PGS Catalog in a searchable grid, select scores, and click "Compute"; results show the score sum, matched-variant count, and percentile within the selected superpopulation.
 <!-- @/rev R13 -->
 
 For variant-only whole-genome VCFs, just-prs offers optional reference-homozygote restoration. A reference-allele dataset resolves otherwise unscorable absent loci, allowing them to contribute as homozygous reference when the user selects this mode. This can increase scoring-file coverage for many scores, under the assumption that the absent loci were callable and homozygous reference. Restoration is off by default; it is not applied to gVCF inputs, and array restoration is restricted to eligible chip positions with matching reference data.
 
 The consumer-array workflow accepts formats such as 23andMe and AncestryDNA and uses precomputed linkage disequilibrium (LD) proxy tables to estimate untyped scoring variants from typed proxies where suitable tables are available. LD-based estimation and reference-homozygote restoration address different sources of missingness: the former uses correlations between loci, while the latter assigns reference genotypes to eligible absent loci. Coverage and the assumptions used to recover missing information remain part of the result's interpretation.
 
-**Figure 3. PRS results in Just-DNA-Lite (just-prs trait view).** For a selected trait, all associated PGS Catalog models are computed and shown together as a consensus distribution with the user's percentile against a 1000 Genomes reference population, alongside per-model variant match rates and quality tiers. Showing the models together — including where they disagree — is deliberate (see Section 6.3).
+**Figure 3. PRS results in Just-DNA-Lite (just-prs trait view).** For a selected trait, all associated PGS Catalog models are computed and shown together as a consensus distribution with the user's percentile against a 1000 Genomes reference population, alongside per-model variant match rates and quality tiers. Showing the models together — including where they disagree — is deliberate (see Section 5.3).
 
 <!-- AUTHOR TODO: Replace the existing images/just_prs_trait_consensus.jpg with a current screenshot for Figure 3. The existing image shows an absolute-risk percentage for intelligence and inconsistent quality labels. Capture a current trait view with the reference population, model IDs, coverage, and settings visible, then embed it here and align the caption with the final image. -->
 
@@ -158,10 +169,10 @@ The platform also provides an MCP interface for calling Just-DNA-Lite's broader 
 The PRS tools support catalogue search, model-metadata inspection, genome-build and ancestry detection, input normalization, scoring, reference-population comparison, and result-quality assessment. Trait reports bring multiple models together with their identifiers, variant coverage, and population context. This gives users a report they can inspect alongside the assistant's explanation.
 
 <!-- @rev R14 rounds=1 by=robi:2026-09-25 -->
-The tools return PGS IDs, variant-match rates, model quality tiers, reference populations, percentiles, and agreement or disagreement amongst models for a trait. These fields provide the assistant with computational context, however, their presence does not ensure that an assistant will explain them correctly. The server runs locally, but a remotely hosted assistant may receive tool outputs containing genomic results. Local scoring and private conversational processing therefore require separate consideration (Section 6.2).
+The tools return PGS IDs, variant-match rates, model quality tiers, reference populations, percentiles, and agreement or disagreement amongst models for a trait. These fields provide the assistant with computational context, however, their presence does not ensure that an assistant will explain them correctly. The server runs locally, but a remotely hosted assistant may receive tool outputs containing genomic results. Local scoring and private conversational processing therefore require separate consideration (Section 5.2).
 <!-- @/rev R14 -->
 
-The web application, Python library, command line, standalone PRS interface, and MCP client share the scoring implementation. Equivalent inputs, engine selection, reference data, and settings are required for equivalent results; the engine benchmark in Section 5.2 does not independently test every interface or the accuracy of assistant-generated explanations.
+The web application, Python library, command line, standalone PRS interface, and MCP client share the scoring implementation. Equivalent inputs, engine selection, reference data, and settings are required for equivalent results; the engine benchmark in Section 4.2 does not independently test every interface or the accuracy of assistant-generated explanations.
 
 ### **3.3 Additional Trait Annotation Modules**
 
@@ -169,26 +180,14 @@ The platform includes several additional modules that annotate variants against 
 
 ### **3.4 Growing the Module Ecosystem**
 
-The default set is extensible through the same module contract used by the application and registry. Researchers can prepare variant tables and metadata, compile them into portable artifacts, and distribute versions through configured repositories or `just-dna-registry`. Users can then select the resulting modules without modifying the annotation engine. This separates content updates from application releases, while leaving evidence review and scientific curation with module contributors. AI-assisted drafting provides another route to the same artifacts (Section 4).
+The default set is extensible through the same module contract used by the application and registry. Researchers can prepare variant tables and metadata, compile them into portable artifacts, and distribute versions through configured repositories or `just-dna-registry`. Users can then select the resulting modules without modifying the annotation engine. This separates content updates from application releases, while leaving evidence review and scientific curation with module contributors. <!-- @rev D1 rounds=1 by=claude:2026-10-10 -->Rather than embedding its own assistant, the platform exposes its operations to the AI assistants authors already use. Modules can be drafted in such an assistant through the just-module-creator plugin (github.com/dna-seq/just-module-creator); the result is the same artifact, validated and compiled the same way, and its curator field marks it as AI-generated. Through the platform's MCP server, the assistant can then install the draft, annotate a genome with it and inspect the result (Section 3.2.1).<!-- @/rev D1 -->
 
-## **4. AI-Assisted Module Creation (platform feature)**
+## **4. Benchmarking and Validation**
 
-Building annotation modules by hand is labour-intensive: it requires reading the primary literature, identifying relevant variants, looking up rsIDs and genomic positions, assigning effect weights based on study quality and replication, and formatting the output. Just-DNA-Lite integrates an AI-assisted module-creation capability directly in the web interface, so that the platform can grow its own annotation content: a user can create a new module from within the app, without external tooling. The user provides a free-text prompt in a chat interface and optionally attaches source documents; the system researches the variants against biomedical databases, drafts the module specification, and returns it for review.
-
-Whatever produces the draft, what it emits is the platform's standard, deterministic module artifacts (`module_spec.yaml`, `variants.csv`, `studies.csv`, `MODULE.md`, and a thumbnail), loaded into an editing slot in the UI where the user can review every file, make manual edits, iterate through follow-up messages, and then register the module with one click. The artifact contract, not the drafting method, is what the platform depends on — which is why the same slot accepts a module written entirely by hand.
-
-Importantly, generated modules enter the platform through exactly the same path as hand-authored ones: they are deterministic specification files that are checked by the module validator (schema compliance, genotype sorting, weight/state consistency, wild-type presence) and compiled to Parquet before they can be registered. Provenance is made explicit — each module's metadata carries a `curator` field distinguishing expert-curated from AI-generated content — so that AI-generated modules are surfaced to users as automated first drafts that benefit from expert review rather than as validated findings (see Section 6.1).
-
-The companion manuscript, *Creating and Sharing Genomic Annotation Modules with AI: The Just-DNA Ecosystem*, describes the authoring workflow and its evaluation. Here, AI-assisted creation is an integration feature; the runtime benchmarks do not evaluate draft accuracy or compare authoring models and agent arrangements. Schema validation establishes structural compliance, not the correctness of the extracted associations.
-
-**Figure 4.** The in-app AI Module Creator: the user attaches a research paper and describes the desired module; the generated module then appears in the editing slot with all files for review and one-click registration.
-
-## **5. Benchmarking and Validation**
-
-### **5.1 Annotation Speed**
+### **4.1 Annotation Speed**
 
 <!-- @rev R15 rounds=1 by=robi:2026-09-25 -->
-We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the same hardware. The input was a single whole-genome VCF containing 6,138,868 variant records (4,729,824 SNPs and 1,414,226 indels), produced by DeepVariant v1.4.0 against GRCh38 at ~162× mean coverage. This is the genome of one of the co-authors, released publicly on Zenodo (record 18370498, CC0) — the same genome used for the PRS benchmark in Section 5.2 — so the benchmark is fully reproducible end-to-end; the benchmark scripts are provided in the repository, and the pipeline can equally be run on any standard whole-genome VCF.
+We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the same hardware. The input was a single whole-genome VCF containing 6,138,868 variant records (4,729,824 SNPs and 1,414,226 indels), produced by DeepVariant v1.4.0 against GRCh38 at ~162× mean coverage. This is the genome of one of the co-authors, released publicly on Zenodo (record 18370498, CC0) — the same genome used for the PRS benchmark in Section 4.2 — so the benchmark is fully reproducible end-to-end; the benchmark scripts are provided in the repository, and the pipeline can equally be run on any standard whole-genome VCF.
 <!-- @/rev R15 -->
 
 **Table 2.** Annotation speed benchmark: Just-DNA-Lite vs OakVar (Generation I).
@@ -223,7 +222,7 @@ We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the
 
 The approximately 172-fold speedup is the ratio of the reported mean Generation I runtime to the mean warm-run Just-DNA-Lite runtime. It applies to these configurations and this input, rather than to OakVar generally. The benchmark used HDD storage and a workstation with 128 GB RAM; it does not directly establish performance on a laptop or the gains from SSD storage. Reported peak memory remained below 750 MB for the runs in Table 3. Streaming joins and column-pruned reads are architectural differences, but this comparison does not isolate their individual contributions to runtime.
 
-### **5.2 PRS Computation**
+### **4.2 PRS Computation**
 
 We benchmarked just-prs's DuckDB and Polars engines against the external tool PLINK2 on 100 PGS Catalog scores using a personal whole-genome VCF (4,661,444 biallelic variants, GRCh38; Zenodo 18370498). The benchmark script is `benchmarks/benchmark_engines.py` in the just-prs repository. Each observation represents a different scoring model applied to the same individual.
 
@@ -253,25 +252,25 @@ Reported variant-match rates in this benchmark were approximately 50 to 54%. The
 Annotation reliability depends on both the source evidence and its representation in the module. Generally, published associations do not by themselves validate data extraction, allele orientation, genotype matching, or report wording. The present benchmarks measure runtime and score agreement; they do not constitute a systematic accuracy evaluation of the annotation modules.
 <!-- @/rev R16 -->
 
-## **6. Discussion**
+## **5. Discussion**
 
-### **6.1 Limitations of Variant Annotation**
+### **5.1 Limitations of Variant Annotation**
 
 <!-- @rev R17 rounds=1 by=robi:2026-09-25 -->
-Variant annotation tools surface statistical associations from published literature, and several inherent limitations apply. Heritability is a population-level statistic, not individual determinism, and estimates change with environment, study design, and cohort. A polygenic risk score is a linear weighted sum that reflects where an individual is situated in a reference population's distribution. However, biology is not linear, and gene-gene and gene-environment interactions, feedback loops, developmental windows, and compensatory mechanisms are not always captured by a polygenic score. Moreover, most PGS Catalog scoring files were derived from predominantly European cohorts, so associations may not transfer to other ancestries (Section 6.4). Additionally, most variants surfaced are statistical associations from GWAS, not established causal mechanisms; many GWAS hits are tagging SNPs, and effect sizes typically shrink in replication.
+Variant annotation tools surface statistical associations from published literature, and several inherent limitations apply. Heritability is a population-level statistic, not individual determinism, and estimates change with environment, study design, and cohort. A polygenic risk score is a linear weighted sum that reflects where an individual is situated in a reference population's distribution. However, biology is not linear, and gene-gene and gene-environment interactions, feedback loops, developmental windows, and compensatory mechanisms are not always captured by a polygenic score. Moreover, most PGS Catalog scoring files were derived from predominantly European cohorts, so associations may not transfer to other ancestries (Section 5.4). Additionally, most variants surfaced are statistical associations from GWAS, not established causal mechanisms; many GWAS hits are tagging SNPs, and effect sizes typically shrink in replication.
 <!-- @/rev R17 -->
 
 <!-- @rev R18 rounds=1 by=robi:2026-09-25 -->
 AI-generated modules carry additional uncertainty: they are automated drafts produced by language models reading published papers, and they will contain mistakes. Users should treat them as lower confidence than expert-curated modules and review the underlying evidence. Just-DNA-Lite is a research tool, not a clinical pipeline. Raw VCFs contain false positives, and automated annotations have inherent error rates. The platform joins the user's variants against published databases and computes polygenic risk scores, adding contextual information from those sources; it does not interpret results in a clinical context.
 <!-- @/rev R18 -->
 
-### **6.2 Local Processing and Data Privacy**
+### **5.2 Local Processing and Data Privacy**
 
 <!-- @rev R19 rounds=1 by=robi:2026-09-25 -->
 Core annotation and PRS computation use local genome files, cached reference datasets, and local result storage. Downloading reference data does not require uploading the user's genome. This architecture reduces the need to disclose genomic data to a hosted analysis service, however, local execution is not a guarantee against disclosure through other parts of the workflow. More precisely, optional AI explanations and MCP clients, for example, require a separate assessment: when an assistant uses an external model provider, prompts and tool outputs may transmit sensitive results even if the raw VCF remains local. Privacy therefore depends on the deployment, the selected services, and the information shared with them. The platform's local architecture alone does not establish regulatory compliance.
 <!-- @/rev R19 -->
 
-### **6.3 Platform Philosophy: Transparency and the Right to Read Your Own Genome**
+### **5.3 Platform Philosophy: Transparency and the Right to Read Your Own Genome**
 
 <!-- @rev R20 rounds=1 by=robi:2026-09-25 -->
 Just-DNA-Lite is built on a simple conviction: people have the right to read and explore their own genomic data, and well-intended researchers have the right to work with public genomes without a gatekeeper's permission. The GDPR's right of access (Article 15) already entitles individuals to obtain a copy of their personal data, and the emerging European Health Data Space is designed to give people access to and control over their own health information. A tool that runs locally and shows users useful information in their own genome is, in this light, an instrument of an existing right.
@@ -281,19 +280,19 @@ Just-DNA-Lite is built on a simple conviction: people have the right to read and
 Genomic findings can be misinterpreted or provide false reassurance, particularly when analytical errors and ancestry differences are overlooked (Tandy-Connor et al., 2018; Manrai et al., 2016). The interface presents model provenance, variant-match rates, ancestry context, and differences among scores to make these limitations inspectable. However, the platform is not intended to provide medical advice. Displaying this information is a design choice; whether it improves user understanding requires a usability study. The project also maintains tutorials and has run hands-on workshops for non-specialists.
 <!-- @/rev R21 -->
 
-### **6.4 Limitations**
+### **5.4 Limitations**
 
 <!-- @rev R22 rounds=1 by=robi:2026-09-25 -->
-**Population stratification.** The 1000 Genomes-based percentile distributions provide population-specific reference points (AFR, AMR, EAS, EUR, SAS), but most modules and PGS scoring files derive from predominantly European cohorts; transferability to non-European populations is a known limitation of the source data, not specific to this platform. **Ancestry selection.** Automatic ancestry inference from the VCF is not yet implemented; users have to select the closest reference superpopulation. **Input format.** The platform supports WGS and WES VCFs; GRCh38 is the primary build, with GRCh37/hg19 handled via liftover; consumer microarray data is supported experimentally (with far lower coverage, which the platform surfaces to users); T2T references are not yet supported. **Module quality variation.** Expert-curated modules inherit the limitations of their source databases; AI-generated modules have additional variability and require user review.
+**Population stratification.** The 1000 Genomes-based percentile distributions provide population-specific reference points (AFR, AMR, EAS, EUR, SAS), but most modules and PGS scoring files derive from predominantly European cohorts; transferability to non-European populations is a known limitation of the source data, not specific to this platform. **Ancestry selection.** Automatic ancestry inference from the VCF is not yet implemented; users have to select the closest reference superpopulation. **Input format.** The platform supports WGS and WES VCFs; GRCh38 is the primary build, with GRCh37/hg19 handled via liftover; consumer microarray data is supported experimentally (with far lower coverage, which the platform surfaces to users); T2T references are not yet supported. **Module quality variation.** Expert-curated modules inherit the limitations of their source databases; AI-generated modules have additional variability and require user review. <!-- @rev C2d rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->**Benchmark scope.** Runtime and score agreement were measured on one public genome. They describe computational performance; they do not establish predictive accuracy or agreement in rankings across individuals.<!-- @/rev C2d -->
 <!-- @/rev R22 -->
 
-### **6.5 Future Directions**
+### **5.5 Future Directions**
 
 <!-- @rev R23 rounds=1 by=robi:2026-09-25 -->
 Several extensions are underway or planned: GRCh37/hg19 liftover (added, but still under testing), experimental consumer-microarray support, and T2T reference support. Multi-species support (companion-animal genomics) is a compelling direction. We are also considering methylation and transcriptomic ageing clocks, among the analyses users most frequently request. Within the ROGEN consortium, population-calibrated polygenic risk scores are planned for a Romanian genomic cohort of approximately 5,000 individuals; that cohort is currently being sequenced, and none of the work reported here uses cohort data. Beyond technical extensions, the larger experiment is social: we encourage the community to build and share modules, and by design do not vet what others publish. This openness has an unavoidable consequence — community- and AI-generated modules will contain mistakes — which the platform mitigates not by gatekeeping but by making provenance visible (the `curator` field, the explicit expert-versus-AI distinction) so that trust can be calibrated. How best to curate and validate a large, decentralized ecosystem of genomic annotations is not yet known; Just-DNA-Lite is offered both as a usable platform and as a testbed for that question.
 <!-- @/rev R23 -->
 
-## **7. Conclusion**
+## **6. Conclusion**
 
 <!-- @rev R24 rounds=1 by=robi:2026-09-25 -->
 Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspectable reports with a portable annotation-module contract and versioned content discovery. Typed MCP tools make the PRS engine available to AI assistants. Albeit tested only on one public genome, the reported benchmarks show faster annotation than the earlier Just-DNA-Seq configuration and close numerical agreement between scoring engines. Evaluation across individuals, reference populations, and matched-variant sets remains necessary to establish the broader reliability of these workflows. The platform provides infrastructure for research and education, without establishing clinical validity for the findings it reports.
@@ -303,7 +302,7 @@ Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspec
 
 - **Kulaga Anton** — co-founded the project, bioinformatic pipeline development, Just-DNA-Lite architecture (Dagster/Polars/DuckDB pipeline, uv workspace), just-prs library development and benchmarking, web UI development, team management, article writing
 <!-- @rev R25 rounds=1 by=robi:2026-09-25 -->
-- **Usanov Nikolay** — co-founded the project, Just-DNA-Lite platform development, integration of the AI module-creation capability into the web interface, fundraising
+- **Usanov Nikolay** — co-founded the project, Just-DNA-Lite platform development, <!-- @rev D3 rounds=1 by=claude:2026-10-10 -->the module system, AI-assisted module authoring<!-- @/rev D3 -->, fundraising
 <!-- @/rev R25 -->
 - **Borysova Olga** — modules and report content (longevity variants, cardiovascular traits, lipid metabolism, VO2 max, athletic performance, pharmacogenomics), LongevityMap database curation and expansion, pathway categorization, report structure, data collection and analysis
 - **Karmazin Alexey** — lead architect of the Generation I report system, OakVar report modules and preparation utilities, PRS modules
@@ -355,6 +354,10 @@ Annotation modules and reference datasets are published to the just-dna-seq orga
 *(Carried over from the combined manuscript; to be finalized with 2022–2026 additions.)*
 
 Alteri, E., et al. (2024). The 23andMe data breach. *European Journal of Human Genetics*, 32(11), 1317–1320.
+
+<!-- @rev C3r rounds=1 by=claude:2026-10-10 -->
+Added in the v0.3 revision (to be merged into the list above): Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107. Ehman, M., et al. (2025). The cost and cost trajectory of genome sequencing and bioinformatics analysis for Indigenous children with suspected rare diseases. *Genetics in Medicine*, 27(11), 101568. doi:10.1016/j.gim.2025.101568. Illumina (2023). Press release, 4 April 2023 ("$200 per genome", sequencing consumables only, 100 Gb per genome); NovaSeq X product page, https://www.illumina.com/systems/sequencing-platforms/novaseq-x-plus/applications/broad-sequencing.html (accessed 10 October 2026). Mordaunt, D. A., et al. (2024). The cost of proband and trio exome and genome analysis in rare disease: a micro-costing study. *Genetics in Medicine*, 26(4), 101058. doi:10.1016/j.gim.2023.101058. National Human Genome Research Institute (2021). The Cost of Sequencing a Human Genome. https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost (accessed 10 October 2026). Nelson, S. C., et al. (2019). Third-Party Genetic Interpretation Tools: A Mixed-Methods Study of Consumer Motivation and Behavior. *American Journal of Human Genetics*, 105(1), 122–131. doi:10.1016/j.ajhg.2019.05.014. O'Daniel, J. M., et al. (2025). Direct-to-Consumer Genetic Testing. *NEJM Evidence*, 4(11), EVIDra2400455. doi:10.1056/EVIDra2400455. Ultima Genomics (2025). Ultima Genomics increases output by over 50% and lowers sequencing costs by a further 20% with the introduction of UG 100 Solaris. PR Newswire, 24 February 2025. Wiewiórka, M., Khamutou, P., Zbysiński, M., & Gambin, T. (2025). polars-bio: fast, scalable, and out-of-core operations on large genomic interval datasets. *Bioinformatics*, 41(12), btaf640. doi:10.1093/bioinformatics/btaf640.
+<!-- @/rev C3r -->
 Annas, G. J., & Elias, S. (2014). 23andMe and the FDA. *NEJM*, 370(11), 985–988.
 Association for Molecular Pathology v. Myriad Genetics, Inc., 569 U.S. 576 (2013).
 Bloss, C. S., Schork, N. J., & Topol, E. J. (2011). Effect of direct-to-consumer genomewide profiling to assess disease risk. *NEJM*, 364(6), 524–534.
