@@ -86,6 +86,12 @@ surviving hardware log. Its ratio to the calibration genome's 2026 warm time on 
 is the only like-for-like ratio that exists. The new public-genome runs are not divided by the OakVar
 time.
 
+**Amended 2026-10-10: OakVar is re-run as well.** The user asked for a live Generation I run on this
+machine, which gives the first like-for-like ratio on the public genome. The 2023 configuration is not
+reachable, so the run is a **reconstruction** from the published `just_*` modules in a Docker image
+(`a3/oakvar/`), labelled as such. The 2023 numbers above stay as their own historical row. Every step
+is recorded in [`a3/PROTOCOL.md`](a3/PROTOCOL.md).
+
 ## PRS benchmark (Section 4.2)
 
 Re-run `just-prs/benchmarks/benchmark_engines.py` (just-prs is read-only from just-dna-lite; run it

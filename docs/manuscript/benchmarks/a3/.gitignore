@@ -1,0 +1,4 @@
+.bp.lock
+.bp.counter
+# The repo ignores *.log; the protocol logs are the record and are committed.
+!logs/*.log

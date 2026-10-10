@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# bp: run one benchmark-protocol step and leave a trace of it.
+#
+#   bp <slug> <command> [args...]
+#
+# Runs the command, tees its stdout+stderr into a3/logs/NNN_<slug>.log and appends one JSON line
+# {n, ts_start, ts_end, seconds, cwd, cmd, exit, log} to a3/protocol.jsonl. The narrative (why a step
+# was taken, what was decided) goes into a3/PROTOCOL.md by hand; this file is the machine record.
+set -uo pipefail
+
+if [[ $# -lt 2 ]]; then
+    echo "usage: bp <slug> <command> [args...]" >&2
+    exit 2
+fi
+
+A3_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_DIR="$A3_DIR/logs"
+JSONL="$A3_DIR/protocol.jsonl"
+mkdir -p "$LOG_DIR"
+touch "$JSONL"
+
+slug="$1"
+shift
+# Step numbers come from a counter under a lock, so parallel bp calls never share one.
+n=$(
+    exec 9>"$A3_DIR/.bp.lock"
+    flock 9
+    last=$(cat "$A3_DIR/.bp.counter" 2>/dev/null || wc -l < "$JSONL")
+    echo $(( last + 1 )) | tee "$A3_DIR/.bp.counter"
+)
+log="$LOG_DIR/$(printf '%03d' "$n")_${slug}.log"
+cmd_str="$(printf '%q ' "$@")"
+
+ts_start="$(date --iso-8601=seconds)"
+t0=$(date +%s.%N)
+{
+    echo "# step $n: $slug"
+    echo "# cwd: $PWD"
+    echo "# cmd: $cmd_str"
+    echo "# start: $ts_start"
+} > "$log"
+"$@" 2>&1 | tee -a "$log"
+rc=${PIPESTATUS[0]}
+t1=$(date +%s.%N)
+ts_end="$(date --iso-8601=seconds)"
+echo "# end: $ts_end exit=$rc" >> "$log"
+
+python3 - "$JSONL" "$n" "$ts_start" "$ts_end" "$t0" "$t1" "$PWD" "$cmd_str" "$rc" "${log#"$A3_DIR"/}" <<'PY'
+import json, sys
+path, n, ts0, ts1, t0, t1, cwd, cmd, rc, log = sys.argv[1:]
+row = {"n": int(n), "ts_start": ts0, "ts_end": ts1, "seconds": round(float(t1) - float(t0), 3),
+       "cwd": cwd, "cmd": cmd.strip(), "exit": int(rc), "log": log}
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write(json.dumps(row) + "\n")
+PY
+exit "$rc"

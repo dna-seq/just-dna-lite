@@ -1,0 +1,51 @@
+{
+  "primary": {
+    "path": "/data/a3-bench/inputs/anton/antonkulaga.vcf",
+    "size_bytes": 482783972,
+    "md5": "21598da4f77d8237577662ab89e8a55d",
+    "sha256": "0ff74f990742954dff79d214118592f7b46481ecfdc381e769d48b717ab8acd5",
+    "records": 6079744,
+    "snv_records": 4616002,
+    "other_records": 1463742,
+    "contigs": 170,
+    "caller_headers": [
+      "##fileformat=VCFv4.2",
+      "##DeepVariant_version=1.1.0"
+    ],
+    "source": "https://zenodo.org/records/18370498"
+  },
+  "second_caller": {
+    "path": "/data/a3-bench/inputs/livia/SIMHIFQTILQ.hard-filtered.vcf.gz",
+    "size_bytes": 349465049,
+    "md5": "43afb27df1c6dd00a007db78435ef171",
+    "sha256": "1230e4f8ff8cdf262ee95fc70bb43561b38ce9d41963b7d863996d0984d819ff",
+    "records": 5064598,
+    "snv_records": 4104611,
+    "other_records": 959987,
+    "contigs": 264,
+    "caller_headers": [
+      "##fileformat=VCFv4.2",
+      "##DRAGENCommandLine=<ID=HashTableBuild,Version=\"SW: 00.000.000.4.4.1-298-g41a5a69b, HashTableVersion: 11\",CommandLineOptions=\"/opt/dragen/4.4.1-298-g41a5a69b/bin/dragen --ht-reference=/staging/tmp/suite_def/illumina-isi07/scratch/dragen_datasets/data/vault/reference_genomes/Hsapiens/hg38/seq/hg38.fa",
+      "##DRAGENCommandLine=<ID=dragen,Version=\"SW: 13.021.779.4.4.4, HW: 13.021.779\",Date=\"Wed Sep 24 05:26:36 UTC 2025\",CommandLineOptions=\"--enable-personalization false --enable-sv true --enable-variant-annotation true --output-format CRAM --enable-duplicate-marking true --enable-variant-caller true --f",
+      "##reference=file:///scratch/hg38-alt_masked/DRAGEN/11/reference.bin",
+      "##source=DRAGEN_SNV",
+      "##source=DRAGEN_TARGETED"
+    ],
+    "source": "https://zenodo.org/records/19487816"
+  },
+  "calibration": {
+    "path": "/data/a3-bench/inputs/newton/newtonwinter.GRCh38.ens106.deep.vcf.gz",
+    "size_bytes": 125261729,
+    "md5": "fd01f293655f606482ecfa70c9976d11",
+    "sha256": "1e7912bd75d71fe2661db5f0b158db6be4bdc3c26e03a1969a758f0ed1feb93a",
+    "records": 6138868,
+    "snv_records": 4724429,
+    "other_records": 1414439,
+    "contigs": 175,
+    "caller_headers": [
+      "##fileformat=VCFv4.2",
+      "##DeepVariant_version=1.3.0"
+    ],
+    "source": "private: krypton Genomes/newton/consensus/variants/deepvariant"
+  }
+}

@@ -1,0 +1,7 @@
+# step 6: copy-calibration
+# cwd: /data/a3-bench/inputs
+# cmd: cp -v /mnt/krypton/Genomes/newton/consensus/variants/deepvariant/newtonwinter.GRCh38.ens106.deep.vcf.gz /mnt/krypton/Genomes/newton/consensus/variants/deepvariant/newtonwinter.GRCh38.ens106.deep.vcf.gz.tbi newton/ 
+# start: 2026-10-10T23:02:21+02:00
+'/mnt/krypton/Genomes/newton/consensus/variants/deepvariant/newtonwinter.GRCh38.ens106.deep.vcf.gz' -> 'newton/newtonwinter.GRCh38.ens106.deep.vcf.gz'
+'/mnt/krypton/Genomes/newton/consensus/variants/deepvariant/newtonwinter.GRCh38.ens106.deep.vcf.gz.tbi' -> 'newton/newtonwinter.GRCh38.ens106.deep.vcf.gz.tbi'
+# end: 2026-10-10T23:02:23+02:00 exit=0
