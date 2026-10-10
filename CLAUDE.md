@@ -747,7 +747,10 @@ reused for annotation.
   `prepare-annotations`.
 - Runs on Linux, macOS (incl. Apple Silicon) and native Windows (`windows/` scripts). Nix:
   `nix develop`, `uv sync`, `uv run start`.
-- The AI Module Creator uses Agno and can target OpenAI-compatible local models (Ollama, vLLM).
+- The in-app AI Module Creator (Agno; OpenAI-compatible local models such as Ollama, vLLM) is latent
+  code with technical debt: it lags the module-library spec. AI-assisted authoring now goes through
+  the just-module-creator plugin in the user's own assistant plus our MCP server, and the paper no
+  longer presents the in-app creator.
 - README images live in `images/`; use `<img>` inside HTML `<div>` blocks.
 - Load `.env` with `runtime.load_env()` before reading `JUST_DNA_PIPELINES_CACHE_DIR` or
   `JUST_DNA_PIPELINES_OUTPUT_DIR`, **never a bare `load_dotenv()`**: it climbs past the checkout and read
