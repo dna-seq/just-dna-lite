@@ -39,7 +39,9 @@ PAPERS = [
     ROOT / "docs/manuscript/v0.3/paper1-just-dna-lite.md",
     ROOT / "docs/manuscript/v0.3/paper2-just-module-creator.md",
 ]
-PAPER1 = PAPERS[0]
+# Sentence-pinned tests read a frozen copy of paper 1 as it stood before the v0.3 review edits, so
+# editing the live paper never breaks them. The live papers are still linted and round-tripped above.
+PAPER1 = ROOT / "tests/data/manuscript/v0.3-review-baseline/paper1-just-dna-lite.md"
 BY = "robi:2026-09-25,claude:2026-10-10"
 SEED = 20261010
 
@@ -97,7 +99,7 @@ ABSTRACT_OPENING = "Personal genome analysis requires tools that make published 
 CORRELATION = "Correlation with PLINK2 across the 96 scores completed by all engines was Pearson r = 0.999859."
 UNICODE_CELL = "Târgu Mureș"
 TABLE_CELL = "Variant-trait associations from the LongevityMap database"
-INTRO_EXTREMES = "Existing solutions generally belong to two extremes."
+INTRO_EXTREMES = "Existing solutions occupy two extremes."
 
 
 @pytest.mark.parametrize("path", PAPERS, ids=lambda p: p.name)

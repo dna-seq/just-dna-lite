@@ -29,7 +29,8 @@ from just_dna_lite.manuscript.ledger import read_source, strip_markers
 from just_dna_pipelines.runtime import load_env
 
 ROOT = Path(__file__).resolve().parents[1]
-PAPER1 = ROOT / "docs/manuscript/v0.3/paper1-just-dna-lite.md"
+# A frozen copy of paper 1 from before the v0.3 review edits: the tests pin its sentences.
+PAPER1 = ROOT / "tests/data/manuscript/v0.3-review-baseline/paper1-just-dna-lite.md"
 CORRELATION = "Correlation with PLINK2 across the 96 scores completed by all engines was Pearson r = 0.999859."
 
 
