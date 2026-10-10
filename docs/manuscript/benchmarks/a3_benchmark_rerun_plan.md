@@ -98,9 +98,16 @@ from a separate checkout or through `uv run --no-sync` here) on the primary geno
 - `benchmark_results.csv` (per ID and engine: seconds, matched, total, score, memory method) committed
   under `a3/prs/`;
 - a paired speed comparison on the IDs every engine finished, beside the unpaired medians;
-- the per-variant difference tables from the r ≠ 1 investigation (the scratchpad `r-gap/` agent,
-  2026-10-10), committed as supplementary data, so Section 4.2 can state the measured cause of every
-  score difference.
+- the per-variant difference analysis, rerun on the new results. The 2026-10-10 investigation already
+  explains the old gap with zero residual: 71.4% from the benchmark using only the first inferred
+  other-allele candidate, 15.7% from building the pgen without `--vcf-filter` (RefCall counted), 9.5%
+  from just-prs's position-only join, 1.4% from unsplit multi-allelic ALTs and 1.9% from chrX. PLINK2
+  failed on 4 scores because of liftover duplicate IDs. Deliverables and scripts:
+  `/data/just-dna-cache/r-gap/deliverables/` (`run_all.sh`). Commit the per-variant tables as
+  supplementary data.
+- **fix the two benchmark-input defects first** (all candidate alleles; `--vcf-filter` for PASS
+  records only; deduplicate liftover duplicates), or report both configurations. Fixed, agreement
+  rose to r = 0.999997 (max |Δ| 0.50).
 
 ## After the run
 
