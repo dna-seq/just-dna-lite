@@ -584,13 +584,71 @@ def report_rows(ledger: Ledger) -> list[dict[str, str]]:
     ]
 
 
+class Paragraph(BaseModel):
+    """One prose line of the source (paragraph, list item or table row) and whether a segment covers it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    line: int
+    start: int
+    end: int
+    text: str
+    covered: bool
+
+    @property
+    def first_words(self) -> str:
+        words = self.text.split()
+        head = " ".join(words[:FIRST_WORDS])
+        return f"{head} …" if len(words) > FIRST_WORDS else head
+
+
+# Lines that carry no prose of their own: headings, horizontal rules, table rulers, comment-only lines.
+_NON_PROSE_RE = re.compile(r"^\s*(#|-{3,}\s*$|\*{3,}\s*$|\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$|<!--.*-->\s*$)")
+
+
+def paragraphs(ledger: Ledger) -> list[Paragraph]:
+    """Every prose line, marked covered when any segment overlaps it.
+
+    The papers keep one paragraph per line, so a line is the unit a reader's attention lands on.
+    Uncovered lines are the blind spots: text no review round has touched.
+    """
+    spans = [(segment.open.start, segment.close.end) for segment in ledger.segments]
+    found: list[Paragraph] = []
+    offset = 0
+    code = _code_ranges(ledger.text)
+    for number, raw in enumerate(ledger.text.splitlines(keepends=True), start=1):
+        start, end = offset, offset + len(raw)
+        offset = end
+        body = raw.strip()
+        if not body or _NON_PROSE_RE.match(body) or _in_ranges(start, code):
+            continue
+        covered = any(lo < end and start < hi for lo, hi in spans)
+        found.append(Paragraph(line=number, start=start, end=end, text=body, covered=covered))
+    return found
+
+
+def blind_spots(ledger: Ledger) -> list[Paragraph]:
+    return [paragraph for paragraph in paragraphs(ledger) if not paragraph.covered]
+
+
 def report_totals(ledger: Ledger) -> dict[str, int]:
+    found = paragraphs(ledger)
     return {
         "segments": len(ledger.segments),
         "rounds": sum(segment.rounds for segment in ledger.segments),
         "comments": len({segment.attributes.comment_id for segment in ledger.segments}),
         "max rounds": max((segment.rounds for segment in ledger.segments), default=0),
+        "paragraphs": len(found),
+        "blind spots": sum(1 for paragraph in found if not paragraph.covered),
     }
+
+
+def format_blind_spots(ledger: Ledger) -> str:
+    spots = blind_spots(ledger)
+    lines = [f"BLIND SPOTS ({len(spots)} of {len(paragraphs(ledger))} paragraphs no review round has touched)"]
+    width = max((len(str(spot.line)) for spot in spots), default=4)
+    lines += [f"{str(spot.line).rjust(width)}  {spot.first_words}" for spot in spots]
+    return "\n".join(lines) + "\n"
 
 
 def format_report(ledger: Ledger) -> str:
@@ -669,6 +727,10 @@ def render_heatmap(ledger: Ledger, title: str) -> str:
         f'<td class="num">{row["line"]}</td><td>{html.escape(row["first words"])}</td></tr>'
         for row in report_rows(ledger)
     )
+    blind_rows = "\n".join(
+        f'<tr><td class="num">{spot.line}</td><td>{html.escape(spot.first_words)}</td></tr>'
+        for spot in blind_spots(ledger)
+    )
     totals = ", ".join(f"{key}: {value}" for key, value in report_totals(ledger).items())
     legend = "".join(
         f'<span class="h{level}">{level}{"+" if level == HEAT_LEVELS else ""} round{"s" if level > 1 else ""}</span>'
@@ -682,6 +744,9 @@ def render_heatmap(ledger: Ledger, title: str) -> str:
         f'<div class="legend">{legend}</div>\n'
         '<div class="table-wrap"><table>\n<thead><tr><th>ID</th><th>Rounds</th><th>Reviewers</th>'
         f"<th>Line</th><th>First words</th></tr></thead>\n<tbody>\n{rows}\n</tbody>\n</table></div>\n"
+        "<h2>Blind spots</h2>\n<p class=\"meta\">Paragraphs no review round has touched; unshaded in the text below.</p>\n"
+        '<div class="table-wrap"><table class="blind">\n<thead><tr><th>Line</th><th>First words</th></tr></thead>\n'
+        f"<tbody>\n{blind_rows}\n</tbody>\n</table></div>\n"
         f'</header>\n<main>\n<div class="doc">{"".join(body)}</div>\n</main>\n</body>\n</html>\n'
     )
 
@@ -759,10 +824,14 @@ def strip(
 def report(
     path: PathArg,
     html_out: Annotated[Optional[Path], typer.Option("--html", help="Also write a self-contained heat map")] = None,
+    blind: Annotated[bool, typer.Option("--blind", help="Also list the paragraphs no segment covers")] = False,
 ) -> None:
-    """List every segment with its rounds and reviewers, then totals."""
+    """List every segment with its rounds and reviewers, then totals (including blind spots)."""
     ledger = _load_clean(path)
     typer.echo(format_report(ledger), nl=False)
+    if blind:
+        typer.echo("")
+        typer.echo(format_blind_spots(ledger), nl=False)
     if html_out is not None:
         html_out.write_bytes(render_heatmap(ledger, path.name).encode("utf-8"))
         typer.echo(f"wrote {html_out}")

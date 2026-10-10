@@ -27,6 +27,8 @@ from just_dna_lite.manuscript.ledger import (
     parse_ledger,
     parse_review_entry,
     read_source,
+    blind_spots,
+    paragraphs,
     render_heatmap,
     report_totals,
     strip_markers,
@@ -95,6 +97,7 @@ ABSTRACT_OPENING = "Personal genome analysis requires tools that make published 
 CORRELATION = "Correlation with PLINK2 across the 96 scores completed by all engines was Pearson r = 0.999859."
 UNICODE_CELL = "Târgu Mureș"
 TABLE_CELL = "Variant-trait associations from the LongevityMap database"
+INTRO_EXTREMES = "Existing solutions generally belong to two extremes."
 
 
 @pytest.mark.parametrize("path", PAPERS, ids=lambda p: p.name)
@@ -116,7 +119,7 @@ def test_hand_placed_markers_round_trip_byte_for_byte() -> None:
     marked = wrap_inline(marked, *span(marked, TABLE_CELL), "C12")
     marked = wrap_lines(marked, *line_span(marked, ABSTRACT_OPENING), "C2")
     # A whole paragraph rewritten for C5 containing a sentence also rewritten for N2.
-    intro = "Existing solutions occupy two extremes."
+    intro = INTRO_EXTREMES
     marked = wrap_inline(marked, *span(marked, intro), "N2")
     marked = wrap_lines(marked, *line_span(marked, intro), "C5")
 
@@ -351,7 +354,9 @@ def test_report_counts_equal_the_marked_segments(tmp_path: Path) -> None:
     _, marked = marked_paper()
     ledger = parse_ledger(marked)
     totals = report_totals(ledger)
-    assert totals == {"segments": 3, "rounds": 5, "comments": 3, "max rounds": 2}
+    assert {key: totals[key] for key in ("segments", "rounds", "comments", "max rounds")} == {
+        "segments": 3, "rounds": 5, "comments": 3, "max rounds": 2
+    }
 
     source = tmp_path / "paper1.md"
     source.write_bytes(marked.encode("utf-8"))
@@ -460,3 +465,52 @@ def test_the_root_pyproject_installs_the_command() -> None:
     assert result.exit_code == 0
     for command in ("lint", "strip", "report", "bump"):
         assert command in result.output
+
+
+def test_blind_spots_are_exactly_the_uncovered_paragraphs() -> None:
+    baseline = paper_baseline(PAPER1)
+    unmarked = parse_ledger(baseline)
+    every = paragraphs(unmarked)
+    assert every, "the paper has prose"
+    assert [p.line for p in blind_spots(unmarked)] == [p.line for p in every]
+
+    _, marked = marked_paper()
+    ledger = parse_ledger(marked)
+    found = paragraphs(ledger)
+    covered = [p for p in found if p.covered]
+    spots = blind_spots(ledger)
+    totals = report_totals(ledger)
+    assert len(covered) + len(spots) == len(found) == totals["paragraphs"]
+    assert totals["blind spots"] == len(spots)
+    assert covered, "each marked segment covers at least one paragraph"
+    for paragraph in covered:
+        assert any(
+            s.open.start < paragraph.end and paragraph.start < s.close.end for s in ledger.segments
+        )
+    assert not any(p.text.startswith("#") or "@rev" in p.text and p.text.startswith("<!--") for p in found)
+
+
+def test_marking_a_blind_paragraph_removes_exactly_that_one() -> None:
+    baseline = paper_baseline(PAPER1)
+    before = blind_spots(parse_ledger(baseline))
+    target = before[len(before) // 2]
+    lines = baseline.splitlines(keepends=True)
+    lines.insert(target.line, close_marker("N9") + "\n")
+    lines.insert(target.line - 1, open_marker("N9", rounds=1, by="claude:2026-10-10") + "\n")
+    after = blind_spots(parse_ledger("".join(lines)))
+    assert len(after) == len(before) - 1
+    assert target.text not in {p.text for p in after}
+    assert {p.text for p in after} == {p.text for p in before} - {target.text}
+
+
+def test_report_blind_flag_lists_the_blind_spots(tmp_path: Path) -> None:
+    _, marked = marked_paper()
+    source = tmp_path / "paper1.md"
+    source.write_bytes(marked.encode("utf-8"))
+    result = CliRunner().invoke(app, ["ledger", "report", str(source), "--blind"])
+    assert result.exit_code == 0, result.output
+    spots = blind_spots(parse_ledger(marked))
+    header = next(line for line in result.output.splitlines() if line.startswith("BLIND SPOTS"))
+    assert f"({len(spots)} of" in header
+    listed = result.output.split(header, 1)[1].strip().splitlines()
+    assert [int(line.split()[0]) for line in listed] == [spot.line for spot in spots]

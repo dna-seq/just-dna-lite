@@ -25,7 +25,7 @@ from just_dna_lite.manuscript.build import (
     write_clean_twin,
 )
 from just_dna_lite.manuscript.cli import app
-from just_dna_lite.manuscript.ledger import read_source
+from just_dna_lite.manuscript.ledger import read_source, strip_markers
 from just_dna_pipelines.runtime import load_env
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +43,7 @@ def stand_in_tectonic(tmp_path: Path, script: str) -> Path:
 
 def marked_copy(tmp_path: Path) -> tuple[Path, str]:
     """Paper 1 with one ledger segment, in a scratch directory so no build lands in docs/."""
-    original = read_source(PAPER1)
+    original = strip_markers(read_source(PAPER1))  # the paper carries review markers of its own
     marked = original.replace(
         CORRELATION, f"<!-- @rev C3 rounds=1 by=robi:2026-09-25 -->{CORRELATION}<!-- @/rev C3 -->", 1
     )

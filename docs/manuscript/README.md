@@ -65,6 +65,12 @@ uv run manuscript ledger bump docs/manuscript/v0.3/paper1-just-dna-lite.md C3 --
 - `report` prints one row per segment (id, rounds, reviewers, line, first words) and totals. With
   `--html` it also writes a single self-contained page: the document text with each segment shaded
   by its rounds (1 to 5+), a hover note naming the reviewers, and the table linked to each segment.
+- **Blind spots.** The ledger exists to find text nobody has looked at, not to gate edits. Every
+  prose line (paragraph, list item, table row; headings, rulers and comment-only lines excluded) that
+  no segment overlaps is a blind spot. Totals always count `paragraphs` and `blind spots`;
+  `report --blind` lists them by line, and the heat map lists them and leaves them unshaded. A whole
+  paragraph a reviewer touched carries its own segment (Robi's accepted v0.3 suggestions are `R1` to
+  `R26`), so a paragraph he read but left alone still counts as a blind spot.
 - `bump` adds one to `rounds` and appends `--by NAME[:DATE]` (date defaults to today). It rewrites
   that one opening marker and leaves every other byte alone.
 - `strip`, `report` and `bump` refuse to run while lint reports an error, so a half-written marker can
