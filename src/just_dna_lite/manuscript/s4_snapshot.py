@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from huggingface_hub import HfFileSystem, get_token
+from huggingface_hub import HfFileSystem
 
 from just_dna_lite.manuscript.s4 import MANIFEST, Snapshot, SnapshotModule
 from just_dna_pipelines.module_config import MODULES_CONFIG, RegistryStore
@@ -43,7 +43,7 @@ def mirror_manifests() -> tuple[Optional[str], dict[str, dict]]:
     repo_id = next((source.hf_repo_id for source in MODULES_CONFIG.sources if source.is_hf and source.hf_repo_id), None)
     if repo_id is None:
         return None, {}
-    fs = HfFileSystem(token=get_token())
+    fs = HfFileSystem(token=False)  # a public dataset: send no credential, as for the registry
     found: dict[str, dict] = {}
     for path in fs.glob(f"datasets/{repo_id}/data/*/{MANIFEST}"):
         found[Path(path).parent.name] = json.loads(fs.read_text(path))
