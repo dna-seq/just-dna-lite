@@ -99,3 +99,35 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
   types complete, the warm run uses `annotate_modules_and_report_job` (no normalize step), the cold
   run's drop is recorded. All modules annotated 0 variants on this 792-record file; the full-genome
   warm-up is the real check that the module set matches anything.
+
+### Community reference genome (HG002)
+
+- Chosen by a search agent that listed the whole `gs://deepvariant/case-study-outputs/` bucket
+  (versions 1.0.0 to 1.10.0). From 1.1.0 on, Google's single-sample Illumina WGS case study uses
+  HG003; HG002 Illumina WGS output exists only as the **DeepVariant 1.0.0** run and as DeepTrio child
+  calls (a trio caller, so not comparable). Chosen: DeepVariant 1.0.0, HG002, Illumina NovaSeq
+  PCR-free 35x, GRCh38 no-alt (`HG002.novaseq.pcr-free.35x.dedup.grch38_no_alt.bam`, per the run
+  script and log in the bucket). It declares PASS / RefCall / LowQual.
+- **Licence:** none is stated for the bucket's outputs. DeepVariant's code is BSD-3-Clause; NIST says
+  GIAB data are "publicly available without publication embargo" and the trio was chosen as
+  "consented for commercial redistribution". So the paper links to the file and does not re-host it.
+- **25** `dl-hg002` (step number from `protocol.jsonl`): md5 `29d00cf5…` equals Google's
+  `x-goog-hash`. **26** `inputs-check-hg002`: 7,753,721 records, `DeepVariant_version=1.0.0`, 25 contigs.
+
+### PRS harness
+
+- just-prs cloned at tag **v0.10.1** (`b1a6d60`) into `/data/a3-bench/just-prs`, the version the
+  bench worktree's `uv.lock` resolves. The sibling checkout `/data/sources/just-prs` had uncommitted
+  changes from another session, so it is not used.
+- PLINK2 **v2.0.0-a.6.33LM (28 Feb 2026)**, the build `benchmark_engines.py` pins, downloaded from
+  `s3.amazonaws.com/plink2-assets/alpha6/`; binary sha256 `f87f8be0…`, equal to the gap report's.
+- [`prs/bench_prs.py`](prs/bench_prs.py) imports the upstream script's engines and memory measurement
+  unchanged and adds: the committed ID lists ([`prs/pgs_ids.txt`](prs/pgs_ids.txt): PGS000006–PGS000106 without
+  PGS000085; [`prs/warmup_ids.txt`](prs/warmup_ids.txt): PGS000001–3), PLINK2's `.log`/stdout/exit kept per ID,
+  PLINK2's score-input preparation timed separately (`prep_sec`; upstream starts PLINK2's clock after
+  it, while the Polars/DuckDB times include parsing), and `--config original|fixed`. *Fixed* builds
+  the pgen with `--vcf-filter`, writes an ID for every `hm_inferOtherAllele` candidate, and sums the
+  weights of IDs two scoring rows share (liftover collisions), which is what just-prs computes.
+- Smoke test, 3 IDs, both configurations: *original* reproduces the published PLINK2 scores
+  (PGS000006–8: −0.0038, −0.7342, −0.7906) and *fixed* reproduces the gap report's counterfactual
+  run (−0.1464, −0.797, −0.8558) exactly.

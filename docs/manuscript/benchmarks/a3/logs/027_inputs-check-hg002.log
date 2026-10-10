@@ -1,0 +1,20 @@
+# step 27: inputs-check-hg002
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: python3 -I scripts/inputs_check.py inputs.json community_reference=/data/a3-bench/inputs/hg002/HG002.output.vcf.gz@https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz 
+# start: 2026-10-10T23:19:37+02:00
+{
+ "community_reference": {
+  "path": "/data/a3-bench/inputs/hg002/HG002.output.vcf.gz",
+  "size_bytes": 136167438,
+  "md5": "29d00cf5e84ae8971cb868200b574268",
+  "sha256": "6fcc22463def171821b619f847f7c4155c4a1d7c2611d16a44f00143dc8931f8",
+  "records": 7753721,
+  "snv_records": 6476847,
+  "other_records": 1276874,
+  "contigs": 25,
+  "source": "https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz"
+ }
+}
+    ##fileformat=VCFv4.2
+    ##DeepVariant_version=1.0.0
+# end: 2026-10-10T23:19:44+02:00 exit=0

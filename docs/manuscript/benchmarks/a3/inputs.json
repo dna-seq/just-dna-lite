@@ -47,5 +47,20 @@
       "##DeepVariant_version=1.3.0"
     ],
     "source": "private: krypton Genomes/newton/consensus/variants/deepvariant"
+  },
+  "community_reference": {
+    "path": "/data/a3-bench/inputs/hg002/HG002.output.vcf.gz",
+    "size_bytes": 136167438,
+    "md5": "29d00cf5e84ae8971cb868200b574268",
+    "sha256": "6fcc22463def171821b619f847f7c4155c4a1d7c2611d16a44f00143dc8931f8",
+    "records": 7753721,
+    "snv_records": 6476847,
+    "other_records": 1276874,
+    "contigs": 25,
+    "caller_headers": [
+      "##fileformat=VCFv4.2",
+      "##DeepVariant_version=1.0.0"
+    ],
+    "source": "https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz"
   }
 }

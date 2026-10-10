@@ -1,0 +1,22 @@
+# step 24: clone-just-prs
+# cwd: /data/a3-bench
+# cmd: git clone -q --branch v0.10.1 git@github.com:dna-seq/just-prs.git just-prs 
+# start: 2026-10-10T23:15:42+02:00
+Note: switching to 'b1a6d602c3d19b7c9a1331db484b29be2f2b87d0'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+# end: 2026-10-10T23:16:04+02:00 exit=0

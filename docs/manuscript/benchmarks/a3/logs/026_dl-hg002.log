@@ -1,0 +1,7 @@
+# step 26: dl-hg002
+# cwd: /data/a3-bench/inputs
+# cmd: bash -c curl\ -sS\ --fail\ -o\ hg002/HG002.output.vcf.gz\ https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz\ \&\&\ curl\ -sS\ --fail\ -o\ hg002/HG002.output.vcf.gz.tbi\ https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz.tbi\ \&\&\ md5sum\ hg002/\* 
+# start: 2026-10-10T23:19:11+02:00
+29d00cf5e84ae8971cb868200b574268  hg002/HG002.output.vcf.gz
+65a29492ded47349c3b781f631e64a63  hg002/HG002.output.vcf.gz.tbi
+# end: 2026-10-10T23:19:21+02:00 exit=0

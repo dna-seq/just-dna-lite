@@ -1,0 +1,8 @@
+# step 25: dl-plink2
+# cwd: /data/a3-bench/prs/plink2
+# cmd: bash -c curl\ -sS\ --fail\ -O\ https://s3.amazonaws.com/plink2-assets/alpha6/plink2_linux_x86_64_20260228.zip\ \&\&\ sha256sum\ plink2_linux_x86_64_20260228.zip\ \&\&\ unzip\ -o\ -q\ plink2_linux_x86_64_20260228.zip\ plink2\ \&\&\ sha256sum\ plink2\ \&\&\ ./plink2\ --version 
+# start: 2026-10-10T23:17:53+02:00
+9b1b633d8cea59b3c4d9a752d0985899fee63fc7ccf9f0fefa7a09d35a820925  plink2_linux_x86_64_20260228.zip
+f87f8be00b6cbf4f255cb9395522fab8af0c3f347c6813caaa6ec411a3a16c76  plink2
+PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)
+# end: 2026-10-10T23:17:55+02:00 exit=0
