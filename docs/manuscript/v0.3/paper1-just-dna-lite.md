@@ -177,7 +177,8 @@ The web application, Python library, command line, standalone PRS interface, and
 
 ### **3.3 Additional Trait Annotation Modules**
 
-The platform includes several additional modules that annotate variants against published GWAS and meta-analysis databases: **cardiovascular-associated variants** (SNPs selected on meta-study p-values and cross-population replication), **lipid metabolism** (same evidence-based inclusion criteria), and **VO2 max and athletic performance** (exercise genomics literature). All modules work by joining the user's VCF against curated variant-trait databases, adding annotation columns (weight, state, gene, conclusion) to matching variants. They do not calculate individual risk, generate diagnoses, or make clinical recommendations.
+<!-- @rev C18 rounds=3 by=robi:2026-09-25,claude:2026-10-10,validator:2026-10-10 -->
+The platform includes several additional modules curated by hand from the published literature: **coronary artery disease** (SNPs selected on meta-study p-values and the number of studies across populations), **lipid metabolism** (selected by the same criteria), **VO2 max** (published studies of the oxygen-uptake response to exercise training, mostly candidate-gene and cohort studies) and **Superhuman** (rare protective alleles from the Church laboratory's Protective and Enhancing Alleles list, checked against the primary literature). Table S4 gives each module's curation and every source it cites.<!-- @/rev C18 --> All modules work by joining the user's VCF against curated variant-trait databases, adding annotation columns (weight, state, gene, conclusion) to matching variants. They do not calculate individual risk, generate diagnoses, or make clinical recommendations.
 
 ### **3.4 Growing the Module Ecosystem**
 
