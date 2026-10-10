@@ -116,23 +116,29 @@ Consistent with the "runs on a laptop" principle, Just-DNA-Lite prioritizes memo
 ## **3. Annotation Modules and Polygenic Scoring**
 
 <!-- @rev R11 rounds=1 by=robi:2026-09-25 -->
-Just-DNA-Lite ships with a set of expert-curated annotation modules, illustrating the platform's module system across several trait domains. These modules represent the default set. The platform is designed so that researchers from the scientific community (eg: bioinformaticians, geneticists, etc.) can easily add their own modules, either by hand or with AI assistance (Section 3.4). The modules annotate user variants against published variant-trait association databases; they do not perform clinical interpretation or generate diagnoses.
+Just-DNA-Lite ships with a set of annotation modules, <!-- @rev C13a rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->either curated by experts from the published literature or derived from public databases (ClinVar, ClinPGx)<!-- @/rev C13a -->, illustrating the platform's module system across several trait domains. These modules represent the default set. The platform is designed so that researchers from the scientific community (eg: bioinformaticians, geneticists, etc.) can easily add their own modules, either by hand or with AI assistance (Section 3.4). The modules annotate user variants against published variant-trait association databases; they do not perform clinical interpretation or generate diagnoses.
 <!-- @/rev R11 -->
 
 <!-- @rev R12 rounds=1 by=robi:2026-09-25 -->
 The default modules originate in the first generation of the platform, the OakVar-based Just-DNA-Seq (Kulaga et al., 2024). That system was built around longevity and longevity-associated traits, which is why the default set centres on that domain; for the second generation, most modules were ported, largely unchanged, to serve as worked examples of the no-code module format rather than as a definitive trait catalogue.
 <!-- @/rev R12 -->
 
-**Table 1.** Default annotation modules shipped with Just-DNA-Lite.
+<!-- @rev C13b rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+**Table 1.** Annotation modules published by the Just-DNA-Lite project in the module registry (namespace `just-dna-seq`), as of 2026-10-10 18:00 UTC. Later versions may differ; versions, digests and every source are listed in Table S4.
 
 | Module | Description | Curator |
 |---|---|---|
-| Longevity Map | Variant-trait associations from the LongevityMap database | Expert (Olga Borysova) |
-| Coronary Artery Disease | Variants associated with cardiovascular traits from GWAS literature | Expert |
-| Lipid Metabolism | Variants associated with lipid metabolism traits | Expert |
-| VO2 Max | Variants associated with oxygen uptake capacity from exercise genomics literature | Expert |
-| Superhuman / Athletic Performance | Variants associated with elite athletic performance traits | Expert |
-| Longevity Variants 2026 | Variants from recent familial longevity and multimorbidity GWAS studies | AI-generated |
+| Longevity Map | Longevity-associated variants from the LongevityMap database, ported from the Generation I module: 528 variants in 272 genes, citing 126 papers (sources in Table S4) | Expert (Olga Borysova) |
+| Coronary Artery Disease | Coronary artery disease risk associations from published studies, ported from the Generation I module: 27 variants in 22 genes, citing 59 papers (sources in Table S4) | Expert |
+| Lipid Metabolism | Lipid metabolism and cardiovascular risk variants from published studies: 15 variants in 12 genes, citing 37 papers (sources in Table S4) | Expert |
+| VO2 Max | Published studies of the oxygen-uptake response to exercise training: 13 variants in 12 genes, citing 7 papers (sources in Table S4) | Expert |
+| Superhuman (protective alleles) | Rare protective and enhancing alleles from the Church laboratory's list, checked against the primary literature: 74 variants in 28 genes, citing 29 papers (sources in Table S4) | Expert |
+| Thrombophilia | Inherited blood-clotting risk variants (Factor V Leiden, prothrombin and related loci) from published studies: 8 variants in 8 genes, citing 24 papers (sources in Table S4) | Expert |
+| Cardio | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, review status of at least one star) in 297 cardiac-disease genes (sources in Table S4) | Database-derived (ClinVar) |
+| Cancer | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, at least one star) in 298 cancer-predisposition genes (sources in Table S4) | Database-derived (ClinVar) |
+| Pathogenic | Genome-wide flag for ClinVar pathogenic and likely pathogenic variants (release 2026-06-27, at least one star) across 4,793 genes (sources in Table S4) | Database-derived (ClinVar) |
+| Pharmacogenomics | Drug response by genotype from the ClinPGx (PharmGKB) clinical annotations at evidence levels 1A to 2B (release 2025-07-05): 240 annotations, 65 drugs, 35 genes (sources in Table S4) | Database-derived (ClinPGx) |
+<!-- @/rev C13b -->
 
 ### **3.1 Longevity Variants Module (example)**
 
@@ -381,3 +387,7 @@ Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-co
 **S2. Generation I vs Generation II Speed Comparison.** Individual OakVar benchmark runs (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s; mean 6,705 ± 583 s). The 172× speedup is attributable to Polars streaming joins against Parquet, elimination of the multi-step OakVar annotator pipeline, and DuckDB for large joins with predicate pushdown and column pruning.
 
 **S3. Runtime and Memory on Large PRS Scoring Files.** Per-call memory (DuckDB/Polars median heap 0.2 MB; PLINK2 ~590 MB) and runtimes for the 7 genome-wide PGS IDs (1.7–6.9M variants); PLINK2 failed on the four largest due to 4-part ID matching constraints.
+
+<!-- @rev C13c rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
+**S4. Module sources.** For each annotation module the project publishes in the module registry (https://module-registry.just-dna.life, namespace `just-dna-seq`), as of 2026-10-10 18:00 UTC: version, publication date, artifact digest, curator type, how the module was curated, the source databases with their release, and every paper its rows cite (first author, year, PMID, DOI) with the number of rows citing it. Read from the modules' own published files; later versions may differ. Files: `S4_module_sources.md`, `S4_module_sources.csv`, `S4_module_citations.csv`.
+<!-- @/rev C13c -->
