@@ -8,6 +8,7 @@ from typing import Annotated, Optional
 
 import typer
 
+from just_dna_lite.manuscript import s5
 from just_dna_lite.manuscript.build import (
     TECTONIC_ENV_VAR,
     build_paths,
@@ -50,6 +51,11 @@ s4_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(s4_app, name="s4")
+s5_app = typer.Typer(
+    help="Supplementary Table S5 (PGS Catalog coverage of just-prs): scan every scoring file, then render.",
+    no_args_is_help=True,
+)
+app.add_typer(s5_app, name="s5")
 SNAPSHOT_JSON = "snapshot.json"
 
 
@@ -166,6 +172,70 @@ def s4_render(
     write_citations_csv(out / CITATIONS_CSV, modules, bibliography)
     for name in (MD_NAME, MODULES_CSV, CITATIONS_CSV):
         typer.echo(f"wrote {out / name}")
+
+
+@s5_app.command("scan")
+def s5_scan(
+    work_dir: Annotated[Path, typer.Argument(file_okay=False, help="Where s5_catalog.json and the per-file measures go")],
+    cache_dir: Annotated[
+        Path, typer.Option("--cache-dir", file_okay=False, help="Where the harmonized scoring files are downloaded (tens of GB)")
+    ],
+    build: Annotated[str, typer.Option("--build", help="Harmonized build to read")] = s5.DEFAULT_BUILD,
+    downloads: Annotated[int, typer.Option("--downloads", min=1, help="Parallel downloads")] = 12,
+    workers: Annotated[int, typer.Option("--workers", min=1, help="Parallel file readers (about 2 GB each at peak)")] = 6,
+) -> None:
+    """Read-only: record the Catalog release (UTC fetch time), download every scoring file, measure all its rows.
+
+    Resumes: files already measured in WORK_DIR are skipped, and files already in the cache are not
+    downloaded again. A resumed scan refuses if the Catalog has released since the first one.
+    """
+    work_dir.mkdir(parents=True, exist_ok=True)
+    catalog_path = work_dir / s5.CATALOG_JSON
+    if catalog_path.is_file():
+        release = s5.read_catalog(catalog_path)
+        current = s5.fetch_release_info()
+        if current["date"] != release.release_date or release.build != build:
+            typer.echo(
+                f"Error: {catalog_path} is release {release.release_date} ({release.build}); the Catalog is now at "
+                f"{current['date']}. Scan into a new work directory.",
+                err=True,
+            )
+            raise typer.Exit(1)
+    else:
+        release = s5.fetch_catalog(build)
+        s5.write_catalog(catalog_path, release)
+    typer.echo(f"PGS Catalog release {release.release_date}, {len(release.scores)} scores, listed {release.fetched_at.isoformat()}")
+    failed = s5.scan(release, work_dir, cache_dir, downloads, workers, typer.echo)
+    if failed:
+        typer.echo(f"Error: {len(failed)} files not measured, run scan again: {', '.join(failed)}", err=True)
+        raise typer.Exit(1)
+    typer.echo("every score measured")
+
+
+@s5_app.command("render")
+def s5_render(
+    work_dir: Annotated[Path, typer.Argument(exists=True, file_okay=False, help="A work directory `s5 scan` completed")],
+    out: Annotated[Path, typer.Option("--out", "-o", file_okay=False, help="Output directory")],
+    threshold: Annotated[
+        float, typer.Option("--threshold", min=0.0, max=1.0, help="Share of absolute weight that makes a file approximated")
+    ] = s5.DEFAULT_THRESHOLD,
+) -> None:
+    """Write S5 (Markdown, per-file CSV, histogram as SVG and PNG) from a scan, offline."""
+    release = s5.read_catalog(work_dir / s5.CATALOG_JSON)
+    try:
+        files = s5.classify_release(release, s5.read_measures(work_dir / s5.MEASURES_JSONL), threshold)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}; finish `manuscript s5 scan` first", err=True)
+        raise typer.Exit(1) from exc
+    measures = {f.measure.pgs_id: f.measure for f in files}
+    out.mkdir(parents=True, exist_ok=True)
+    (out / s5.MD_NAME).write_text(s5.render_markdown(release, files, s5.sensitivity(release, measures), threshold), encoding="utf-8")
+    s5.write_csv(out / s5.CSV_NAME, s5.coverage_frame(release, files))
+    figures = s5.write_histogram(out / s5.FIGURE_STEM, files, threshold)
+    for path in (out / s5.MD_NAME, out / s5.CSV_NAME, *figures):
+        typer.echo(f"wrote {path}")
+    counts = {category: sum(1 for f in files if f.category == category) for category in s5.CATEGORIES}
+    typer.echo(", ".join(f"{category}: {n:,}" for category, n in counts.items()))
 
 
 if __name__ == "__main__":

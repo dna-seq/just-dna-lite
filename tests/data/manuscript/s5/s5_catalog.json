@@ -1,0 +1,79 @@
+{
+ "release_date": "2026-09-17",
+ "release_score_count": 6991,
+ "rest_api_version": "1.8.6",
+ "fetched_at": "2026-10-10T20:12:00.084638Z",
+ "build": "GRCh38",
+ "scores": [
+  {
+   "pgs_id": "PGS000001",
+   "name": "PRS77_BC",
+   "weight_type": "NR",
+   "variants_number": 77,
+   "variants_interactions": 0,
+   "method_name": "SNPs passing genome-wide significance",
+   "date_release": "2019-10-14",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000001/ScoringFiles/Harmonized/PGS000001_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS000024",
+   "name": "GRS2",
+   "weight_type": "log(OR)",
+   "variants_number": 85,
+   "variants_interactions": 18,
+   "method_name": "Genome-wide significant associations and interaction modelling",
+   "date_release": "2019-10-14",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000024/ScoringFiles/Harmonized/PGS000024_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS000152",
+   "name": "cGRS_Bladder",
+   "weight_type": "Odds Ratio over expected risk",
+   "variants_number": 10,
+   "variants_interactions": 0,
+   "method_name": "Pruning and Thresholding (P+T)",
+   "date_release": "2020-04-29",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000152/ScoringFiles/Harmonized/PGS000152_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS000343",
+   "name": "wGRS_PsA_HLA",
+   "weight_type": "log(OR)",
+   "variants_number": 5,
+   "variants_interactions": 0,
+   "method_name": "HLA-specific significant variants.",
+   "date_release": "2020-11-20",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS000343/ScoringFiles/Harmonized/PGS000343_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS002246",
+   "name": "Melanoma_PRS50",
+   "weight_type": "log(OR) for the effect allele *NOTE* a EAF-normalised weight was used for the PRS (see \"variant_description\" and dosage_#_weight columns)",
+   "variants_number": 50,
+   "variants_interactions": 0,
+   "method_name": "Genome-wide significant variants",
+   "date_release": "2022-02-16",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS002246/ScoringFiles/Harmonized/PGS002246_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS004255",
+   "name": "GenoBoost_rheumatoid_arthritis_0",
+   "weight_type": "beta",
+   "variants_number": 30,
+   "variants_interactions": 0,
+   "method_name": "GenoBoost",
+   "date_release": "2024-06-12",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS004255/ScoringFiles/Harmonized/PGS004255_hmPOS_GRCh38.txt.gz"
+  },
+  {
+   "pgs_id": "PGS005228",
+   "name": "FI_Frailty",
+   "weight_type": "beta",
+   "variants_number": 2379429,
+   "variants_interactions": 0,
+   "method_name": "SBayesR",
+   "date_release": "2025-07-24",
+   "harmonized_url": "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/PGS005228/ScoringFiles/Harmonized/PGS005228_hmPOS_GRCh38.txt.gz"
+  }
+ ]
+}

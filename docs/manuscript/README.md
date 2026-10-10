@@ -1,8 +1,8 @@
 # Manuscript tools
 
 `uv run manuscript` holds the tools for the manuscript sources in this folder: the revision ledger
-(`manuscript ledger …`), the PDF build (`manuscript build …`) and Supplementary Table S4
-(`manuscript s4 …`). The Markdown files are the master;
+(`manuscript ledger …`), the PDF build (`manuscript build …`) and Supplementary Tables S4
+(`manuscript s4 …`) and S5 (`manuscript s5 …`). The Markdown files are the master;
 the LaTeX and the PDF are derived from them and never edited by hand.
 
 ## Revision ledger
@@ -168,3 +168,32 @@ uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10  
 
 Code: `src/just_dna_lite/manuscript/s4.py`, `s4_snapshot.py`, `cli.py`. Tests:
 `tests/test_manuscript_s4.py` (offline, on `data/interim/v1_port/`; skipped with the reason when absent).
+
+## Supplementary Table S5 (PGS Catalog coverage of just-prs)
+
+S5 says, for every scoring file in one PGS Catalog release, how much of it just-prs scores as the
+Catalog specifies it, how much it approximates, how much it drops, and which files it cannot score at
+all. Section 3.2 of Paper 1 quotes its counts. Two steps:
+
+```bash
+uv run manuscript s5 scan /data/just-dna-cache/s5/work --cache-dir /data/just-dna-cache/s5/GRCh38
+uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.3/supplementary
+```
+
+- **`scan`** records the release from the Catalog REST API (`/rest/info`, `/rest/score/all`) with the
+  UTC listing time in `s5_catalog.json`, downloads every harmonized scoring file of `--build`
+  (default GRCh38, about 78 GB) into `--cache-dir`, and reads each one in full: no sampling, no size
+  cut-off. One JSON line per file goes to `s5_measures.jsonl`, so an interrupted scan resumes; a
+  resumed scan refuses if the Catalog has released since. Keep both directories outside the repo.
+- **`render`** is offline. It sorts every row of every file into one class (no position;
+  non-nucleotide effect allele; effect allele equal to the other allele; scored), weighs each class by
+  absolute weight, and classifies the file by the rules in `s5.RULES`, each naming the just-prs code it
+  mirrors. Every rule is read from the file's columns or the Catalog's score metadata
+  (`variants_interactions`, `weight_type`); none is a hand-kept list of IDs. `--threshold` (default
+  0.10) is the share of absolute weight that makes a file approximated; the table also gives the
+  counts at 1%, 10%, 25%, 50% and any nonzero share. It writes `S5_pgs_coverage.md`,
+  `S5_pgs_coverage.csv` (one row per PGS ID) and `S5_unplaceable_weight_histogram.svg`/`.png`
+  (matplotlib, in the dev group).
+
+Code: `src/just_dna_lite/manuscript/s5.py`, `cli.py`. Tests: `tests/test_manuscript_s5.py` (offline,
+on real scoring files in `tests/data/manuscript/s5/`).

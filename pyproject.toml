@@ -45,6 +45,7 @@ webui = { workspace = true }
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
+    "matplotlib>=3.11.2",
     "pypandoc-binary>=1.17",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
