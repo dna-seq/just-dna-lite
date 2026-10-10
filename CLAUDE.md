@@ -667,9 +667,11 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 `PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`
 itself. Genome build: `GRCh38`/`T2T-CHM13v2.0` → `GRCh38`; `GRCh37`/`hg19` → `GRCh37`. Only GRCh38 is
-fully supported. A GRCh37 sample scores against the PGS Catalog's **harmonized** scoring files for that
-build; the VCF itself is never lifted over. `just_prs.liftover` is not a VCF liftover and cannot be
-reused for annotation.
+fully supported. The **library** scores a GRCh37 sample against the PGS Catalog's **harmonized** scoring
+files for that build; the VCF itself is never lifted over. **The web UI does not reach that path yet**:
+it sets `genome_build = "GRCh38"` on every file load, so GRCh37 samples are scored, annotated and
+ancestry-called as GRCh38 with no warning (`docs/INVESTIGATE_GRCH37_UI.md`). `just_prs.liftover` is
+not a VCF liftover and cannot be reused for annotation.
 
 - **Genotypes**: `initialize_prs_for_file(parquet_path, genome_build)` calls
   `set_prs_genotypes_lf(pl.scan_parquet(path))`. Normalized parquets keep polars-bio `start`; just-prs wants `pos`. Always go through
