@@ -28,3 +28,15 @@ reproduced in the app yet.
    whether the UI should call the DuckDB engine, which does not crash. Do not patch just-prs from
    here (CLAUDE.md: file upstream gaps, no workarounds for another repo's defect).
 3. Add a regression test here once a fixed just-prs is published.
+
+## Update 2026-10-11: fixed upstream in just-prs 0.10.2 (not yet on PyPI)
+
+just-prs 0.10.2 (tag v0.10.2, commit f15dd7b) scores a haploid GT as homozygous on the 0..2 scale in
+both engines, matching PLINK2's default `--xchr-model 2` and the 1000G reference distributions; male
+chrX `1/1` stays 2. It does no sex inference. Once 0.10.2 is on PyPI, pin `just-prs>=0.10.2` here, add
+the regression test (step 3 above) and close this note.
+
+0.10.2 also changes just-prs's own `normalize_vcf`: its `genotype` list column now gives `[a, a]` for a
+haploid GT, where it used to give `[]`. just-dna-lite does not call `normalize_vcf`, since annotation reads
+its own `user_vcf_normalized` parquet, so annotation is unaffected. Only just-prs's cached normalized
+parquets carry the old value until re-normalized.
