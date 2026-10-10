@@ -111,15 +111,14 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
 - **Licence:** none is stated for the bucket's outputs. DeepVariant's code is BSD-3-Clause; NIST says
   GIAB data are "publicly available without publication embargo" and the trio was chosen as
   "consented for commercial redistribution". So the paper links to the file and does not re-host it.
-- **25** `dl-hg002` (step number from `protocol.jsonl`): md5 `29d00cf5…` equals Google's
-  `x-goog-hash`. **26** `inputs-check-hg002`: 7,753,721 records, `DeepVariant_version=1.0.0`, 25 contigs.
+- **26** `dl-hg002`: md5 `29d00cf5…` equals Google's `x-goog-hash`. **27** `inputs-check-hg002`: 7,753,721 records, `DeepVariant_version=1.0.0`, 25 contigs.
 
 ### PRS harness
 
-- just-prs cloned at tag **v0.10.1** (`b1a6d60`) into `/data/a3-bench/just-prs`, the version the
+- **24** `clone-just-prs`: just-prs cloned at tag **v0.10.1** (`b1a6d60`) into `/data/a3-bench/just-prs`, the version the
   bench worktree's `uv.lock` resolves. The sibling checkout `/data/sources/just-prs` had uncommitted
   changes from another session, so it is not used.
-- PLINK2 **v2.0.0-a.6.33LM (28 Feb 2026)**, the build `benchmark_engines.py` pins, downloaded from
+- **25** `dl-plink2`: PLINK2 **v2.0.0-a.6.33LM (28 Feb 2026)**, the build `benchmark_engines.py` pins, downloaded from
   `s3.amazonaws.com/plink2-assets/alpha6/`; binary sha256 `f87f8be0…`, equal to the gap report's.
 - [`prs/bench_prs.py`](prs/bench_prs.py) imports the upstream script's engines and memory measurement
   unchanged and adds: the committed ID lists ([`prs/pgs_ids.txt`](prs/pgs_ids.txt): PGS000006–PGS000106 without
