@@ -1,0 +1,35 @@
+PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)
+Options in effect:
+  --chr 1-22
+  --make-pgen
+  --new-id-max-allele-len 10000
+  --out /data/a3-bench/prs/pgen_fixed/benchmark_pgen
+  --set-all-var-ids @:#:$r:$a
+  --threads 4
+  --var-filter
+  --vcf /data/a3-bench/inputs/anton/antonkulaga.vcf
+
+Hostname: October
+Working directory: /data/a3-bench/jdl
+Start time: Sat Oct 10 23:18:52 2026
+
+Random number seed: 1791667132
+64241 MiB RAM detected, ~31265 available; reserving 31201 MiB for main
+workspace.
+Using up to 4 compute threads.
+--vcf: 5772593 variants scanned (307151 skipped).
+--vcf: /data/a3-bench/prs/pgen_fixed/benchmark_pgen-temporary.pgen +
+/data/a3-bench/prs/pgen_fixed/benchmark_pgen-temporary.pvar.zst +
+/data/a3-bench/prs/pgen_fixed/benchmark_pgen-temporary.psam written.
+1 sample (0 females, 0 males, 1 ambiguous; 1 founder) loaded from
+/data/a3-bench/prs/pgen_fixed/benchmark_pgen-temporary.psam.
+Note: 145 nonstandard chromosome codes present.
+4516566 out of 5772593 variants loaded from
+/data/a3-bench/prs/pgen_fixed/benchmark_pgen-temporary.pvar.zst.
+Note: No phenotype data present.
+4516566 variants remaining after main filters.
+Writing /data/a3-bench/prs/pgen_fixed/benchmark_pgen.psam ... done.
+Writing /data/a3-bench/prs/pgen_fixed/benchmark_pgen.pvar ... done.
+Writing /data/a3-bench/prs/pgen_fixed/benchmark_pgen.pgen ... done.
+
+End time: Sat Oct 10 23:18:55 2026

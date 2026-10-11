@@ -236,3 +236,17 @@ timing. The user notes the `just_*` modules changed little since 2023 (bug fixes
 
 - The 37 GB download waits until the night queue has finished, so it does not overlap timed runs.
 - `bench_annotation.py` now defaults to the 2.13.1 image and its home.
+
+### Night queue, second start (2026-10-11, 05:00–07:02)
+
+All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
+
+- **32** `prs-original` and **33** `prs-fixed` (job 25, 05:00–05:22): 100 PGS IDs each, results in
+  [`prs/results-20261011T0500/`](prs/results-20261011T0500/) with every PLINK2 log and stdout.
+- **34–36** `jdl-series-second_caller`, `-community_reference`, `-calibration` (job 30,
+  05:22–06:56). With primary's step 29, `runs.csv` now holds the full series for all four genomes
+  (warm-up, 3 cold, 11 warm, 5 full each, plus primary's Ensembl run), every row exit 0.
+- Job 40 (just-prs's session, 06:56–07:02) wrote to the just-prs repository
+  (`just-prs/benchmarks/results/2026-10-11/`); that session commits it.
+- The user then asked for Generation I to follow straight away instead of waiting for the next
+  03:00 window, so the OakVar install (step 37) started at 07:03, once the queue was idle.

@@ -1,0 +1,27 @@
+PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)    cog-genomics.org/plink/2.0/
+(C) 2005-2026 Shaun Purcell, Christopher Chang    GNU General Public License v3
+Logging to /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/fixed/plink2_runs/PGS000030.log.
+Options in effect:
+  --out /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/fixed/plink2_runs/PGS000030
+  --pfile /data/a3-bench/prs/pgen_fixed/benchmark_pgen
+  --score /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/fixed/plink2_runs/PGS000030_score_input.txt 1 2 3 header no-mean-imputation cols=scoresums
+  --threads 4
+
+Start time: Sun Oct 11 05:21:07 2026
+64241 MiB RAM detected, ~45302 available; reserving 32120 MiB for main
+workspace.
+Using up to 4 compute threads.
+1 sample (0 females, 0 males, 1 ambiguous; 1 founder) loaded from
+/data/a3-bench/prs/pgen_fixed/benchmark_pgen.psam.
+4516566 variants loaded from /data/a3-bench/prs/pgen_fixed/benchmark_pgen.pvar.
+Note: No phenotype data present.
+Warning: --score: 275 entries in
+/data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/fixed/plink2_runs/PGS000030_score_input.txt
+were skipped due to missing variant IDs.
+(Add the 'list-variants' modifier to see which variants were actually used for
+scoring.)
+--score: 71 variants processed.
+--score: Results written to
+/data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/fixed/plink2_runs/PGS000030.sscore
+.
+End time: Sun Oct 11 05:21:07 2026

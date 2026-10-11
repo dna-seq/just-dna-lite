@@ -2,3 +2,5 @@
 .bp.counter
 # The repo ignores *.log; the protocol logs are the record and are committed.
 !logs/*.log
+!prs/results-*/*/plink2_runs/*.log
+!prs/results-*/*/pgen_build.log

@@ -1,0 +1,24 @@
+PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)    cog-genomics.org/plink/2.0/
+(C) 2005-2026 Shaun Purcell, Christopher Chang    GNU General Public License v3
+Logging to /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000014.log.
+Options in effect:
+  --out /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000014
+  --pfile /data/a3-bench/prs/pgen_original/benchmark_pgen
+  --score /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000014_score_input.txt 1 2 3 header no-mean-imputation cols=scoresums
+  --threads 4
+
+Start time: Sun Oct 11 05:14:15 2026
+64241 MiB RAM detected, ~43932 available; reserving 32120 MiB for main
+workspace.
+Using up to 4 compute threads.
+1 sample (0 females, 0 males, 1 ambiguous; 1 founder) loaded from
+/data/a3-bench/prs/pgen_original/benchmark_pgen.psam.
+5772593 variants loaded from
+/data/a3-bench/prs/pgen_original/benchmark_pgen.pvar.
+Note: No phenotype data present.
+--score: 10k variants processed.--score: 20k variants processed.--score: 30k variants processed.--score: 40k variants processed.--score: 50k variants processed.--score: 60k variants processed.--score: 70k variants processed.--score: 80k variants processed.--score: 90k variants processed.--score: 100k variants processed.--score: 110k variants processed.--score: 120k variants processed.--score: 130k variants processed.--score: 140k variants processed.--score: 150k variants processed.--score: 160k variants processed.--score: 170k variants processed.--score: 180k variants processed.--score: 190k variants processed.--score: 200k variants processed.--score: 210k variants processed.--score: 220k variants processed.--score: 230k variants processed.--score: 240k variants processed.--score: 250k variants processed.--score: 260k variants processed.--score: 270k variants processed.--score: 280k variants processed.--score: 290k variants processed.--score: 300k variants processed.--score: 310k variants processed.--score: 320k variants processed.--score: 330k variants processed.--score: 340k variants processed.--score: 350k variants processed.--score: 360k variants processed.--score: 370k variants processed.--score: 380k variants processed.--score: 390k variants processed.--score: 400k variants processed.--score: 410k variants processed.--score: 420k variants processed.--score: 430k variants processed.--score: 440k variants processed.--score: 450k variants processed.--score: 460k variants processed.--score: 470k variants processed.--score: 480k variants processed.--score: 490k variants processed.--score: 500k variants processed.--score: 510k variants processed.--score: 520k variants processed.--score: 530k variants processed.--score: 540k variants processed.--score: 550k variants processed.--score: 560k variants processed.--score: 570k variants processed.--score: 580k variants processed.--score: 590k variants processed.--score: 600k variants processed.--score: 610k variants processed.--score: 620k variants processed.--score: 630k variants processed.--score: 640k variants processed.--score: 650k variants processed.--score: 660k variants processed.--score: 670k variants processed.--score: 680k variants processed.--score: 690k variants processed.--score: 700k variants processed.--score: 710k variants processed.
+Error: --score: ALT1 allele for variant '8:141738107:A:C' appears multiple
+times in
+/data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000014_score_input.txt
+file.
+End time: Sun Oct 11 05:14:17 2026

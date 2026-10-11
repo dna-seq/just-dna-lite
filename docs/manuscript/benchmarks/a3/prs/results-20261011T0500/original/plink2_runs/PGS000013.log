@@ -1,0 +1,26 @@
+PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)
+Options in effect:
+  --out /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000013
+  --pfile /data/a3-bench/prs/pgen_original/benchmark_pgen
+  --score /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000013_score_input.txt 1 2 3 header no-mean-imputation cols=scoresums
+  --threads 4
+
+Hostname: October
+Working directory: /data/a3-bench/jdl
+Start time: Sun Oct 11 05:13:55 2026
+
+Random number seed: 1791688435
+64241 MiB RAM detected, ~44197 available; reserving 32120 MiB for main
+workspace.
+Using up to 4 compute threads.
+1 sample (0 females, 0 males, 1 ambiguous; 1 founder) loaded from
+/data/a3-bench/prs/pgen_original/benchmark_pgen.psam.
+5772593 variants loaded from
+/data/a3-bench/prs/pgen_original/benchmark_pgen.pvar.
+Note: No phenotype data present.
+Error: --score: ALT1 allele for variant '8:141738107:A:C' appears multiple
+times in
+/data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/prs/results-20261011T0500/original/plink2_runs/PGS000013_score_input.txt
+file.
+
+End time: Sun Oct 11 05:13:57 2026
