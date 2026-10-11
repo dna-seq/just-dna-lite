@@ -261,8 +261,8 @@ def main() -> None:
     parser.add_argument("--cache-dir", type=Path, default=Path("/data/just-dna-cache"))
     parser.add_argument("-m", "--module", dest="modules", action="append", default=[])
     # Generation I
-    parser.add_argument("--oakvar-image", default="jdl-bench-oakvar:2.9.15")
-    parser.add_argument("--oakvar-home", type=Path, default=Path("/data/a3-bench/oakvar/home"))
+    parser.add_argument("--oakvar-image", default="jdl-bench-oakvar:2.13.1")
+    parser.add_argument("--oakvar-home", type=Path, default=Path("/data/a3-bench/oakvar/home-2.13.1"))
     parser.add_argument("--oakvar-args", nargs=argparse.REMAINDER, default=[])
     args = parser.parse_args()
 

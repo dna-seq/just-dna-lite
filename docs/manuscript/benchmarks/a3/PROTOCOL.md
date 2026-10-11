@@ -207,3 +207,32 @@ timing. The user notes the `just_*` modules changed little since 2023 (bug fixes
 - A fresh OakVar home for this version, `/data/a3-bench/oakvar/home-2.13.1`, so nothing written by
   the 2.9.15 login attempt mixes in.
 - The paper labels the run with the OakVar version and module commits that actually ran.
+
+### OakVar store login and install plan (2026-10-11, 05:00–05:15)
+
+- The store account the user first tried was never verified, and a second address had no account;
+  OakVar 2.13.1's `system setup` then loops on "User not found" with no way out but stopping the
+  container (`--init` added to the interactive commands so Ctrl+C reaches `ov`). The user then
+  registered a new store account, verified it and logged in with
+  `system setup -f /oakvar/setup-login-only.yml` into `/data/a3-bench/oakvar/home-2.13.1`. The
+  credential lives only in that volume, never in the image or the repo.
+- Setup fetched the store index (5 parts) and, with `base_modules: []`, installed nothing.
+- The store index lists every module the run needs, `longevity2reporter` and all nine `just_*`
+  postaggregators included, so Generation I is installed **from the store**, the way a user would,
+  rather than from GitHub tarballs (fewer moving parts). `modules-current.tsv` stays as the record of
+  each repo's head on the same day; the versions that actually ran are taken from `ov module ls`
+  after install. Store versions on 2026-10-11 (latest of each):
+
+  | module | type | code / data version | download |
+  |---|---|---|---|
+  | dbsnp | annotator | 156.0.1 / 156.0.1 | 24.5 GB |
+  | gnomad | annotator | 2.2.0 / 2.2.0 | 7.8 GB |
+  | sift | annotator | 1.3.0 / 1.1.0 | 4.4 GB |
+  | gencode | mapper | 46.1.1 / 46.1.0 | 0.5 GB |
+  | clinvar | annotator | 2026.10.01 | 0.2 GB |
+  | ncbigene, omim, pubmed, cardioboost | annotators | 2026.10.01, 1.1.1, 1.1.5, 1.0.0 | small |
+  | vcf-converter, vcfinfo | converter, postaggregator | 4.2.1, 3.2.0 | small |
+  | longevity2reporter | reporter | 0.4.3 | small |
+
+- The 37 GB download waits until the night queue has finished, so it does not overlap timed runs.
+- `bench_annotation.py` now defaults to the 2.13.1 image and its home.
