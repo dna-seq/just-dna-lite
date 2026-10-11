@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# A3 Generation II annotation benchmark (just-dna-lite), all four genomes, unattended.
+# A3 Generation II annotation benchmark (just-dna-lite), unattended. Primary finished on
+# 2026-10-11 before a power cut; this run does the remaining three genomes.
 # Plan: docs/manuscript/benchmarks/a3_benchmark_rerun_plan.md; record: a3/PROTOCOL.md.
 set -euo pipefail
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
@@ -19,5 +20,5 @@ docker run --rm --privileged \
     sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 echo "page-cache drop works: buff/cache ${before} MB -> $(free -m | awk '/^Mem:/{print $6}') MB"
 
-"$A3/scripts/run_jdl_series.sh"
+"$A3/scripts/run_jdl_series.sh" second_caller community_reference calibration
 echo "finished $(date -Is)"

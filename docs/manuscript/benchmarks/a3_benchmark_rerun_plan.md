@@ -92,6 +92,11 @@ reachable, so the run is a **reconstruction** from the published `just_*` module
 (`a3/oakvar/`), labelled as such. The 2023 numbers above stay as their own historical row. Every step
 is recorded in [`a3/PROTOCOL.md`](a3/PROTOCOL.md).
 
+The reconstruction pins the **code** to May 2023, but the annotator databases (dbsnp, gnomad, clinvar
+and the rest), where most of OakVar's time goes, come from today's OakVar store. The paper labels the
+run "2023 code, 2026 annotation data" and reports the installed annotator versions beside the timing.
+The `just_*` modules themselves changed little since 2023 (bug fixes only).
+
 ## PRS benchmark (Section 4.2)
 
 Re-run `just-prs/benchmarks/benchmark_engines.py` (just-prs is read-only from just-dna-lite; run it

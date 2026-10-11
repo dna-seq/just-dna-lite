@@ -157,3 +157,26 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
   writes to `a3/prs/results-<stamp>/`; `20-just-prs-engines.sh` (just-prs's session) measures the
   **fixed** engines from its working tree, which the paper reports once that version is released and
   pinned. Each records the just-prs version and commit it ran.
+
+### Power cut during the first night run (2026-10-11, about 03:58)
+
+- The queue started at 03:00:13 (load 0.27). **29** `jdl-series-primary` finished at 03:31 (exit 0):
+  all 21 primary rows are in `runs.csv`.
+- **30** `jdl-series-second_caller` was in its 11th timed run (cold 2) when a storm power surge cut
+  the machine at about 03:58. Its log ends mid-run and it has no `protocol.jsonl` line. The ten rows
+  it had written are moved, unchanged, to `runs-aborted.csv` and are not used: a series is reported
+  whole or not at all, so second_caller runs again from its warm-up in a new series directory.
+- The queue timer was a transient systemd unit, so it did not survive the reboot; jobs 20 and 25 had
+  not started.
+- After the reboot all four input VCFs still match their md5 in `inputs.json`.
+- The user asked for the annotation series to run after the PRS jobs, so the job is renamed
+  `30-jdl-annotation.sh` and runs only `second_caller community_reference calibration`
+  (`run_jdl_series.sh` now takes genome names). New order: 20 → 25 → 30, OakVar last. The old job
+  file and its log are kept in `/data/bench-queue/aborted/`.
+
+### Generation I: 2023 code, 2026 annotation data (2026-10-11)
+
+The OakVar image pins the code to May 2023, but the annotator databases are downloaded from today's
+OakVar store; most of OakVar's runtime is lookups in them. The paper labels the run "2023 code, 2026
+annotation data" and reports the annotator versions installed (recorded at install time) next to its
+timing. The user notes the `just_*` modules changed little since 2023 (bug fixes only).
