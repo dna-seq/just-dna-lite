@@ -1,0 +1,64 @@
+# step 38: oakvar-module-ls
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker run --rm --user 1000:1000 -v /data/a3-bench/oakvar/home-2.13.1:/oakvar jdl-bench-oakvar:2.13.1 module ls 
+# start: 2026-10-11T08:01:45+02:00
+┌────────────┬────────────┬────────────┬─────────────┬────────────┬────────────┐
+│ name       │ title      │ type       │ size        │ version    │ data_sour… │
+├────────────┼────────────┼────────────┼─────────────┼────────────┼────────────┤
+│ cardioboo… │ CardioBoo… │ annotator  │ 18182542    │ 1.0.0      │ v2.1       │
+│ clinvar    │ ClinVar    │ annotator  │ 1772098342  │ 2026.10.01 │ 2026.10.01 │
+│ dbsnp      │ dbSNP      │ annotator  │ 52770153151 │ 156.0.1    │ v156       │
+│ gencode    │ GENCODE    │ mapper     │ 460605548   │ 46.1.1     │            │
+│            │ Mapper     │            │             │            │            │
+│ gnomad     │ gnomAD     │ annotator  │ 17427053964 │ 2.2.0      │ v2.1       │
+│ hg38wgs    │ UCSC hg38  │ common     │ 835395696   │ 1.0.0      │            │
+│            │ Whole      │            │             │            │            │
+│            │ Genome     │            │             │            │            │
+│            │ Sequence   │            │             │            │            │
+│ just_canc… │ Cancer     │ postaggre… │ 220047      │ 0.1.0      │            │
+│            │ postagreg… │            │             │            │            │
+│ just_card… │ Cardio     │ postaggre… │ 120386      │ 0.1.1      │            │
+│            │ postagreg… │            │             │            │            │
+│ just_coro… │ Coronary   │ postaggre… │ 364253      │ 0.1.2      │            │
+│            │ disease    │            │             │            │            │
+│            │ postagreg… │            │             │            │            │
+│ just_drugs │ Longevity  │ postaggre… │ 444733      │ 0.1.0      │            │
+│            │ drugs      │            │             │            │            │
+│            │ postagreg… │            │             │            │            │
+│ just_lipi… │ Lipid      │ postaggre… │ 419436      │ 0.1.2      │            │
+│            │ metabolism │            │             │            │            │
+│            │ postaggre… │            │             │            │            │
+│ just_long… │ Longevity… │ postaggre… │ 3757304     │ 0.1.2      │            │
+│            │ postagreg… │            │             │            │            │
+│ just_supe… │ Superhuma… │ postaggre… │ 1849944     │ 0.1.0      │            │
+│            │ postaggre… │            │             │            │            │
+│ just_thro… │ Thromboph… │ postaggre… │ 410711      │ 0.1.2      │            │
+│            │ risks      │            │             │            │            │
+│            │ postaggre… │            │             │            │            │
+│ just_vo2m… │ VO2max     │ postaggre… │ 199741      │ 0.1.2      │            │
+│            │ postaggre… │            │             │            │            │
+│ longevity… │ Longevity2 │ reporter   │ 502894      │ 0.4.3      │            │
+│ ncbigene   │ NCBI Gene  │ annotator  │ 71331028    │ 2026.10.01 │ 2026.10.01 │
+│ omim       │ OMIM       │ annotator  │ 10370140    │ 1.1.1      │ v4.1       │
+│ pubmed     │ PubMed     │ annotator  │ 975479      │ 1.1.5      │            │
+│ sift       │ SIFT       │ annotator  │ 21874372467 │ 1.3.0      │ SIFT4G     │
+│            │            │            │             │            │ 2016-02-22 │
+│ vcf-conve… │ VCF        │ converter  │ 1419143     │ 4.2.1      │            │
+│            │ Converter  │            │             │            │            │
+│ vcfinfo    │ VCF Info   │ postaggre… │ 4874        │ 1.4.0      │            │
+│ wgallelef… │ Allele     │ webviewer… │ 103090      │ 1.1.0      │            │
+│            │ Frequency  │            │             │            │            │
+│            │ Spectrum   │            │             │            │            │
+│ wgbase     │ Variant    │ webviewer… │ 7463        │ 1.5.3      │            │
+│            │ Annotation │            │             │            │            │
+│ wgclinvar  │ Clinvar    │ webviewer… │ 41169       │ 1.2.0      │            │
+│ wggnomad   │ gnomAD     │ webviewer… │ 23818       │ 1.1.1      │            │
+│ wglollipop │ Protein    │ webviewer… │ 187604509   │ 2.5.2      │            │
+│            │ diagram    │            │             │            │            │
+│ wgncbigene │ NCBI Gene  │ webviewer… │ 60991       │ 1.1.0      │            │
+│ wgsift     │ SIFT       │ webviewer… │ 2037        │ 1.1.0      │            │
+│ wgvcfinfo  │ VCF info   │ webviewer… │ 910         │ 1.0.3      │            │
+│            │ widget     │            │             │            │            │
+└────────────┴────────────┴────────────┴─────────────┴────────────┴────────────┘
+
+# end: 2026-10-11T08:01:47+02:00 exit=0

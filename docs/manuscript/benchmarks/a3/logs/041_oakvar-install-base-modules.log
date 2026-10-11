@@ -1,0 +1,92 @@
+# step 41: oakvar-install-base-modules
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker run --rm --init --name a3-ov-install --user 1000:1000 -v /data/a3-bench/oakvar/home-2.13.1:/oakvar jdl-bench-oakvar:2.13.1 module install -y csv-converter maf-converter vcf-converter textreporter excelreporter vcfreporter stdoutreporter tagsampler vcfinfo gencode wgbase wghg19 
+# start: 2026-10-11T08:02:23+02:00
+No store update to fetch
+The following modules will be installed:
+- csv-converter==1.1.11
+- maf-converter==1.0.3
+- vcf-converter==4.2.1
+- textreporter==3.1.1
+- excelreporter==3.1.1
+- vcfreporter==5.2.5
+- stdoutreporter==2.0.0
+- tagsampler==3.1.0
+- vcfinfo==1.4.0
+- gencode==46.1.1
+- wgbase==1.5.3
+- wghg19==1.0.3
+[2026:10:11 06:02:26] Starting to install csv-converter==1.1.11...
+[2026:10:11 06:02:26] Downloading code archive of csv-converter==1.1.11...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:27] Extracting code archive of csv-converter==1.1.11...
+[2026:10:11 06:02:27] finished installation of csv-converter==1.1.11
+Installed csv-converter.
+[2026:10:11 06:02:27] Starting to install excelreporter==3.1.1...
+Installing required PyPI packages...
+Defaulting to user installation because normal site-packages is not writeable
+Collecting xlsxwriter
+  Downloading xlsxwriter-3.2.9-py3-none-any.whl (175 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 175.3/175.3 kB 1.8 MB/s eta 0:00:00
+Installing collected packages: xlsxwriter
+Successfully installed xlsxwriter-3.2.9
+
+[notice] A new release of pip is available: 23.0.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[2026:10:11 06:02:29] Downloading code archive of excelreporter==3.1.1...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:30] Extracting code archive of excelreporter==3.1.1...
+[2026:10:11 06:02:30] finished installation of excelreporter==3.1.1
+Installed excelreporter.
+gencode==46.1.1 already exists.
+[2026:10:11 06:02:30] Starting to install maf-converter==1.0.3...
+[2026:10:11 06:02:30] Downloading code archive of maf-converter==1.0.3...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:31] Extracting code archive of maf-converter==1.0.3...
+[2026:10:11 06:02:31] finished installation of maf-converter==1.0.3
+Installed maf-converter.
+[2026:10:11 06:02:31] Starting to install stdoutreporter==2.0.0...
+[2026:10:11 06:02:32] Downloading code archive of stdoutreporter==2.0.0...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:32] Extracting code archive of stdoutreporter==2.0.0...
+[2026:10:11 06:02:32] finished installation of stdoutreporter==2.0.0
+Installed stdoutreporter.
+[2026:10:11 06:02:32] Starting to install tagsampler==3.1.0...
+[2026:10:11 06:02:33] Downloading code archive of tagsampler==3.1.0...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:33] Extracting code archive of tagsampler==3.1.0...
+[2026:10:11 06:02:34] finished installation of tagsampler==3.1.0
+Installed tagsampler.
+[2026:10:11 06:02:34] Starting to install textreporter==3.1.1...
+[2026:10:11 06:02:34] Downloading code archive of textreporter==3.1.1...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:35] Extracting code archive of textreporter==3.1.1...
+[2026:10:11 06:02:35] finished installation of textreporter==3.1.1
+Installed textreporter.
+vcf-converter==4.2.1 already exists.
+vcfinfo==1.4.0 already exists.
+[2026:10:11 06:02:35] Starting to install vcfreporter==5.2.5...
+Installing required PyPI packages...
+Defaulting to user installation because normal site-packages is not writeable
+Collecting PyVCF3
+  Downloading pyvcf3-1.0.4-py3-none-any.whl (988 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 988.6/988.6 kB 5.5 MB/s eta 0:00:00
+Requirement already satisfied: setuptools in /usr/local/lib/python3.10/site-packages (from PyVCF3) (84.0.0)
+Installing collected packages: PyVCF3
+Successfully installed PyVCF3-1.0.4
+
+[notice] A new release of pip is available: 23.0.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[2026:10:11 06:02:38] Downloading code archive of vcfreporter==5.2.5...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:38] Extracting code archive of vcfreporter==5.2.5...
+[2026:10:11 06:02:38] finished installation of vcfreporter==5.2.5
+Installed vcfreporter.
+wgbase==1.5.3 already exists.
+[2026:10:11 06:02:38] Starting to install wghg19==1.0.3...
+[2026:10:11 06:02:39] Downloading code archive of wghg19==1.0.3...
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+[2026:10:11 06:02:40] Extracting code archive of wghg19==1.0.3...
+[2026:10:11 06:02:41] finished installation of wghg19==1.0.3
+Installed wghg19.
+# end: 2026-10-11T08:02:41+02:00 exit=0

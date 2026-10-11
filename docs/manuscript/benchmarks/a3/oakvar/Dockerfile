@@ -25,6 +25,14 @@ RUN uv pip install --system --no-cache --exclude-newer "${EXCLUDE_NEWER}" \
         "oakvar==${OAKVAR_VERSION}" mako \
     && uv pip freeze --system > /pip-freeze.txt
 
+# The store's dbsnp annotator (156.0.1, and 154.0.2, the version current in 2023; both checked) does
+# `from cravat.util import get_ucsc_bins, reverse_complement`. No OakVar release from 2.9.15 to 2.13.1
+# exports reverse_complement from its cravat compatibility module (2.9.15 has no cravat.util at all),
+# so dbsnp fails to load and takes the annotator step down with it. OakVar defines the function in
+# oakvar.lib.util.seq; re-export it there. Builds without a cravat/util.py are left unchanged.
+RUN f="$(python -c 'import cravat, pathlib; print(pathlib.Path(cravat.__file__).parent / "util.py")')" \
+    && if [ -f "$f" ]; then printf '\n# A3 re-run: re-export for the store dbsnp annotator.\nfrom oakvar.lib.util.seq import reverse_complement\n' >> "$f"; fi
+
 # Run as the host user (uid/gid passed at `docker run --user`); HOME is the mounted OakVar home.
 ENV HOME=/oakvar \
     OV_ROOT_DIR=/oakvar/ov

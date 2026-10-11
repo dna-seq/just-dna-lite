@@ -1,0 +1,6 @@
+# step 40: oakvar-smoke-5000
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: docker run --rm --init --name a3-ov-smoke --user 1000:1000 -v /data/a3-bench/oakvar/home-2.13.1:/oakvar -v /data/a3-bench/oakvar/smoke:/input:ro -v /data/a3-bench/oakvar/smoke/job1:/job jdl-bench-oakvar:2.13.1 run /input/anton_head5000.vcf -l hg38 -d /job -a dbsnp clinvar omim ncbigene pubmed gnomad sift cardioboost -p just_cancer just_cardio just_coronary just_drugs just_longevitymap just_lipidmetabolism just_thrombophilia just_superhuman just_vo2max -t longevity2reporter 
+# start: 2026-10-11T08:02:12+02:00
+module [tagsampler] does not exist. Possible solutions: 'ov system setup' and/or 'ov module install tagsampler'
+# end: 2026-10-11T08:02:14+02:00 exit=3

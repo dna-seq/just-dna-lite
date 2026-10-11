@@ -1,0 +1,56 @@
+# step 44: build-oakvar-image-2.13.1-shim
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: bash -c docker\ build\ -t\ jdl-bench-oakvar:2.13.1\ --build-arg\ OAKVAR_VERSION=2.13.1\ --build-arg\ EXCLUDE_NEWER=2026-08-31T00:00:00Z\ oakvar\ \&\&\ docker\ image\ inspect\ jdl-bench-oakvar:2.13.1\ --format\ \"\{\{.Id\}\}\"\ \&\&\ docker\ run\ --rm\ --entrypoint\ python\ jdl-bench-oakvar:2.13.1\ -c\ \"from\ cravat.util\ import\ get_ucsc_bins\,\ reverse_complement\;\ print\(\\\"cravat.util\ ok:\\\"\,\ reverse_complement\(\\\"AAC\\\"\)\)\"\ \&\&\ docker\ run\ --rm\ --entrypoint\ sh\ jdl-bench-oakvar:2.13.1\ -c\ \"diff\ \<\(sort\ /pip-freeze.txt\)\ \<\(sort\ /pip-freeze.txt\)\ \&\&\ grep\ -iE\ \\\"\^\(oakvar\|polars\)==\\\"\ /pip-freeze.txt\" 
+# start: 2026-10-11T08:08:32+02:00
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.69kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370
+#2 DONE 0.1s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#3 DONE 0.1s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [stage-0 1/5] FROM docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370
+#5 resolve docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370 0.1s done
+#5 DONE 0.1s
+
+#6 FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#6 resolve ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 0.1s done
+#6 DONE 0.1s
+
+#7 [stage-0 2/5] COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /usr/local/bin/uv
+#7 CACHED
+
+#8 [stage-0 3/5] RUN uv pip install --system --no-cache --exclude-newer "2026-08-31T00:00:00Z"         "oakvar==2.13.1" mako     && uv pip freeze --system > /pip-freeze.txt
+#8 CACHED
+
+#9 [stage-0 4/5] RUN f="$(python -c 'import cravat, pathlib; print(pathlib.Path(cravat.__file__).parent / "util.py")')"     && if [ -f "$f" ]; then printf '\n# A3 re-run: re-export for the store dbsnp annotator.\nfrom oakvar.lib.util.seq import reverse_complement\n' >> "$f"; fi
+#9 DONE 1.6s
+
+#10 [stage-0 5/5] WORKDIR /work
+#10 DONE 0.2s
+
+#11 exporting to image
+#11 exporting layers
+#11 exporting layers 0.5s done
+#11 exporting manifest sha256:724abb388757927f53464d537451ec33206a662233c81743321b2d8fba568de6 0.1s done
+#11 exporting config sha256:8e02da1c50e271a37e8c3bd0d5fa9cbdc766e863b83892fcb189cc350a8c7564 0.1s done
+#11 exporting attestation manifest sha256:f099b1d4cb25a24b6ebed2d7d31550802d5172a9b0be499bafa5867dabd2b7e4 0.1s done
+#11 exporting manifest list sha256:5d17f590f6f301f0b040380b4c419b9a8860738f4a204c8476823393d10fdb35
+#11 exporting manifest list sha256:5d17f590f6f301f0b040380b4c419b9a8860738f4a204c8476823393d10fdb35 0.1s done
+#11 naming to docker.io/library/jdl-bench-oakvar:2.13.1 done
+#11 unpacking to docker.io/library/jdl-bench-oakvar:2.13.1
+#11 unpacking to docker.io/library/jdl-bench-oakvar:2.13.1 0.2s done
+#11 DONE 1.0s
+sha256:5d17f590f6f301f0b040380b4c419b9a8860738f4a204c8476823393d10fdb35
+cravat.util ok: GTT
+sh: 1: Syntax error: "(" unexpected
+# end: 2026-10-11T08:08:38+02:00 exit=2

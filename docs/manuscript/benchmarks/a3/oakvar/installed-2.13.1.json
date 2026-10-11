@@ -1,0 +1,242 @@
+[
+ {
+  "name": "cardioboost",
+  "title": "CardioBoost",
+  "type": "annotator",
+  "size": 18182542,
+  "version": "1.0.0",
+  "data_source": "v2.1"
+ },
+ {
+  "name": "clinvar",
+  "title": "ClinVar",
+  "type": "annotator",
+  "size": 1772098342,
+  "version": "2026.10.01",
+  "data_source": "2026.10.01"
+ },
+ {
+  "name": "dbsnp",
+  "title": "dbSNP",
+  "type": "annotator",
+  "size": 52770153151,
+  "version": "156.0.1",
+  "data_source": "v156"
+ },
+ {
+  "name": "gencode",
+  "title": "GENCODE Mapper",
+  "type": "mapper",
+  "size": 460605548,
+  "version": "46.1.1",
+  "data_source": ""
+ },
+ {
+  "name": "gnomad",
+  "title": "gnomAD",
+  "type": "annotator",
+  "size": 17427053964,
+  "version": "2.2.0",
+  "data_source": "v2.1"
+ },
+ {
+  "name": "hg38wgs",
+  "title": "UCSC hg38 Whole Genome Sequence",
+  "type": "common",
+  "size": 835395696,
+  "version": "1.0.0",
+  "data_source": ""
+ },
+ {
+  "name": "just_cancer",
+  "title": "Cancer postagregator",
+  "type": "postaggregator",
+  "size": 220047,
+  "version": "0.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "just_cardio",
+  "title": "Cardio postagregator",
+  "type": "postaggregator",
+  "size": 120386,
+  "version": "0.1.1",
+  "data_source": ""
+ },
+ {
+  "name": "just_coronary",
+  "title": "Coronary disease postagregator",
+  "type": "postaggregator",
+  "size": 364253,
+  "version": "0.1.2",
+  "data_source": ""
+ },
+ {
+  "name": "just_drugs",
+  "title": "Longevity drugs postagregator",
+  "type": "postaggregator",
+  "size": 444733,
+  "version": "0.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "just_lipidmetabolism",
+  "title": "Lipid metabolism postaggregator",
+  "type": "postaggregator",
+  "size": 419436,
+  "version": "0.1.2",
+  "data_source": ""
+ },
+ {
+  "name": "just_longevitymap",
+  "title": "Longevitymap postagregator",
+  "type": "postaggregator",
+  "size": 3757304,
+  "version": "0.1.2",
+  "data_source": ""
+ },
+ {
+  "name": "just_superhuman",
+  "title": "Superhumangenes postaggregator",
+  "type": "postaggregator",
+  "size": 1849944,
+  "version": "0.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "just_thrombophilia",
+  "title": "Thrombophilia risks postaggregator",
+  "type": "postaggregator",
+  "size": 410711,
+  "version": "0.1.2",
+  "data_source": ""
+ },
+ {
+  "name": "just_vo2max",
+  "title": "VO2max postaggregator",
+  "type": "postaggregator",
+  "size": 199741,
+  "version": "0.1.2",
+  "data_source": ""
+ },
+ {
+  "name": "longevity2reporter",
+  "title": "Longevity2",
+  "type": "reporter",
+  "size": 502894,
+  "version": "0.4.3",
+  "data_source": ""
+ },
+ {
+  "name": "ncbigene",
+  "title": "NCBI Gene",
+  "type": "annotator",
+  "size": 71331028,
+  "version": "2026.10.01",
+  "data_source": "2026.10.01"
+ },
+ {
+  "name": "omim",
+  "title": "OMIM",
+  "type": "annotator",
+  "size": 10370140,
+  "version": "1.1.1",
+  "data_source": "v4.1"
+ },
+ {
+  "name": "pubmed",
+  "title": "PubMed",
+  "type": "annotator",
+  "size": 975479,
+  "version": "1.1.5",
+  "data_source": ""
+ },
+ {
+  "name": "sift",
+  "title": "SIFT",
+  "type": "annotator",
+  "size": 21874372467,
+  "version": "1.3.0",
+  "data_source": "SIFT4G 2016-02-22"
+ },
+ {
+  "name": "vcf-converter",
+  "title": "VCF Converter",
+  "type": "converter",
+  "size": 1419143,
+  "version": "4.2.1",
+  "data_source": ""
+ },
+ {
+  "name": "vcfinfo",
+  "title": "VCF Info",
+  "type": "postaggregator",
+  "size": 4874,
+  "version": "1.4.0",
+  "data_source": ""
+ },
+ {
+  "name": "wgallelefrequency",
+  "title": "Allele Frequency Spectrum",
+  "type": "webviewerwidget",
+  "size": 103090,
+  "version": "1.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "wgbase",
+  "title": "Variant Annotation",
+  "type": "webviewerwidget",
+  "size": 7463,
+  "version": "1.5.3",
+  "data_source": ""
+ },
+ {
+  "name": "wgclinvar",
+  "title": "Clinvar",
+  "type": "webviewerwidget",
+  "size": 41169,
+  "version": "1.2.0",
+  "data_source": ""
+ },
+ {
+  "name": "wggnomad",
+  "title": "gnomAD",
+  "type": "webviewerwidget",
+  "size": 23818,
+  "version": "1.1.1",
+  "data_source": ""
+ },
+ {
+  "name": "wglollipop",
+  "title": "Protein diagram",
+  "type": "webviewerwidget",
+  "size": 187604509,
+  "version": "2.5.2",
+  "data_source": ""
+ },
+ {
+  "name": "wgncbigene",
+  "title": "NCBI Gene",
+  "type": "webviewerwidget",
+  "size": 60991,
+  "version": "1.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "wgsift",
+  "title": "SIFT",
+  "type": "webviewerwidget",
+  "size": 2037,
+  "version": "1.1.0",
+  "data_source": ""
+ },
+ {
+  "name": "wgvcfinfo",
+  "title": "VCF info widget",
+  "type": "webviewerwidget",
+  "size": 910,
+  "version": "1.0.3",
+  "data_source": ""
+ }
+]

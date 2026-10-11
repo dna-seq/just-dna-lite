@@ -1,0 +1,5 @@
+# step 39: oakvar-module-ls-json
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: bash -c docker\ run\ --rm\ --user\ 1000:1000\ -v\ /data/a3-bench/oakvar/home-2.13.1:/oakvar\ jdl-bench-oakvar:2.13.1\ module\ ls\ -i\ --fmt\ json\ \>\ oakvar/installed-2.13.1.json 
+# start: 2026-10-11T08:01:56+02:00
+# end: 2026-10-11T08:01:57+02:00 exit=0

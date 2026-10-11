@@ -247,6 +247,48 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   05:22–06:56). With primary's step 29, `runs.csv` now holds the full series for all four genomes
   (warm-up, 3 cold, 11 warm, 5 full each, plus primary's Ensembl run), every row exit 0.
 - Job 40 (just-prs's session, 06:56–07:02) wrote to the just-prs repository
-  (`just-prs/benchmarks/results/2026-10-11/`); that session commits it.
+  (`just-prs/benchmarks/results/2026-10-11/`), committed there as just-prs 64000d1 and written up in
+  just-prs `docs/benchmarks.md` (median time: duckdb 0.082 s, polars 0.309 s, PLINK2 0.602 s;
+  polars vs PLINK2 r = 0.99999996, every residual attributed).
 - The user then asked for Generation I to follow straight away instead of waiting for the next
   03:00 window, so the OakVar install (step 37) started at 07:03, once the queue was idle.
+
+### Generation I install, the dbsnp import fix and the smoke test (2026-10-11, 07:03–08:10)
+
+- **37** `oakvar-install-modules` (58 min): the annotators, `vcf-converter`, `gencode` and the ten
+  Longevity2 modules from the store. OakVar pulled `hg38wgs` and the `wg*` widgets as
+  dependencies, and pip-installed `mako` 1.4.3 into the volume's user site on its own (the image has
+  1.4.1). **38–39** `oakvar-module-ls`, `-ls-json`: the installed set is in
+  [`oakvar/installed-2.13.1.json`](oakvar/installed-2.13.1.json) (30 modules, 95.4 GB). OakVar's
+  `--fmt json` prints a Python literal, so the file is that output converted with `ast.literal_eval`.
+- **40** `oakvar-smoke-5000` (exit 3): `tagsampler` missing. The login file had `base_modules: []`,
+  so **41** installed OakVar's default base modules (`vcfreporter` pip-installed PyVCF3 on its own).
+- **42** `oakvar-smoke-5000` (exit 0, but wrong): on the first 5,000 records of the primary VCF,
+  the store's **dbsnp 156.0.1** failed to load (`from cravat.util import get_ucsc_bins,
+  reverse_complement`: ImportError), and its `ModuleLoadingError` took the annotator step down, so
+  sift, ncbigene and pubmed never ran either. Every `just_*` module then failed on every variant
+  (`'dbsnp__rsid'`; `just_cardio` on `'base__hugo'`, which OakVar adds only when a gene-level input
+  such as `ncbigene__ncbi_desc` exists).
+- Diagnosis, from the PyPI source archives of OakVar 2.9.15, 2.9.99, 2.10.4, 2.11.10, 2.11.26,
+  2.12.6, 2.12.22, 2.12.25 and 2.13.1: **no release exports `reverse_complement` from its `cravat`
+  compatibility module** (2.9.15 has no `cravat.util` at all; tested in the 2.9.15 image:
+  `ModuleNotFoundError`). OakVar defines it in `oakvar.lib.util.seq`. dbsnp 154.0.2, the version
+  current in 2023, has the same import (its download, **43**, was stopped partway and its partial
+  files removed; 156.0.1 stayed installed). So stepping OakVar down cannot fix this, and the user's
+  downgrade ladder does not apply: it is a store-module/OakVar mismatch, not our modules.
+- Fix: the Dockerfile appends `from oakvar.lib.util.seq import reverse_complement` to the image's
+  `cravat/util.py`. The store's module files stay byte-for-byte as installed. **44** rebuilt the
+  2.13.1 image with it (its exit 2 is a redundant last check of mine with a shell syntax error; the
+  image built and the import test printed `GTT`); the dependency freeze is identical to step 31's.
+  Every other `cravat` import in the installed modules was tested in the image and resolves.
+- **45** `oakvar-smoke-5000-shim` (exit 0, 8.1 s): all 8 annotators present (`dbsnp__`, `sift__` …
+  in the variant table, `ncbigene__`, `pubmed__` in the gene table), every `just_*` module wrote
+  output, no `err.just_*` line. The 2,171 `vcf-converter` skips are DeepVariant RefCall records
+  (`No alternate allele`); Generation II drops the same records through its quality filter.
+- **46** `oakvar-smoke-5000-gz` (exit 0): the same on a gzipped VCF (calibration genome's head).
+- The paper should say: OakVar 2.13.1 with a one-line compatibility re-export, because the store's
+  dbsnp annotator imports a name no OakVar release exports. Worth reporting upstream (the user's
+  call: outbound).
+- Timed runs: [`queue/50-oakvar-annotation.sh`](queue/50-oakvar-annotation.sh), 3 runs on the
+  primary genome then 1 on the calibration genome, each a fresh job directory, no cache drop
+  (`full`), started straight after this check at the user's request rather than at 03:00.
