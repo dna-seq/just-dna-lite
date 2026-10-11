@@ -255,7 +255,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | RAM | 63 GiB |
 | Storage | SATA SSD (data, caches and outputs) |
 | OS | Linux 7.2.9 |
-| Generation II | Just-DNA-Lite 0.3.25, 10 modules (Table S2) |
+| Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
 | Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
 | Input: second caller | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
@@ -277,11 +277,11 @@ Every engine scored every ID.
 
 | Engine pair | PLINK2 input | *N* PGS | Pearson *r* | Max \|Δ score\| |
 |---|---|---|---|---|
-| just-prs DuckDB ↔ just-prs Polars | fixed | 100 | 1.000000 | 5.7e-14 |
-| just-prs DuckDB ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
-| just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
-| just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21 |
-| just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21 |
+| just-prs DuckDB ↔ just-prs Polars | fixed | 100 | 1.000000 | 5.68e-14 |
+| just-prs DuckDB ↔ PLINK2 | fixed | 100 | 0.999997 | 0.501 |
+| just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.501 |
+| just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
+| just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
 
 ## Numbers quoted in the text
 

@@ -314,7 +314,7 @@ def paper_table4() -> str:
         ["RAM", f"{m['ram_bytes'] / 2**30:.0f} GiB"],
         ["Storage", f"{'HDD' if disk['rotational'] else 'SATA SSD'} (data, caches and outputs)"],
         ["OS", f"Linux {m['kernel'].split('-')[0]}"],
-        ["Generation II", f"Just-DNA-Lite {c['packages']['just-dna-lite']}, {len(env['modules'])} modules (Table S2)"],
+        ["Generation II", f"Just-DNA-Lite {c['packages']['just-dna-lite']}, {len(env['modules'])} modules (versions and digests as in Table S4)"],
         ["Generation I", f"OakVar {env['generation_i']['oakvar']} in Docker (Table S2)"],
     ]
     for g in GENOMES:
@@ -339,7 +339,7 @@ def paper_table6() -> str:
             xb = [float(by_id[i][b]["score"]) for i in ids]
             diff = max(abs(p - q) for p, q in zip(xa, xb))
             rows.append([f"{ENGINE_LABEL[a]} ↔ {ENGINE_LABEL[b]}", config, str(len(ids)),
-                         f"{pearson(xa, xb):.6f}", f"{diff:.2g}"])
+                         f"{pearson(xa, xb):.6f}", f"{diff:.3g}"])
     return table(["Engine pair", "PLINK2 input", "*N* PGS", "Pearson *r*", "Max \\|Δ score\\|"], rows)
 
 

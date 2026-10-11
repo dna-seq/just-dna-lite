@@ -201,7 +201,7 @@ We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the
 <!-- @/rev R15 -->
 
 <!-- @rev B24 rounds=1 by=claude:2026-10-11 -->
-Each genome was annotated with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the like-for-like comparison. A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the runs of each genome were interleaved in a seeded random order. Generation I ran OakVar 2.13.1, the current release, with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator (versions in Supplementary S2). All runs, Generation I included, used the same workstation.
+Each genome was annotated with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the like-for-like comparison. A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the runs of each genome were interleaved in a seeded random order. Generation I ran OakVar 2.13.1, the latest release at the time (published 2026-08-30), with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator (versions in Supplementary S2). All runs, Generation I included, used the same workstation.
 <!-- @/rev B24 -->
 
 <!-- @rev C22 rounds=1 by=claude:2026-10-11 -->
@@ -251,7 +251,7 @@ Each genome was annotated with the ten modules of Table 1, with Ensembl annotati
 | RAM | 63 GiB |
 | Storage | SATA SSD (data, caches and outputs) |
 | OS | Linux 7.2.9 |
-| Generation II | Just-DNA-Lite 0.3.25, 10 modules (Table S2) |
+| Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
 | Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
 | Input: second caller | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
@@ -289,15 +289,15 @@ PLINK2's input was built in two ways. The *original* input is the one the just-p
 
 | Engine pair | PLINK2 input | *N* PGS | Pearson *r* | Max \|Δ score\| |
 |---|---|---|---|---|
-| just-prs DuckDB ↔ just-prs Polars | fixed | 100 | 1.000000 | 5.7e-14 |
-| just-prs DuckDB ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
-| just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
-| just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21 |
-| just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21 |
+| just-prs DuckDB ↔ just-prs Polars | fixed | 100 | 1.000000 | 5.68e-14 |
+| just-prs DuckDB ↔ PLINK2 | fixed | 100 | 0.999997 | 0.501 |
+| just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.501 |
+| just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
+| just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
 <!-- @/rev C26 -->
 
 <!-- @rev C27 rounds=1 by=claude:2026-10-11 -->
-DuckDB and Polars agreed to within 6 × 10⁻¹⁴ on this input. Because both engines compute the same weighted sum and differ only in how the join is executed, their agreement checks the implementation, not the method. With the fixed input, scores agreed closely with the external PLINK2 comparator (Pearson r = 0.999997; maximum absolute score difference 0.50); with the original input, r was 0.999859 and the maximum difference 21.4. The workflows differ in variant identification. just-prs joins on chromosome and position and counts the effect allele if it equals the reference or alternate allele, otherwise a dosage of zero, with no strand flipping; PLINK2 matches exact chr:pos:ref:alt identifiers. The routes can therefore include different variants (chrX, multi-allelic sites, positions where the alleles disagree), so score differences can remain despite the same weighted-sum calculation. The comparison concerns this PLINK2 configuration, not a general limitation of the tool. Correlation here measures agreement across scores for one genome; it does not measure rankings across individuals. Supplementary S3 reports each engine's memory, which is measured differently for the in-process engines and for PLINK2.
+DuckDB and Polars agreed to within 5.68 × 10⁻¹⁴ on this input. Because both engines compute the same weighted sum and differ only in how the join is executed, their agreement checks the implementation, not the method. With the fixed input, scores agreed closely with the external PLINK2 comparator (Pearson r = 0.999997; maximum absolute score difference 0.501); with the original input, r was 0.999859 and the maximum difference 21.4. The workflows differ in variant identification. just-prs joins on chromosome and position and counts the effect allele if it equals the reference or alternate allele, otherwise a dosage of zero, with no strand flipping; PLINK2 matches exact chr:pos:ref:alt identifiers. The routes can therefore include different variants (chrX, multi-allelic sites, positions where the alleles disagree), so score differences can remain despite the same weighted-sum calculation. The comparison concerns this PLINK2 configuration, not a general limitation of the tool. Correlation here measures agreement across scores for one genome; it does not measure rankings across individuals. Supplementary S3 reports each engine's memory, which is measured differently for the in-process engines and for PLINK2.
 <!-- @/rev C27 -->
 
 <!-- @rev B31 rounds=1 by=claude:2026-10-11 -->
@@ -430,7 +430,7 @@ Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-co
 **S1. Generation I: OakVar-Based Just-DNA-Seq Platform.** Architecture, pipeline, module types, and repository table for the OakVar-based Generation I system (see combined-manuscript supplement for full detail).
 
 <!-- @rev B28 rounds=1 by=claude:2026-10-11 -->
-**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4: 6,005.4, 6,068.5 and 5,889.3 s on the primary genome, 5,995.5 s on the calibration genome) with their peak memory; OakVar's own step times (on the primary genome the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators (just_cancer to just_vo2max, 0.1.0 to 0.1.2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), which the v0.3 draft compared with. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
+**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4: 6,005.4, 6,068.5 and 5,889.3 s on the primary genome, 5,995.5 s on the calibration genome) with their peak memory; OakVar's own step times (on the primary genome the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators (just_cancer to just_vo2max, 0.1.0 to 0.1.2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
 <!-- @/rev B28 -->
 
 <!-- @rev B32 rounds=1 by=claude:2026-10-11 -->

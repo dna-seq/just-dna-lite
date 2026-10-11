@@ -344,3 +344,10 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
 - Two `full` runs were slow (primary #1, 50.8 s; second_caller #5, 81.0 s): annotation and report took
   about twice as long at lower CPU% (250–270% against about 345–385%), normalization barely changed. A
   transient contention, not a code path; the tables give the median and range per the plan.
+- The paper's Sections 4.1, 4.2, S2, S3 and one Conclusion clause were rewritten from `tables.md`
+  (commit 4a77f7b and the fix after it). Tables 2–6 are pasted from its "As printed in the paper"
+  section and checked equal to it; every number in the new prose appears in `tables.md`,
+  `inputs.json` or `env.json` (memory is quoted in MB for that reason). `@rev` ids: B22–B25, B27–B32,
+  C22, C23, C26, C27, and A3a–A3c for text no review comment covers. B26 is moot (no single cold-start
+  row remains). Table 4 stays, since C24 (delete it) is still the user's decision. The ten Generation
+  II modules match Table S4 in version and digest.
