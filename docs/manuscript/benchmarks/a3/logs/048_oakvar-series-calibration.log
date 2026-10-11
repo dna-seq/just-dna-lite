@@ -1,0 +1,9 @@
+# step 48: oakvar-series-calibration
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool oakvar --genome calibration --vcf /data/a3-bench/inputs/newton/newtonwinter.GRCh38.ens106.deep.vcf.gz --series-dir /data/a3-bench/series/20261011T0810/oakvar/calibration --no-warmup --cold 0 --warm 0 --full 1 --oakvar-args -a dbsnp clinvar omim ncbigene pubmed gnomad sift cardioboost -p just_cancer just_cardio just_coronary just_drugs just_longevitymap just_lipidmetabolism just_thrombophilia just_superhuman just_vo2max -t longevity2reporter 
+# start: 2026-10-11T13:09:42+02:00
+schedule (oakvar, calibration, seed 20261010): full
+  load 1.60 > 1.5, waiting
+[0] full1 load=1.03 start=2026-10-11T11:10:12+00:00
+    exit=0 cli=5995.528s job=Nones peak=3837.5MB cpu=None%
+# end: 2026-10-11T14:50:08+02:00 exit=0

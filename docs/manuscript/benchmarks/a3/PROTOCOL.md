@@ -292,3 +292,34 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
 - Timed runs: [`queue/50-oakvar-annotation.sh`](queue/50-oakvar-annotation.sh), 3 runs on the
   primary genome then 1 on the calibration genome, each a fresh job directory, no cache drop
   (`full`), started straight after this check at the user's request rather than at 03:00.
+
+### Generation I timed runs (2026-10-11, 08:10–14:50)
+
+- Queue unit `bench-queue-oakvar` (started 08:10:19 at load 0.53 by the same `run-queue.sh`, which
+  skipped 25/30/40 as done) ran [`queue/50-oakvar-annotation.sh`](queue/50-oakvar-annotation.sh),
+  image `jdl-bench-oakvar:2.13.1` (`sha256:5d17f590f6f3…`), exit 0 at 14:50:08.
+- **47** `oakvar-series-primary` (4 h 59 min): 3 `full` runs, each a fresh job directory: 6,005.4 s,
+  6,068.5 s, 5,889.3 s (load before: 0.53, 1.28, 1.28). Peak RSS of the container's process tree
+  4,610 MB in all three.
+- **48** `oakvar-series-calibration` (1 h 40 min): 1 `full` run, 5,995.5 s (load 1.60 at first, so the
+  driver waited, then started at 1.03). Peak RSS 3,838 MB.
+- Every run ended `finished normally`. No traceback. The only `err.` lines are `vcf-converter`'s
+  `No alternate allele` skips of DeepVariant RefCall records (1,418,835 on the primary genome, the
+  same on every run); Generation II drops the same records through `pass_filters`. All 9 `just_*`
+  postaggregators ran on every run. Each primary run log contains "error" about 1,760 times and
+  "failed" 820 times, all inside the converter's row dumps of RefSeq gene descriptions ("an inborn error of …").
+- Output, identical across the three primary runs: 4,727,413 variants and 54,465 genes in the result
+  database (calibration: 4,804,600 and 54,395).
+- The reporter logs `No module just_prs`: the Longevity2 reporter reads Generation I's PRS
+  postaggregator when present. It was not in the run's module set (nor installed), so the report has
+  no PRS section; Generation II's annotation series has no PRS step either (PRS is benchmarked apart,
+  job 25), so the comparison stays like-for-like. The reporter step is 0.25 s because it renders from
+  the postaggregators' own databases.
+- Step and module timings, from OakVar's own log lines, are in
+  [`oakvar/steps-20261011T0810.tsv`](oakvar/steps-20261011T0810.tsv), extracted by
+  [`oakvar/extract_steps.sh`](oakvar/extract_steps.sh) (the 6-million-line container logs stay in
+  `/data/a3-bench/series/20261011T0810/oakvar/`, not committed). On the primary genome about 40% of
+  the time is the postaggregator step (the `just_*` modules and tagsampler/vcfinfo), 28% the
+  annotators, 17% the mapper, 8% the converter and 7% the aggregator.
+- Loads 1.0–1.3 during the day runs are above the night series' typical idle level; they stayed under
+  the 1.5 gate. Treat the three primary runs' spread (SD about 90 s, 1.5%) as including that.

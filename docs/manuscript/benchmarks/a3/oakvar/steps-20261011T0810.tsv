@@ -1,0 +1,97 @@
+genome	run	kind	name	seconds
+calibration	00_full1	step	converter	452.411
+calibration	00_full1	step	preparer	0.000
+calibration	00_full1	step	mapper	1002.465
+calibration	00_full1	step	annotator	1740.774
+calibration	00_full1	module	Aggregator variant	356.951
+calibration	00_full1	module	Aggregator gene	1.107
+calibration	00_full1	module	Aggregator sample	51.410
+calibration	00_full1	module	Aggregator mapping	25.107
+calibration	00_full1	step	aggregator	434.580
+calibration	00_full1	module	tagsampler	251.441
+calibration	00_full1	module	vcfinfo	169.398
+calibration	00_full1	module	just_cancer	86.475
+calibration	00_full1	module	just_cardio	30.651
+calibration	00_full1	module	just_coronary	144.472
+calibration	00_full1	module	just_drugs	25.892
+calibration	00_full1	module	just_longevitymap	267.694
+calibration	00_full1	module	just_lipidmetabolism	308.714
+calibration	00_full1	module	just_thrombophilia	327.707
+calibration	00_full1	module	just_superhuman	516.060
+calibration	00_full1	module	just_vo2max	233.595
+calibration	00_full1	step	postaggregator	2362.222
+calibration	00_full1	module	longevity2reporter	0.108
+calibration	00_full1	step	reporter	0.251
+calibration	00_full1	total	runtime	5992.793
+primary	00_full1	step	converter	488.702
+primary	00_full1	step	preparer	0.000
+primary	00_full1	step	mapper	1023.528
+primary	00_full1	step	annotator	1725.404
+primary	00_full1	module	Aggregator variant	368.369
+primary	00_full1	module	Aggregator gene	1.000
+primary	00_full1	module	Aggregator sample	47.368
+primary	00_full1	module	Aggregator mapping	27.297
+primary	00_full1	step	aggregator	444.039
+primary	00_full1	module	tagsampler	249.123
+primary	00_full1	module	vcfinfo	165.493
+primary	00_full1	module	just_cancer	87.789
+primary	00_full1	module	just_cardio	31.110
+primary	00_full1	module	just_coronary	143.721
+primary	00_full1	module	just_drugs	26.153
+primary	00_full1	module	just_longevitymap	264.863
+primary	00_full1	module	just_lipidmetabolism	302.268
+primary	00_full1	module	just_thrombophilia	321.488
+primary	00_full1	module	just_superhuman	500.803
+primary	00_full1	module	just_vo2max	227.467
+primary	00_full1	step	postaggregator	2320.356
+primary	00_full1	module	longevity2reporter	0.108
+primary	00_full1	step	reporter	0.246
+primary	00_full1	total	runtime	6002.326
+primary	01_full2	step	converter	483.262
+primary	01_full2	step	preparer	0.000
+primary	01_full2	step	mapper	1014.889
+primary	01_full2	step	annotator	1807.904
+primary	01_full2	module	Aggregator variant	339.589
+primary	01_full2	module	Aggregator gene	1.114
+primary	01_full2	module	Aggregator sample	57.486
+primary	01_full2	module	Aggregator mapping	27.438
+primary	01_full2	step	aggregator	425.631
+primary	01_full2	module	tagsampler	234.715
+primary	01_full2	module	vcfinfo	187.673
+primary	01_full2	module	just_cancer	88.482
+primary	01_full2	module	just_cardio	30.659
+primary	01_full2	module	just_coronary	143.336
+primary	01_full2	module	just_drugs	26.242
+primary	01_full2	module	just_longevitymap	264.722
+primary	01_full2	module	just_lipidmetabolism	300.833
+primary	01_full2	module	just_thrombophilia	318.542
+primary	01_full2	module	just_superhuman	510.907
+primary	01_full2	module	just_vo2max	227.322
+primary	01_full2	step	postaggregator	2333.471
+primary	01_full2	module	longevity2reporter	0.107
+primary	01_full2	step	reporter	0.249
+primary	01_full2	total	runtime	6065.456
+primary	02_full3	step	converter	485.893
+primary	02_full3	step	preparer	0.000
+primary	02_full3	step	mapper	1028.777
+primary	02_full3	step	annotator	1508.046
+primary	02_full3	module	Aggregator variant	347.780
+primary	02_full3	module	Aggregator gene	1.543
+primary	02_full3	module	Aggregator sample	56.522
+primary	02_full3	module	Aggregator mapping	27.453
+primary	02_full3	step	aggregator	433.303
+primary	02_full3	module	tagsampler	249.325
+primary	02_full3	module	vcfinfo	166.771
+primary	02_full3	module	just_cancer	85.895
+primary	02_full3	module	just_cardio	30.617
+primary	02_full3	module	just_coronary	144.597
+primary	02_full3	module	just_drugs	25.777
+primary	02_full3	module	just_longevitymap	268.891
+primary	02_full3	module	just_lipidmetabolism	303.261
+primary	02_full3	module	just_thrombophilia	332.778
+primary	02_full3	module	just_superhuman	594.218
+primary	02_full3	module	just_vo2max	228.193
+primary	02_full3	step	postaggregator	2430.437
+primary	02_full3	module	longevity2reporter	0.111
+primary	02_full3	step	reporter	0.252
+primary	02_full3	total	runtime	5886.792
