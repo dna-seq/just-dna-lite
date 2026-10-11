@@ -184,3 +184,26 @@ The OakVar image pins the code to May 2023, but the annotator databases are down
 OakVar store; most of OakVar's runtime is lookups in them. The paper labels the run "2023 code, 2026
 annotation data" and reports the annotator versions installed (recorded at install time) next to its
 timing. The user notes the `just_*` modules changed little since 2023 (bug fixes only).
+
+### Generation I switched to the current OakVar (2026-10-11, 04:50)
+
+- The user ruled: run the **current** OakVar first, and step down to a 2025, 2024 or 2023 release
+  only if the `just_*` modules fail on it ("OakVar is frail as it is"). The May 2023 build stays in
+  the Dockerfile as that fallback.
+- Before that, a probe of `store.oakvar.com` showed the 2.9.15 client's endpoints still answer
+  (`/account/login`, `/fetch_summary`, `/fetch_versions`, `/fetch_conf/…`, `/urls/…` all reply
+  "not logged in" or name the missing login field, none 404). The 2.9.15 login attempt failed only
+  because that store account was not yet verified.
+- **31** `build-oakvar-image-2.13.1`: OakVar 2.13.1 (published 2026-08-30, latest on 2026-10-11),
+  dependencies resolved as of 2026-08-31 (`--exclude-newer`). Resolving as of the build day pulled
+  polars 2.0.0 (released 2026-10-06), a major version OakVar was never released against, so the
+  cut-off is OakVar's own release date, the same rule as the 2023 build. Resolved: polars 1.44.1,
+  duckdb 1.5.5, numpy 2.2.6, mako 1.4.1.
+- Modules: [`oakvar/modules-current.tsv`](oakvar/modules-current.tsv), each repo's latest commit on
+  2026-10-11. The current `longevity2reporter` (0.4.3) also requires `just_vo2max`, so the current
+  set is the reporter plus 9 postaggregators; the 2023 set ([`oakvar/modules.tsv`](oakvar/modules.tsv))
+  had 8. Annotators they require: dbsnp, clinvar, omim, ncbigene, pubmed, gnomad, sift, cardioboost
+  (only the current `just_cardio`), and vcfinfo.
+- A fresh OakVar home for this version, `/data/a3-bench/oakvar/home-2.13.1`, so nothing written by
+  the 2.9.15 login attempt mixes in.
+- The paper labels the run with the OakVar version and module commits that actually ran.

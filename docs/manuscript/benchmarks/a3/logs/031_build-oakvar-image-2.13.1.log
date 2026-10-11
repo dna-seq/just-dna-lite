@@ -1,0 +1,113 @@
+# step 31: build-oakvar-image-2.13.1
+# cwd: /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3
+# cmd: bash -c docker\ build\ -t\ jdl-bench-oakvar:2.13.1\ --build-arg\ OAKVAR_VERSION=2.13.1\ --build-arg\ EXCLUDE_NEWER=2026-08-31T00:00:00Z\ oakvar\ \&\&\ docker\ image\ inspect\ jdl-bench-oakvar:2.13.1\ --format\ \"\{\{.Id\}\}\"\ \&\&\ docker\ run\ --rm\ --entrypoint\ cat\ jdl-bench-oakvar:2.13.1\ /pip-freeze.txt 
+# start: 2026-10-11T04:54:30+02:00
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.92kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370
+#2 DONE 0.1s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#3 DONE 0.1s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [stage-0 1/4] FROM docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370
+#5 resolve docker.io/library/python:3.10-slim-bookworm@sha256:5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370 0.1s done
+#5 DONE 0.1s
+
+#6 FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#6 resolve ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#6 resolve ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 0.1s done
+#6 DONE 0.1s
+
+#7 [stage-0 2/4] COPY --from=ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /usr/local/bin/uv
+#7 CACHED
+
+#8 [stage-0 3/4] RUN uv pip install --system --no-cache --exclude-newer "2026-08-31T00:00:00Z"         "oakvar==2.13.1" mako     && uv pip freeze --system > /pip-freeze.txt
+#8 CACHED
+
+#9 [stage-0 4/4] WORKDIR /work
+#9 CACHED
+
+#10 exporting to image
+#10 exporting layers done
+#10 exporting manifest sha256:9557c66e84ea193fadee36f3628a531698a7d1d2865bb5df57dfe4d6645dbf0d done
+#10 exporting config sha256:2c974f5cc443b4f8feb5756165d07897f77e9c455221e1eae31cbab293eed893 done
+#10 exporting attestation manifest sha256:f26e6286cce9922291403232acbffecc4edc9f42b80799654ea4c9aa5ef050db
+#10 exporting attestation manifest sha256:f26e6286cce9922291403232acbffecc4edc9f42b80799654ea4c9aa5ef050db 0.1s done
+#10 exporting manifest list sha256:a4044d069339df2573234456da2f5d73a281b24a9c74cca8e4aa69f073891b57 0.1s done
+#10 naming to docker.io/library/jdl-bench-oakvar:2.13.1
+#10 naming to docker.io/library/jdl-bench-oakvar:2.13.1 done
+#10 unpacking to docker.io/library/jdl-bench-oakvar:2.13.1 0.0s done
+#10 DONE 0.3s
+sha256:a4044d069339df2573234456da2f5d73a281b24a9c74cca8e4aa69f073891b57
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiohttp-cors==0.8.1
+aiosignal==1.4.0
+aiosqlite==0.22.1
+async-timeout==5.0.1
+attrs==26.1.0
+beautifulsoup4==4.15.0
+certifi==2026.7.22
+chardet==5.2.0
+charset-normalizer==3.5.1
+connectorx==0.4.5
+dill==0.4.1
+download==0.3.5
+duckdb==1.5.5
+filelock==3.32.4
+frozenlist==1.8.0
+gdown==6.1.0
+idna==3.19
+intervaltree==3.2.1
+liftover==1.4.1
+mako==1.4.1
+markdown==3.10.3
+markdown-it-py==4.2.0
+markupsafe==3.0.3
+mdurl==0.1.2
+mpmath==1.4.1
+multidict==6.7.1
+multiprocess==0.70.19
+nest-asyncio==1.6.0
+numpy==2.2.6
+oakvar==2.13.1
+oyaml==1.0
+packaging==26.3
+pillow==12.3.0
+pip==23.0.1
+polars==1.44.1
+polars-runtime-32==1.44.1
+propcache==0.5.2
+psutil==7.2.2
+pyarrow==25.0.1
+pygments==2.21.0
+pyjwt==2.13.0
+pysimplegui==6.3.0.1
+pysocks==1.7.1
+python-dateutil==2.9.0.post0
+pyyaml==6.0.3
+requests==2.34.2
+requests-toolbelt==1.0.0
+rich==15.0.0
+setuptools==84.0.0
+six==1.17.0
+sortedcontainers==2.4.0
+soupsieve==2.9.2
+split-file-reader==0.1.4
+tqdm==4.70.0
+twobitreader==4.0.2
+typing-extensions==4.16.0
+ujson==5.13.0
+urllib3==2.7.0
+wheel==0.46.3
+yarl==1.24.5
+# end: 2026-10-11T04:54:32+02:00 exit=0

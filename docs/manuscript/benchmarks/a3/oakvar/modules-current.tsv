@@ -1,0 +1,11 @@
+name	kind	repo	commit	commit_date	version
+longevity2reporter	reporter	dna-seq/longevity2reporter	f591b2a5f424131e00bb78f6d18378dbae97727e	2025-03-05T04:10:23Z	0.4.3
+just_cardio	postaggregator	dna-seq/just_cardio	39453e1ea417c359d06b8fb793837b9158f06b57	2026-04-11T21:30:57Z	0.1.1
+just_cancer	postaggregator	dna-seq/just_cancer	98e75868933da0d45e9dce541075931996dd93f3	2026-04-11T21:30:03Z	0.1.0
+just_coronary	postaggregator	dna-seq/just_coronary	c565a92453db550f0775f62da0a682722e351a90	2024-10-31T01:51:08Z	0.1.2
+just_drugs	postaggregator	dna-seq/just_drugs	bf40013030604e39ac6eb4a5a1e96cd730b16ecb	2024-10-31T01:45:34Z	0.1.0
+just_longevitymap	postaggregator	dna-seq/just_longevitymap	debb5f8dcf0c32f8915d8c8c11546ac792195bf6	2025-03-05T04:01:05Z	0.2.0
+just_lipidmetabolism	postaggregator	dna-seq/just_lipidmetabolism	607236442ddc3b3c6ab014a909e975a4e19b8ad9	2024-10-31T01:41:10Z	0.1.1
+just_thrombophilia	postaggregator	dna-seq/just_thrombophilia	afac35c9a34b1bc93f6faf7660bf85bd27dcef0c	2026-04-11T21:28:34Z	0.2.0
+just_superhuman	postaggregator	dna-seq/just_superhuman	0c4ac89f314cb8b9b51386ef1d48be3c91fbf5a6	2024-11-13T00:41:34Z	0.1.0
+just_vo2max	postaggregator	dna-seq/just_vo2max	e7284d53bd8fc8c60ffeb59055f455e327933c70	2024-10-31T01:46:58Z	0.1.2
