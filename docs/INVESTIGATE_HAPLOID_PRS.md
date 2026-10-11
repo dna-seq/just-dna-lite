@@ -40,3 +40,12 @@ the regression test (step 3 above) and close this note.
 haploid GT, where it used to give `[]`. just-dna-lite does not call `normalize_vcf`, since annotation reads
 its own `user_vcf_normalized` parquet, so annotation is unaffected. Only just-prs's cached normalized
 parquets carry the old value until re-normalized.
+
+## Update 2026-10-11 (later): the "haploid counts as 2" rule is withdrawn
+
+The user rejected scoring a haploid GT as homozygous. just-prs commit 743a9b4 (unreleased, to be
+0.10.3) counts a one-allele GT (`1`) as 0 or 1 copies in both engines, and `normalize_vcf` gives `[G]`,
+not `[a, a]`. The section above describes 0.10.2 only. Paper 1 must not say just-prs follows PLINK2's
+`--xchr-model 2`. Pin `>=0.10.3` instead of 0.10.2 when it is published. Measured by the just-prs
+session: no change for antonkulaga or Livia's VCF, neither of which has a haploid GT on X or Y. just-prs
+is adding sex inference so a male's diploid-written X/Y calls score one copy.

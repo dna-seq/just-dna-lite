@@ -171,8 +171,10 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
 - After the reboot all four input VCFs still match their md5 in `inputs.json`.
 - The user asked for the annotation series to run after the PRS jobs, so the job is renamed
   `30-jdl-annotation.sh` and runs only `second_caller community_reference calibration`
-  (`run_jdl_series.sh` now takes genome names). New order: 20 → 25 → 30, OakVar last. The old job
+  (`run_jdl_series.sh` now takes genome names). Order at that point: 20 → 25 → 30, OakVar last. The old job
   file and its log are kept in `/data/bench-queue/aborted/`.
+- just-prs's session renamed its job to `40-just-prs-engines.sh` (the user: the just-dna-lite bench
+  runs first), so the order is 25 → 30 → 40, OakVar after that.
 - Re-armed the same way for **05:00 the same night** (`--on-calendar='2026-10-11 05:00:00'`); the
   load gates hold each job until the machine is quiet.
 
