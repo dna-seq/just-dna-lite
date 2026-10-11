@@ -173,6 +173,8 @@ Large data (inputs, OakVar home, Dagster homes, outputs) lives outside the repo 
   `30-jdl-annotation.sh` and runs only `second_caller community_reference calibration`
   (`run_jdl_series.sh` now takes genome names). New order: 20 → 25 → 30, OakVar last. The old job
   file and its log are kept in `/data/bench-queue/aborted/`.
+- Re-armed the same way for **05:00 the same night** (`--on-calendar='2026-10-11 05:00:00'`); the
+  load gates hold each job until the machine is quiet.
 
 ### Generation I: 2023 code, 2026 annotation data (2026-10-11)
 
