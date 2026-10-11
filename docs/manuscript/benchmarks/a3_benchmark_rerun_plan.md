@@ -92,10 +92,15 @@ reachable, so the run is a **reconstruction** from the published `just_*` module
 (`a3/oakvar/`), labelled as such. The 2023 numbers above stay as their own historical row. Every step
 is recorded in [`a3/PROTOCOL.md`](a3/PROTOCOL.md).
 
-The reconstruction pins the **code** to May 2023, but the annotator databases (dbsnp, gnomad, clinvar
-and the rest), where most of OakVar's time goes, come from today's OakVar store. The paper labels the
-run "2023 code, 2026 annotation data" and reports the installed annotator versions beside the timing.
-The `just_*` modules themselves changed little since 2023 (bug fixes only).
+**Amended 2026-10-11: the run uses the current OakVar, not 2023 code.** At the user's direction
+("try with current oakvar first; downgrade only if our modules fail"), Generation I ran on OakVar
+2.13.1, with every module (the annotators, the `just_*` postaggregators and the reporter) installed
+from today's OakVar store; the May 2023 build stays in the Dockerfile as an unused fallback. The image
+adds one compatibility line (`reverse_complement` re-exported from `cravat.util`), because the store's
+dbsnp annotator imports a name no OakVar release exports (PROTOCOL.md, steps 42–46). The paper labels
+the run "OakVar 2.13.1 with a one-line compatibility re-export, 2026 store modules and annotation data"
+and lists the installed module versions (generated S2). The `just_*` modules changed little since 2023
+(bug fixes only).
 
 ## PRS benchmark (Section 4.2)
 

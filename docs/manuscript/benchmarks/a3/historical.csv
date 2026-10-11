@@ -1,0 +1,6 @@
+tool,genome,run_type,date,n,value_s,mean_s,sem_s,sd_s,source
+oakvar,calibration,full,2023-02-17,1,5651,,,,"paper v0.3 S2 (Generation I run on the old workstation: Xeon E5-2667 v4, 128 GB, HDD array)"
+oakvar,calibration,full,2023-02-19,1,6803,,,,"paper v0.3 S2 (Generation I run on the old workstation: Xeon E5-2667 v4, 128 GB, HDD array)"
+oakvar,calibration,full,2023-05-07,1,7662,,,,"paper v0.3 S2 (Generation I run on the old workstation: Xeon E5-2667 v4, 128 GB, HDD array)"
+jdl,calibration,normal,,11,,38.9,3.3,10.9,"paper v0.3 Table 2, 'normal' (old workstation; per-run times not kept)"
+jdl,calibration,cold_start,,3,,203.3,9.0,15.5,"paper v0.3 Table 2, 'cold start' (old workstation; per-run times not kept)"

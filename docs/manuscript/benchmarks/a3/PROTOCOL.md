@@ -323,3 +323,24 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   annotators, 17% the mapper, 8% the converter and 7% the aggregator.
 - Loads 1.0–1.3 during the day runs are above the night series' typical idle level; they stayed under
   the 1.5 gate. Treat the three primary runs' spread (SD about 90 s, 1.5%) as including that.
+
+### Analysis (2026-10-11, after the timed runs)
+
+- [`scripts/make_env.py`](scripts/make_env.py) writes [`env.json`](env.json) from the committed logs
+  only: the machine from step 1's snapshot, the code from the worktree commit (step 2) and the
+  package versions from step 3's `uv sync`, the Generation II module versions and digests from the
+  registry downloads (steps 14–23), the OakVar image id from step 44 and the PRS tool versions from
+  each `metadata.json`. The `uv.lock` hash is that of commit `bb4b294`, which the worktree used
+  unmodified; step 1 hashed the main checkout's lock, which held another session's uncommitted edit
+  at that moment.
+- [`scripts/make_tables.py`](scripts/make_tables.py) writes [`tables.md`](tables.md) (Tables 2–6,
+  S2, S3) from `runs.csv`, `inputs.json`, `env.json`, `historical.csv`, the OakVar step TSV and the
+  PRS results. [`historical.csv`](historical.csv) holds the v0.3 paper's 2023 numbers (OakVar's three
+  runs from S2, Generation II's "normal" and "cold start" summaries from Table 2) with their source;
+  they are not reproducible, only carried.
+- The `ensembl` run is labelled `full + Ensembl` in the tables: it runs `annotate_all_job`, which
+  normalizes again (15.4 s) and verifies the Ensembl cache (34.3 s) before the join (29.0 s), so it
+  is not a warm-state run as the driver's docstring says.
+- Two `full` runs were slow (primary #1, 50.8 s; second_caller #5, 81.0 s): annotation and report took
+  about twice as long at lower CPU% (250–270% against about 345–385%), normalization barely changed. A
+  transient contention, not a code path; the tables give the median and range per the plan.
