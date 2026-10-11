@@ -286,6 +286,110 @@ def s3(config: str) -> str:
             + table(["Engine", "Memory method", "Median, MB (all IDs)", "Max, MB"], mem_rows))
 
 
+def paper_table3(runs) -> str:
+    """Table 3 as printed in the paper: the full runs (like-for-like with OakVar) and Generation I."""
+    rows = []
+    for g in GENOMES:
+        rs = runs[("jdl", g, "full")]
+        pk = col(rs, "peak_rss_mb")
+        rows.append([GENOME_LABEL[g].split(" (")[0], "Generation II, full", str(len(rs)),
+                     *(f(st.median(col(rs, c))) for c in ("normalize_s", "annotate_s", "report_s")),
+                     f(st.median(pk), 0), f(max(pk), 0), f(st.median(col(rs, "cpu_pct")), 0)])
+        oak = runs.get(("oakvar", g, "full"))
+        if oak:
+            pk = col(oak, "peak_rss_mb")
+            rows.append([GENOME_LABEL[g].split(" (")[0], "Generation I", str(len(oak)), "—", "—", "—",
+                         f(st.median(pk), 0), f(max(pk), 0), "—"])
+    return table(["Genome", "Run", "*n* (runs)", "Normalize (s)", "Annotate (s)", "Report (s)",
+                  "Peak RAM, median (MB)", "Peak RAM, max (MB)", "CPU (%)"], rows)
+
+
+def paper_table4() -> str:
+    env = json.loads((A3 / "env.json").read_text())
+    m, c = env["machine"], env["code"]
+    disk = m["data_mount"]["disk"]
+    inputs = json.loads((A3 / "inputs.json").read_text())
+    rows = [
+        ["CPU", f"{m['cpu_model'].replace(' 8-Core Processor', '')} ({m['cores']} cores, {m['threads']} threads)"],
+        ["RAM", f"{m['ram_bytes'] / 2**30:.0f} GiB"],
+        ["Storage", f"{'HDD' if disk['rotational'] else 'SATA SSD'} (data, caches and outputs)"],
+        ["OS", f"Linux {m['kernel'].split('-')[0]}"],
+        ["Generation II", f"Just-DNA-Lite {c['packages']['just-dna-lite']}, {len(env['modules'])} modules (Table S2)"],
+        ["Generation I", f"OakVar {env['generation_i']['oakvar']} in Docker (Table S2)"],
+    ]
+    for g in GENOMES:
+        d = inputs[g]
+        caller = next((h.split("=", 1)[1] for h in d["caller_headers"] if h.startswith("##DeepVariant_version=")), None)
+        caller = f"DeepVariant {caller}" if caller else "DRAGEN " + next(
+            h.split('Version="SW: ')[1].split(",")[0] for h in d["caller_headers"] if "ID=dragen," in h)
+        rows.append([f"Input: {GENOME_LABEL[g].split(' (')[0].lower()}",
+                     f"{d['records']:,} records ({d['snv_records']:,} SNVs), {caller}, GRCh38"])
+    return table(["Parameter", "Value"], rows)
+
+
+def paper_table6() -> str:
+    rows = []
+    for config in ("fixed", "original"):
+        by_id = load_prs(config)
+        for a, b in (("duckdb", "polars"), ("duckdb", "plink2"), ("polars", "plink2")):
+            if config == "original" and a == "duckdb" and b == "polars":
+                continue
+            ids = sorted(i for i, d in by_id.items() if scored(d[a]) and scored(d[b]))
+            xa = [float(by_id[i][a]["score"]) for i in ids]
+            xb = [float(by_id[i][b]["score"]) for i in ids]
+            diff = max(abs(p - q) for p, q in zip(xa, xb))
+            rows.append([f"{ENGINE_LABEL[a]} ↔ {ENGINE_LABEL[b]}", config, str(len(ids)),
+                         f"{pearson(xa, xb):.6f}", f"{diff:.2g}"])
+    return table(["Engine pair", "PLINK2 input", "*N* PGS", "Pearson *r*", "Max \\|Δ score\\|"], rows)
+
+
+def plink2_failures(config: str) -> list[tuple[str, str]]:
+    out = []
+    for i, d in sorted(load_prs(config).items()):
+        if not scored(d["plink2"]):
+            log = next(A3.glob(f"prs/results-*/{config}/plink2_runs/{i}.log")).read_text()
+            err = " ".join(log.split("Error:", 1)[1].split())[:90]
+            out.append((i, err))
+    return out
+
+
+def quoted(runs) -> str:
+    """Every number the paper's prose quotes, with where it comes from."""
+    med = lambda k: st.median(col(runs[k], "cli_wall_s"))  # noqa: E731
+    lines = []
+    for g in ("primary", "calibration"):
+        oak = med(("oakvar", g, "full"))
+        lines += [
+            f"- {g}: Generation I median {f(oak)} s; Generation II full median {f(med(('jdl', g, 'full')))} s, "
+            f"cold {f(med(('jdl', g, 'cold')))} s, warm {f(med(('jdl', g, 'warm')))} s; ratios full "
+            f"{oak / med(('jdl', g, 'full')):.0f}×, cold {oak / med(('jdl', g, 'cold')):.0f}×, "
+            f"warm {oak / med(('jdl', g, 'warm')):.0f}× (warm is not like-for-like)",
+        ]
+    full_pk = [x for g in GENOMES for x in col(runs[("jdl", g, "full")], "peak_rss_mb")]
+    prim_pk = [x for t in JDL_TYPES for x in col(runs[("jdl", "primary", t)], "peak_rss_mb")]
+    lines += [
+        f"- Generation II peak RAM, primary genome, all warm/full/cold runs: {f(min(prim_pk), 0)}–{f(max(prim_pk), 0)} MB",
+        f"- Generation II peak RAM, every full run on every genome: max {f(max(full_pk), 0)} MB",
+        f"- Generation II peak RAM, every warm/full/cold run on every genome: max "
+        f"{f(max(x for g in GENOMES for t in JDL_TYPES for x in col(runs[('jdl', g, t)], 'peak_rss_mb')), 0)} MB",
+        f"- Generation I peak RAM, primary: max {f(max(col(runs[('oakvar', 'primary', 'full')], 'peak_rss_mb')), 0)} MB",
+        f"- Ensembl run (primary): wall {f(col(runs[('jdl', 'primary', 'ensembl')], 'cli_wall_s')[0])} s, "
+        f"peak {f(col(runs[('jdl', 'primary', 'ensembl')], 'peak_rss_mb')[0], 0)} MB",
+    ]
+    for config in ("fixed", "original"):
+        by_id = load_prs(config)
+        for e in ENGINES:
+            fr = [int(d[e]["variants_matched"]) / int(d[e]["variants_total"]) for d in by_id.values() if scored(d[e])]
+            lines.append(f"- PRS {config}, {e}: matched / total per ID, median {100 * st.median(fr):.0f}% "
+                         f"(range {100 * min(fr):.0f}–{100 * max(fr):.0f}%), n={len(fr)}")
+        for i, err in plink2_failures(config):
+            lines.append(f"- PRS {config}: PLINK2 failed on {i}: {err}")
+    meta = json.loads(next(A3.glob("prs/results-*/fixed/metadata.json")).read_text())
+    lines.append(f"- PRS input: {meta['normalized_rows']:,} PASS records; just-prs {meta['just_prs']}; "
+                 f"{meta['plink2_version']}; {len(meta['ids'])} IDs, warm-up {', '.join(meta['warmup_ids'])}")
+    return "\n".join(lines)
+
+
 def main() -> None:
     runs = load_runs()
     t2, ratios = table2(runs)
@@ -313,6 +417,13 @@ def main() -> None:
     parts += ["## S2. Generation I runs, steps, hardware factor and module versions", s2(runs)]
     for config in ("fixed", "original"):
         parts += [f"## S3 ({config}). Large scoring files: time and memory", s3(config)]
+    parts += ["# As printed in the paper",
+              "## Paper Table 2", t2,
+              "## Paper Table 3", paper_table3(runs),
+              "## Paper Table 4", paper_table4(),
+              "## Paper Table 5", table5("fixed"),
+              "## Paper Table 6", paper_table6(),
+              "## Numbers quoted in the text", quoted(runs)]
     (A3 / "tables.md").write_text("\n\n".join(parts) + "\n")
 
 

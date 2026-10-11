@@ -210,3 +210,96 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | just-prs DuckDB | process_rss_delta_10ms | 5.4 | 461 |
 | just-prs Polars | process_rss_delta_10ms | 1,346.4 | 4,087 |
 | PLINK2 | subprocess_peak_rss_100ms | 620.5 | 804 |
+
+# As printed in the paper
+
+## Paper Table 2
+
+| Genome / run | *n* | Median (min–max), s | Mean ± SEM, s | SD, s | Generation I ÷ this (medians) |
+|---|---|---|---|---|---|
+| **Primary (public, Zenodo 18370498)** |  |  |  |  |  |
+| Generation II, warm | 11 | 16.3 (16.2–17.2) | 16.4 ± 0.1 | 0.3 | — |
+| Generation II, full | 5 | 32.7 (31.9–50.8) | 36.8 ± 3.6 | 8.1 | 183× |
+| Generation II, cold | 3 | 35.9 (35.6–36.0) | 35.9 ± 0.1 | 0.2 | 167× |
+| Generation I (OakVar 2.13.1), full | 3 | 6,005.4 (5,889.3–6,068.5) | 5,987.7 ± 52.5 | 90.9 | 1× (ref.) |
+| **Second caller (public, Zenodo 19487816)** |  |  |  |  |  |
+| Generation II, warm | 11 | 20.2 (20.1–20.8) | 20.3 ± 0.1 | 0.2 | — |
+| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | — |
+| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | — |
+| **Community reference (HG002, DeepVariant case study)** |  |  |  |  |  |
+| Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
+| Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
+| Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
+| **Calibration (private, the 2023 benchmark file)** |  |  |  |  |  |
+| Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
+| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 181× |
+| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 163× |
+| Generation I (OakVar 2.13.1), full | 1 | 5,995.5 | — | — | 1× (ref.) |
+
+## Paper Table 3
+
+| Genome | Run | *n* (runs) | Normalize (s) | Annotate (s) | Report (s) | Peak RAM, median (MB) | Peak RAM, max (MB) | CPU (%) |
+|---|---|---|---|---|---|---|---|---|
+| Primary | Generation II, full | 5 | 15.4 | 10.4 | 1.8 | 2,224 | 2,270 | 376 |
+| Primary | Generation I | 3 | — | — | — | 4,610 | 4,611 | — |
+| Second caller | Generation II, full | 5 | 41.6 | 13.7 | 1.8 | 4,465 | 4,514 | 345 |
+| Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
+| Calibration | Generation II, full | 5 | 16.6 | 9.4 | 2.1 | 2,274 | 2,296 | 376 |
+| Calibration | Generation I | 1 | — | — | — | 3,838 | 3,838 | — |
+
+## Paper Table 4
+
+| Parameter | Value |
+|---|---|
+| CPU | AMD Ryzen 7 3800X (8 cores, 16 threads) |
+| RAM | 63 GiB |
+| Storage | SATA SSD (data, caches and outputs) |
+| OS | Linux 7.2.9 |
+| Generation II | Just-DNA-Lite 0.3.25, 10 modules (Table S2) |
+| Generation I | OakVar 2.13.1 in Docker (Table S2) |
+| Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
+| Input: second caller | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
+| Input: community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
+| Input: calibration | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
+
+## Paper Table 5
+
+| Engine | *N* scored | Median (all), s | Mean (all), s | Median (excl. 7 with ≥ 1M variants), s | PLINK2 median ÷ engine median | Median per-ID PLINK2 ÷ engine |
+|---|---|---|---|---|---|---|
+| just-prs DuckDB | 100 | 0.081 | 0.188 | 0.081 | 7.4× | 7.4× (n=100) |
+| just-prs Polars | 100 | 0.305 | 0.371 | 0.301 | 2.0× | 2.0× (n=100) |
+| PLINK2 | 100 | 0.602 | 0.754 | 0.602 | 1.0× | 1.0× (n=100) |
+| PLINK2 + score-file preparation | 100 | 0.604 | 1.555 | 0.604 | — | — |
+
+Every engine scored every ID.
+
+## Paper Table 6
+
+| Engine pair | PLINK2 input | *N* PGS | Pearson *r* | Max \|Δ score\| |
+|---|---|---|---|---|
+| just-prs DuckDB ↔ just-prs Polars | fixed | 100 | 1.000000 | 5.7e-14 |
+| just-prs DuckDB ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
+| just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.5 |
+| just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21 |
+| just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21 |
+
+## Numbers quoted in the text
+
+- primary: Generation I median 6,005.4 s; Generation II full median 32.7 s, cold 35.9 s, warm 16.3 s; ratios full 183×, cold 167×, warm 368× (warm is not like-for-like)
+- calibration: Generation I median 5,995.5 s; Generation II full median 33.1 s, cold 36.7 s, warm 16.2 s; ratios full 181×, cold 163×, warm 370× (warm is not like-for-like)
+- Generation II peak RAM, primary genome, all warm/full/cold runs: 2,054–2,270 MB
+- Generation II peak RAM, every full run on every genome: max 4,514 MB
+- Generation II peak RAM, every warm/full/cold run on every genome: max 4,525 MB
+- Generation I peak RAM, primary: max 4,611 MB
+- Ensembl run (primary): wall 95.4 s, peak 5,750 MB
+- PRS fixed, duckdb: matched / total per ID, median 53% (range 22–79%), n=100
+- PRS fixed, polars: matched / total per ID, median 53% (range 22–79%), n=100
+- PRS fixed, plink2: matched / total per ID, median 51% (range 22–78%), n=100
+- PRS original, duckdb: matched / total per ID, median 53% (range 22–79%), n=100
+- PRS original, polars: matched / total per ID, median 53% (range 22–79%), n=100
+- PRS original, plink2: matched / total per ID, median 51% (range 14–78%), n=96
+- PRS original: PLINK2 failed on PGS000013: --score: ALT1 allele for variant '8:141738107:A:C' appears multiple times in /data/sources
+- PRS original: PLINK2 failed on PGS000014: --score: ALT1 allele for variant '8:141738107:A:C' appears multiple times in /data/sources
+- PRS original: PLINK2 failed on PGS000016: --score: ALT1 allele for variant '10:17929907:T:G' appears multiple times in /data/sources
+- PRS original: PLINK2 failed on PGS000017: --score: ALT1 allele for variant '8:141738107:A:C' appears multiple times in /data/sources
+- PRS input: 4,661,444 PASS records; just-prs 0.10.1; PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 100 IDs, warm-up PGS000001, PGS000002, PGS000003
