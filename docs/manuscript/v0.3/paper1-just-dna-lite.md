@@ -195,13 +195,13 @@ The default set is extensible through the same module contract used by the appli
 ### **4.1 Annotation Speed**
 
 <!-- @rev R15 rounds=1 by=robi:2026-09-25 -->
-<!-- @rev B22 rounds=1 by=claude:2026-10-11 -->
-We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the same workstation (Table 4). The main input was the whole-genome VCF of one of the co-authors, released publicly on Zenodo (record 18370498, CC0; 6,079,744 records called with DeepVariant 1.1.0 against GRCh38), the same genome used for the PRS benchmark in Section 4.2. Three more inputs vary the caller and the size: a second public genome called with DRAGEN (Zenodo record 19487816, CC-BY-4.0), the HG002 output of the DeepVariant 1.0.0 whole-genome case study, and the private genome on which the earlier Generation I times were measured (Supplementary S2). The benchmark is therefore reproducible end-to-end on public data;<!-- @rev B27 rounds=1 by=claude:2026-10-11 --> the benchmark scripts, the record of every run and the script that generates Tables 2 to 6 from them are in the repository (`docs/manuscript/benchmarks/a3/`),<!-- @/rev B27 --> and the pipeline can equally be run on any standard whole-genome VCF.
+<!-- @rev B22 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the same workstation (Table 4). The main input was the whole-genome VCF of one of the co-authors, released publicly on Zenodo (record 18370498, CC0; 6,079,744 records called with DeepVariant 1.1.0 against GRCh38), the same genome used for the PRS benchmark in Section 4.2. Three more inputs vary the caller and the size: a second co-author's public genome, called with DRAGEN (Zenodo record 19487816, CC-BY-4.0), the HG002 output of the DeepVariant 1.0.0 whole-genome case study, and the private genome on which the earlier Generation I times were measured, on another workstation (Supplementary S2). The benchmark is therefore reproducible on the three public genomes, Generation I given an OakVar store account (the store serves its current module versions, recorded in Table S2);<!-- @rev B27 rounds=1 by=claude:2026-10-11 --> the benchmark scripts, the record of every run and the script that generates Tables 2 to 6 from them are in the repository (`docs/manuscript/benchmarks/a3/`),<!-- @/rev B27 --> and the pipeline can equally be run on any standard whole-genome VCF.
 <!-- @/rev B22 -->
 <!-- @/rev R15 -->
 
-<!-- @rev B24 rounds=1 by=claude:2026-10-11 -->
-Each genome was annotated with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the like-for-like comparison. A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the runs of each genome were interleaved in a seeded random order. Generation I ran OakVar 2.13.1, the latest release at the time (published 2026-08-30), with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator (versions in Supplementary S2). All runs, Generation I included, used the same workstation.
+<!-- @rev B24 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the counterpart of an OakVar run (same VCF and same kind of report, not the same computation). A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order. Generation I ran three times on the primary genome and once on the calibration genome, with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module). It ran OakVar 2.13.1, the latest release at the time (published 2026-08-30), with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
 <!-- @/rev B24 -->
 
 <!-- @rev C22 rounds=1 by=claude:2026-10-11 -->
@@ -230,7 +230,7 @@ Each genome was annotated with the ten modules of Table 1, with Ensembl annotati
 <!-- @/rev C22 -->
 
 <!-- @rev C23 rounds=1 by=claude:2026-10-11 -->
-**Table 3.** Stage times and resources of the full runs (medians unless stated).<!-- @rev B25 rounds=1 by=claude:2026-10-11 --> Peak RAM is the resident memory summed over the whole process tree (for Generation I, the container's processes), sampled ten times a second; pages shared between processes count once per process, so it is an upper bound.<!-- @/rev B25 --> CPU is user plus system time divided by wall time; it was not measured for Generation I. Warm and cold runs are in the repository's generated tables.
+**Table 3.** Stage times and resources of the full runs (medians unless stated).<!-- @rev B25 rounds=2 by=claude:2026-10-11,claude:2026-10-12 --> Peak RAM is the resident memory summed over the whole process tree (for Generation I, the container's processes), sampled ten times a second; pages shared between processes count once per process, which overstates the total, while a peak shorter than the sampling interval can be missed.<!-- @/rev B25 --> CPU is user plus system time divided by wall time; it was not measured for Generation I. Warm and cold runs are in the repository's generated tables.
 
 | Genome | Run | *n* (runs) | Normalize (s) | Annotate (s) | Report (s) | Peak RAM, median (MB) | Peak RAM, max (MB) | CPU (%) |
 |---|---|---|---|---|---|---|---|---|
@@ -242,14 +242,14 @@ Each genome was annotated with the ten modules of Table 1, with Ensembl annotati
 | Calibration | Generation I | 1 | — | — | — | 3,838 | 3,838 | — |
 <!-- @/rev C23 -->
 
-<!-- @rev B23 rounds=1 by=claude:2026-10-11 -->
+<!-- @rev B23 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
 **Table 4.** Benchmark hardware and inputs, recorded at run time (October 2026).
 
 | Parameter | Value |
 |---|---|
 | CPU | AMD Ryzen 7 3800X (8 cores, 16 threads) |
 | RAM | 63 GiB |
-| Storage | SATA SSD (data, caches and outputs) |
+| Storage | SATA SSD, NTFS through the Linux ntfs3 driver (data, caches and outputs) |
 | OS | Linux 7.2.9 |
 | Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
@@ -265,12 +265,12 @@ On the primary genome, the median full run took 32.7 s against 6,005.4 s for Gen
 
 ### **4.2 PRS Computation**
 
-<!-- @rev B29 rounds=1 by=claude:2026-10-11 -->
-We benchmarked just-prs's DuckDB and Polars engines against the external tool PLINK2 on 100 PGS Catalog scores (PGS000006 to PGS000106, excluding PGS000085; PGS000001 to PGS000003 ran first as a warm-up) using the primary whole-genome VCF of Section 4.1 (4,661,444 PASS records, GRCh38; Zenodo 18370498). The engines, timing and memory measurement are those of `benchmarks/benchmark_engines.py` in just-prs 0.10.1, run through a harness that fixes the list of scores and keeps PLINK2's log for every score (`docs/manuscript/benchmarks/a3/prs/`). Each observation represents a different scoring model applied to the same individual.
+<!-- @rev B29 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+We benchmarked just-prs's DuckDB and Polars engines against the external tool PLINK2 on 100 PGS Catalog scores (PGS000006 to PGS000106, excluding PGS000085; PGS000001 to PGS000003 ran first as a warm-up) using the primary whole-genome VCF of Section 4.1 (4,661,444 records with FILTER PASS or unset, GRCh38; Zenodo 18370498). The engines, timing and memory measurement are those of `benchmarks/benchmark_engines.py` in just-prs 0.10.1, run through a harness that fixes the list of scores, calls PLINK2 with the same command line but keeps its log for every score, and includes PLINK2 in the warm-up (`docs/manuscript/benchmarks/a3/prs/`). Each observation represents a different scoring model applied to the same individual.
 <!-- @/rev B29 -->
 
-<!-- @rev A3b rounds=1 by=claude:2026-10-11 -->
-PLINK2's input was built in two ways. The *original* input is the one the just-prs benchmark script builds: a genotype file from every record, reference calls included, and one variant identifier per scoring row from its first candidate other allele. The *fixed* input builds the genotype file from PASS records only, as the just-prs input is, gives an identifier for every candidate other allele, and sums the weights of identifiers that two scoring rows share after liftover. Table 5 reports the fixed input; Table 6 reports both. PLINK2's time excludes preparing its score file, as in the just-prs script; including it moves PLINK2's median from 0.602 s to 0.604 s (Table 5).
+<!-- @rev A3b rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+PLINK2's input was built in two ways. The *original* input is the one the just-prs benchmark script builds: a genotype file from every record, reference calls included, and variant identifiers (in both allele orders) built from each scoring row's first candidate other allele only. The *fixed* input builds the genotype file from the records just-prs reads (FILTER PASS or unset), gives identifiers for every candidate other allele, and sums the weights of identifiers that two scoring rows share after liftover. Both inputs restrict PLINK2 to the autosomes, while just-prs reads every chromosome. Table 5 reports the fixed input; Table 6 reports both. PLINK2's time excludes preparing its score file, as in the just-prs script; including it moves PLINK2's median from 0.602 s to 0.604 s (Table 5).
 <!-- @/rev A3b -->
 
 <!-- @rev B30 rounds=1 by=claude:2026-10-11 -->
@@ -296,12 +296,12 @@ PLINK2's input was built in two ways. The *original* input is the one the just-p
 | just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
 <!-- @/rev C26 -->
 
-<!-- @rev C27 rounds=1 by=claude:2026-10-11 -->
-DuckDB and Polars agreed to within 5.68 × 10⁻¹⁴ on this input. Because both engines compute the same weighted sum and differ only in how the join is executed, their agreement checks the implementation, not the method. With the fixed input, scores agreed closely with the external PLINK2 comparator (Pearson r = 0.999997; maximum absolute score difference 0.501); with the original input, r was 0.999859 and the maximum difference 21.4. The workflows differ in variant identification. just-prs joins on chromosome and position and counts the effect allele if it equals the reference or alternate allele, otherwise a dosage of zero, with no strand flipping; PLINK2 matches exact chr:pos:ref:alt identifiers. The routes can therefore include different variants (chrX, multi-allelic sites, positions where the alleles disagree), so score differences can remain despite the same weighted-sum calculation. The comparison concerns this PLINK2 configuration, not a general limitation of the tool. Correlation here measures agreement across scores for one genome; it does not measure rankings across individuals. Supplementary S3 reports each engine's memory, which is measured differently for the in-process engines and for PLINK2.
+<!-- @rev C27 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+DuckDB and Polars agreed to within 5.68 × 10⁻¹⁴ on this input. Because both engines apply the same dosage rule and weighted sum and differ mainly in how the join is executed, their agreement checks the implementation, not the method. With the fixed input, scores agreed closely with the external PLINK2 comparator (Pearson r = 0.999997; maximum absolute score difference 0.501); with the original input, in which PLINK2 lost every candidate other allele but the first and counted reference-call records, r was 0.999859 and the maximum difference 21.4. The workflows differ in variant identification. just-prs joins on chromosome and position and counts the effect allele if it equals the reference or alternate allele, otherwise a dosage of zero, with no strand flipping; it compares a multi-allelic record's alternate alleles as one string, does not check the other allele, and ran with reference-homozygote restoration off; PLINK2 matches exact chr:pos:ref:alt identifiers. The routes can therefore include different variants (chrX, which the PLINK2 runs leave out; multi-allelic sites; positions where the alleles disagree), so score differences can remain despite the same weighted-sum calculation. The comparison concerns this PLINK2 configuration, not a general limitation of the tool. Correlation here measures agreement across scores for one genome; it does not measure rankings across individuals. Supplementary S3 reports each engine's memory, which is measured differently for the in-process engines and for PLINK2.
 <!-- @/rev C27 -->
 
-<!-- @rev B31 rounds=1 by=claude:2026-10-11 -->
-The share of a score's variants that were matched had a median of 53% for just-prs (range 22 to 79%) and 51% for PLINK2 (range 22 to 78%). The two counts are not the same measure: just-prs counts scoring rows whose position is found in the genome, PLINK2 the variants it used as predictors. These values describe the benchmark configuration, rather than the maximum coverage supported by just-prs. Reference-homozygote restoration can recover eligible absent loci for many scores, and the array workflow supports LD-proxy estimation (Section 3.2); their coverage gains are not quantified by this engine comparison. Missingness and allele matching also affect comparison with reference distributions. The reported speedups are ratios of median runtimes over the same 100 scores; the medians of the per-score ratios are the same (Table 5).
+<!-- @rev B31 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+With the fixed input, the share of a score's variants that were matched had a median of 53% for just-prs (range 22 to 79%) and 51% for PLINK2 (range 22 to 78%). The two counts are not the same measure: just-prs counts scoring rows with a called genotype at their position, PLINK2 the variants it processed, matched by identifier. These values describe the benchmark configuration, rather than the maximum coverage supported by just-prs. Reference-homozygote restoration can recover eligible absent loci for many scores, and the array workflow supports LD-proxy estimation (Section 3.2); their coverage gains are not quantified by this engine comparison. Missingness and allele matching also affect comparison with reference distributions. The reported speedups are ratios of median runtimes over the same 100 scores; the medians of the per-score ratios agree with them to the precision shown (Table 5).
 <!-- @/rev B31 -->
 
 
@@ -348,7 +348,7 @@ Several extensions are underway or planned: GRCh37/hg19 liftover (added, but sti
 ## **6. Conclusion**
 
 <!-- @rev R24 rounds=1 by=robi:2026-09-25 -->
-Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspectable reports with a portable annotation-module contract and versioned content discovery. Typed MCP tools make the PRS engine available to AI assistants. Albeit tested on<!-- @rev A3c rounds=1 by=claude:2026-10-11 --> four genomes for annotation and one for scoring<!-- @/rev A3c -->, the reported benchmarks show faster annotation than the earlier Just-DNA-Seq configuration and close numerical agreement between scoring engines. Evaluation across individuals, reference populations, and matched-variant sets remains necessary to establish the broader reliability of these workflows. The platform provides infrastructure for research and education, without establishing clinical validity for the findings it reports.
+Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspectable reports with a portable annotation-module contract and versioned content discovery. Typed MCP tools make the PRS engine available to AI assistants. Albeit tested on<!-- @rev A3c rounds=2 by=claude:2026-10-11,claude:2026-10-12 --> four genomes for annotation and one for scoring, the reported benchmarks show faster annotation than the OakVar-based Generation I system run on the same machine<!-- @/rev A3c --> and close numerical agreement between scoring engines. Evaluation across individuals, reference populations, and matched-variant sets remains necessary to establish the broader reliability of these workflows. The platform provides infrastructure for research and education, without establishing clinical validity for the findings it reports.
 <!-- @/rev R24 -->
 
 ## **Contribution Statements**
@@ -429,12 +429,40 @@ Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-co
 
 **S1. Generation I: OakVar-Based Just-DNA-Seq Platform.** Architecture, pipeline, module types, and repository table for the OakVar-based Generation I system (see combined-manuscript supplement for full detail).
 
-<!-- @rev B28 rounds=1 by=claude:2026-10-11 -->
-**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4: 6,005.4, 6,068.5 and 5,889.3 s on the primary genome, 5,995.5 s on the calibration genome) with their peak memory; OakVar's own step times (on the primary genome the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators (just_cancer to just_vo2max, 0.1.0 to 0.1.2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
+<!-- @rev B28 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4: 6,005.4, 6,068.5 and 5,889.3 s on the primary genome, 5,995.5 s on the calibration genome), with peak memory of 4,611, 4,610, 4,610 and 3,838 MB; OakVar's own step times (on the primary genome, as medians of the three runs, the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
 <!-- @/rev B28 -->
 
-<!-- @rev B32 rounds=1 by=claude:2026-10-11 -->
-**S3. Runtime and Memory on Large PRS Scoring Files.** Runtimes and memory for the 7 genome-wide PGS IDs (1.7 to 6.9M variants) with both PLINK2 inputs; with the original input PLINK2 failed on the four largest (Table 5). Memory is measured differently per engine: for DuckDB and Polars, the growth of the benchmark process's resident memory during the call, sampled every 10 ms (median over all 100 scores 5.4 MB and 1,061.2 MB); for PLINK2, the peak resident memory of its own process, sampled every 100 ms (median 511.6 MB). The two measures are not directly comparable.
+<!-- @rev A3d rounds=1 by=claude:2026-10-12 -->
+**Table S2.** The OakVar modules that ran in the 2026 Generation I runs, as installed from the OakVar store on 2026-10-11, beside the version of each Just-DNA-Seq repository on GitHub on the same day and at its last commit by 2023-05-07 (date of the last commit in brackets). Modules not maintained by the Just-DNA-Seq project have no GitHub column. Widget modules, which do not run during annotation, are omitted.
+
+| OakVar module | Type | Version that ran (store) | Data | GitHub head, 2026-10-11 | GitHub, last commit by 2023-05-07 |
+|---|---|---|---|---|---|
+| vcf-converter | converter | 4.2.1 | — | — | — |
+| gencode | mapper | 46.1.1 | — | — | — |
+| cardioboost | annotator | 1.0.0 | v2.1 | — | — |
+| clinvar | annotator | 2026.10.01 | 2026.10.01 | — | — |
+| dbsnp | annotator | 156.0.1 | v156 | — | — |
+| gnomad | annotator | 2.2.0 | v2.1 | — | — |
+| ncbigene | annotator | 2026.10.01 | 2026.10.01 | — | — |
+| omim | annotator | 1.1.1 | v4.1 | — | — |
+| pubmed | annotator | 1.1.5 | — | — | — |
+| sift | annotator | 1.3.0 | SIFT4G 2016-02-22 | — | — |
+| just_cancer | postaggregator | 0.1.0 | — | 0.1.0 (2026-04-11) | 0.1.0 (2023-01-31) |
+| just_cardio | postaggregator | 0.1.1 | — | 0.1.1 (2026-04-11) | 0.1.1 (2023-01-31) |
+| just_coronary | postaggregator | 0.1.2 | — | 0.1.2 (2024-10-31) | 0.1.1 (2023-01-31) |
+| just_drugs | postaggregator | 0.1.0 | — | 0.1.0 (2024-10-31) | 0.1.0 (2023-01-31) |
+| just_lipidmetabolism | postaggregator | 0.1.2 | — | 0.1.1 (2024-10-31) | 0.1.0 (2023-03-24) |
+| just_longevitymap | postaggregator | 0.1.2 | — | 0.2.0 (2025-03-05) | 0.1.1 (2023-03-11) |
+| just_superhuman | postaggregator | 0.1.0 | — | 0.1.0 (2024-11-13) | 0.1.0 (2023-03-26) |
+| just_thrombophilia | postaggregator | 0.1.2 | — | 0.2.0 (2026-04-11) | 0.1.0 (2023-03-24) |
+| just_vo2max | postaggregator | 0.1.2 | — | 0.1.2 (2024-10-31) | — |
+| vcfinfo | postaggregator | 1.4.0 | — | — | — |
+| longevity2reporter | reporter | 0.4.3 | — | 0.4.3 (2025-03-05) | 0.4.0 (2023-04-28) |
+<!-- @/rev A3d -->
+
+<!-- @rev B32 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+**S3. Runtime and Memory on Large PRS Scoring Files.** Runtimes and memory for the 7 genome-wide PGS IDs (1.7 to 6.9M variants) with both PLINK2 inputs; with the original input PLINK2 failed on the four largest (Table 5). Memory is measured differently per engine: for DuckDB and Polars, the growth of the benchmark process's resident memory during the call, sampled every 10 ms (median over all 100 scores with the fixed input, 5.4 MB and 1,061.2 MB); for PLINK2, the peak resident memory of its own process, sampled every 100 ms (median 511.6 MB, fixed input). The two measures are not directly comparable.
 <!-- @/rev B32 -->
 
 <!-- @rev C13c rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->

@@ -253,7 +253,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 |---|---|
 | CPU | AMD Ryzen 7 3800X (8 cores, 16 threads) |
 | RAM | 63 GiB |
-| Storage | SATA SSD (data, caches and outputs) |
+| Storage | SATA SSD, NTFS through the Linux ntfs3 driver (data, caches and outputs) |
 | OS | Linux 7.2.9 |
 | Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
@@ -282,6 +282,32 @@ Every engine scored every ID.
 | just-prs Polars ↔ PLINK2 | fixed | 100 | 0.999997 | 0.501 |
 | just-prs DuckDB ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
 | just-prs Polars ↔ PLINK2 | original | 96 | 0.999859 | 21.4 |
+
+## Paper Table S2
+
+| OakVar module | Type | Version that ran (store) | Data | GitHub head, 2026-10-11 | GitHub, last commit by 2023-05-07 |
+|---|---|---|---|---|---|
+| vcf-converter | converter | 4.2.1 | — | — | — |
+| gencode | mapper | 46.1.1 | — | — | — |
+| cardioboost | annotator | 1.0.0 | v2.1 | — | — |
+| clinvar | annotator | 2026.10.01 | 2026.10.01 | — | — |
+| dbsnp | annotator | 156.0.1 | v156 | — | — |
+| gnomad | annotator | 2.2.0 | v2.1 | — | — |
+| ncbigene | annotator | 2026.10.01 | 2026.10.01 | — | — |
+| omim | annotator | 1.1.1 | v4.1 | — | — |
+| pubmed | annotator | 1.1.5 | — | — | — |
+| sift | annotator | 1.3.0 | SIFT4G 2016-02-22 | — | — |
+| just_cancer | postaggregator | 0.1.0 | — | 0.1.0 (2026-04-11) | 0.1.0 (2023-01-31) |
+| just_cardio | postaggregator | 0.1.1 | — | 0.1.1 (2026-04-11) | 0.1.1 (2023-01-31) |
+| just_coronary | postaggregator | 0.1.2 | — | 0.1.2 (2024-10-31) | 0.1.1 (2023-01-31) |
+| just_drugs | postaggregator | 0.1.0 | — | 0.1.0 (2024-10-31) | 0.1.0 (2023-01-31) |
+| just_lipidmetabolism | postaggregator | 0.1.2 | — | 0.1.1 (2024-10-31) | 0.1.0 (2023-03-24) |
+| just_longevitymap | postaggregator | 0.1.2 | — | 0.2.0 (2025-03-05) | 0.1.1 (2023-03-11) |
+| just_superhuman | postaggregator | 0.1.0 | — | 0.1.0 (2024-11-13) | 0.1.0 (2023-03-26) |
+| just_thrombophilia | postaggregator | 0.1.2 | — | 0.2.0 (2026-04-11) | 0.1.0 (2023-03-24) |
+| just_vo2max | postaggregator | 0.1.2 | — | 0.1.2 (2024-10-31) | — |
+| vcfinfo | postaggregator | 1.4.0 | — | — | — |
+| longevity2reporter | reporter | 0.4.3 | — | 0.4.3 (2025-03-05) | 0.4.0 (2023-04-28) |
 
 ## Numbers quoted in the text
 

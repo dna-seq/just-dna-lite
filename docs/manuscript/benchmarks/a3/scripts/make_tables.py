@@ -312,7 +312,7 @@ def paper_table4() -> str:
     rows = [
         ["CPU", f"{m['cpu_model'].replace(' 8-Core Processor', '')} ({m['cores']} cores, {m['threads']} threads)"],
         ["RAM", f"{m['ram_bytes'] / 2**30:.0f} GiB"],
-        ["Storage", f"{'HDD' if disk['rotational'] else 'SATA SSD'} (data, caches and outputs)"],
+        ["Storage", f"{'HDD' if disk['rotational'] else 'SATA SSD'}, NTFS through the Linux {m['data_mount']['fstype']} driver (data, caches and outputs)"],
         ["OS", f"Linux {m['kernel'].split('-')[0]}"],
         ["Generation II", f"Just-DNA-Lite {c['packages']['just-dna-lite']}, {len(env['modules'])} modules (versions and digests as in Table S4)"],
         ["Generation I", f"OakVar {env['generation_i']['oakvar']} in Docker (Table S2)"],
@@ -341,6 +341,29 @@ def paper_table6() -> str:
             rows.append([f"{ENGINE_LABEL[a]} ↔ {ENGINE_LABEL[b]}", config, str(len(ids)),
                          f"{pearson(xa, xb):.6f}", f"{diff:.3g}"])
     return table(["Engine pair", "PLINK2 input", "*N* PGS", "Pearson *r*", "Max \\|Δ score\\|"], rows)
+
+
+def paper_table_s2() -> str:
+    """The Generation I modules that ran (OakVar store), beside each dna-seq repo's GitHub versions."""
+    installed = {m["name"]: m for m in json.loads((A3 / "oakvar" / "installed-2.13.1.json").read_text())}
+    heads = {}
+    for name in ("modules-current.tsv", "modules.tsv"):
+        heads[name] = {r["name"]: r for r in csv.DictReader((A3 / "oakvar" / name).open(), delimiter="\t")}
+    order = ("converter", "mapper", "annotator", "postaggregator", "reporter")
+    used = {"vcf-converter", "gencode", "dbsnp", "clinvar", "omim", "ncbigene", "pubmed", "gnomad", "sift",
+            "cardioboost", "vcfinfo", "longevity2reporter"}
+
+    def gh(name: str, tsv: str) -> str:
+        r = heads[tsv].get(name)
+        return "—" if r is None else f"{r['version']} ({r['commit_date'][:10]})"
+
+    rows = [[m["name"], m["type"], m["version"], str(m.get("data_source") or "—"),
+             gh(m["name"], "modules-current.tsv"), gh(m["name"], "modules.tsv")]
+            for m in sorted((m for m in installed.values()
+                             if m["type"] in order and (m["name"] in used or m["name"].startswith("just_"))),
+                            key=lambda m: (order.index(m["type"]), m["name"]))]
+    return table(["OakVar module", "Type", "Version that ran (store)", "Data", "GitHub head, 2026-10-11",
+                  "GitHub, last commit by 2023-05-07"], rows)
 
 
 def plink2_failures(config: str) -> list[tuple[str, str]]:
@@ -423,6 +446,7 @@ def main() -> None:
               "## Paper Table 4", paper_table4(),
               "## Paper Table 5", table5("fixed"),
               "## Paper Table 6", paper_table6(),
+              "## Paper Table S2", paper_table_s2(),
               "## Numbers quoted in the text", quoted(runs)]
     (A3 / "tables.md").write_text("\n\n".join(parts) + "\n")
 

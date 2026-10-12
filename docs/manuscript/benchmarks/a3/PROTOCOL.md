@@ -351,3 +351,27 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   C22, C23, C26, C27, and A3a–A3c for text no review comment covers. B26 is moot (no single cold-start
   row remains). Table 4 stays, since C24 (delete it) is still the user's decision. The ten Generation
   II modules match Table S4 in version and digest.
+
+### Claim validation (2026-10-12)
+
+- Five independent validators (Sonnet subagents, read-only) checked every claim of Sections 4.1,
+  4.2, S2, S3 and the Conclusion clause against these files, the just-prs 0.10.1 source, PyPI and
+  Zenodo. `tables.md` and `env.json` regenerate byte-identical; every table and number in the text
+  recomputes from `runs.csv`, the PRS results and the OakVar step TSV.
+- Wording fixed in the paper (rounds bumped to 2): Generation I ran nine postaggregators on two
+  genomes with no warm-up, and its run is the counterpart of a full run, not the same computation;
+  "public data" is scoped to the three public genomes plus an OakVar store account; the RSS method
+  can both overstate (shared pages) and miss sub-100 ms peaks; the PRS input is FILTER PASS or unset,
+  PLINK2 runs on autosomes only (`--chr 1-22`), and the original PLINK2 input carries both allele
+  orders of the first candidate; just-prs compares multi-allelic ALTs as one string, does not check
+  the other allele and ran without reference-homozygote restoration; match rates are for the fixed
+  input; the S3 memory medians are the fixed input's; the Conclusion names the OakVar-based system
+  measured, not "the earlier configuration". Table 4 names the NTFS (`ntfs3`) disk.
+- Table S2 (new, `make_tables.py:paper_table_s2`) lists every OakVar module that ran, with the store
+  version beside each Just-DNA-Seq repo's GitHub version on 2026-10-11 and at its last commit by
+  2023-05-07. Store and GitHub differ for `just_longevitymap` and `just_thrombophilia` (0.1.2 against
+  0.2.0) and `just_lipidmetabolism` (0.1.2 against 0.1.1).
+- Not changed, recorded here: the harness's PLINK2 count regex `valid predictor` matches no log line;
+  the count used is the fallback `--score: N variants processed`. The two just-prs engines read
+  haploid and half-called genotypes differently (Polars: no-call; DuckDB: dosage), which this genome
+  does not exercise.
