@@ -12,7 +12,11 @@ Run types:
   full    fresh DAGSTER_HOME and output directory, page cache NOT dropped: the whole pipeline,
           normalization included, with warm OS caches. Its normalize_s is the offset that turns a
           warm time into a full one, and it is the like-for-like counterpart of an OakVar run.
-  ensembl one extra warm-state run with --ensembl (Generation II only)
+  ensembl run with --ensembl (Generation II only), appended after the series (--ensembl N). It runs
+          annotate_all_job, which normalizes again, so it is a full run plus the Ensembl join, on the
+          series' shared Dagster instance.
+  Generation I runs are `full` unless --full-label names them otherwise (dbsnp_only: OakVar with
+  the dbSNP annotator and the VCF reporter only, the counterpart of a Generation II ensembl run).
 
 Measurement per run:
   cli_wall_s   wall time of the whole command (includes Python start-up and module discovery)
@@ -249,7 +253,10 @@ def main() -> None:
     parser.add_argument("--full", type=int, default=5)
     parser.add_argument("--seed", type=int, default=20261010)
     parser.add_argument("--no-warmup", action="store_true")
-    parser.add_argument("--ensembl-extra", action="store_true")
+    parser.add_argument("--ensembl-extra", action="store_true", help="same as --ensembl 1")
+    parser.add_argument("--ensembl", type=int, default=0, help="Ensembl runs appended to the series")
+    parser.add_argument("--full-label", default="full",
+                        help="run_type written for the full runs (Generation I only)")
     parser.add_argument("--load-gate", type=float, default=1.5)
     parser.add_argument("--max-wait", type=float, default=4 * 3600)
     parser.add_argument("--out", type=Path, default=A3 / "runs.csv")
@@ -266,11 +273,12 @@ def main() -> None:
     parser.add_argument("--oakvar-args", nargs=argparse.REMAINDER, default=[])
     args = parser.parse_args()
 
-    order = ["cold"] * args.cold + ["warm"] * args.warm + ["full"] * args.full
+    if args.full_label != "full" and args.tool != "oakvar":
+        sys.exit("--full-label is for Generation I runs only")
+    order = ["cold"] * args.cold + ["warm"] * args.warm + [args.full_label] * args.full
     random.Random(args.seed).shuffle(order)
     schedule = ([] if args.no_warmup else ["warmup"]) + order
-    if args.ensembl_extra:
-        schedule.append("ensembl")
+    schedule += ["ensembl"] * max(args.ensembl, int(args.ensembl_extra))
     print(f"schedule ({args.tool}, {args.genome}, seed {args.seed}): {' '.join(schedule)}", flush=True)
     if args.dry_run:
         return

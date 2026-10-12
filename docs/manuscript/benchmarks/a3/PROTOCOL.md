@@ -375,3 +375,23 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   the count used is the fallback `--score: N variants processed`. The two just-prs engines read
   haploid and half-called genotypes differently (Polars: no-call; DuckDB: dosage), which this genome
   does not exercise.
+
+### Night 2 queue (scheduled 2026-10-12 23:27 for 2026-10-13 02:00)
+
+- The user asked for more Generation I runs for an error estimate (calibration ×2, second caller ×3)
+  and for a fairer pair beside the 183×: Generation II with the whole Ensembl join against OakVar
+  with dbSNP only. "Like-for-like" was already dropped from the text; this pair measures it.
+- Driver (`scripts/bench_annotation.py`): `--ensembl N` appends N Ensembl runs (`--ensembl-extra` is
+  `--ensembl 1`), and `--full-label` names Generation I's full runs, here `dbsnp_only` (`-a dbsnp
+  -t vcf`: no postaggregators, the VCF reporter). The docstring's "warm-state" note for `ensembl` is
+  corrected. The Generation II pair still runs its ten modules and report on top, so the pair errs
+  in OakVar's favour.
+- Smoke tests: `oakvar-smoke-5000-dbsnp-only` (exit 0, 39.0 s on the primary's first 5,000 records;
+  output `.vcf` and `.sqlite`) and `oakvar-smoke-5000-second-caller` (exit 0, 36.2 s on the DRAGEN
+  VCF's first 5,000 records, every annotator and postaggregator finished, report written).
+- Queue (`queue/60`–`65`, series under `/data/a3-bench/series/20261013T0200/`), in this order:
+  `60` OakVar calibration ×2 (full), `61` OakVar primary ×3 (dbsnp_only), `62` Generation II primary
+  ×3 (ensembl, no warm-up), `63`–`65` OakVar second caller ×1 each. The second-caller runs come last
+  and are one job each, so if the user starts the app stack in the morning, the port check refuses
+  the next run instead of timing beside it. Estimated end: about 12:00–13:00.
+- Timer: `systemd-run --user --on-calendar='2026-10-13 02:00:00' --unit=bench-queue-2`.
