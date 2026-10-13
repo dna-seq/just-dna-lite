@@ -15,17 +15,21 @@ Wall time is `cli_wall_s`: the whole command, from start to report written, for 
 | Generation I (OakVar 2.13.1), full | 3 | 6,005.4 (5,889.3–6,068.5) | 5,987.7 ± 52.5 | 90.9 | 1× (ref.) |
 | **Second caller (public, Zenodo 19487816)** |  |  |  |  |  |
 | Generation II, warm | 11 | 20.2 (20.1–20.8) | 20.3 ± 0.1 | 0.2 | — |
-| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | — |
-| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | — |
+| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | 171× |
+| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | 162× |
+| Generation I (OakVar 2.13.1), full | 1 | 10,627.7 | — | — | 1× (ref.) |
 | **Community reference (HG002, DeepVariant case study)** |  |  |  |  |  |
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
 | **Calibration (private, the 2023 benchmark file)** |  |  |  |  |  |
 | Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
-| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 181× |
-| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 163× |
-| Generation I (OakVar 2.13.1), full | 1 | 5,995.5 | — | — | 1× (ref.) |
+| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 235× |
+| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
+| Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
+| **Primary, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
+| Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
+| Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
 
 ## Table 3. Generation II stage times and resources (medians)
 
@@ -36,18 +40,19 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 | Primary | Generation II, warm | 11 | — | 9.8 | 1.8 | — | 11.8 | 2,148 (2,189) | 1,166 | 557 |
 | Primary | Generation II, full | 5 | 15.4 | 10.4 | 1.8 | — | 27.9 | 2,224 (2,270) | 976 | 376 |
 | Primary | Generation II, cold | 3 | 16.0 | 9.9 | 1.9 | — | 28.2 | 2,241 (2,243) | 897 | 345 |
-| Primary | Generation II, full + Ensembl (annotate_all_job) | 1 | 15.4 | 9.7 | 1.8 | 29.0 (+ 34.3 cache check) | 90.8 | 5,750 (5,750) | 1,629 | 475 |
+| Primary | Generation II, full + Ensembl (annotate_all_job) | 4 | 22.4 | 12.4 | 1.8 | 46.7 (+ 2.5 cache check) | 111.4 | 5,697 (5,750) | 1,812 | 388 |
 | Primary | Generation I (OakVar 2.13.1), full | 3 | — | — | — | — | — | 4,610 (4,611) | 2,817 | not measured |
 | Second caller | Generation II, warm | 11 | — | 13.7 | 1.8 | — | 15.8 | 4,311 (4,364) | 2,402 | 693 |
 | Second caller | Generation II, full | 5 | 41.6 | 13.7 | 1.8 | — | 57.4 | 4,465 (4,514) | 1,335 | 345 |
 | Second caller | Generation II, cold | 3 | 42.1 | 13.6 | 1.8 | — | 58.0 | 4,471 (4,525) | 1,273 | 327 |
+| Second caller | Generation I (OakVar 2.13.1), full | 1 | — | — | — | — | — | 4,529 (4,529) | 1,817 | not measured |
 | Community reference | Generation II, warm | 11 | — | 10.6 | 1.8 | — | 12.6 | 2,740 (2,803) | 1,471 | 586 |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | — | 33.7 | 2,893 (2,925) | 1,076 | 363 |
 | Community reference | Generation II, cold | 3 | 21.3 | 10.7 | 1.8 | — | 34.1 | 2,843 (2,844) | 995 | 334 |
 | Calibration | Generation II, warm | 11 | — | 9.5 | 2.1 | — | 11.8 | 2,117 (2,216) | 1,169 | 562 |
 | Calibration | Generation II, full | 5 | 16.6 | 9.4 | 2.1 | — | 28.4 | 2,274 (2,296) | 968 | 376 |
 | Calibration | Generation II, cold | 3 | 17.1 | 9.5 | 2.2 | — | 29.1 | 2,209 (2,347) | 891 | 341 |
-| Calibration | Generation I (OakVar 2.13.1), full | 1 | — | — | — | — | — | 3,838 (3,838) | 2,010 | not measured |
+| Calibration | Generation I (OakVar 2.13.1), full | 3 | — | — | — | — | — | 3,837 (3,838) | 1,862 | not measured |
 
 ## Table 4. Machine and inputs
 
@@ -108,15 +113,21 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 
 ## S2. Generation I runs, steps, hardware factor and module versions
 
-| Series | Genome | Date | Wall time, s | Peak RSS, MB | Load before |
-|---|---|---|---|---|---|
-| 2023 (old workstation) | calibration | 2023-02-17 | 5651 | — | — |
-| 2023 (old workstation) | calibration | 2023-02-19 | 6803 | — | — |
-| 2023 (old workstation) | calibration | 2023-05-07 | 7662 | — | — |
-| 2026 (this machine) | primary | 2026-10-11 | 6,005.4 | 4,611 | 0.53 |
-| 2026 (this machine) | primary | 2026-10-11 | 6,068.5 | 4,610 | 1.28 |
-| 2026 (this machine) | primary | 2026-10-11 | 5,889.3 | 4,610 | 1.28 |
-| 2026 (this machine) | calibration | 2026-10-11 | 5,995.5 | 3,838 | 1.03 |
+| Series | Genome | Mode | Started | Wall time, s | Peak RSS, MB | Load before | Used in |
+|---|---|---|---|---|---|---|---|
+| 2023 (old workstation) | calibration | full | 2023-02-17 | 5651 | — | — | — |
+| 2023 (old workstation) | calibration | full | 2023-02-19 | 6803 | — | — | — |
+| 2023 (old workstation) | calibration | full | 2023-05-07 | 7662 | — | — | — |
+| 2026 (this machine) | primary | full | 2026-10-11 06:10 UTC | 6,005.4 | 4,611 | 0.53 | Table 2 |
+| 2026 (this machine) | primary | full | 2026-10-11 07:50 UTC | 6,068.5 | 4,610 | 1.28 | Table 2 |
+| 2026 (this machine) | primary | full | 2026-10-11 09:31 UTC | 5,889.3 | 4,610 | 1.28 | Table 2 |
+| 2026 (this machine) | calibration | full | 2026-10-11 11:10 UTC | 5,995.5 | 3,838 | 1.03 | Table 2 |
+| 2026 (this machine) | calibration | full | 2026-10-13 01:35 UTC | 7,785.3 | 3,832 | 1.09 | Table 2 |
+| 2026 (this machine) | calibration | full | 2026-10-13 03:45 UTC | 8,281.0 | 3,837 | 1.32 | Table 2 |
+| 2026 (this machine) | second_caller | full | 2026-10-13 10:11 UTC | 10,627.7 | 4,529 | 1.05 | Table 2 |
+| 2026 (this machine) | primary | dbsnp_only | 2026-10-13 06:04 UTC | 7,041.5 | 3,838 | 1.09 | warm-up, dropped |
+| 2026 (this machine) | primary | dbsnp_only | 2026-10-13 08:01 UTC | 3,627.5 | 3,838 | 1.31 | Table 2 |
+| 2026 (this machine) | primary | dbsnp_only | 2026-10-13 09:02 UTC | 3,446.8 | 3,837 | 1.37 | Table 2 |
 
 | OakVar step / module (primary genome, median of 3) | Seconds | Share |
 |---|---|---|
@@ -147,7 +158,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 
 | Calibration genome | Old workstation, s | This machine (median), s | Old ÷ new |
 |---|---|---|---|
-| Generation I, full | 6,705.3 (mean of 3, 2023) | 5,995.5 | 1.12 |
+| Generation I, full | 6,705.3 (mean of 3, 2023) | 7,785.3 | 0.86 |
 | Generation II, 'normal' (2023 tables) vs warm (2026) | 38.9 (mean of 11) | 16.2 | 2.40 |
 | Generation II, 'normal' (2023 tables) vs full (2026) | 38.9 (mean of 11) | 33.1 | 1.17 |
 
@@ -224,17 +235,21 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | Generation I (OakVar 2.13.1), full | 3 | 6,005.4 (5,889.3–6,068.5) | 5,987.7 ± 52.5 | 90.9 | 1× (ref.) |
 | **Second caller (public, Zenodo 19487816)** |  |  |  |  |  |
 | Generation II, warm | 11 | 20.2 (20.1–20.8) | 20.3 ± 0.1 | 0.2 | — |
-| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | — |
-| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | — |
+| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | 171× |
+| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | 162× |
+| Generation I (OakVar 2.13.1), full | 1 | 10,627.7 | — | — | 1× (ref.) |
 | **Community reference (HG002, DeepVariant case study)** |  |  |  |  |  |
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
 | **Calibration (private, the 2023 benchmark file)** |  |  |  |  |  |
 | Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
-| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 181× |
-| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 163× |
-| Generation I (OakVar 2.13.1), full | 1 | 5,995.5 | — | — | 1× (ref.) |
+| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 235× |
+| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
+| Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
+| **Primary, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
+| Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
+| Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
 
 ## Paper Table 3
 
@@ -243,9 +258,10 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | Primary | Generation II, full | 5 | 15.4 | 10.4 | 1.8 | 2,224 | 2,270 | 376 |
 | Primary | Generation I | 3 | — | — | — | 4,610 | 4,611 | — |
 | Second caller | Generation II, full | 5 | 41.6 | 13.7 | 1.8 | 4,465 | 4,514 | 345 |
+| Second caller | Generation I | 1 | — | — | — | 4,529 | 4,529 | — |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
 | Calibration | Generation II, full | 5 | 16.6 | 9.4 | 2.1 | 2,274 | 2,296 | 376 |
-| Calibration | Generation I | 1 | — | — | — | 3,838 | 3,838 | — |
+| Calibration | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
 
 ## Paper Table 4
 
@@ -312,12 +328,25 @@ Every engine scored every ID.
 ## Numbers quoted in the text
 
 - primary: Generation I median 6,005.4 s; Generation II full median 32.7 s, cold 35.9 s, warm 16.3 s; ratios full 183×, cold 167×, warm 368× (warm is not like-for-like)
-- calibration: Generation I median 5,995.5 s; Generation II full median 33.1 s, cold 36.7 s, warm 16.2 s; ratios full 181×, cold 163×, warm 370× (warm is not like-for-like)
+- calibration: Generation I median 7,785.3 s; Generation II full median 33.1 s, cold 36.7 s, warm 16.2 s; ratios full 235×, cold 212×, warm 480× (warm is not like-for-like)
 - Generation II peak RAM, primary genome, all warm/full/cold runs: 2,054–2,270 MB
 - Generation II peak RAM, every full run on every genome: max 4,514 MB
 - Generation II peak RAM, every warm/full/cold run on every genome: max 4,525 MB
 - Generation I peak RAM, primary: max 4,611 MB
-- Ensembl run (primary): wall 95.4 s, peak 5,750 MB
+- Generation I peak RAM, every run: max 4,611 MB
+- Generation II peak RAM with Ensembl on, every run: 5,568–5,750 MB (n=4)
+- second_caller: Generation I median 10,627.7 s (n=1); ratio full 171×, cold 162×
+- Reference-database pair (primary, first run dropped): Generation I dbSNP only median 3,537.2 s (n=2, 3,446.8–3,627.5); Generation II full + Ensembl median 103.1 s (n=2, 64.2–142.0); ratio of medians 34×; ratio range over run pairs 24–57×
+- The full-run ratio on the primary genome (183×) is 5.3 times the pair's
+- Pair warm-up dropped, jdl: 229.7 s
+- Pair warm-up dropped, oakvar: 7,041.5 s
+- OakVar annotator step, dbSNP-only runs: 00_dbsnp_only1 3,520.3 s, 01_dbsnp_only2 608.1 s, 02_dbsnp_only3 574.8 s
+- Generation II Ensembl join step, night-2 runs in order: 97.8 s, 61.3 s, 32.1 s
+- Every Generation II full or cold run: 31.9–81.0 s; with Ensembl, pair runs: 64.2–142.0 s
+- Every Generation I full run: 5,889.3–10,627.7 s (1.6–3.0 h); dbSNP only, pair runs: 3,446.8–3,627.5 s
+- Generation I full runs, primary: n=3, dates 2026-10-11; slowest is 3% slower than fastest
+- Generation I full runs, calibration: n=3, dates 2026-10-11, 2026-10-13; slowest is 38% slower than fastest
+- Generation I full runs, second_caller: n=1, dates 2026-10-13; slowest is 0% slower than fastest
 - PRS fixed, duckdb: matched / total per ID, median 53% (range 22–79%), n=100
 - PRS fixed, polars: matched / total per ID, median 53% (range 22–79%), n=100
 - PRS fixed, plink2: matched / total per ID, median 51% (range 22–78%), n=100

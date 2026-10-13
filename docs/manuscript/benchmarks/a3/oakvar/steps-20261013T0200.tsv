@@ -1,0 +1,122 @@
+genome	run	kind	name	seconds
+calibration	00_full1	step	converter	454.573
+calibration	00_full1	step	preparer	0.000
+calibration	00_full1	step	mapper	1097.368
+calibration	00_full1	step	annotator	2750.105
+calibration	00_full1	module	Aggregator variant	811.493
+calibration	00_full1	module	Aggregator gene	1.895
+calibration	00_full1	module	Aggregator sample	79.619
+calibration	00_full1	module	Aggregator mapping	37.709
+calibration	00_full1	step	aggregator	930.720
+calibration	00_full1	module	tagsampler	261.939
+calibration	00_full1	module	vcfinfo	217.151
+calibration	00_full1	module	just_cancer	88.523
+calibration	00_full1	module	just_cardio	31.425
+calibration	00_full1	module	just_coronary	145.419
+calibration	00_full1	module	just_drugs	26.657
+calibration	00_full1	module	just_longevitymap	274.377
+calibration	00_full1	module	just_lipidmetabolism	328.283
+calibration	00_full1	module	just_thrombophilia	382.610
+calibration	00_full1	module	just_superhuman	561.146
+calibration	00_full1	module	just_vo2max	229.403
+calibration	00_full1	step	postaggregator	2547.226
+calibration	00_full1	module	longevity2reporter	0.111
+calibration	00_full1	step	reporter	0.265
+calibration	00_full1	total	runtime	7782.042
+calibration	01_full2	step	converter	524.941
+calibration	01_full2	step	preparer	0.000
+calibration	01_full2	step	mapper	1467.947
+calibration	01_full2	step	annotator	3196.042
+calibration	01_full2	module	Aggregator variant	618.144
+calibration	01_full2	module	Aggregator gene	2.591
+calibration	01_full2	module	Aggregator sample	54.379
+calibration	01_full2	module	Aggregator mapping	25.217
+calibration	01_full2	step	aggregator	700.334
+calibration	01_full2	module	tagsampler	252.288
+calibration	01_full2	module	vcfinfo	199.439
+calibration	01_full2	module	just_cancer	88.076
+calibration	01_full2	module	just_cardio	31.331
+calibration	01_full2	module	just_coronary	147.047
+calibration	01_full2	module	just_drugs	26.421
+calibration	01_full2	module	just_longevitymap	269.108
+calibration	01_full2	module	just_lipidmetabolism	305.800
+calibration	01_full2	module	just_thrombophilia	325.915
+calibration	01_full2	module	just_superhuman	511.852
+calibration	01_full2	module	just_vo2max	231.147
+calibration	01_full2	step	postaggregator	2388.465
+calibration	01_full2	module	longevity2reporter	0.110
+calibration	01_full2	step	reporter	0.252
+calibration	01_full2	total	runtime	8278.052
+primary-dbsnp	00_dbsnp_only1	step	converter	506.649
+primary-dbsnp	00_dbsnp_only1	step	preparer	0.000
+primary-dbsnp	00_dbsnp_only1	step	mapper	1391.441
+primary-dbsnp	00_dbsnp_only1	step	annotator	3520.347
+primary-dbsnp	00_dbsnp_only1	module	Aggregator variant	328.645
+primary-dbsnp	00_dbsnp_only1	module	Aggregator gene	0.308
+primary-dbsnp	00_dbsnp_only1	module	Aggregator sample	72.083
+primary-dbsnp	00_dbsnp_only1	module	Aggregator mapping	39.122
+primary-dbsnp	00_dbsnp_only1	step	aggregator	440.168
+primary-dbsnp	00_dbsnp_only1	module	tagsampler	261.274
+primary-dbsnp	00_dbsnp_only1	module	vcfinfo	288.182
+primary-dbsnp	00_dbsnp_only1	step	postaggregator	549.539
+primary-dbsnp	00_dbsnp_only1	module	vcfreporter	598.754
+primary-dbsnp	00_dbsnp_only1	step	reporter	598.833
+primary-dbsnp	00_dbsnp_only1	total	runtime	7039.172
+primary-dbsnp	01_dbsnp_only2	step	converter	569.167
+primary-dbsnp	01_dbsnp_only2	step	preparer	0.000
+primary-dbsnp	01_dbsnp_only2	step	mapper	1109.838
+primary-dbsnp	01_dbsnp_only2	step	annotator	608.148
+primary-dbsnp	01_dbsnp_only2	module	Aggregator variant	293.459
+primary-dbsnp	01_dbsnp_only2	module	Aggregator gene	0.305
+primary-dbsnp	01_dbsnp_only2	module	Aggregator sample	47.680
+primary-dbsnp	01_dbsnp_only2	module	Aggregator mapping	29.230
+primary-dbsnp	01_dbsnp_only2	step	aggregator	370.678
+primary-dbsnp	01_dbsnp_only2	module	tagsampler	195.390
+primary-dbsnp	01_dbsnp_only2	module	vcfinfo	161.526
+primary-dbsnp	01_dbsnp_only2	step	postaggregator	356.939
+primary-dbsnp	01_dbsnp_only2	module	vcfreporter	608.280
+primary-dbsnp	01_dbsnp_only2	step	reporter	608.307
+primary-dbsnp	01_dbsnp_only2	total	runtime	3624.839
+primary-dbsnp	02_dbsnp_only3	step	converter	491.088
+primary-dbsnp	02_dbsnp_only3	step	preparer	0.000
+primary-dbsnp	02_dbsnp_only3	step	mapper	1076.167
+primary-dbsnp	02_dbsnp_only3	step	annotator	574.774
+primary-dbsnp	02_dbsnp_only3	module	Aggregator variant	372.388
+primary-dbsnp	02_dbsnp_only3	module	Aggregator gene	0.317
+primary-dbsnp	02_dbsnp_only3	module	Aggregator sample	57.179
+primary-dbsnp	02_dbsnp_only3	module	Aggregator mapping	27.506
+primary-dbsnp	02_dbsnp_only3	step	aggregator	457.395
+primary-dbsnp	02_dbsnp_only3	module	tagsampler	195.351
+primary-dbsnp	02_dbsnp_only3	module	vcfinfo	139.735
+primary-dbsnp	02_dbsnp_only3	step	postaggregator	335.109
+primary-dbsnp	02_dbsnp_only3	module	vcfreporter	507.190
+primary-dbsnp	02_dbsnp_only3	step	reporter	507.217
+primary-dbsnp	02_dbsnp_only3	total	runtime	3444.453
+second_caller-1	00_full1	step	converter	753.170
+second_caller-1	00_full1	step	preparer	0.000
+second_caller-1	00_full1	step	mapper	1184.936
+second_caller-1	00_full1	step	annotator	5055.419
+second_caller-1	00_full1	module	Aggregator variant	672.298
+second_caller-1	00_full1	module	Aggregator gene	1.690
+second_caller-1	00_full1	module	Aggregator sample	70.522
+second_caller-1	00_full1	module	Aggregator mapping	30.778
+second_caller-1	00_full1	step	aggregator	775.293
+second_caller-1	00_full1	module	tagsampler	400.299
+second_caller-1	00_full1	module	vcfinfo	321.467
+second_caller-1	00_full1	module	just_cancer	97.585
+second_caller-1	00_full1	module	just_cardio	34.119
+second_caller-1	00_full1	module	just_coronary	157.424
+second_caller-1	00_full1	module	just_drugs	29.591
+second_caller-1	00_full1	module	just_longevitymap	296.206
+second_caller-1	00_full1	module	just_lipidmetabolism	331.402
+second_caller-1	00_full1	module	just_thrombophilia	350.339
+second_caller-1	00_full1	module	just_superhuman	559.346
+second_caller-1	00_full1	module	just_vo2max	250.070
+second_caller-1	00_full1	step	postaggregator	2828.109
+second_caller-1	00_full1	module	longevity2reporter	0.170
+second_caller-1	00_full1	step	reporter	0.329
+second_caller-1	00_full1	total	runtime	10624.657
+second_caller-2	00_full1	step	converter	678.200
+second_caller-2	00_full1	step	preparer	0.000
+second_caller-2	00_full1	step	mapper	1183.461
+second_caller-2	00_full1	step	annotator	2792.020

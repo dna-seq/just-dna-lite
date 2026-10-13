@@ -1,0 +1,18 @@
+# step 53: jdl-series-primary-ensembl
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool jdl --genome primary --vcf /data/a3-bench/inputs/anton/antonkulaga.vcf --series-dir /data/a3-bench/series/20261013T0200/jdl/primary-ensembl --no-warmup --cold 0 --warm 0 --full 0 --ensembl 3 -m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic -m pharmgkb -m superhuman -m thrombophilia -m vo2max 
+# start: 2026-10-13T11:59:27+02:00
+schedule (jdl, primary, seed 20261010): ensembl ensembl ensembl
+[0] ensembl1 load=1.38 start=2026-10-13T09:59:27+00:00
+    exit=0 cli=229.699s job=180.072s peak=5567.8MB cpu=168.0%
+  load 5.97 > 1.5, waiting
+  load 3.75 > 1.5, waiting
+  load 2.27 > 1.5, waiting
+[1] ensembl2 load=1.44 start=2026-10-13T10:04:48+00:00
+    exit=0 cli=141.985s job=132.056s peak=5677.3MB cpu=300.5%
+  load 3.98 > 1.5, waiting
+  load 2.49 > 1.5, waiting
+  load 1.51 > 1.5, waiting
+[2] ensembl3 load=0.97 start=2026-10-13T10:08:41+00:00
+    exit=0 cli=64.166s job=59.677s peak=5716.2MB cpu=675.0%
+# end: 2026-10-13T12:09:47+02:00 exit=0

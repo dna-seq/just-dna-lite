@@ -1,0 +1,13 @@
+# step 52: oakvar-series-primary-dbsnp-only
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool oakvar --genome primary --vcf /data/a3-bench/inputs/anton/antonkulaga.vcf --series-dir /data/a3-bench/series/20261013T0200/oakvar/primary-dbsnp --no-warmup --cold 0 --warm 0 --full 3 --full-label dbsnp_only --oakvar-args -a dbsnp -t vcf 
+# start: 2026-10-13T08:03:41+02:00
+schedule (oakvar, primary, seed 20261010): dbsnp_only dbsnp_only dbsnp_only
+  load 1.55 > 1.5, waiting
+[0] dbsnp_only1 load=1.09 start=2026-10-13T06:04:11+00:00
+    exit=0 cli=7041.531s job=Nones peak=3837.8MB cpu=None%
+[1] dbsnp_only2 load=1.31 start=2026-10-13T08:01:32+00:00
+    exit=0 cli=3627.528s job=Nones peak=3837.6MB cpu=None%
+[2] dbsnp_only3 load=1.37 start=2026-10-13T09:02:00+00:00
+    exit=0 cli=3446.846s job=Nones peak=3837.0MB cpu=None%
+# end: 2026-10-13T11:59:27+02:00 exit=0

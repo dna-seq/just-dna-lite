@@ -198,12 +198,12 @@ The default set is extensible through the same module contract used by the appli
 We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on the same workstation (Table 4). The main input was the whole-genome VCF of one of the co-authors, released publicly on Zenodo (record 18370498, CC0; 6,079,744 records called with DeepVariant 1.1.0 against GRCh38), the same genome used for the PRS benchmark in Section 4.2. Three more inputs vary the caller and the size: a second co-author's public genome, called with DRAGEN (Zenodo record 19487816, CC-BY-4.0), the HG002 output of the DeepVariant 1.0.0 whole-genome case study, and the private genome on which the earlier Generation I times were measured, on another workstation (Supplementary S2). The benchmark is therefore reproducible on the three public genomes, Generation I given an OakVar store account (the store serves its current module versions, recorded in Table S2);<!-- @rev B27 rounds=1 by=claude:2026-10-11 --> the benchmark scripts, the record of every run and the script that generates Tables 2 to 6 from them are in the repository (`docs/manuscript/benchmarks/a3/`),<!-- @/rev B27 --> and the pipeline can equally be run on any standard whole-genome VCF.
 <!-- @/rev B22 -->
 
-<!-- @rev B24 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
-Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the counterpart of an OakVar run (same VCF and same kind of report, not the same computation). A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order. Generation I ran three times on the primary genome and once on the calibration genome, with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module). It ran OakVar 2.13.1, the latest release at the time (published 2026-08-30), with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
+<!-- @rev B24 rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13 -->
+Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three modes. A *warm* run repeats the analysis of a sample whose quality-filtered table already exists, so the VCF is not read again. A *full* run starts from a fresh instance and reads the VCF, as every OakVar run does, so it is the counterpart of an OakVar run (same VCF and same kind of report, not the same computation). A *cold* run is a full run after the operating system's page cache has been dropped. After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order. Generation I ran with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module): three times on the primary genome and once on the calibration genome on one night, and twice more on the calibration genome and once on the second-caller genome on a second night, so that its spread includes the differences in page cache and machine load between nights. To compare annotation against a whole-genome reference database, Generation I also ran three times on the primary genome with its dbSNP annotator alone and a VCF report, and Generation II three times with Ensembl annotation on; the two are not the same computation, since Generation II also ran its ten modules and wrote its report, and OakVar's run includes its GENCODE gene mapper. Neither of these two series had a warm-up, and the first run of each, which read its database from disk for the first time (OakVar's annotator step took 3,520.3 s, against 608.1 and 574.8 s in the next two runs), is dropped as the warm-up; both first runs are in the repository's record of runs. It ran OakVar 2.13.1, the latest release at the time (published 2026-08-30), with the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
 <!-- @/rev B24 -->
 
-<!-- @rev C22 rounds=1 by=claude:2026-10-11 -->
-**Table 2.** Annotation wall time, from command start to report written: Just-DNA-Lite (Generation II) vs OakVar (Generation I). *n*, number of repeated runs. The last column divides the median Generation I time by the median of the row; a warm run does not read the VCF, so it is not compared.
+<!-- @rev C22 rounds=2 by=claude:2026-10-11,claude:2026-10-13 -->
+**Table 2.** Annotation wall time, from command start to report written: Just-DNA-Lite (Generation II) vs OakVar (Generation I). *n*, number of repeated runs. The last column divides the median Generation I time by the median of the row; a warm run does not read the VCF, so it is not compared. In the last section, the reference is Generation I with its dbSNP annotator alone, and the first run of each series is dropped as its warm-up.
 
 | Genome / run | *n* | Median (min–max), s | Mean ± SEM, s | SD, s | Generation I ÷ this (medians) |
 |---|---|---|---|---|---|
@@ -214,20 +214,24 @@ Generation II annotated each genome with the ten modules of Table 1, with Ensemb
 | Generation I (OakVar 2.13.1), full | 3 | 6,005.4 (5,889.3–6,068.5) | 5,987.7 ± 52.5 | 90.9 | 1× (ref.) |
 | **Second caller (public, Zenodo 19487816)** |  |  |  |  |  |
 | Generation II, warm | 11 | 20.2 (20.1–20.8) | 20.3 ± 0.1 | 0.2 | — |
-| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | — |
-| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | — |
+| Generation II, full | 5 | 62.1 (62.0–81.0) | 65.9 ± 3.8 | 8.4 | 171× |
+| Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | 162× |
+| Generation I (OakVar 2.13.1), full | 1 | 10,627.7 | — | — | 1× (ref.) |
 | **Community reference (HG002, DeepVariant case study)** |  |  |  |  |  |
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
 | **Calibration (private, the 2023 benchmark file)** |  |  |  |  |  |
 | Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
-| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 181× |
-| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 163× |
-| Generation I (OakVar 2.13.1), full | 1 | 5,995.5 | — | — | 1× (ref.) |
+| Generation II, full | 5 | 33.1 (33.0–33.3) | 33.1 ± 0.1 | 0.1 | 235× |
+| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
+| Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
+| **Primary, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
+| Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
+| Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
 <!-- @/rev C22 -->
 
-<!-- @rev C23 rounds=1 by=claude:2026-10-11 -->
+<!-- @rev C23 rounds=2 by=claude:2026-10-11,claude:2026-10-13 -->
 **Table 3.** Stage times and resources of the full runs (medians unless stated).<!-- @rev B25 rounds=2 by=claude:2026-10-11,claude:2026-10-12 --> Peak RAM is the resident memory summed over the whole process tree (for Generation I, the container's processes), sampled ten times a second; pages shared between processes count once per process, which overstates the total, while a peak shorter than the sampling interval can be missed.<!-- @/rev B25 --> CPU is user plus system time divided by wall time; it was not measured for Generation I. Warm and cold runs are in the repository's generated tables.
 
 | Genome | Run | *n* (runs) | Normalize (s) | Annotate (s) | Report (s) | Peak RAM, median (MB) | Peak RAM, max (MB) | CPU (%) |
@@ -235,9 +239,10 @@ Generation II annotated each genome with the ten modules of Table 1, with Ensemb
 | Primary | Generation II, full | 5 | 15.4 | 10.4 | 1.8 | 2,224 | 2,270 | 376 |
 | Primary | Generation I | 3 | — | — | — | 4,610 | 4,611 | — |
 | Second caller | Generation II, full | 5 | 41.6 | 13.7 | 1.8 | 4,465 | 4,514 | 345 |
+| Second caller | Generation I | 1 | — | — | — | 4,529 | 4,529 | — |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
 | Calibration | Generation II, full | 5 | 16.6 | 9.4 | 2.1 | 2,274 | 2,296 | 376 |
-| Calibration | Generation I | 1 | — | — | — | 3,838 | 3,838 | — |
+| Calibration | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
 <!-- @/rev C23 -->
 
 <!-- @rev B23 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
@@ -257,8 +262,8 @@ Generation II annotated each genome with the ten modules of Table 1, with Ensemb
 | Input: calibration | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
 <!-- @/rev B23 -->
 
-<!-- @rev A3a rounds=1 by=claude:2026-10-11 -->
-On the primary genome, the median full run took 32.7 s against 6,005.4 s for Generation I, an approximately 183-fold speedup (181-fold on the calibration genome). It applies to these configurations and these inputs, rather than to OakVar generally. A warm run, which reuses the sample's quality-filtered table, took 16.3 s. The benchmark used SSD storage and a workstation with 63 GiB RAM; it does not directly establish performance on a laptop or on rotational disks. Peak memory of a Just-DNA-Lite run with Ensembl off was 2,054 to 2,270 MB on the primary genome and at most 4,525 MB on any genome, against at most 4,611 MB for Generation I (Table 3); one run with Ensembl annotation on took 95.4 s and 5,750 MB. Streaming joins and column-pruned reads are architectural differences, but this comparison does not isolate their individual contributions to runtime.
+<!-- @rev A3a rounds=2 by=claude:2026-10-11,claude:2026-10-13 -->
+On the primary genome, the median full run took 32.7 s against 6,005.4 s for Generation I, an approximately 183-fold speedup (235-fold on the calibration genome and 171-fold on the second-caller genome). These ratios carry Generation I's own spread: on the calibration genome its slowest run took 38% longer than its fastest, the two having run on different nights. Against a whole-genome reference database the gap narrows: Generation II with Ensembl annotation on took a median of 103.1 s and Generation I with dbSNP alone 3,537.2 s, about 34-fold, a fifth of the gap with the report modules. The larger gap with the report modules is consistent with their being compiled in advance into tables keyed for the join (Section 2.1), but this comparison does not isolate that contribution. In practice, a whole-genome run that took Generation I about one to three hours took Generation II between half a minute and two and a half minutes. These ratios apply to these configurations and these inputs, rather than to OakVar generally. A warm run, which reuses the sample's quality-filtered table, took 16.3 s. The benchmark used SSD storage and a workstation with 63 GiB RAM; it does not directly establish performance on a laptop or on rotational disks. Peak memory of a Just-DNA-Lite run with Ensembl off was 2,054 to 2,270 MB on the primary genome and at most 4,525 MB on any genome, against at most 4,611 MB for Generation I (Table 3); with Ensembl annotation on it was 5,568 to 5,750 MB. Streaming joins and column-pruned reads are architectural differences, but this comparison does not isolate their individual contributions to runtime.
 <!-- @/rev A3a -->
 
 ### **4.2 PRS Computation**
@@ -427,8 +432,8 @@ Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-co
 
 **S1. Generation I: OakVar-Based Just-DNA-Seq Platform.** Architecture, pipeline, module types, and repository table for the OakVar-based Generation I system (see combined-manuscript supplement for full detail).
 
-<!-- @rev B28 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
-**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4: 6,005.4, 6,068.5 and 5,889.3 s on the primary genome, 5,995.5 s on the calibration genome), with peak memory of 4,611, 4,610, 4,610 and 3,838 MB; OakVar's own step times (on the primary genome, as medians of the three runs, the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
+<!-- @rev B28 rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13 -->
+**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table 4): on the primary genome 6,005.4, 6,068.5 and 5,889.3 s on the first night; on the calibration genome 5,995.5 s on the first night and 7,785.3 and 8,281.0 s on the second; on the second-caller genome 10,627.7 s; and with dbSNP alone on the primary genome 7,041.5 s (the warm-up), 3,627.5 and 3,446.8 s; with peak memory of 3,832 to 4,611 MB; OakVar's own step times (on the primary genome, as medians of the three runs, the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
 <!-- @/rev B28 -->
 
 <!-- @rev A3d rounds=1 by=claude:2026-10-12 -->

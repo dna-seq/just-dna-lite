@@ -33,7 +33,15 @@ RUN_LABEL = {
     "cold": "Generation II, cold",
     "ensembl": "Generation II, full + Ensembl (annotate_all_job)",
     "oakvar": "Generation I (OakVar 2.13.1), full",
+    "dbsnp_only": "Generation I (OakVar 2.13.1), dbSNP only",
 }
+# Night 2 timed both generations against a whole-genome reference database: OakVar with its dbSNP annotator
+# alone, Generation II with Ensembl on. Neither series had a warm-up run, and the first run of each read its
+# database from disk for the first time (OakVar's annotator step took about six times as long), so the first
+# run is dropped as the warm-up: the author's call after the runs (PROTOCOL.md, night 2). Both series ran on
+# the same night, so the pair compares like with like; the night-1 Ensembl run is left out of it.
+PAIR_SERIES = "/series/20261013T0200/"
+PAIR = {"jdl": ("jdl", "primary", "ensembl"), "oakvar": ("oakvar", "primary", "dbsnp_only")}
 LARGE_SCORE = 1_000_000
 ENGINES = ("duckdb", "polars", "plink2")
 ENGINE_LABEL = {"duckdb": "just-prs DuckDB", "polars": "just-prs Polars", "plink2": "PLINK2"}
@@ -78,6 +86,21 @@ def col(rows: list[dict], name: str) -> list[float]:
     return [float(r[name]) for r in rows if r[name] not in ("", "None")]
 
 
+def in_pair_series(r: dict) -> bool:
+    return PAIR_SERIES in r["run_dir"] and r["run_type"] in ("ensembl", "dbsnp_only")
+
+
+def pair_runs(runs, tool: str) -> list[dict]:
+    """The runs of one side of the reference-database pair, its warm-up (the series' first run) dropped."""
+    return [r for r in runs[PAIR[tool]] if in_pair_series(r) and r["order"] != "0"]
+
+
+def load_steps() -> list[dict]:
+    """OakVar's own step and module times, every series."""
+    return [r for path in sorted(A3.glob("oakvar/steps-*.tsv"))
+            for r in csv.DictReader(path.open(), delimiter="\t")]
+
+
 def table2(runs) -> tuple[str, dict]:
     out_rows = []
     ratios = {}
@@ -95,6 +118,14 @@ def table2(runs) -> tuple[str, dict]:
         if oak:
             out_rows.append([RUN_LABEL["oakvar"], *time_cells(summary(col(oak, "cli_wall_s"))),
                              "1× (ref.)"])
+    oak = summary(col(pair_runs(runs, "oakvar"), "cli_wall_s"))
+    jdl = summary(col(pair_runs(runs, "jdl"), "cli_wall_s"))
+    ratios["pair"] = oak["median"] / jdl["median"]
+    out_rows += [
+        ["**Primary, against a whole-genome reference database (first run of each dropped)**", "", "", "", "", ""],
+        ["Generation II, full + Ensembl", *time_cells(jdl), f"{ratios['pair']:,.0f}×"],
+        [RUN_LABEL["dbsnp_only"], *time_cells(oak), "1× (ref.)"],
+    ]
     text = table(["Genome / run", "*n*", "Median (min–max), s", "Mean ± SEM, s", "SD, s",
                   "Generation I ÷ this (medians)"], out_rows)
     return text, ratios
@@ -221,14 +252,16 @@ def s2(runs) -> str:
     rows = []
     for h in hist:
         if h["tool"] == "oakvar":
-            rows.append(["2023 (old workstation)", "calibration", h["date"], h["value_s"], "—", "—"])
-    for g in ("primary", "calibration"):
-        for r in runs.get(("oakvar", g, "full"), []):
-            rows.append(["2026 (this machine)", g, r["started_at"][:10], f(float(r["cli_wall_s"])),
-                         f(float(r["peak_rss_mb"]), 0), r["load1_before"]])
-    runs_table = table(["Series", "Genome", "Date", "Wall time, s", "Peak RSS, MB", "Load before"], rows)
+            rows.append(["2023 (old workstation)", "calibration", "full", h["date"], h["value_s"], "—", "—", "—"])
+    for g, t in (("primary", "full"), ("calibration", "full"), ("second_caller", "full"), ("primary", "dbsnp_only")):
+        for r in sorted(runs.get(("oakvar", g, t), []), key=lambda r: r["started_at"]):
+            used = "warm-up, dropped" if in_pair_series(r) and r["order"] == "0" else "Table 2"
+            rows.append(["2026 (this machine)", g, t, r["started_at"][:16].replace("T", " ") + " UTC",
+                         f(float(r["cli_wall_s"])), f(float(r["peak_rss_mb"]), 0), r["load1_before"], used])
+    runs_table = table(["Series", "Genome", "Mode", "Started", "Wall time, s", "Peak RSS, MB", "Load before",
+                        "Used in"], rows)
 
-    steps = list(csv.DictReader(next(A3.glob("oakvar/steps-*.tsv")).open(), delimiter="\t"))
+    steps = load_steps()
     step_rows = []
     for kind, name in [(r["kind"], r["name"]) for r in steps if r["genome"] == "primary" and r["run"].startswith("00_")]:
         vals = [float(r["seconds"]) for r in steps if r["genome"] == "primary" and r["kind"] == kind and r["name"] == name]
@@ -396,9 +429,53 @@ def quoted(runs) -> str:
         f"- Generation II peak RAM, every warm/full/cold run on every genome: max "
         f"{f(max(x for g in GENOMES for t in JDL_TYPES for x in col(runs[('jdl', g, t)], 'peak_rss_mb')), 0)} MB",
         f"- Generation I peak RAM, primary: max {f(max(col(runs[('oakvar', 'primary', 'full')], 'peak_rss_mb')), 0)} MB",
-        f"- Ensembl run (primary): wall {f(col(runs[('jdl', 'primary', 'ensembl')], 'cli_wall_s')[0])} s, "
-        f"peak {f(col(runs[('jdl', 'primary', 'ensembl')], 'peak_rss_mb')[0], 0)} MB",
+        f"- Generation I peak RAM, every run: max "
+        f"{f(max(x for k, rs in runs.items() if k[0] == 'oakvar' for x in col(rs, 'peak_rss_mb')), 0)} MB",
+        f"- Generation II peak RAM with Ensembl on, every run: "
+        f"{f(min(col(runs[PAIR['jdl']], 'peak_rss_mb')), 0)}–{f(max(col(runs[PAIR['jdl']], 'peak_rss_mb')), 0)} MB "
+        f"(n={len(runs[PAIR['jdl']])})",
     ]
+    second = runs.get(("oakvar", "second_caller", "full"))
+    if second:
+        oak = med(("oakvar", "second_caller", "full"))
+        lines.append(f"- second_caller: Generation I median {f(oak)} s (n={len(second)}); ratio full "
+                     f"{oak / med(('jdl', 'second_caller', 'full')):.0f}×, cold {oak / med(('jdl', 'second_caller', 'cold')):.0f}×")
+    oak_p, jdl_p = (col(pair_runs(runs, k), "cli_wall_s") for k in ("oakvar", "jdl"))
+    full_ratio = med(("oakvar", "primary", "full")) / med(("jdl", "primary", "full"))
+    pair_ratio = st.median(oak_p) / st.median(jdl_p)
+    lines += [
+        f"- Reference-database pair (primary, first run dropped): Generation I dbSNP only median {f(st.median(oak_p))} s "
+        f"(n={len(oak_p)}, {f(min(oak_p))}–{f(max(oak_p))}); Generation II full + Ensembl median {f(st.median(jdl_p))} s "
+        f"(n={len(jdl_p)}, {f(min(jdl_p))}–{f(max(jdl_p))}); ratio of medians {pair_ratio:.0f}×; ratio range over "
+        f"run pairs {min(oak_p) / max(jdl_p):.0f}–{max(oak_p) / min(jdl_p):.0f}×",
+        f"- The full-run ratio on the primary genome ({full_ratio:.0f}×) is {full_ratio / pair_ratio:.1f} times the pair's",
+    ]
+    for tool, key in PAIR.items():
+        first = next(r for r in runs[key] if in_pair_series(r) and r["order"] == "0")
+        lines.append(f"- Pair warm-up dropped, {tool}: {f(float(first['cli_wall_s']))} s")
+    ann = {r["run"]: float(r["seconds"]) for r in load_steps()
+           if r["genome"] == "primary-dbsnp" and r["kind"] == "step" and r["name"] == "annotator"}
+    lines.append("- OakVar annotator step, dbSNP-only runs: "
+                 + ", ".join(f"{run} {f(s)} s" for run, s in sorted(ann.items())))
+    joins = [(r["order"], json.loads(r["steps_json"])["user_annotated_vcf_duckdb"]["seconds"])
+             for r in runs[PAIR["jdl"]] if in_pair_series(r)]
+    lines.append("- Generation II Ensembl join step, night-2 runs in order: "
+                 + ", ".join(f"{f(s)} s" for _, s in sorted(joins)))
+    every = [(k, x) for k, rs in runs.items() if k[2] != "warmup" for x in col(rs, "cli_wall_s")]
+    g2 = [x for k, x in every if k[0] == "jdl" and k[2] in ("full", "cold")]
+    g1 = [x for k, x in every if k[0] == "oakvar" and k[2] == "full"]
+    lines += [
+        f"- Every Generation II full or cold run: {f(min(g2))}–{f(max(g2))} s; with Ensembl, pair runs: "
+        f"{f(min(jdl_p))}–{f(max(jdl_p))} s",
+        f"- Every Generation I full run: {f(min(g1))}–{f(max(g1))} s ({min(g1) / 3600:.1f}–{max(g1) / 3600:.1f} h); "
+        f"dbSNP only, pair runs: {f(min(oak_p))}–{f(max(oak_p))} s",
+    ]
+    for g in ("primary", "calibration", "second_caller"):
+        rs = runs.get(("oakvar", g, "full"), [])
+        w = col(rs, "cli_wall_s")
+        lines.append(f"- Generation I full runs, {g}: n={len(rs)}, dates "
+                     + ", ".join(sorted({r['started_at'][:10] for r in rs}))
+                     + f"; slowest is {100 * (max(w) / min(w) - 1):.0f}% slower than fastest")
     for config in ("fixed", "original"):
         by_id = load_prs(config)
         for e in ENGINES:

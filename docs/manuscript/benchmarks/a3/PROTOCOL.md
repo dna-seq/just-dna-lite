@@ -395,3 +395,32 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   and are one job each, so if the user starts the app stack in the morning, the port check refuses
   the next run instead of timing beside it. Estimated end: about 12:00–13:00.
 - Timer: `systemd-run --user --on-calendar='2026-10-13 02:00:00' --unit=bench-queue-2`.
+
+### Night 2 results so far, and two decisions (2026-10-13, 16:00)
+
+- Queue start 02:00:23 at load 11.1; the load gate held job 60 until 03:35. Jobs 60–63 exited 0
+  (logs `051`–`054`); `64` is running, `65` queued (each about 3 h). The just-prs session's jobs
+  `69`, `70` and `80` follow in the same queue and time nothing of ours.
+- OakVar ran slower on night 2: calibration 7,785.3 and 8,281.0 s against 5,995.5 s on night 1. Its
+  own step times put it in the I/O-bound steps (annotator 2,750 and 3,196 s against 1,741 s;
+  aggregator and mapper slower too; postaggregator about the same), consistent with a colder page
+  cache under the user's daytime work. **Decision (user):** pool all three calibration runs (n=3,
+  median 7,785.3 s, 235×). The point of the extra runs is the spread a real machine shows between
+  hot and cold caches and load, not a single reproducible number.
+- The first run of each night-2 reference-database series was slow: OakVar dbSNP-only 7,041.5 s
+  (annotator step 3,520.3 s, against 608.1 and 574.8 s after it) and Generation II with Ensembl
+  229.7 s (join step 97.8 s, then 61.3 and 32.1 s). Neither series had a warm-up run.
+  **Decision (user):** drop the first run of each as its warm-up; it also overlapped the user's
+  coding. The pair is then 3,537.2 s against 103.1 s, 34× (24–57× over run pairs), a fifth of the
+  183× with the report modules. The paper gives both ratios, says the larger one is consistent with
+  modules compiled in advance into join-keyed tables without isolating it, and puts them in user
+  terms: about one to three hours against half a minute to two and a half minutes.
+- Correction to the night-2 queue note above: "the pair errs in OakVar's favour" is not established.
+  Generation II also runs its modules and report, but OakVar's dbSNP-only run includes its GENCODE
+  mapper (1,076–1,391 s), which Generation II has no counterpart of. The paper says the two are not
+  the same computation.
+- `make_tables.py`: Table 2 gains the pair section (`PAIR_SERIES`, `pair_runs`); S2 lists every
+  OakVar run with its mode and whether Table 2 uses it; step times read every `oakvar/steps-*.tsv`
+  (night 2: `steps-20261013T0200.tsv`, partial until `65` ends); new quoted lines for the pair, the
+  warm-ups, Generation I's spread and the run ranges. Paper v0.4: B24, C22, C23 (Table 3), A3a and
+  B28 updated, rounds bumped. After `65`: regenerate, update the second-caller row and counts.
