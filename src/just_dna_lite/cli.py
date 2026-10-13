@@ -19,10 +19,12 @@ load_env()  # this checkout's .env (or .env.template), never one above it
 with environ_guard():
     import just_dna_registry.client_cli  # noqa: F401
 
+from just_dna_lite.dagster_maintenance import human_bytes, prune_history, resolve_dagster_home
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
+    find_dagster_instance_pids,
     find_port_listeners,
     install_launcher_signal_handlers,
     lite_mcp_http_argv,
@@ -1058,6 +1060,92 @@ def cleanup_orphaned_runs(
         typer.echo(f"  ✓ Canceled run {run.run_id[:8]}...")
     
     typer.secho(f"\n✅ Cleaned up {len(run_records)} orphaned run(s).", fg=typer.colors.GREEN)
+
+
+@app.command("prune-dagster-history")
+def prune_dagster_history_cmd(
+    max_age_days: Annotated[
+        int,
+        typer.Option("--max-age-days", help="Delete runs whose history is older than this many days")
+    ] = 30,
+    keep_runless: Annotated[
+        bool,
+        typer.Option("--keep-runless/--prune-runless", help="Keep every runless asset event instead of only the newest per partition")
+    ] = False,
+    no_vacuum: Annotated[
+        bool,
+        typer.Option("--no-vacuum", help="Skip the SQLite VACUUM that returns the freed pages to the filesystem")
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Report what would be removed without removing it")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Also remove files and vacuum while Dagster is running")
+    ] = False,
+) -> None:
+    """Bound the size of the Dagster event log.
+
+    Deletes aged runs, orphaned per-run databases and superseded runless asset
+    events, then vacuums the index so the pages return to the filesystem. The
+    newest runless materialization per asset and partition is always kept, which
+    is the one the web UI reads back.
+    """
+    root = _find_workspace_root(Path.cwd())
+    if root is None:
+        raise typer.BadParameter("Could not find workspace root. Run this from the repo root.")
+
+    dagster_home = resolve_dagster_home(root)
+    if not dagster_home.exists():
+        typer.secho("No Dagster instance found. Nothing to prune.", fg=typer.colors.YELLOW)
+        return
+
+    # A daemon holds the databases open without listening on the UI port, so ask for
+    # this instance's Dagster processes as well as the port.
+    dagster_port = _resolve_dagster_port(None)
+    holders = sorted(set(find_port_listeners(dagster_port)) | set(find_dagster_instance_pids(dagster_home)))
+    dagster_running = bool(holders) and not force
+    if holders:
+        typer.secho(
+            f"Dagster is running for this instance (pids: {', '.join(str(p) for p in holders)}).",
+            fg=typer.colors.YELLOW,
+        )
+        typer.echo(
+            "Pruning rows anyway; file removals and the vacuum wait for a pass with the stack stopped."
+            if dagster_running
+            else "Pruning everything anyway because --force was given."
+        )
+
+    report = prune_history(
+        dagster_home,
+        max_age_days=max_age_days,
+        prune_runless=not keep_runless,
+        run_vacuum=not no_vacuum,
+        dry_run=dry_run,
+        dagster_running=dagster_running,
+    )
+
+    typer.echo(f"Dagster home: {report.dagster_home}")
+    typer.echo(f"Event log before: {human_bytes(report.before.total)} ({report.before.per_run_count} per-run databases)")
+    typer.echo(f"  runs older than {max_age_days} days: {len(report.deleted_runs)}")
+    typer.echo(f"  orphaned per-run databases: {len(report.orphan_run_dbs)}")
+    typer.echo(
+        f"  superseded runless asset events: {report.runless_rows_deleted}"
+        f" ({human_bytes(report.runless_bytes_deleted)} of payload)"
+    )
+    if report.stray_index_removed:
+        verb = "would remove" if dry_run else "removed"
+        typer.secho(f"  {verb} a stray '.db' index written for an empty run id", fg=typer.colors.YELLOW)
+    for reason in report.skipped:
+        typer.secho(f"  skipped: {reason}", fg=typer.colors.YELLOW)
+
+    if dry_run:
+        typer.secho("\nDRY RUN: nothing was removed.", fg=typer.colors.YELLOW)
+        return
+
+    typer.echo(f"Event log after: {human_bytes(report.after.total)}")
+    typer.secho(f"\nFreed {human_bytes(report.bytes_freed)}.", fg=typer.colors.GREEN)
 
 
 def _start_all_cli() -> None:

@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
-from dagster import AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterInstance, MetadataValue
+from dagster import (
+    AssetKey,
+    AssetMaterialization,
+    AssetRecordsFilter,
+    DagsterInstance,
+    MetadataValue,
+)
 from dagster._serdes import serialize_value
-
-import webui.state as state
 from webui.state import (
     PRS_CHECKPOINT_FILENAME,
     PRS_RESULTS_ASSET_KEY,
@@ -18,6 +23,8 @@ from webui.state import (
     checkpoint_prs_results,
     restore_prs_checkpoint,
 )
+
+from webui import state
 
 
 def _rows(padding: int = 0) -> list[dict[str, Any]]:

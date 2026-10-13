@@ -588,6 +588,17 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; startup
    cancels orphaned `NOT_STARTED` runs. Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
    [--dry-run]`. Fallback runs cannot be re-executed from the Dagster UI.
+   **Event-log size is bounded by `uv run pipelines prune-dagster-history`, not by `cleanup-runs`.**
+   `report_runless_asset_event` writes rows with an empty `run_id`, so `delete_run` never reaches them
+   and `SqliteEventLogStorage` also mirrors them into a stray `history/runs/.db`. Before #35 the PRS
+   checkpoint put the whole results table in each one (~10 MB per compute, 30 GB in total); the rows
+   are a file now, but the events still accumulate. The prune keeps the newest runless materialization
+   per `(asset_key, partition)` (the one the restore path reads), drops the rest and vacuums. With
+   Dagster running (port listener or `find_dagster_instance_pids`) it prunes rows anyway but defers file
+   removals and the vacuum (unlinking a database the daemon holds open frees nothing). Orphaned per-run
+   databases are judged by `get_run_by_id`, never by membership of one page of `get_run_records`. It
+   opens the instance from its directory and never sets `DAGSTER_HOME`. Weekly cron wrapper:
+   `scripts/prune_dagster_history.sh`. Tests: `tests/test_dagster_maintenance.py`.
 4. Button state is **per file** (`selected_file_is_running`), never a global `self.running`.
 
 CLI tools may call `job_def.execute_in_process(run_config=..., instance=..., tags=...)` directly, after

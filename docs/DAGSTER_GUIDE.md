@@ -212,6 +212,53 @@ runs still appear in the Dagster UI as before.
 from the Dagster UI is not supported (no `remote_job_origin`). Cleaning up orphans is
 unchanged: `uv run pipelines cleanup-runs --status STARTED`.
 
+### Keeping the event log from filling the disk
+
+`data/interim/dagster` grew to 30 GB on the development machine, and deleting old
+runs would have reclaimed 7 MB of it. All the rest sat in two SQLite files that no
+run owns.
+
+The web UI checkpoints PRS results with `instance.report_runless_asset_event`
+(`webui/src/webui/state.py`, `checkpoint_prs_results`). Those rows carry an empty
+`run_id`, which has two consequences: `instance.delete_run` never reaches them, and
+Dagster's `SqliteEventLogStorage` opens a per-run database named after the empty id,
+so a second file called `.db` mirrors `index.db` byte for byte. Until issue #35 each
+checkpoint also carried the whole results table through `MetadataValue.json`, about
+10 MB and growing with every score added; roughly 1,600 of them made 15.9 GB, twice
+over. The rows now live in `prs_results.json` beside the sample and the event holds
+only its path, but one event per compute still accumulates, and only the newest per
+partition is ever read back.
+
+`uv run pipelines prune-dagster-history` bounds all of it:
+
+```bash
+uv run pipelines prune-dagster-history --dry-run          # report, change nothing
+uv run pipelines prune-dagster-history --max-age-days 30  # the weekly default
+```
+
+It deletes runs older than `--max-age-days`, removes per-run databases whose run is
+gone and the stray `.db`, keeps only the newest runless materialization per asset
+and partition, then vacuums `index.db` so the pages return to the filesystem.
+Keeping the newest is what preserves the UI's cross-session PRS restore. The
+vacuum needs room for a second copy of the live data and says so instead of
+failing when the disk is too full, which is exactly when it is reached for.
+
+With the stack running it still prunes rows, because SQLite arbitrates that
+transaction and it is the part that reclaims the space. File removals and the
+vacuum defer to a pass with Dagster stopped and say so in the output: unlinking a
+database the daemon holds open returns nothing to the filesystem, since the writer
+keeps its descriptor. Dagster counts as running when something listens on its port
+or a Dagster process uses this instance's `DAGSTER_HOME`. `--force` does them anyway.
+`scripts/prune_dagster_history.sh` is the cron wrapper; it finds the checkout from its
+own location:
+
+```
+17 4 * * 0 /path/to/just-dna-lite/scripts/prune_dagster_history.sh
+```
+
+It appends to `logs/prune-dagster-history.log` and trims that log to its last 2000
+lines.
+
 ### Why both assets and jobs?
 
 You'll see `assets.py` plus `ops.py` / `jobs.py`:
