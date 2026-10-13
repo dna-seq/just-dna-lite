@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate every benchmark table of Paper 1 (Tables 2-6, S2, S3) from the committed A3 files.
+"""Generate every benchmark table of Paper 1 (Tables 2-5, S2, S3, S6) from the committed A3 files.
 
 Inputs, all in docs/manuscript/benchmarks/a3/: runs.csv, inputs.json, env.json, historical.csv,
 oakvar/steps-*.tsv, oakvar/installed-2.13.1.json, prs/results-*/{fixed,original}/benchmark_results.csv.
@@ -180,7 +180,7 @@ def table3(runs) -> str:
                   "Job, s", "Peak RSS, MB: median (max)", "Mean RSS, MB", "CPU, %"], rows)
 
 
-def table4() -> str:
+def table_s6() -> str:
     env = json.loads((A3 / "env.json").read_text())
     m, c = env["machine"], env["code"]
     disk = m["data_mount"]["disk"]
@@ -218,7 +218,7 @@ def scored(r: dict) -> bool:
     return r["score"] not in ("", "None") and r.get("plink2_exit") in ("", "0", None)
 
 
-def table5(config: str) -> str:
+def table4(config: str) -> str:
     by_id = load_prs(config)
     done = {e: [i for i, d in by_id.items() if e in d and scored(d[e])] for e in ENGINES}
     paired = sorted(set.intersection(*(set(v) for v in done.values())))
@@ -248,7 +248,7 @@ def pearson(xs: list[float], ys: list[float]) -> float:
     return st.correlation(xs, ys)
 
 
-def table6(config: str) -> str:
+def table5(config: str) -> str:
     by_id = load_prs(config)
     rows = []
     for a, b in (("duckdb", "polars"), ("duckdb", "plink2"), ("polars", "plink2")):
@@ -355,7 +355,7 @@ def paper_table3(runs) -> str:
                   "Peak RAM, median (MB)", "Peak RAM, max (MB)", "CPU (%)"], rows)
 
 
-def paper_table4() -> str:
+def paper_table_s6() -> str:
     env = json.loads((A3 / "env.json").read_text())
     m, c = env["machine"], env["code"]
     disk = m["data_mount"]["disk"]
@@ -378,7 +378,7 @@ def paper_table4() -> str:
     return table(["Parameter", "Value"], rows)
 
 
-def paper_table6() -> str:
+def paper_table5() -> str:
     rows = []
     for config in ("fixed", "original"):
         by_id = load_prs(config)
@@ -535,20 +535,20 @@ def main() -> None:
         "CPU is user + system time of the command and every descendant it reaped, divided by wall time; it was "
         "not measured for Generation I (the container's processes are not the driver's children).",
         table3(runs),
-        "## Table 4. Machine and inputs", table4(),
+        "## Table S6. Machine and inputs", table_s6(),
     ]
     for config, label in (("fixed", "fixed benchmark inputs (primary)"), ("original", "original benchmark inputs")):
-        parts += [f"## Table 5 ({label}). PRS runtime per PGS ID", table5(config),
-                  f"## Table 6 ({label}). Score concordance", table6(config)]
+        parts += [f"## Table 4 ({label}). PRS runtime per PGS ID", table4(config),
+                  f"## Table 5 ({label}). Score concordance", table5(config)]
     parts += ["## S2. Generation I runs, steps, hardware factor and module versions", s2(runs)]
     for config in ("fixed", "original"):
         parts += [f"## S3 ({config}). Large scoring files: time and memory", s3(config)]
     parts += ["# As printed in the paper",
               "## Paper Table 2", t2,
               "## Paper Table 3", paper_table3(runs),
-              "## Paper Table 4", paper_table4(),
-              "## Paper Table 5", table5("fixed"),
-              "## Paper Table 6", paper_table6(),
+              "## Paper Table S6", paper_table_s6(),
+              "## Paper Table 4", table4("fixed"),
+              "## Paper Table 5", paper_table5(),
               "## Paper Table S2", paper_table_s2(),
               "## Numbers quoted in the text", quoted(runs)]
     (A3 / "tables.md").write_text("\n\n".join(parts) + "\n")

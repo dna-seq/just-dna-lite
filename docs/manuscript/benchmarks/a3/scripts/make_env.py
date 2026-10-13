@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble env.json from the committed protocol logs, so every machine and software fact in Table 4
+"""Assemble env.json from the committed protocol logs, so every machine and software fact in Table S6
 comes from what was recorded at run time, not from the machine as it is when this script runs.
 
 Standard library only. Run from anywhere inside the repository:
