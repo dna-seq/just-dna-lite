@@ -18,6 +18,20 @@ ov() {  # ov <slug> <genome> <vcf> <series-dir> <driver args...>
         uv run --no-sync python -I "$A3/scripts/bench_annotation.py" --tool oakvar --genome "$genome" \
         --vcf "$vcf" --series-dir "$series" --no-warmup --cold 0 --warm 0 "$@")
 }
+# A3 day 2 (added 2026-10-13 ~16:40, before this job started): Generation II full runs on the three
+# genomes Generation I ran on, with the desktop in light use, so that Generation II is also measured
+# outside the idle night-1 condition. Warm-up + 5 full runs each, the ten modules, default load gate.
+MODULES=(-m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic
+         -m pharmgkb -m superhuman -m thrombophilia -m vo2max)
+jdl_day() {  # jdl_day <genome> <vcf>
+    (cd /data/a3-bench/jdl && "$A3/scripts/bp" "jdl-series-$1-day2" \
+        uv run --no-sync python -I "$A3/scripts/bench_annotation.py" --tool jdl --genome "$1" \
+        --vcf "$2" --series-dir "/data/a3-bench/series/20261013T0200/jdl/$1-day2" \
+        --cold 0 --warm 0 --full 5 "${MODULES[@]}")
+}
+jdl_day primary "$I/anton/antonkulaga.vcf"
+jdl_day calibration "$I/newton/newtonwinter.GRCh38.ens106.deep.vcf.gz"
+jdl_day second_caller "$I/livia/SIMHIFQTILQ.hard-filtered.vcf.gz"
 # A3 night 2: Generation I full run 3 of 3 on the second-caller genome (Livia, DRAGEN). One run per
 # queue job, so the port check above runs again before each one.
 ov oakvar-series-second-caller-3 second_caller "$I/livia/SIMHIFQTILQ.hard-filtered.vcf.gz" /data/a3-bench/series/20261013T0200/oakvar/second_caller-3 \

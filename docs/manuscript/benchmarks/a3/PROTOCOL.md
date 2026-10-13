@@ -424,3 +424,11 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   (night 2: `steps-20261013T0200.tsv`, partial until `65` ends); new quoted lines for the pair, the
   warm-ups, Generation I's spread and the run ranges. Paper v0.4: B24, C22, C23 (Table 3), A3a and
   B28 updated, rounds bumped. After `65`: regenerate, update the second-caller row and counts.
+- **Decision (user, ~16:30):** pool the nights. Same machine and specs; night 2 differs by light
+  desktop use, which is the everyday condition, and OakVar slowing under it is OakVar's behaviour, not
+  a method fault. The text reports roughly 200× with its spread for the report modules. Because the
+  calibration and second-caller ratios divided night-2 OakVar by night-1 Generation II, Generation II
+  is measured in the same light-use condition too: job `65` now starts with Generation II warm-up + 5
+  full runs on the primary, calibration and second-caller genomes (series `…/20261013T0200/jdl/*-day2`),
+  then its OakVar run. Edited before `65` started (the queue expands its job list once, so a new file
+  would not run); not run at once because OakVar job `64` was being timed.
