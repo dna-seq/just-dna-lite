@@ -1177,7 +1177,7 @@ def agent_chat_panel() -> rx.Component:
             rx.el.div(
                 rx.el.textarea(
                     id="agent-chat-input",
-                    key=AgentState._agent_input_key,
+                    key=AgentState.agent_input_key,
                     default_value=AgentState.agent_input,
                     on_change=AgentState.set_agent_input,
                     placeholder="Describe the module you want to create...\n(Shift+Enter for new line)",

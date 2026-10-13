@@ -29,7 +29,7 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 
 ## Dependency pins
 
-- The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.9.12` in
+- The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.10.0` in
   `webui/pyproject.toml`. Everything else floats on `>=`. No `constraint-dependencies` or
   `override-dependencies` exist anywhere.
 - Deliberate ceilings: `grpcio<1.82` and `grpcio-health-checking<1.82` in lockstep (1.82 gencode needs
@@ -646,8 +646,16 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 - `rx.foreach` dict values are `Any`: cast with `.to(int)` / `.to(bool)`.
 - Per-row UI state (e.g. a busy button) is a bool stamped on the row (`item["busy"].to(bool)`), not a
   comparison of a global var to the item. Don't blanket `disabled=` primary buttons (looks pressed).
-- `_underscore` vars never reach the client: a remount `key=` must be public (`form_key`). Reset uploads
-  with `rx.clear_selected_files(...)` and don't debounce those setters.
+- `_underscore` vars never reach the client: a remount `key=` must be public (`form_key`,
+  `agent_input_key`). Reset uploads with `rx.clear_selected_files(...)` and don't debounce those
+  setters.
+- **Reflex 0.10 state classes**: `State._var` read on the class returns its `Field`, so passing it to
+  a component raises `TypeError … Field … LiteralVar` at compile, and `State._var[k] = v` breaks. A
+  process-wide value shared by every session (`UploadState._active_inproc_runs`) is a `ClassVar`.
+  Assigning a var through the class (`State.x = …`, `monkeypatch.setattr(State, "x", …)`) raises:
+  use `State.__fields__["x"].set_default(…)`. `backend_vars` and
+  `reflex_base.utils.types.is_backend_base_variable` are gone: `get_fields()` lists every var,
+  `base_vars` only the ones that reach the client.
 - Fomantic: segments, buttons, labels, dividers, messages and `top attached tabular menu` +
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
   `ui fixed menu` and accordions don't: use flexbox. Checkboxes need the Fomantic
@@ -662,7 +670,7 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
   `backend_api_url` never returns `""`.
 
-## PRS (`just-prs>=0.10.0`, `prs-ui>=0.3.16`)
+## PRS (`just-prs>=0.10.3`, `prs-ui>=0.3.18`)
 
 `PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`

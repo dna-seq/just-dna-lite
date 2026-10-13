@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from reflex_base.utils.types import is_backend_base_variable
-
 import pytest
 
 from webui.pages.registry import _CARD_BLURB_STYLE
@@ -56,7 +54,8 @@ def test_catalog_get_busy_is_a_card_field_not_a_global_frontend_var() -> None:
 
     The grid reads ``card["busy"]``. The stamp source is backend-only.
     """
-    assert is_backend_base_variable("_busy_key", RegistryState)
+    assert "_busy_key" in RegistryState.get_fields()
+    assert "_busy_key" not in RegistryState.base_vars
     assert "busy_key" not in RegistryState.base_vars
 
 

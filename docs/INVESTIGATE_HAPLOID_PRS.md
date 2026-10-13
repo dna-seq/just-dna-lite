@@ -49,3 +49,8 @@ not `[a, a]`. The section above describes 0.10.2 only. Paper 1 must not say just
 `--xchr-model 2`. Pin `>=0.10.3` instead of 0.10.2 when it is published. Measured by the just-prs
 session: no change for antonkulaga or Livia's VCF, neither of which has a haploid GT on X or Y. just-prs
 is adding sex inference so a male's diploid-written X/Y calls score one copy.
+
+## Update 2026-10-13: pinned `just-prs>=0.10.3`
+
+0.10.3 is on PyPI and is now the floor in the root `pyproject.toml`. The regression test (step 3) is
+still open, so this note stays open.

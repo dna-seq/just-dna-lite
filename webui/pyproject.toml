@@ -5,11 +5,11 @@ description = "Reflex Web UI for just-dna-lite"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "reflex==0.9.12",
+  "reflex==0.10.0",
   "just-dna-pipelines",
   "granian>=2.8.1",
   "fastapi>=0.141.1",
-  "prs-ui>=0.3.16",
+  "prs-ui>=0.3.18",
   "reflex-mui-datagrid>=0.3.14",
   "gunicorn>=26.0.0",
   "google-genai>=1.75.0,<2.0",

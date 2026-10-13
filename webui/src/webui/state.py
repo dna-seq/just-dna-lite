@@ -15,7 +15,7 @@ import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Dict, Generator, List, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Callable, ClassVar, Dict, Generator, List, Optional, Sequence, Union
 
 import polars as pl
 import reflex as rx
@@ -452,9 +452,10 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 
     # Custom module registry (managed by AgentState slot, kept here for remove/refresh)
 
-    # Class variable to track active in-process runs (for SIGTERM cleanup)
-    # Maps token/run_id -> partition_key for jobs running in compute children
-    _active_inproc_runs: Dict[str, str] = {}
+    # Process-wide registry of active in-process runs (for SIGTERM cleanup), shared by
+    # every session: a ClassVar, since reflex 0.10 turns a `_var` read on the class
+    # into its Field descriptor. Maps token/run_id -> partition_key.
+    _active_inproc_runs: ClassVar[Dict[str, str]] = {}
 
     # Zenodo import state
     zenodo_url_input: str = ""
@@ -5587,8 +5588,9 @@ class AgentState(rx.State):
     agent_status: str = ""
     agent_events: List[Dict[str, str]] = []
     agent_input: str = ""
-    # Key used by the modules page textarea to remount on reset.
-    _agent_input_key: int = 0
+    # Key used by the modules page textarea to remount on reset. Public: a backend
+    # (`_`) var never reaches the client, so it could not change the key.
+    agent_input_key: int = 0
     agent_uploaded_files: List[str] = []
     _agent_uploaded_paths: List[str] = []
 
@@ -5685,7 +5687,7 @@ class AgentState(rx.State):
     def _reset_agent_input(self) -> None:
         """Clear chat input and remount uncontrolled textarea."""
         self.agent_input = ""
-        self._agent_input_key = self._agent_input_key + 1
+        self.agent_input_key = self.agent_input_key + 1
 
     # -- Slot computed vars ---------------------------------------------------
 
