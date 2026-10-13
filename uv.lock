@@ -2233,7 +2233,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-lite"
-version = "0.3.25"
+version = "0.3.26"
 source = { editable = "." }
 dependencies = [
     { name = "dagster-dg-cli" },
@@ -2284,7 +2284,7 @@ dev = [
 
 [[package]]
 name = "just-dna-pipelines"
-version = "0.2.6"
+version = "0.2.7"
 source = { editable = "just-dna-pipelines" }
 dependencies = [
     { name = "agno", extra = ["mcp"] },
@@ -4837,7 +4837,7 @@ wheels = [
 
 [[package]]
 name = "webui"
-version = "0.2.10"
+version = "0.2.11"
 source = { editable = "webui" }
 dependencies = [
     { name = "fastapi" },
