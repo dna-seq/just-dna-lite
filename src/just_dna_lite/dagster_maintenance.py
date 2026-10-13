@@ -244,15 +244,8 @@ def human_bytes(num_bytes: int) -> str:
     return f"{size:.1f} TB"
 
 
-def _prune_runs(
-    instance: DagsterInstance,
-    dagster_home: Path,
-    max_age_days: int,
-    dry_run: bool,
-    dagster_running: bool,
-    report: PruneReport,
-) -> None:
-    """Delete aged runs, then per-run databases and the stray index no run owns."""
+def _collect_aged_runs(instance: DagsterInstance, max_age_days: int, report: PruneReport) -> None:
+    """Note every run created more than *max_age_days* ago for deletion."""
     cutoff = datetime.now(UTC) - timedelta(days=max_age_days)
     for record in instance.get_run_records(filters=RunsFilter(), limit=10_000):
         run_id = record.dagster_run.run_id
@@ -263,6 +256,19 @@ def _prune_runs(
             created = created.replace(tzinfo=UTC)
         if created < cutoff:
             report.deleted_runs.append(run_id)
+
+
+def _prune_runs(
+    instance: DagsterInstance,
+    dagster_home: Path,
+    max_age_days: int | None,
+    dry_run: bool,
+    dagster_running: bool,
+    report: PruneReport,
+) -> None:
+    """Delete aged runs if asked, then per-run databases and the stray index no run owns."""
+    if max_age_days is not None:
+        _collect_aged_runs(instance, max_age_days, report)
 
     if not dry_run:
         for run_id in report.deleted_runs:
@@ -287,13 +293,19 @@ def _prune_runs(
 
 def prune_history(
     dagster_home: Path,
-    max_age_days: int = 30,
+    max_age_days: int | None = None,
     prune_runless: bool = True,
     run_vacuum: bool = True,
     dry_run: bool = False,
     dagster_running: bool = False,
 ) -> PruneReport:
-    """Delete aged runs, superseded runless materializations and orphan files.
+    """Delete superseded runless materializations and orphan files, and aged runs if asked.
+
+    Runs are kept unless ``max_age_days`` is given. Deleting a run deletes the
+    materializations it recorded, and the web UI reads the latest one per sample
+    to decide that it is normalized and annotated (`normalized_parquet_is_current`,
+    the sample's status, the asset chain): a sample whose last run aged out reads as
+    only uploaded and is normalized again. Runs were ~7 MB of the 30 GB in #35.
 
     ``dagster_running`` narrows the pass rather than cancelling it. Deleting rows
     is a transaction SQLite arbitrates, so it is safe against a live daemon and

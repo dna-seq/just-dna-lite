@@ -20,7 +20,7 @@ mkdir -p "${REPO}/logs"
 
 {
     echo "=== $(date -Is) ==="
-    "${UV}" run pipelines prune-dagster-history --max-age-days 30 2>&1
+    "${UV}" run pipelines prune-dagster-history 2>&1
     status=$?
     [ "${status}" -eq 0 ] || echo "prune exited ${status}"
 } >>"${LOG}"

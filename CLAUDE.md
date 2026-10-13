@@ -593,7 +593,9 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
    and `SqliteEventLogStorage` also mirrors them into a stray `history/runs/.db`. Before #35 the PRS
    checkpoint put the whole results table in each one (~10 MB per compute, 30 GB in total); the rows
    are a file now, but the events still accumulate. The prune keeps the newest runless materialization
-   per `(asset_key, partition)` (the one the restore path reads), drops the rest and vacuums. With
+   per `(asset_key, partition)` (the one the restore path reads), drops the rest and vacuums. It keeps
+   every run unless given `--max-age-days`: a deleted run takes its materializations, so the sample
+   reads as only uploaded (status, `normalized_parquet_is_current`) and is normalized again. With
    Dagster running (port listener or `find_dagster_instance_pids`) it prunes rows anyway but defers file
    removals and the vacuum (unlinking a database the daemon holds open frees nothing). Orphaned per-run
    databases are judged by `get_run_by_id`, never by membership of one page of `get_run_records`. It

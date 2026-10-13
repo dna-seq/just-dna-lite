@@ -1065,9 +1065,14 @@ def cleanup_orphaned_runs(
 @app.command("prune-dagster-history")
 def prune_dagster_history_cmd(
     max_age_days: Annotated[
-        int,
-        typer.Option("--max-age-days", help="Delete runs whose history is older than this many days")
-    ] = 30,
+        Optional[int],
+        typer.Option(
+            "--max-age-days",
+            help="Also delete runs older than this many days. Off by default: a deleted run takes its "
+            "materializations along, and a sample whose last run is gone shows as only uploaded "
+            "and is normalized again.",
+        ),
+    ] = None,
     keep_runless: Annotated[
         bool,
         typer.Option("--keep-runless/--prune-runless", help="Keep every runless asset event instead of only the newest per partition")
@@ -1087,10 +1092,10 @@ def prune_dagster_history_cmd(
 ) -> None:
     """Bound the size of the Dagster event log.
 
-    Deletes aged runs, orphaned per-run databases and superseded runless asset
-    events, then vacuums the index so the pages return to the filesystem. The
-    newest runless materialization per asset and partition is always kept, which
-    is the one the web UI reads back.
+    Deletes orphaned per-run databases and superseded runless asset events, then
+    vacuums the index so the pages return to the filesystem. The newest runless
+    materialization per asset and partition is always kept, which is the one the
+    web UI reads back. Runs are deleted only with --max-age-days.
     """
     root = _find_workspace_root(Path.cwd())
     if root is None:
@@ -1128,7 +1133,8 @@ def prune_dagster_history_cmd(
 
     typer.echo(f"Dagster home: {report.dagster_home}")
     typer.echo(f"Event log before: {human_bytes(report.before.total)} ({report.before.per_run_count} per-run databases)")
-    typer.echo(f"  runs older than {max_age_days} days: {len(report.deleted_runs)}")
+    if max_age_days is not None:
+        typer.echo(f"  runs older than {max_age_days} days: {len(report.deleted_runs)}")
     typer.echo(f"  orphaned per-run databases: {len(report.orphan_run_dbs)}")
     typer.echo(
         f"  superseded runless asset events: {report.runless_rows_deleted}"

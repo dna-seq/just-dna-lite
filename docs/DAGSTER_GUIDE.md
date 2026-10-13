@@ -232,13 +232,20 @@ partition is ever read back.
 `uv run pipelines prune-dagster-history` bounds all of it:
 
 ```bash
-uv run pipelines prune-dagster-history --dry-run          # report, change nothing
-uv run pipelines prune-dagster-history --max-age-days 30  # the weekly default
+uv run pipelines prune-dagster-history --dry-run   # report, change nothing
+uv run pipelines prune-dagster-history             # what the weekly cron runs
 ```
 
-It deletes runs older than `--max-age-days`, removes per-run databases whose run is
-gone and the stray `.db`, keeps only the newest runless materialization per asset
-and partition, then vacuums `index.db` so the pages return to the filesystem.
+It removes per-run databases whose run is gone and the stray `.db`, keeps only the
+newest runless materialization per asset and partition, then vacuums `index.db` so
+the pages return to the filesystem.
+
+It keeps every run unless you pass `--max-age-days N`. Deleting a run deletes the
+materializations it recorded, and the web UI reads the latest one per sample to
+decide that the sample is normalized and annotated. A sample whose last run aged out
+shows as only uploaded, its normalized parquet counts as stale and is rebuilt, and
+its run history is gone; the files on disk stay. Runs were about 7 MB of the 30 GB,
+so the default leaves them alone.
 Keeping the newest is what preserves the UI's cross-session PRS restore. The
 vacuum needs room for a second copy of the live data and says so instead of
 failing when the disk is too full, which is exactly when it is reached for.

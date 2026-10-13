@@ -15,15 +15,25 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+import polars as pl
 import pytest
 from dagster import (
     AssetKey,
     AssetMaterialization,
+    AssetRecordsFilter,
     DagsterInstance,
     MetadataValue,
+    Output,
+    StaticPartitionsDefinition,
+    asset,
     job,
+    materialize,
     op,
 )
+from just_dna_pipelines.annotation.annotation_runner import (
+    normalized_parquet_is_current,
+)
+from just_dna_pipelines.module_config import _load_config
 from webui.state import (
     _prs_partition_key,
     checkpoint_prs_results,
@@ -306,3 +316,71 @@ def test_prune_does_not_set_dagster_home(instance_home: Path, monkeypatch: pytes
     prune_history(instance_home, dagster_running=False)
 
     assert "DAGSTER_HOME" not in os.environ
+
+
+_SAMPLE = "public/sampleA"
+
+
+@asset(partitions_def=StaticPartitionsDefinition([_SAMPLE]), name="user_vcf_normalized")
+def _normalized() -> Output[None]:
+    return Output(
+        None,
+        metadata={"quality_filters_hash": MetadataValue.text(_load_config().quality_filters.config_hash())},
+    )
+
+
+@asset(partitions_def=StaticPartitionsDefinition([_SAMPLE]), name="user_hf_module_annotations")
+def _annotations() -> Output[None]:
+    return Output(None, metadata={"modules": MetadataValue.int(1)})
+
+
+def _sample_state(home: Path, normalized_path: Path) -> tuple[bool, int, int]:
+    """(normalized parquet current, annotation records, runs), as the web UI reads them."""
+    with DagsterInstance.from_ref(DagsterInstance.local_temp(str(home)).get_ref()) as instance:
+        annotations = instance.fetch_materializations(
+            records_filter=AssetRecordsFilter(
+                asset_key=AssetKey("user_hf_module_annotations"), asset_partitions=[_SAMPLE]
+            ),
+            limit=1,
+        ).records
+        return (
+            normalized_parquet_is_current(instance, _SAMPLE, normalized_path),
+            len(annotations),
+            len(instance.get_run_records()),
+        )
+
+
+@pytest.fixture
+def annotated_sample(instance_home: Path, tmp_path: Path) -> Path:
+    """A sample whose normalization and annotation were recorded by a real run."""
+    normalized_path = tmp_path / "user_vcf_normalized.parquet"
+    pl.DataFrame({"chrom": ["1"], "start": [1]}).write_parquet(normalized_path)
+    with DagsterInstance.local_temp(str(instance_home)) as instance:
+        materialize([_normalized, _annotations], instance=instance, partition_key=_SAMPLE)
+    # A year old: past any age limit the prune has ever defaulted to.
+    connection = sqlite3.connect(instance_home / "history" / "runs.db")
+    connection.execute("UPDATE runs SET create_timestamp = datetime('now', '-365 days')")
+    connection.commit()
+    connection.close()
+    assert _sample_state(instance_home, normalized_path) == (True, 1, 1)
+    return normalized_path
+
+
+def test_the_default_prune_keeps_what_a_sample_s_runs_recorded(
+    instance_home: Path, annotated_sample: Path
+) -> None:
+    """Deleting runs would make an annotated sample read as only uploaded."""
+    report = prune_history(instance_home, dagster_running=False)
+
+    assert report.deleted_runs == []
+    assert _sample_state(instance_home, annotated_sample) == (True, 1, 1)
+
+
+def test_max_age_days_deletes_runs_and_what_they_recorded(
+    instance_home: Path, annotated_sample: Path
+) -> None:
+    """The opt-in still works, with the consequence its help text names."""
+    report = prune_history(instance_home, max_age_days=30, dagster_running=False)
+
+    assert len(report.deleted_runs) == 1
+    assert _sample_state(instance_home, annotated_sample) == (False, 0, 0)
