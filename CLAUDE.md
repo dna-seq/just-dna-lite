@@ -691,6 +691,13 @@ not a VCF liftover and cannot be reused for annotation.
   `prs_results`, the chart spec and `prs_results_source_file`; compute snapshots `prs_compute_token` and
   discards stale writes. After updating `prs_results`, rebuild `prs_results_rows` / `_columns` /
   `_column_groups`. Switching the file also clears the comparison.
+- **The PRS checkpoint is a file, the Dagster event is its index** (#35). `checkpoint_prs_results`
+  writes `prs_results.json` beside the sample (temp name + `os.replace`) and reports a runless
+  `prs_results` materialization carrying only `path` and small fields; `restore_prs_checkpoint` reads
+  the newest one, gated on `format_version`. **Never put bulk data in materialization metadata**:
+  runless events have no run, so nothing deletes them, and rows there grew the event log to 30 GB.
+  JSON, not parquet: `risk_estimates_by_method` is keyed by method name, and a struct column adds
+  every key seen in any row. Tests: `tests/test_prs_checkpoint.py`.
 - **Annotations and reports are per sample** (`data/output/users/{user}/{sample}/`). `select_file`
   clears `output_files` / `report_files` at once; the background loader publishes only when
   `outputs_loaded_for_file == selected_file`, and tab badges and empty states read those gated lists.

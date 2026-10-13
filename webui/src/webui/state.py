@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import gc
+import json
 import logging
 import os
 import queue
@@ -15,7 +16,7 @@ import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, ClassVar, Dict, Generator, List, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Callable, ClassVar, Dict, Generator, List, Literal, Optional, Sequence, Union
 
 import polars as pl
 import reflex as rx
@@ -3852,6 +3853,131 @@ def _prs_ready_parquet_path(parquet_path: str) -> str:
     return ""
 
 
+# The PRS checkpoint keeps its rows in a file beside the sample and only an index entry in
+# Dagster. Rows used to ride in the materialization metadata (~10 MB per compute), and
+# runless events can never be deleted, so the event log grew to 30 GB (issue #35). JSON,
+# not parquet: `risk_estimates_by_method` is a dict keyed by method name, which a struct
+# column would widen to every key seen in any row.
+PRS_CHECKPOINT_FILENAME = "prs_results.json"
+PRS_RESULTS_ASSET_KEY = "prs_results"
+
+
+class PrsCheckpoint(BaseModel):
+    """What the restore path found for one sample's partition."""
+
+    status: Literal["restored", "stale", "absent"]
+    rows: list[dict[str, Any]] = []
+    sample_type: str = ""
+    row_count: int = 0
+
+
+def _prs_partition_key(parquet_path: str) -> str:
+    """``{user}/{sample}`` for a sample's normalized parquet."""
+    p = Path(parquet_path)
+    return f"{p.parent.parent.name}/{p.parent.name}"
+
+
+def _write_prs_checkpoint_file(sample_dir: Path, rows: list[dict[str, Any]]) -> Path:
+    """Write *rows* to the sample's checkpoint file, replacing it atomically.
+
+    A per-write temp name in the same directory, then ``os.replace``: two tabs on one
+    sample must not read each other's half-written file.
+    """
+    payload = json.dumps(rows)
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    final_path = sample_dir / PRS_CHECKPOINT_FILENAME
+    fd, tmp_name = tempfile.mkstemp(dir=sample_dir, prefix=f".{PRS_CHECKPOINT_FILENAME}.", suffix=".tmp")
+    tmp_path = Path(tmp_name)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(payload)
+    tmp_path.chmod(0o644)  # mkstemp creates 0600; match the sample's other outputs
+    os.replace(tmp_path, final_path)
+    return final_path
+
+
+def _read_prs_checkpoint_file(path: Path) -> list[dict[str, Any]] | None:
+    """Rows from a checkpoint file, or ``None`` when it is missing or unreadable."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("PRS checkpoint %s unreadable, recomputing: %s", path, exc)
+        return None
+    if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
+        logger.warning("PRS checkpoint %s is not a list of rows, recomputing", path)
+        return None
+    return data
+
+
+def checkpoint_prs_results(
+    instance: DagsterInstance,
+    parquet_path: str,
+    rows: list[dict[str, Any]],
+    genome_build: str,
+    ancestry: str,
+    sample_type: str,
+) -> Path:
+    """Write *rows* beside the sample and index them with a small Dagster event."""
+    final_path = _write_prs_checkpoint_file(Path(parquet_path).parent, rows)
+    pgs_ids = [r.get("pgs_id", "") for r in rows]
+    instance.report_runless_asset_event(
+        AssetMaterialization(
+            asset_key=PRS_RESULTS_ASSET_KEY,
+            partition=_prs_partition_key(parquet_path),
+            metadata={
+                "path": MetadataValue.path(str(final_path)),
+                "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
+                "genome_build": MetadataValue.text(genome_build),
+                "ancestry": MetadataValue.text(ancestry),
+                "sample_type": MetadataValue.text(sample_type),
+                "row_count": MetadataValue.int(len(rows)),
+                "format_version": MetadataValue.text(_prs_results_version()),
+            },
+        )
+    )
+    return final_path
+
+
+def _metadata_text(metadata: dict[str, Any], key: str) -> str:
+    entry = metadata.get(key)
+    return str(entry.value) if entry is not None and hasattr(entry, "value") else ""
+
+
+def restore_prs_checkpoint(instance: DagsterInstance, partition_key: str) -> PrsCheckpoint:
+    """Read the newest checkpoint for *partition_key*.
+
+    An event without a ``path`` (written before issue #35) or a missing or unreadable
+    file counts as no checkpoint, so the caller recomputes.
+    """
+    result = instance.fetch_materializations(
+        records_filter=AssetRecordsFilter(
+            asset_key=AssetKey(PRS_RESULTS_ASSET_KEY),
+            asset_partitions=[partition_key],
+        ),
+        limit=1,
+    )
+    if not result.records:
+        return PrsCheckpoint(status="absent")
+    mat = result.records[0].asset_materialization
+    if not mat or not mat.metadata:
+        return PrsCheckpoint(status="absent")
+    if _metadata_text(mat.metadata, "format_version") != _prs_results_version():
+        return PrsCheckpoint(status="stale")
+    path_text = _metadata_text(mat.metadata, "path")
+    if not path_text:
+        return PrsCheckpoint(status="absent")
+    rows = _read_prs_checkpoint_file(Path(path_text))
+    if rows is None:
+        return PrsCheckpoint(status="absent")
+    rows = [row for row in rows if not str(row.get("sample") or "")]
+    count_text = _metadata_text(mat.metadata, "row_count")
+    return PrsCheckpoint(
+        status="restored",
+        rows=rows,
+        sample_type=_metadata_text(mat.metadata, "sample_type"),
+        row_count=int(count_text) if count_text else len(rows),
+    )
+
+
 def _prs_compute_belongs_to_current_genome(
     compute_token: int,
     compute_file: str,
@@ -4700,9 +4826,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         parquet_path = self.prs_initialized_for_file
         if not parquet_path:
             return ""
-        p = Path(parquet_path)
-        partition_key = f"{p.parent.parent.name}/{p.parent.name}"
-        return f"{get_dagster_web_url()}/assets/prs_results?partition={partition_key}"
+        partition_key = _prs_partition_key(parquet_path)
+        return f"{get_dagster_web_url()}/assets/{PRS_RESULTS_ASSET_KEY}?partition={partition_key}"
 
     def initialize_prs_for_file(self, parquet_path: str, genome_build: str) -> Any:
         """Initialize PRS for a newly selected VCF file.
@@ -4737,9 +4862,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         yield from self.initialize_prs()
 
         if not self.prs_results and ready_parquet_path:
-            p = Path(ready_parquet_path)
-            partition_key = f"{p.parent.parent.name}/{p.parent.name}"
-            self._load_prs_results_from_dagster(partition_key)
+            self._load_prs_results_from_dagster(_prs_partition_key(ready_parquet_path))
 
         yield PRSTraitState.initialize_traits(self.genome_build, ready_parquet_path, self.include_harmonized)
 
@@ -5054,88 +5177,51 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                     self.status_message = f"PRS computation failed: {exc}"
 
     def _checkpoint_prs_to_dagster(self) -> None:
-        """Persist current PRS results to Dagster for cross-session restore."""
-        import json
+        """Persist current PRS results beside the sample for cross-session restore."""
         if self.is_multi_sample:
             return
         parquet_path = self.prs_initialized_for_file
         if not parquet_path or not self.prs_results:
             return
-        p = Path(parquet_path)
-        partition_key = f"{p.parent.parent.name}/{p.parent.name}"
-        pgs_ids = [r.get("pgs_id", "") for r in self.prs_results]
         try:
-            instance = get_dagster_instance()
-            instance.report_runless_asset_event(
-                AssetMaterialization(
-                    asset_key="prs_results",
-                    partition=partition_key,
-                    metadata={
-                        "results": MetadataValue.json({"rows": self.prs_results}),
-                        "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
-                        "genome_build": MetadataValue.text(self.genome_build),
-                        "ancestry": MetadataValue.text(self.selected_ancestry or ""),
-                        "sample_type": MetadataValue.text(self.sample_type),
-                        "row_count": MetadataValue.int(len(self.prs_results)),
-                        "format_version": MetadataValue.text(_prs_results_version()),
-                    },
-                )
+            checkpoint_prs_results(
+                get_dagster_instance(),
+                parquet_path,
+                list(self.prs_results),
+                genome_build=self.genome_build,
+                ancestry=self.selected_ancestry or "",
+                sample_type=self.sample_type,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("PRS checkpoint for %s did not land: %s", parquet_path, exc, exc_info=True)
 
     def _load_prs_results_from_dagster(self, partition_key: str) -> None:
-        """Restore PRS results from the latest Dagster materialization."""
+        """Restore PRS results from the latest checkpoint."""
         if not partition_key or self.prs_force_recompute:
             return
         try:
-            instance = get_dagster_instance()
-            result = instance.fetch_materializations(
-                records_filter=AssetRecordsFilter(
-                    asset_key=AssetKey("prs_results"),
-                    asset_partitions=[partition_key],
-                ),
-                limit=1,
-            )
-            if not result.records:
-                return
-            mat = result.records[0].asset_materialization
-            if not mat or not mat.metadata:
-                return
-            version_meta = mat.metadata.get("format_version")
-            stored_version = str(version_meta.value) if version_meta and hasattr(version_meta, "value") else ""
-            if stored_version != _prs_results_version():
-                self.status_message = "Stored PRS results are from an older version — please recompute."
-                return
-            results_meta = mat.metadata.get("results")
-            if not results_meta or not hasattr(results_meta, "data"):
-                return
-            data = results_meta.data
-            rows = data.get("rows", []) if isinstance(data, dict) else []
-            rows = [row for row in rows if not str(row.get("sample") or "")]
-            if rows:
-                source_file = self.prs_initialized_for_file
-                stamped = []
-                for row in rows:
-                    item = dict(row)
-                    item["_source_file"] = source_file
-                    stamped.append(item)
-                self.prs_results = stamped
-                self.prs_results_source_file = source_file
-                self._build_prs_results_grid()
-                stype_meta = mat.metadata.get("sample_type")
-                stored_stype = str(stype_meta.value) if stype_meta and hasattr(stype_meta, "value") else ""
-                if stored_stype in ("wgs", "array"):
-                    self.sample_type = stored_stype
-                    self.sample_type_source = "metadata"
-                if self.prs_results:
-                    self.build_trait_summary()
-                    self._ensure_result_chart_selected()
-                count_meta = mat.metadata.get("row_count")
-                n = int(count_meta.value) if count_meta and hasattr(count_meta, "value") else len(rows)
-                self.status_message = f"Restored {n} PRS result(s) from previous session"
+            checkpoint = restore_prs_checkpoint(get_dagster_instance(), partition_key)
         except Exception as exc:
             logger.warning("Failed to restore PRS results from Dagster: %s", exc)
+            return
+        if checkpoint.status == "stale":
+            self.status_message = "Stored PRS results are from an older version — please recompute."
+            return
+        if not checkpoint.rows:
+            return
+        source_file = self.prs_initialized_for_file
+        self.prs_results = [{**row, "_source_file": source_file} for row in checkpoint.rows]
+        self.prs_results_source_file = source_file
+        self._build_prs_results_grid()
+        if checkpoint.sample_type in ("wgs", "array"):
+            self.sample_type = checkpoint.sample_type
+            self.sample_type_source = "metadata"
+        try:
+            self.build_trait_summary()
+        except Exception as summary_exc:
+            logger.warning("Trait summary build after PRS restore failed: %s", summary_exc, exc_info=True)
+        self._ensure_result_chart_selected()
+        self.status_message = f"Restored {checkpoint.row_count} PRS result(s) from previous session"
 
 
 # ============================================================================
