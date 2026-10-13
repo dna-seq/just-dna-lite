@@ -2265,7 +2265,7 @@ requires-dist = [
     { name = "grpcio-health-checking", specifier = "<1.82" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
     { name = "just-dna-registry", specifier = ">=0.27.0" },
-    { name = "just-prs", specifier = ">=0.10.3" },
+    { name = "just-prs", specifier = ">=0.10.4" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.27.1" },
@@ -2390,7 +2390,7 @@ wheels = [
 
 [[package]]
 name = "just-prs"
-version = "0.10.3"
+version = "0.10.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "altair" },
@@ -2409,9 +2409,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/78/5f24efe83d307f371022c297c17cece8cc37cf66f3df09e1271075b5bab7/just_prs-0.10.3.tar.gz", hash = "sha256:13248297ae80b0e70e6ac550c5ef83bb7707cef62d626ecfea886de73750f93f", size = 421108, upload-time = "2026-10-12T21:26:59.436Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/d7/5270c37f8815b7beb9c8d79f035c99ee4a17123151d0445ccf9fcd5f51a1/just_prs-0.10.4.tar.gz", hash = "sha256:9003c44f42b35a65ec25a8908e1dc8c9b6af203396950099223726d6c00bc0cf", size = 426359, upload-time = "2026-10-13T18:51:11.208Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/ac/c503a93a6568cdb51f408bf242ca682b9318d3478aaf65822626b201b902/just_prs-0.10.3-py3-none-any.whl", hash = "sha256:7f7cf70b0e209808e927f137eb9488dca6442f5f0903623585359219700b14e5", size = 463271, upload-time = "2026-10-12T21:26:56.951Z" },
+    { url = "https://files.pythonhosted.org/packages/96/92/8fe1e4e490f1eef5e873bc6fc411b12f662cdd9992183ec74e31b70d6550/just_prs-0.10.4-py3-none-any.whl", hash = "sha256:e4d2e341497a620338d9267ed67125e3d1979ca3dc4f4ca20c8b38068457599a", size = 468520, upload-time = "2026-10-13T18:51:09.701Z" },
 ]
 
 [[package]]

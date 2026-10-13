@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import gc
+import importlib.metadata
 import json
 import logging
 import os
@@ -3842,8 +3843,13 @@ def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
 
 
 def _prs_results_version() -> str:
-    """Version tag for stored PRS results.  Changes when enrichment format changes."""
-    return f"prs-ui={prs_ui.__version__}"
+    """Version tag for stored PRS results.
+
+    Both libraries shape a stored row: prs-ui builds it, just-prs computes and
+    enriches it (0.10.4 picks the percentile curve by karyotype), so either release
+    makes a checkpoint stale.
+    """
+    return f"prs-ui={importlib.metadata.version('prs-ui')};just-prs={importlib.metadata.version('just-prs')}"
 
 
 def _prs_ready_parquet_path(parquet_path: str) -> str:
