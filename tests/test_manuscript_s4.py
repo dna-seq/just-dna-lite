@@ -165,7 +165,7 @@ def test_render_refuses_as_of_beside_a_snapshot(tmp_path: Path) -> None:
     assert "records its own cutoff" in result.output
 
 
-COMMITTED_CURATION = ROOT / "docs/manuscript/v0.3/supplementary" / CURATION_YAML
+COMMITTED_CURATION = ROOT / "docs/manuscript/v0.4/supplementary" / CURATION_YAML
 
 
 def test_the_committed_curation_renders_one_line_per_noted_module(modules: list[ModuleSources]) -> None:

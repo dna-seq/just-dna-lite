@@ -36,7 +36,7 @@ from just_dna_lite.manuscript.ledger import (
 
 ROOT = Path(__file__).resolve().parents[1]
 PAPERS = [
-    ROOT / "docs/manuscript/v0.3/paper1-just-dna-lite.md",
+    ROOT / "docs/manuscript/v0.4/paper1-just-dna-lite.md",
     ROOT / "docs/manuscript/v0.3/paper2-just-module-creator.md",
 ]
 # Sentence-pinned tests read a frozen copy of paper 1 as it stood before the v0.3 review edits, so
