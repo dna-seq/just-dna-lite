@@ -11,7 +11,7 @@ import reflex as rx
 
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
-from webui.features import MODULE_CREATOR_ENABLED
+from webui.features import module_creator_available
 from webui.state import UploadState, AgentState
 
 
@@ -1271,7 +1271,7 @@ def modules_page() -> rx.Component:
 # The route is only registered when the creator is enabled; while it is off the
 # page is unreachable rather than merely unlinked. `app.add_page(modules_page)`
 # then also skips it, because an undecorated component has no route to add.
-if MODULE_CREATOR_ENABLED:
+if module_creator_available():
     modules_page = rx.page(
         route="/modules",
         title="Module Creator | Just DNA Lite",

@@ -15,7 +15,7 @@ import reflex as rx
 from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
-from webui.features import MODULE_CREATOR_ENABLED
+from webui.features import module_creator_available
 from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
 from reflex_mui_datagrid import lazyframe_grid
 from prs_ui import prs_scores_selector
@@ -2343,7 +2343,7 @@ def new_analysis_section() -> rx.Component:
                 style={"fontSize": "0.85rem", "color": "#a333c8", "marginLeft": "4px"},
             ),
             style={"display": "flex", "alignItems": "center", "marginBottom": "14px"},
-        )] if MODULE_CREATOR_ENABLED else []),
+        )] if module_creator_available() else []),
         rx.el.div(
             rx.el.button(
                 "Select All",

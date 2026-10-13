@@ -28,7 +28,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 # data paths at import time.
 load_env()
 
-from webui.features import MODULE_CREATOR_ENABLED  # noqa: E402
+from webui.features import module_creator_available  # noqa: E402
 from webui.pages.dashboard import dashboard_page  # noqa: E402
 from webui.pages.index import index_page  # noqa: E402
 from webui.pages.analysis import analysis_page  # noqa: E402
@@ -600,7 +600,7 @@ app.add_page(dashboard_page)
 app.add_page(index_page)
 app.add_page(analysis_page)
 app.add_page(annotate_page)
-if MODULE_CREATOR_ENABLED:
+if module_creator_available():
     app.add_page(modules_page)
 app.add_page(registry_page)
 app.add_page(faq_page)

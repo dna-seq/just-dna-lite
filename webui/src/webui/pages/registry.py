@@ -17,7 +17,7 @@ from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.crawler_assets import page_image_url, page_meta
 from just_dna_pipelines.module_config import get_registry_stores
 
-from webui.features import MODULE_CREATOR_ENABLED, REGISTRY_PUBLICATION_ENABLED
+from webui.features import module_creator_available, registry_publication_available
 from webui.state import RegistryState
 
 # Card text is clamped to a fixed number of lines and ends with an ellipsis; the height is fixed
@@ -203,7 +203,7 @@ def _action_buttons() -> rx.Component:
                     class_name="ui small button",
                     style={"flex": "1"},
                     title="Load into the Module Manager editing slot",
-                )] if MODULE_CREATOR_ENABLED else []),
+                )] if module_creator_available() else []),
                 rx.el.a(
                     fomantic_icon("download", size=13),
                     " Export",
@@ -526,7 +526,7 @@ def _tab_menu() -> rx.Component:
             class_name=rx.cond(RegistryState.registry_active_tab == "publication", "active item", "item"),
             on_click=lambda: RegistryState.switch_registry_tab("publication"),
             style=_TAB_STYLE,
-        )] if REGISTRY_PUBLICATION_ENABLED else []),
+        )] if registry_publication_available() else []),
         class_name="ui top attached tabular menu",
         style={"marginBottom": "0"},
         id="registry-tab-menu",
@@ -1317,7 +1317,7 @@ def registry_right_panel() -> rx.Component:
             rx.match(
                 RegistryState.registry_active_tab,
                 ("catalog", _catalog_tab()),
-                *([("publication", _publication_tab())] if REGISTRY_PUBLICATION_ENABLED else []),
+                *([("publication", _publication_tab())] if registry_publication_available() else []),
                 _catalog_tab(),
             ),
             class_name="ui bottom attached segment",

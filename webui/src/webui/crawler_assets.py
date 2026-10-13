@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from webui.deployment_urls import resolve_public_app_url
-from webui.features import MODULE_CREATOR_ENABLED
+from webui.features import module_creator_available
 
 SITE_TITLE = "Just DNA Lite"
 SITE_DESCRIPTION = (
@@ -56,7 +56,7 @@ PUBLIC_ROUTES: tuple[RouteMetadata, ...] = (
         title="Module Creator",
         description="Create and manage annotation modules, including AI-assisted module drafts.",
         priority="0.8",
-        enabled=MODULE_CREATOR_ENABLED,
+        enabled=module_creator_available(),
     ),
     RouteMetadata(
         path="/registry",
