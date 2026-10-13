@@ -1,6 +1,6 @@
 # C36: Comparison with other tools (draft for Paper 1, Just-DNA-Lite)
 
-Status: DRAFT. Not applied to any repository file. All tool cells were filled from each project's own documentation, README or paper, opened on 2026-10-10. "?" means the project's own material did not state it.
+Status: applied on 2026-10-13 as Supplementary S7 (Table S7, its notes and references) of `paper1-just-dna-lite.md`, cited from the Introduction; this file keeps the evidence for every cell. All tool cells were filled from each project's own documentation, README or paper, opened on 2026-10-10. "?" means the project's own material did not state it.
 
 ---
 

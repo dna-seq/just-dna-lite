@@ -49,7 +49,7 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 | Calibration | Generation II, cold | 3 | 17.1 | 9.5 | 2.2 | — | 29.1 | 2,209 (2,347) | 891 | 341 |
 | Calibration | Generation I (OakVar 2.13.1), full | 1 | — | — | — | — | — | 3,838 (3,838) | 2,010 | not measured |
 
-## Table 4. Machine and inputs
+## Table S6. Machine and inputs
 
 | Parameter | Value |
 |---|---|
@@ -68,7 +68,7 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 | Community reference (HG002, DeepVariant case study) | 7,753,721 | 6,476,847 | 1,276,874 | DeepVariant 1.0.0 | 29d00cf5e84ae8971cb868200b574268 |
 | Calibration (private, the 2023 benchmark file) | 6,138,868 | 4,724,429 | 1,414,439 | DeepVariant 1.3.0 | fd01f293655f606482ecfa70c9976d11 |
 
-## Table 5 (fixed benchmark inputs (primary)). PRS runtime per PGS ID
+## Table 4 (fixed benchmark inputs (primary)). PRS runtime per PGS ID
 
 | Engine | *N* scored | Median (all), s | Mean (all), s | Median (excl. 7 with ≥ 1M variants), s | PLINK2 median ÷ engine median | Median per-ID PLINK2 ÷ engine |
 |---|---|---|---|---|---|---|
@@ -79,7 +79,7 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 
 Every engine scored every ID.
 
-## Table 6 (fixed benchmark inputs (primary)). Score concordance
+## Table 5 (fixed benchmark inputs (primary)). Score concordance
 
 | Engine pair | *N* PGS | Pearson *r* | Max \|Δ score\| (ID) | Median \|Δ score\| |
 |---|---|---|---|---|
@@ -87,7 +87,7 @@ Every engine scored every ID.
 | just-prs DuckDB ↔ PLINK2 | 100 | 0.999997 | 0.501 (PGS000015) | 2.14e-06 |
 | just-prs Polars ↔ PLINK2 | 100 | 0.999997 | 0.501 (PGS000015) | 2.14e-06 |
 
-## Table 5 (original benchmark inputs). PRS runtime per PGS ID
+## Table 4 (original benchmark inputs). PRS runtime per PGS ID
 
 | Engine | *N* scored | Median (all), s | Mean (all), s | Median (excl. 7 with ≥ 1M variants), s | PLINK2 median ÷ engine median | Median per-ID PLINK2 ÷ engine |
 |---|---|---|---|---|---|---|
@@ -98,7 +98,7 @@ Every engine scored every ID.
 
 PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 
-## Table 6 (original benchmark inputs). Score concordance
+## Table 5 (original benchmark inputs). Score concordance
 
 | Engine pair | *N* PGS | Pearson *r* | Max \|Δ score\| (ID) | Median \|Δ score\| |
 |---|---|---|---|---|
@@ -247,7 +247,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | Calibration | Generation II, full | 5 | 16.6 | 9.4 | 2.1 | 2,274 | 2,296 | 376 |
 | Calibration | Generation I | 1 | — | — | — | 3,838 | 3,838 | — |
 
-## Paper Table 4
+## Paper Table S6
 
 | Parameter | Value |
 |---|---|
@@ -262,7 +262,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | Input: community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
 | Input: calibration | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
 
-## Paper Table 5
+## Paper Table 4
 
 | Engine | *N* scored | Median (all), s | Mean (all), s | Median (excl. 7 with ≥ 1M variants), s | PLINK2 median ÷ engine median | Median per-ID PLINK2 ÷ engine |
 |---|---|---|---|---|---|---|
@@ -273,7 +273,7 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 
 Every engine scored every ID.
 
-## Paper Table 6
+## Paper Table 5
 
 | Engine pair | PLINK2 input | *N* PGS | Pearson *r* | Max \|Δ score\| |
 |---|---|---|---|---|
