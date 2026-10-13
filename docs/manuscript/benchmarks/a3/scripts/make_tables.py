@@ -74,12 +74,27 @@ def time_cells(s: dict, digits: int = 1) -> list[str]:
     return [str(s["n"]), rng, mean, f(s["sd"], digits)]
 
 
+# Runs that did not finish, by run directory, with the cause found in their logs. A failed run without an
+# entry here stops the script, so that no failure goes unexplained.
+FAILED = {
+    "/data/a3-bench/series/20261013T0200/oakvar/second_caller-3/00_full1":
+        "killed after 1,277.8 s when a system update (docker-ce and containerd, 17:29 UTC) restarted the Docker "
+        "daemon at 17:34:08 UTC",
+}
+
+
 def load_runs() -> dict[tuple[str, str, str], list[dict]]:
     groups = defaultdict(list)
     for r in csv.DictReader((A3 / "runs.csv").open()):
-        assert r["exit"] == "0", r
+        if r["exit"] != "0":
+            assert r["run_dir"] in FAILED, r
+            continue
         groups[(r["tool"], r["genome"], r["run_type"])].append(r)
     return groups
+
+
+def failed_runs() -> list[dict]:
+    return [r for r in csv.DictReader((A3 / "runs.csv").open()) if r["exit"] != "0"]
 
 
 def col(rows: list[dict], name: str) -> list[float]:
@@ -258,6 +273,9 @@ def s2(runs) -> str:
             used = "warm-up, dropped" if in_pair_series(r) and r["order"] == "0" else "Table 2"
             rows.append(["2026 (this machine)", g, t, r["started_at"][:16].replace("T", " ") + " UTC",
                          f(float(r["cli_wall_s"])), f(float(r["peak_rss_mb"]), 0), r["load1_before"], used])
+    for r in failed_runs():
+        rows.append(["2026 (this machine)", r["genome"], r["run_type"], r["started_at"][:16].replace("T", " ") + " UTC",
+                     f"failed (exit {r['exit']})", "—", r["load1_before"], FAILED[r["run_dir"]]])
     runs_table = table(["Series", "Genome", "Mode", "Started", "Wall time, s", "Peak RSS, MB", "Load before",
                         "Used in"], rows)
 
@@ -470,6 +488,14 @@ def quoted(runs) -> str:
         f"- Every Generation I full run: {f(min(g1))}–{f(max(g1))} s ({min(g1) / 3600:.1f}–{max(g1) / 3600:.1f} h); "
         f"dbSNP only, pair runs: {f(min(oak_p))}–{f(max(oak_p))} s",
     ]
+    three = [med(("oakvar", g, "full")) / med(("jdl", g, "full")) for g in ("primary", "calibration", "second_caller")]
+    lines.append(f"- Full-run ratio over the three genomes Generation I ran on: {min(three):.0f}–{max(three):.0f}×, "
+                 f"mean {st.mean(three):.0f}×")
+    for g in ("primary", "calibration", "second_caller"):
+        w = col(runs[("jdl", g, "full")], "cli_wall_s")
+        cpu = col(runs[("jdl", g, "full")], "cpu_pct")
+        lines.append(f"- Generation II full runs, {g}: n={len(w)}, {f(min(w))}–{f(max(w))} s "
+                     f"(slowest {max(w) / min(w):.1f}× the fastest), CPU {min(cpu):.0f}–{max(cpu):.0f}%")
     for g in ("primary", "calibration", "second_caller"):
         rs = runs.get(("oakvar", g, "full"), [])
         w = col(rs, "cli_wall_s")

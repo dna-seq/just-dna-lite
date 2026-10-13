@@ -1,0 +1,117 @@
+# step 58: jdl-series-second_caller-day2
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool jdl --genome second_caller --vcf /data/a3-bench/inputs/livia/SIMHIFQTILQ.hard-filtered.vcf.gz --series-dir /data/a3-bench/series/20261013T0200/jdl/second_caller-day2 --cold 0 --warm 0 --full 5 -m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic -m pharmgkb -m superhuman -m thrombophilia -m vo2max 
+# start: 2026-10-13T18:13:27+02:00
+schedule (jdl, second_caller, seed 20261010): warmup full full full full full
+  load 8.35 > 1.5, waiting
+  load 5.14 > 1.5, waiting
+  load 4.73 > 1.5, waiting
+  load 4.55 > 1.5, waiting
+  load 5.00 > 1.5, waiting
+  load 4.21 > 1.5, waiting
+  load 6.49 > 1.5, waiting
+  load 6.37 > 1.5, waiting
+  load 5.35 > 1.5, waiting
+  load 5.04 > 1.5, waiting
+  load 3.28 > 1.5, waiting
+  load 4.07 > 1.5, waiting
+  load 2.96 > 1.5, waiting
+  load 3.82 > 1.5, waiting
+  load 3.85 > 1.5, waiting
+  load 3.80 > 1.5, waiting
+  load 3.80 > 1.5, waiting
+  load 4.60 > 1.5, waiting
+  load 6.50 > 1.5, waiting
+  load 5.50 > 1.5, waiting
+  load 4.38 > 1.5, waiting
+  load 3.64 > 1.5, waiting
+  load 4.18 > 1.5, waiting
+  load 2.85 > 1.5, waiting
+  load 1.85 > 1.5, waiting
+[0] warmup1 load=1.36 start=2026-10-13T16:25:57+00:00
+    exit=0 cli=67.778s job=62.675s peak=4397.3MB cpu=332.1%
+  load 4.56 > 1.5, waiting
+  load 2.82 > 1.5, waiting
+  load 2.19 > 1.5, waiting
+  load 3.43 > 1.5, waiting
+  load 2.56 > 1.5, waiting
+  load 2.31 > 1.5, waiting
+  load 2.00 > 1.5, waiting
+  load 4.07 > 1.5, waiting
+  load 9.45 > 1.5, waiting
+  load 13.00 > 1.5, waiting
+  load 14.73 > 1.5, waiting
+  load 15.94 > 1.5, waiting
+  load 18.35 > 1.5, waiting
+  load 19.81 > 1.5, waiting
+  load 20.79 > 1.5, waiting
+  load 22.33 > 1.5, waiting
+  load 22.60 > 1.5, waiting
+  load 22.03 > 1.5, waiting
+  load 24.30 > 1.5, waiting
+  load 22.68 > 1.5, waiting
+  load 21.18 > 1.5, waiting
+  load 21.36 > 1.5, waiting
+  load 21.10 > 1.5, waiting
+  load 20.11 > 1.5, waiting
+  load 21.10 > 1.5, waiting
+  load 22.56 > 1.5, waiting
+  load 20.93 > 1.5, waiting
+  load 22.74 > 1.5, waiting
+  load 21.20 > 1.5, waiting
+  load 20.71 > 1.5, waiting
+  load 19.33 > 1.5, waiting
+  load 14.07 > 1.5, waiting
+  load 11.03 > 1.5, waiting
+  load 14.43 > 1.5, waiting
+  load 18.92 > 1.5, waiting
+  load 20.95 > 1.5, waiting
+  load 15.10 > 1.5, waiting
+  load 10.16 > 1.5, waiting
+  load 6.76 > 1.5, waiting
+  load 4.43 > 1.5, waiting
+  load 5.02 > 1.5, waiting
+  load 3.58 > 1.5, waiting
+  load 2.52 > 1.5, waiting
+  load 1.95 > 1.5, waiting
+  load 1.99 > 1.5, waiting
+  load 1.62 > 1.5, waiting
+  load 1.52 > 1.5, waiting
+  load 2.21 > 1.5, waiting
+  load 2.17 > 1.5, waiting
+  load 2.10 > 1.5, waiting
+  load 1.79 > 1.5, waiting
+  load 1.70 > 1.5, waiting
+  load 2.94 > 1.5, waiting
+  load 4.45 > 1.5, waiting
+  load 5.32 > 1.5, waiting
+  load 4.67 > 1.5, waiting
+  load 4.11 > 1.5, waiting
+  load 2.83 > 1.5, waiting
+  load 2.50 > 1.5, waiting
+  load 1.88 > 1.5, waiting
+[1] full1 load=1.14 start=2026-10-13T16:57:06+00:00
+    exit=0 cli=68.117s job=63.06s peak=4321.0MB cpu=329.1%
+  load 3.27 > 1.5, waiting
+  load 2.44 > 1.5, waiting
+  load 1.59 > 1.5, waiting
+[2] full2 load=1.17 start=2026-10-13T16:59:45+00:00
+    exit=0 cli=64.799s job=59.91s peak=4432.7MB cpu=335.8%
+  load 6.42 > 1.5, waiting
+  load 3.89 > 1.5, waiting
+  load 2.54 > 1.5, waiting
+  load 1.61 > 1.5, waiting
+[3] full3 load=1.26 start=2026-10-13T17:02:51+00:00
+    exit=0 cli=91.737s job=86.028s peak=3957.6MB cpu=244.3%
+  load 3.39 > 1.5, waiting
+  load 2.24 > 1.5, waiting
+[4] full4 load=1.42 start=2026-10-13T17:05:24+00:00
+    exit=0 cli=107.589s job=84.557s peak=4095.4MB cpu=214.5%
+  load 8.57 > 1.5, waiting
+  load 5.55 > 1.5, waiting
+  load 3.93 > 1.5, waiting
+  load 2.82 > 1.5, waiting
+  load 1.78 > 1.5, waiting
+[5] full5 load=1.13 start=2026-10-13T17:09:43+00:00
+    exit=0 cli=65.388s job=60.501s peak=4440.0MB cpu=334.4%
+# end: 2026-10-13T19:10:50+02:00 exit=0

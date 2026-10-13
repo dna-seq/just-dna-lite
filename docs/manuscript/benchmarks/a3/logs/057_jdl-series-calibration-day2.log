@@ -1,0 +1,70 @@
+# step 57: jdl-series-calibration-day2
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool jdl --genome calibration --vcf /data/a3-bench/inputs/newton/newtonwinter.GRCh38.ens106.deep.vcf.gz --series-dir /data/a3-bench/series/20261013T0200/jdl/calibration-day2 --cold 0 --warm 0 --full 5 -m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic -m pharmgkb -m superhuman -m thrombophilia -m vo2max 
+# start: 2026-10-13T17:40:14+02:00
+schedule (jdl, calibration, seed 20261010): warmup full full full full full
+  load 2.62 > 1.5, waiting
+  load 1.89 > 1.5, waiting
+[0] warmup1 load=1.5 start=2026-10-13T15:41:14+00:00
+    exit=0 cli=47.287s job=29.925s peak=2211.4MB cpu=267.3%
+  load 1.90 > 1.5, waiting
+  load 2.52 > 1.5, waiting
+  load 1.77 > 1.5, waiting
+[1] full1 load=1.2 start=2026-10-13T15:43:33+00:00
+    exit=0 cli=79.575s job=60.21s peak=2209.7MB cpu=158.3%
+  load 1.99 > 1.5, waiting
+[2] full2 load=1.21 start=2026-10-13T15:45:23+00:00
+    exit=0 cli=105.02s job=77.672s peak=2206.5MB cpu=122.0%
+  load 3.02 > 1.5, waiting
+  load 2.29 > 1.5, waiting
+  load 1.53 > 1.5, waiting
+[3] full3 load=1.4 start=2026-10-13T15:48:40+00:00
+    exit=0 cli=95.495s job=71.577s peak=2183.1MB cpu=133.7%
+  load 4.84 > 1.5, waiting
+  load 3.49 > 1.5, waiting
+  load 2.80 > 1.5, waiting
+  load 2.02 > 1.5, waiting
+  load 1.86 > 1.5, waiting
+  load 3.01 > 1.5, waiting
+  load 4.20 > 1.5, waiting
+  load 2.76 > 1.5, waiting
+  load 1.94 > 1.5, waiting
+[4] full4 load=1.32 start=2026-10-13T15:54:47+00:00
+    exit=0 cli=34.148s job=29.187s peak=2202.7MB cpu=364.4%
+  load 2.49 > 1.5, waiting
+  load 2.48 > 1.5, waiting
+  load 1.64 > 1.5, waiting
+  load 2.66 > 1.5, waiting
+  load 2.24 > 1.5, waiting
+  load 3.48 > 1.5, waiting
+  load 4.23 > 1.5, waiting
+  load 3.38 > 1.5, waiting
+  load 2.31 > 1.5, waiting
+  load 3.10 > 1.5, waiting
+  load 3.64 > 1.5, waiting
+  load 3.31 > 1.5, waiting
+  load 3.53 > 1.5, waiting
+  load 3.36 > 1.5, waiting
+  load 2.21 > 1.5, waiting
+  load 2.77 > 1.5, waiting
+  load 1.81 > 1.5, waiting
+  load 2.61 > 1.5, waiting
+  load 2.00 > 1.5, waiting
+  load 4.41 > 1.5, waiting
+  load 4.75 > 1.5, waiting
+  load 4.32 > 1.5, waiting
+  load 4.36 > 1.5, waiting
+  load 5.35 > 1.5, waiting
+  load 15.95 > 1.5, waiting
+  load 12.58 > 1.5, waiting
+  load 7.75 > 1.5, waiting
+  load 5.34 > 1.5, waiting
+  load 3.89 > 1.5, waiting
+  load 6.20 > 1.5, waiting
+  load 4.63 > 1.5, waiting
+  load 3.01 > 1.5, waiting
+  load 2.53 > 1.5, waiting
+  load 2.27 > 1.5, waiting
+[5] full5 load=1.43 start=2026-10-13T16:12:22+00:00
+    exit=0 cli=64.194s job=58.952s peak=2281.9MB cpu=196.9%
+# end: 2026-10-13T18:13:27+02:00 exit=0

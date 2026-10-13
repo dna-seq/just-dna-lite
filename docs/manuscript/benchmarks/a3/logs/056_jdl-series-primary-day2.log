@@ -1,0 +1,35 @@
+# step 56: jdl-series-primary-day2
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool jdl --genome primary --vcf /data/a3-bench/inputs/anton/antonkulaga.vcf --series-dir /data/a3-bench/series/20261013T0200/jdl/primary-day2 --cold 0 --warm 0 --full 5 -m cancer -m cardio -m coronary -m lipidmetabolism -m longevitymap -m pathogenic -m pharmgkb -m superhuman -m thrombophilia -m vo2max 
+# start: 2026-10-13T17:27:53+02:00
+schedule (jdl, primary, seed 20261010): warmup full full full full full
+  load 4.46 > 1.5, waiting
+  load 2.93 > 1.5, waiting
+  load 1.95 > 1.5, waiting
+  load 1.56 > 1.5, waiting
+[0] warmup1 load=1.03 start=2026-10-13T15:29:53+00:00
+    exit=0 cli=56.075s job=28.738s peak=2226.0MB cpu=222.9%
+  load 5.22 > 1.5, waiting
+  load 3.36 > 1.5, waiting
+  load 2.08 > 1.5, waiting
+[1] full1 load=1.26 start=2026-10-13T15:32:20+00:00
+    exit=0 cli=33.298s job=28.285s peak=2201.1MB cpu=374.6%
+  load 2.93 > 1.5, waiting
+  load 2.19 > 1.5, waiting
+  load 1.59 > 1.5, waiting
+[2] full2 load=1.47 start=2026-10-13T15:34:25+00:00
+    exit=0 cli=33.129s job=28.08s peak=2245.6MB cpu=375.1%
+  load 2.61 > 1.5, waiting
+  load 1.77 > 1.5, waiting
+[3] full3 load=1.2 start=2026-10-13T15:35:59+00:00
+    exit=0 cli=33.154s job=28.166s peak=2209.8MB cpu=373.9%
+  load 2.62 > 1.5, waiting
+  load 1.59 > 1.5, waiting
+[4] full4 load=1.07 start=2026-10-13T15:37:33+00:00
+    exit=0 cli=33.212s job=28.197s peak=2259.4MB cpu=375.7%
+  load 4.04 > 1.5, waiting
+  load 2.64 > 1.5, waiting
+  load 1.84 > 1.5, waiting
+[5] full5 load=1.26 start=2026-10-13T15:39:37+00:00
+    exit=0 cli=35.549s job=29.615s peak=2269.7MB cpu=350.1%
+# end: 2026-10-13T17:40:14+02:00 exit=0

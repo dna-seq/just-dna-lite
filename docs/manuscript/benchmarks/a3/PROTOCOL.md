@@ -432,3 +432,18 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   full runs on the primary, calibration and second-caller genomes (series `…/20261013T0200/jdl/*-day2`),
   then its OakVar run. Edited before `65` started (the queue expands its job list once, so a new file
   would not run); not run at once because OakVar job `64` was being timed.
+
+### Night 2 end (2026-10-13, 19:34)
+
+- Job `64` exited 0 (second caller run 2, 8,337.6 s). Job `65`: the 18 Generation II light-use runs
+  (warm-up + 5 full on primary, calibration and second caller; logs `056`–`058`) exited 0. Its OakVar
+  run (log `059`) was killed after 1,277.8 s: the user's PackageKit update (19:29 CEST) upgraded
+  docker-ce and containerd, and the daemon restarted at 19:34:08, ending the container (exit 125,
+  "Error waiting for container … context canceled"). The row stays in `runs.csv`; `make_tables.py`
+  skips it only because `FAILED` names its cause, and S2 lists it.
+- The update also installed kernel 7.2.9-2; every run so far is on 7.2.9-1 (Table 4). A reboot before
+  any further run changes the kernel, which Table 4 would then have to say.
+- Pooled (user's decision above): full-run ratio 181× primary, 231× calibration, 146× second caller
+  (n=2 OakVar), 146–231×, mean 186×. Generation II slowed more than OakVar in light use (calibration
+  33.0–105.0 s, CPU down to 122% from ~375%), since it uses several cores. Paper v0.4 B24, A3a, B28,
+  Tables 2 and 3 updated from `tables.md`.
