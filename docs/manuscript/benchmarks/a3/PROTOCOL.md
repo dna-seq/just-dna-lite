@@ -447,3 +447,15 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   (n=2 OakVar), 146–231×, mean 186×. Generation II slowed more than OakVar in light use (calibration
   33.0–105.0 s, CPU down to 122% from ~375%), since it uses several cores. Paper v0.4 B24, A3a, B28,
   Tables 2 and 3 updated from `tables.md`.
+
+### Second-caller run 3 again (queued 2026-10-15, ~13:40)
+
+- The user re-queued the killed OakVar run as job `66` (`queue/66-oakvar-second-caller-3-rerun.sh`),
+  OakVar only: job `65`'s Generation II runs had finished. Series directory
+  `…/oakvar/second_caller-3-rerun`; the failed `second_caller-3` stays, listed in S2.
+- It starts when the just-prs reference rescore (`81`, untimed, no load gate, ETA ~23:00) exits, then
+  waits for the default load gate (1.5, at most 4 h). Run outside `run-queue.sh`, which would rerun
+  `65` in full. Same kernel (7.2.9-1, not rebooted); Docker is now 29.9.0 (runs 1 and 2: 29.8.2), which
+  the preflight line records.
+- After it: regenerate `tables.md`, then update the second-caller ratio (n=3) and the pooled range in
+  paper v0.4 (B24, A3a, B28, Tables 2 and 3).
