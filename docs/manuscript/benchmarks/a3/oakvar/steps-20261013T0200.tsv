@@ -142,3 +142,27 @@ second_caller-2	00_full1	step	reporter	0.394
 second_caller-2	00_full1	total	runtime	8333.723
 second_caller-3	00_full1	step	converter	650.877
 second_caller-3	00_full1	step	preparer	0.000
+second_caller-3-rerun	00_full1	step	converter	659.728
+second_caller-3-rerun	00_full1	step	preparer	0.000
+second_caller-3-rerun	00_full1	step	mapper	1129.697
+second_caller-3-rerun	00_full1	step	annotator	2817.400
+second_caller-3-rerun	00_full1	module	Aggregator variant	886.906
+second_caller-3-rerun	00_full1	module	Aggregator gene	0.839
+second_caller-3-rerun	00_full1	module	Aggregator sample	50.197
+second_caller-3-rerun	00_full1	module	Aggregator mapping	30.542
+second_caller-3-rerun	00_full1	step	aggregator	968.488
+second_caller-3-rerun	00_full1	module	tagsampler	382.371
+second_caller-3-rerun	00_full1	module	vcfinfo	195.170
+second_caller-3-rerun	00_full1	module	just_cancer	96.352
+second_caller-3-rerun	00_full1	module	just_cardio	33.793
+second_caller-3-rerun	00_full1	module	just_coronary	156.674
+second_caller-3-rerun	00_full1	module	just_drugs	29.044
+second_caller-3-rerun	00_full1	module	just_longevitymap	290.497
+second_caller-3-rerun	00_full1	module	just_lipidmetabolism	331.328
+second_caller-3-rerun	00_full1	module	just_thrombophilia	370.332
+second_caller-3-rerun	00_full1	module	just_superhuman	612.302
+second_caller-3-rerun	00_full1	module	just_vo2max	247.797
+second_caller-3-rerun	00_full1	step	postaggregator	2745.791
+second_caller-3-rerun	00_full1	module	longevity2reporter	0.111
+second_caller-3-rerun	00_full1	step	reporter	0.265
+second_caller-3-rerun	00_full1	total	runtime	8321.422

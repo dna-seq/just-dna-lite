@@ -468,3 +468,11 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   and A3g (the concordance with PLINK2 X model 1). Not timed (load rose during that run).
 - Per-sex percentile curves (just-prs job `81`) are not on HuggingFace yet; 0.10.4 falls back to the
   pooled curves, so the paper's percentile text stays as it is until they are published.
+
+### Second-caller run 3 done (2026-10-15, 20:48–23:09 CEST)
+
+- Job `66` (log `060`) started when rescore `81` exited (20:47), passed the load gate at 1.36 and exited
+  0: 8,325.7 s CLI wall time (OakVar's own runtime 8,321.4 s), peak 4,529 MB. Kernel 7.2.9-1, Docker 29.9.0.
+- `oakvar/steps-20261013T0200.tsv` re-extracted (only the new run's rows added); `tables.md` regenerated.
+  Second caller: Generation I n=3, median 8,337.6 s, full-run ratio 128× (was 146× at n=2); range over
+  the three genomes 128–231×, mean 180×. Paper v0.4: Table 2, Table 3, A3a, S2 (B28) and J16 updated.

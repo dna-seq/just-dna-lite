@@ -1,0 +1,13 @@
+# step 60: oakvar-series-second-caller-3-rerun
+# cwd: /data/a3-bench/jdl
+# cmd: uv run --no-sync python -I /data/sources/just-dna-lite/docs/manuscript/benchmarks/a3/scripts/bench_annotation.py --tool oakvar --genome second_caller --vcf /data/a3-bench/inputs/livia/SIMHIFQTILQ.hard-filtered.vcf.gz --series-dir /data/a3-bench/series/20261013T0200/oakvar/second_caller-3-rerun --no-warmup --cold 0 --warm 0 --full 1 --oakvar-args -a dbsnp clinvar omim ncbigene pubmed gnomad sift cardioboost -p just_cancer just_cardio just_coronary just_drugs just_longevitymap just_lipidmetabolism just_thrombophilia just_superhuman just_vo2max -t longevity2reporter 
+# start: 2026-10-15T20:48:02+02:00
+schedule (oakvar, second_caller, seed 20261010): full
+  load 1.92 > 1.5, waiting
+  load 1.59 > 1.5, waiting
+  load 3.44 > 1.5, waiting
+  load 2.61 > 1.5, waiting
+  load 1.94 > 1.5, waiting
+[0] full1 load=1.36 start=2026-10-15T18:50:32+00:00
+    exit=0 cli=8325.724s job=Nones peak=4529.4MB cpu=None%
+# end: 2026-10-15T23:09:18+02:00 exit=0
