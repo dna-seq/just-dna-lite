@@ -1,0 +1,26 @@
+key,value
+just_prs_version,0.10.4
+just_prs_source,/data/just-dna-cache/prs-benchmark/src-9f2cca084e/just-prs/src/just_prs
+just_prs_git_commit,9f2cca084e882ce7ec772b5b7b20963be39aae5e
+just_prs_source_dirty,False
+python_version,3.13.16
+platform,Linux-7.2.9-1-liquorix-amd64-x86_64-with-glibc2.41
+cpu_count_logical,16
+total_ram_gb,62.7
+n_pgs_benchmarked,195
+n_pgs_scoring_failed,0
+warmup_ids,"PGS000001,PGS000002,PGS000003"
+vcf_url,https://zenodo.org/api/records/18370498/files/antonkulaga.vcf/content
+vcf_md5,21598da4f77d8237577662ab89e8a55d
+genotype_input,antonkulaga_normalized.parquet
+genotype_records,4661444
+autosomes_only,False
+sex_chromosomes,True
+sample_karyotype_given,XY
+sample_karyotype_inferred,XY
+genome_build,GRCh38
+plink2_version,PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026)
+plink2_pgen,"--vcf-filter --split-par hg38 --chr 1-22,X,Y,PAR1,PAR2,MT --update-sex --set-all-var-ids @:#:$r:$a"
+plink2_score,"header no-mean-imputation cols=scoresums (plink2: --xchr-model 1, plink2_xchr2: --xchr-model 2)"
+memory_method_python,rss_delta_peak_minus_baseline
+memory_method_plink2,subprocess_peak_rss

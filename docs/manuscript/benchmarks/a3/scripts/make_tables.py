@@ -2,7 +2,8 @@
 """Generate every benchmark table of Paper 1 (Tables 2-5, S2, S3, S6) from the committed A3 files.
 
 Inputs, all in docs/manuscript/benchmarks/a3/: runs.csv, inputs.json, env.json, historical.csv,
-oakvar/steps-*.tsv, oakvar/installed-2.13.1.json, prs/results-*/{fixed,original}/benchmark_results.csv.
+oakvar/steps-*.tsv, oakvar/installed-2.13.1.json, prs/results-*/{fixed,original}/benchmark_results.csv,
+prs/sexchr-*/benchmark_{per_pgs,metadata}.csv (just-prs's own benchmark with X, Y, PAR and MT, copied in).
 Output: tables.md beside them. No number in the paper's Sections 4.1, 4.2 or S2-S3 is typed by hand;
 each one is in tables.md.
 
@@ -260,6 +261,44 @@ def table5(config: str) -> str:
         rows.append([f"{ENGINE_LABEL[a]} ↔ {ENGINE_LABEL[b]}", str(len(ids)), f"{pearson(xa, xb):.6f}",
                      f"{diff[worst]:.3g} ({ids[worst]})", f"{st.median(diff):.3g}"])
     return table(["Engine pair", "*N* PGS", "Pearson *r*", "Max \\|Δ score\\| (ID)", "Median \\|Δ score\\|"], rows)
+
+
+# just-prs's own benchmark with X, Y, PAR and MT (copied from just-prs benchmarks/results/2026-10-13-sexchr). The
+# sample is marked male in PLINK2 and given as XY to just-prs. Two codings of a man's non-PAR X: one copy
+# (just-prs default) against PLINK2 --xchr-model 1, and 0..2 against --xchr-model 2.
+SEXCHR_PAIRS = (("duckdb", "polars", "copies"), ("duckdb_dc", "polars_dc", "0..2"),
+                ("polars", "plink2", "copies vs --xchr-model 1"), ("polars_dc", "plink2_xchr2", "0..2 vs --xchr-model 2"))
+
+
+def load_sexchr() -> tuple[list[dict], dict[str, str]]:
+    d = next(A3.glob("prs/sexchr-*"))
+    rows = list(csv.DictReader((d / "benchmark_per_pgs.csv").open()))
+    meta = {r["key"]: r["value"] for r in csv.DictReader((d / "benchmark_metadata.csv").open())}
+    return rows, meta
+
+
+def table_sexchr() -> str:
+    rows, meta = load_sexchr()
+    out = []
+    for a, b, coding in SEXCHR_PAIRS:
+        ok = [r for r in rows if r[f"score_{a}"] not in ("", "None") and r[f"score_{b}"] not in ("", "None")]
+        xa = [float(r[f"score_{a}"]) for r in ok]
+        xb = [float(r[f"score_{b}"]) for r in ok]
+        diff = [abs(p - q) for p, q in zip(xa, xb)]
+        k = max(range(len(ok)), key=lambda i: diff[i])
+        out.append([f"{a} ↔ {b}", coding, str(len(ok)), f"{pearson(xa, xb):.8f}",
+                    f"{diff[k]:.3g} ({ok[k]['pgs_id']}, score {xb[k]:.1f})", str(sum(x <= 1e-3 for x in diff))])
+    # A het call on a man's non-PAR X is a no-call in just-prs and half a copy (model 1) or one copy (model 2) in
+    # PLINK2, so its share of the model-2 difference is twice its share of the model-1 one: 2*d1 - d2 is the rest.
+    rest = [(abs(2 * (float(r["score_polars"]) - float(r["score_plink2"]))
+                 - (float(r["score_polars_dc"]) - float(r["score_plink2_xchr2"]))), r["pgs_id"]) for r in rows]
+    worst_rest = max(rest)
+    note = (f"just-prs {meta['just_prs_version']} ({meta['just_prs_git_commit'][:7]}); {meta['plink2_version']}; "
+            f"{int(meta['genotype_records']):,} records; karyotype given {meta['sample_karyotype_given']}, inferred "
+            f"{meta['sample_karyotype_inferred']}. Difference left after removing the part that doubles from model 1 "
+            f"to model 2 (2·Δ₁ − Δ₂): at most {worst_rest[0]:.2g} ({worst_rest[1]}).")
+    return table(["Engine pair", "Coding of a man's non-PAR X", "*N* PGS", "Pearson *r*", "Max \\|Δ score\\| (ID)",
+                  "IDs within 10⁻³"], out) + f"\n\n{note}"
 
 
 def s2(runs) -> str:
@@ -543,6 +582,7 @@ def main() -> None:
     parts += ["## S2. Generation I runs, steps, hardware factor and module versions", s2(runs)]
     for config in ("fixed", "original"):
         parts += [f"## S3 ({config}). Large scoring files: time and memory", s3(config)]
+    parts += ["## PRS with X, Y, PAR and MT: score concordance (just-prs benchmark, primary genome)", table_sexchr()]
     parts += ["# As printed in the paper",
               "## Paper Table 2", t2,
               "## Paper Table 3", paper_table3(runs),

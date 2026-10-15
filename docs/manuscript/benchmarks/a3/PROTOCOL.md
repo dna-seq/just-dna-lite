@@ -459,3 +459,12 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
   the preflight line records.
 - After it: regenerate `tables.md`, then update the second-caller ratio (n=3) and the pooled range in
   paper v0.4 (B24, A3a, B28, Tables 2 and 3).
+
+### PRS with X, Y, PAR and MT (added 2026-10-15)
+
+- just-prs's own 2026-10-13 benchmark (just-prs 0.10.4, 195 IDs on the primary genome, sample XY) is
+  copied into `prs/sexchr-20261013/` from just-prs `benchmarks/results/2026-10-13-sexchr/`.
+  `make_tables.py` gains `table_sexchr()`; paper v0.4 gains A3f (how the engines count X, Y, PAR and MT)
+  and A3g (the concordance with PLINK2 X model 1). Not timed (load rose during that run).
+- Per-sex percentile curves (just-prs job `81`) are not on HuggingFace yet; 0.10.4 falls back to the
+  pooled curves, so the paper's percentile text stays as it is until they are published.

@@ -224,6 +224,17 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | just-prs Polars | process_rss_delta_10ms | 1,346.4 | 4,087 |
 | PLINK2 | subprocess_peak_rss_100ms | 620.5 | 804 |
 
+## PRS with X, Y, PAR and MT: score concordance (just-prs benchmark, primary genome)
+
+| Engine pair | Coding of a man's non-PAR X | *N* PGS | Pearson *r* | Max \|Δ score\| (ID) | IDs within 10⁻³ |
+|---|---|---|---|---|---|
+| duckdb ↔ polars | copies | 195 | 1.00000000 | 2.27e-13 (PGS000012, score 303.6) | 195 |
+| duckdb_dc ↔ polars_dc | 0..2 | 195 | 1.00000000 | 9.09e-13 (PGS003903, score 533.8) | 195 |
+| polars ↔ plink2 | copies vs --xchr-model 1 | 195 | 0.99999847 | 2.95 (PGS001108, score 854.9) | 114 |
+| polars_dc ↔ plink2_xchr2 | 0..2 vs --xchr-model 2 | 195 | 0.99999537 | 5.89 (PGS001108, score 925.2) | 113 |
+
+just-prs 0.10.4 (9f2cca0); PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 4,661,444 records; karyotype given XY, inferred XY. Difference left after removing the part that doubles from model 1 to model 2 (2·Δ₁ − Δ₂): at most 0.14 (PGS002861).
+
 # As printed in the paper
 
 ## Paper Table 2
