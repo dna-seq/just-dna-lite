@@ -477,7 +477,7 @@ Run protocol. After one warm-up run, the Generation II runs of each genome were 
 **S6. Benchmark hardware and inputs.** The workstation, software versions and input genomes of the annotation benchmark in Section 4.1, recorded at run time (Table S6).
 <!-- @/rev C24a -->
 
-<!-- @rev B23 rounds=2 by=claude:2026-10-11,claude:2026-10-12 -->
+<!-- @rev B23 rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-17 -->
 **Table S6.** Benchmark hardware and inputs, recorded at run time (October 2026).
 
 | Parameter | Value |
@@ -485,7 +485,7 @@ Run protocol. After one warm-up run, the Generation II runs of each genome were 
 | CPU | AMD Ryzen 7 3800X (8 cores, 16 threads) |
 | RAM | 63 GiB |
 | Storage | SATA SSD, NTFS through the Linux ntfs3 driver (data, caches and outputs) |
-| OS | Linux 7.2.9 |
+| OS | Linux 7.2 |
 | Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
 | Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |

@@ -403,7 +403,9 @@ def paper_table_s6() -> str:
         ["CPU", f"{m['cpu_model'].replace(' 8-Core Processor', '')} ({m['cores']} cores, {m['threads']} threads)"],
         ["RAM", f"{m['ram_bytes'] / 2**30:.0f} GiB"],
         ["Storage", f"{'HDD' if disk['rotational'] else 'SATA SSD'}, NTFS through the Linux {m['data_mount']['fstype']} driver (data, caches and outputs)"],
-        ["OS", f"Linux {m['kernel'].split('-')[0]}"],
+        # The paper states the kernel series only (the user's call, 2026-10-17): a patch release of the same series is not
+        # a different machine for these timings. The exact build stays in env.json and Table S6 of tables.md.
+        ["OS", f"Linux {'.'.join(m['kernel'].split('-')[0].split('.')[:2])}"],
         ["Generation II", f"Just-DNA-Lite {c['packages']['just-dna-lite']}, {len(env['modules'])} modules (versions and digests as in Table S4)"],
         ["Generation I", f"OakVar {env['generation_i']['oakvar']} in Docker (Table S2)"],
     ]

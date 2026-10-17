@@ -284,7 +284,7 @@ just-prs 0.10.4 (9f2cca0); PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 4,6
 | CPU | AMD Ryzen 7 3800X (8 cores, 16 threads) |
 | RAM | 63 GiB |
 | Storage | SATA SSD, NTFS through the Linux ntfs3 driver (data, caches and outputs) |
-| OS | Linux 7.2.9 |
+| OS | Linux 7.2 |
 | Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
 | Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |

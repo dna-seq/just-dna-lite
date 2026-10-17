@@ -476,3 +476,11 @@ All three jobs exited 0 (`/data/bench-queue/logs/run-queue.log`):
 - `oakvar/steps-20261013T0200.tsv` re-extracted (only the new run's rows added); `tables.md` regenerated.
   Second caller: Generation I n=3, median 8,337.6 s, full-run ratio 128× (was 146× at n=2); range over
   the three genomes 128–231×, mean 180×. Paper v0.4: Table 2, Table 3, A3a, S2 (B28) and J16 updated.
+
+### Kernel stated as a series (2026-10-17)
+
+- A power failure rebooted the machine into kernel 7.2.10-2 (every timed run so far: 7.2.9-1). The
+  user's call: a patch release of the same series is not a different machine for these timings, so
+  the paper's Table S6 states "Linux 7.2" and further timed runs need no reboot into 7.2.9. The exact
+  build stays in `env.json` and in Table S6 of `tables.md`; a run on another build records `uname -r`
+  in its preflight line (as job `66` does) and gets a line here.
