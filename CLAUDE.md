@@ -683,7 +683,7 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
   `backend_api_url` never returns `""`.
 
-## PRS (`just-prs>=0.10.4`, `prs-ui>=0.3.18`)
+## PRS (`just-prs>=0.10.5`, `prs-ui>=0.3.18`)
 
 `PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`

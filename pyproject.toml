@@ -11,7 +11,7 @@ dependencies = [
   "pyyaml>=6.0.3",
   "pydantic>=2.13.4",
   "dagster-dg-cli>=1.13.17",
-  "just-prs>=0.10.4",
+  "just-prs>=0.10.5",
   # The catalog client. `version.contract_compatible` compares the installed `just-dna-format`
   # on client and server and treats a 0.x minor as breaking, so this floor moves with the format
   # floor in just-dna-pipelines/pyproject.toml, never alone. 0.25.0 is the format-0.7 cut; 0.27.0
