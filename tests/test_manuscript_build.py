@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -64,8 +65,9 @@ def test_the_cli_exposes_build_beside_the_ledger() -> None:
 
 def test_outputs_default_to_a_build_directory_beside_the_source(tmp_path: Path) -> None:
     paths = build_paths(PAPER1)
-    assert {p.parent for p in (paths.clean, paths.tex, paths.pdf, paths.log)} == {PAPER1.parent / "build"}
+    assert {p.parent for p in (paths.clean, paths.tex, paths.docx, paths.pdf, paths.log)} == {PAPER1.parent / "build"}
     assert paths.clean.name == "paper1-just-dna-lite.clean.md"
+    assert paths.docx.name == "paper1-just-dna-lite.docx"
     assert paths.pdf.name == "paper1-just-dna-lite.pdf"
     assert build_paths(PAPER1, tmp_path).tex == tmp_path / "paper1-just-dna-lite.tex"
 
@@ -128,7 +130,8 @@ def test_the_tectonic_binary_can_be_overridden_from_the_environment(tmp_path: Pa
 def test_a_failed_render_reports_and_removes_the_old_pdf(
     script: str, message: str, tmp_path: Path, monkeypatch
 ) -> None:
-    """The LaTeX is written, the failure is reported, and no earlier PDF is left to pass as current."""
+    """The LaTeX and the .docx are written, the failure is reported, and no earlier PDF is left to
+    pass as current: the .docx comes before tectonic, so a broken TeX install still gives the Drive copy."""
     source, _ = marked_copy(tmp_path)
     out = tmp_path / "out"
     paths = build_paths(source, out)
@@ -141,6 +144,7 @@ def test_a_failed_render_reports_and_removes_the_old_pdf(
     assert message in result.output
     assert paths.tex.is_file()
     assert paths.clean.is_file()
+    assert zipfile.is_zipfile(paths.docx)
     assert not paths.pdf.exists()
 
 
@@ -156,6 +160,8 @@ def test_no_pdf_stops_at_the_latex_and_flags_an_older_pdf(tmp_path: Path, monkey
     result = CliRunner().invoke(app, ["build", str(source), "--out", str(out), "--no-pdf"])
     assert result.exit_code == 0, result.output
     assert paths.tex.is_file()
+    assert zipfile.is_zipfile(paths.docx)
+    assert f"wrote {paths.docx}" in result.output
     assert "earlier build" in result.output
     assert paths.pdf.read_bytes() == b"%PDF-1.5 an earlier build"
 

@@ -774,6 +774,13 @@ not a VCF liftover and cannot be reused for annotation.
 - `uv run manuscript build PATH [--out DIR] [--no-pdf] [--template T]`: clean twin → pandoc LaTeX →
   tectonic PDF in `build/` beside PATH (gitignored). `MANUSCRIPT_TECTONIC` overrides the binary,
   `TECTONIC_CACHE_DIR` keeps the TeX bundle off `~/.cache`. A failed render deletes the old PDF.
+- The same build writes `build/<stem>.docx`, the copy uploaded to Google Drive (also with `--no-pdf`).
+  `filters/docx_tables.lua` sizes table columns from their content, and `finish_docx_layout` writes the
+  widths in twips, because Google Docs reads the column grid. A table too wide for portrait gets its
+  own landscape pages with its caption, and an image stays on the page of its "Figure N." caption
+  (keep-with-next styles). This is docx-only: the LaTeX PDF still squeezes Table S7.
+  Never hand-convert a clean twin with bare pandoc: that is how v0.5 reached co-authors with
+  borderless, word-per-line tables. Tests: `tests/test_manuscript_docx.py`.
 - Before submitting, run the `manuscript-integrity-check` skill from the
   [manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin (desk-reject screens, reference
   resolution, AI-use disclosure per venue); `manuscript-journal-select` compares venues and

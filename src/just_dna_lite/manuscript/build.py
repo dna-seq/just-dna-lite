@@ -1,7 +1,8 @@
-"""Build a manuscript PDF from its Markdown master.
+"""Build a manuscript PDF and .docx from its Markdown master.
 
-The chain is: ledger strip (`<stem>.clean.md`) → pandoc → LaTeX (`<stem>.tex`) → tectonic → PDF.
-The Markdown is the master here; the LaTeX is derived and never edited by hand. Ported from the
+The chain is: ledger strip (`<stem>.clean.md`) → pandoc → LaTeX (`<stem>.tex`) → tectonic → PDF, and
+from the same clean twin pandoc → `<stem>.docx` (the copy co-authors comment on in Google Docs).
+The Markdown is the master here; everything else is derived and never edited by hand. Ported from the
 just-module-creator manuscript CLI, where the direction is the reverse (LaTeX master, Markdown derived).
 """
 
@@ -12,8 +13,12 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
+from xml.dom import minidom
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,12 +52,94 @@ FONT_VARIABLES = (
 _PAGES_RE = re.compile(r"Output written on .*? \((?P<pages>[0-9]+) pages?")
 _MISSING_CHAR_RE = re.compile(r"Missing character: There is no (?P<char>.) \(U\+(?P<code>[0-9A-F]+)\)")
 
+# The .docx: A4 portrait with 2 cm margins, tables in 9 pt Arial (the filter's width estimates use
+# Arial metrics, and Word, LibreOffice and Google Docs all have Arial or a metric twin). Lengths are
+# twips (1/20 pt); 1 cm = 567 twips.
+DOCX_TABLE_FILTER = Path(__file__).parent / "filters" / "docx_tables.lua"
+A4_WIDTH_TWIPS = 11906
+A4_HEIGHT_TWIPS = 16838
+DOCX_MARGIN_TWIPS = 1134
+TABLE_FONT = "Arial"
+TABLE_FONT_PT = 9
+CELL_MARGIN_TWIPS = 85  # left and right
+CELL_MARGIN_VERTICAL_TWIPS = 28
+TABLE_TEXT_STYLE = "TableText"
+TABLE_HEADING_STYLE = "TableHeading"
+TABLE_TITLE_STYLE = "TableTitle"  # the bold "Table X." paragraph, kept with its table
+TABLE_CODE_STYLE = "TableCode"  # inline code in a cell; pandoc's Verbatim Char is 11 pt
+FIGURE_IMAGE_STYLE = "FigureImage"  # an image paragraph, kept with the "Figure N." caption below it
+_PCT_FULL = 5000  # OOXML `pct` widths are fiftieths of a percent
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_TABLE_STYLE_RE = re.compile(r'<w:style w:type="table" w:default="1" w:styleId="Table">.*?</w:style>', re.DOTALL)
+_SECT_PR_RE = re.compile(r"<w:sectPr>.*?</w:sectPr>", re.DOTALL)
+_BORDER = 'w:val="single" w:sz="4" w:space="0" w:color="auto"'
+_TABLE_BORDERS = (
+    "<w:tblBorders>"
+    + "".join(f"<w:{side} {_BORDER}/>" for side in ("top", "left", "bottom", "right", "insideH", "insideV"))
+    + "</w:tblBorders>"
+)
+_CELL_MARGINS = (
+    "<w:tblCellMar>"
+    f'<w:top w:w="{CELL_MARGIN_VERTICAL_TWIPS}" w:type="dxa"/>'
+    f'<w:left w:w="{CELL_MARGIN_TWIPS}" w:type="dxa"/>'
+    f'<w:bottom w:w="{CELL_MARGIN_VERTICAL_TWIPS}" w:type="dxa"/>'
+    f'<w:right w:w="{CELL_MARGIN_TWIPS}" w:type="dxa"/>'
+    "</w:tblCellMar>"
+)
+_REFERENCE_TABLE_STYLE = (
+    '<w:style w:type="table" w:default="1" w:styleId="Table">'
+    '<w:name w:val="Table"/><w:basedOn w:val="TableNormal"/><w:qFormat/>'
+    f'<w:tblPr><w:tblInd w:w="0" w:type="dxa"/>{_TABLE_BORDERS}{_CELL_MARGINS}</w:tblPr>'
+    '<w:tblStylePr w:type="firstRow"><w:rPr><w:b/><w:bCs/></w:rPr>'
+    '<w:tcPr><w:vAlign w:val="bottom"/></w:tcPr></w:tblStylePr>'
+    "</w:style>"
+)
+_TABLE_FONT_RPR = (
+    f'<w:rFonts w:ascii="{TABLE_FONT}" w:hAnsi="{TABLE_FONT}" w:cs="{TABLE_FONT}"/>'
+    f'<w:sz w:val="{TABLE_FONT_PT * 2}"/><w:szCs w:val="{TABLE_FONT_PT * 2}"/>'
+)
+# Paragraph styles outrank a table style's run properties in Word, so the font and the header's
+# bold live here, where every cell paragraph takes them, not in the table style. "Table Title" keeps
+# a "Table X." caption with its table; "Table Code" sets inline code in a cell at the table size.
+_REFERENCE_TABLE_STYLES = (
+    f'<w:style w:type="paragraph" w:customStyle="1" w:styleId="{TABLE_TEXT_STYLE}">'
+    '<w:name w:val="Table Text"/><w:basedOn w:val="Normal"/><w:qFormat/>'
+    '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
+    f"<w:rPr>{_TABLE_FONT_RPR}</w:rPr></w:style>"
+    f'<w:style w:type="paragraph" w:customStyle="1" w:styleId="{TABLE_HEADING_STYLE}">'
+    f'<w:name w:val="Table Heading"/><w:basedOn w:val="{TABLE_TEXT_STYLE}"/><w:qFormat/>'
+    "<w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:bCs/></w:rPr></w:style>"
+    f'<w:style w:type="paragraph" w:customStyle="1" w:styleId="{TABLE_TITLE_STYLE}">'
+    '<w:name w:val="Table Title"/><w:basedOn w:val="BodyText"/><w:qFormat/>'
+    "<w:pPr><w:keepNext/><w:keepLines/></w:pPr></w:style>"
+    f'<w:style w:type="character" w:customStyle="1" w:styleId="{TABLE_CODE_STYLE}">'
+    '<w:name w:val="Table Code"/><w:basedOn w:val="VerbatimChar"/>'
+    f'<w:rPr><w:sz w:val="{TABLE_FONT_PT * 2}"/><w:szCs w:val="{TABLE_FONT_PT * 2}"/></w:rPr></w:style>'
+    f'<w:style w:type="paragraph" w:customStyle="1" w:styleId="{FIGURE_IMAGE_STYLE}">'
+    '<w:name w:val="Figure Image"/><w:basedOn w:val="BodyText"/><w:qFormat/>'
+    '<w:pPr><w:keepNext/><w:keepLines/><w:jc w:val="center"/></w:pPr></w:style>'
+)
+_REFERENCE_SECT_PR = (
+    f'<w:sectPr><w:pgSz w:w="{A4_WIDTH_TWIPS}" w:h="{A4_HEIGHT_TWIPS}"/>'
+    f'<w:pgMar w:top="{DOCX_MARGIN_TWIPS}" w:right="{DOCX_MARGIN_TWIPS}" w:bottom="{DOCX_MARGIN_TWIPS}" '
+    f'w:left="{DOCX_MARGIN_TWIPS}" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>'
+)
+# Read by docx_tables.lua, which removes them before the writer runs.
+_FILTER_METADATA = {
+    "docx-page-width": A4_WIDTH_TWIPS,
+    "docx-page-height": A4_HEIGHT_TWIPS,
+    "docx-margin": DOCX_MARGIN_TWIPS,
+    "docx-table-font-size": TABLE_FONT_PT,
+    "docx-cell-margin": CELL_MARGIN_TWIPS,
+}
+
 
 class BuildPaths(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     clean: Path
     tex: Path
+    docx: Path
     pdf: Path
     log: Path
 
@@ -72,6 +159,7 @@ def build_paths(source: Path, out_dir: Optional[Path] = None) -> BuildPaths:
     return BuildPaths(
         clean=directory / f"{stem}{CLEAN_SUFFIX}",
         tex=directory / f"{stem}.tex",
+        docx=directory / f"{stem}.docx",
         pdf=directory / f"{stem}.pdf",
         log=directory / f"{stem}.log",
     )
@@ -92,8 +180,7 @@ def markdown_to_latex(clean: Path, tex: Path, resource_dir: Path, template: Opti
     *template* is the hook for a venue template (Bioinformatics/OUP and the like): a pandoc LaTeX
     template, see `pandoc -D latex` for the variables it receives. None uses pandoc's own article.
     """
-    if pypandoc is None:
-        raise RuntimeError("pypandoc is not installed; run `uv sync` (it is in the dev dependency group)")
+    _require_pypandoc()
     if template is not None and not template.is_file():
         raise FileNotFoundError(f"template {template} not found")
     args = [*PANDOC_ARGS, f"--resource-path={resource_dir.resolve()}"]
@@ -104,6 +191,214 @@ def markdown_to_latex(clean: Path, tex: Path, resource_dir: Path, template: Opti
     tex.parent.mkdir(parents=True, exist_ok=True)
     pypandoc.convert_file(str(clean), "latex", format="markdown", outputfile=str(tex), extra_args=args)
     return tex
+
+
+def _require_pypandoc() -> None:
+    if pypandoc is None:
+        raise RuntimeError("pypandoc is not installed; run `uv sync` (it is in the dev dependency group)")
+
+
+def markdown_to_docx(clean: Path, docx: Path, resource_dir: Path) -> Path:
+    """Convert the clean Markdown to .docx with readable tables (see `filters/docx_tables.lua`).
+
+    Same heading shift and resource path as the LaTeX. The reference document is generated for the
+    build from pandoc's default, and the tables are pinned to absolute widths afterwards. The previous
+    .docx is deleted first, so a failed conversion never leaves an old one that reads as current.
+    """
+    _require_pypandoc()
+    docx.unlink(missing_ok=True)
+    docx.parent.mkdir(parents=True, exist_ok=True)
+    args = [*PANDOC_ARGS, f"--resource-path={resource_dir.resolve()}", f"--lua-filter={DOCX_TABLE_FILTER}"]
+    args.extend(f"--metadata={key}={value}" for key, value in _FILTER_METADATA.items())
+    with tempfile.TemporaryDirectory(prefix="manuscript-docx-") as scratch:
+        reference = write_reference_docx(Path(scratch) / "reference.docx")
+        args.append(f"--reference-doc={reference}")
+        pypandoc.convert_file(str(clean), "docx", format="markdown", outputfile=str(docx), extra_args=args)
+    finish_docx_layout(docx)
+    return docx
+
+
+def write_reference_docx(dest: Path) -> Path:
+    """Pandoc's default reference.docx, patched; generated per build so no binary is committed.
+
+    A4 portrait with 2 cm margins in the final section; the "Table" style gets thin single borders on
+    every side and between cells, and modest cell margins; "Table Text" (9 pt Arial, no space after,
+    single spacing), "Table Heading" (the same, bold), "Table Title" (keep with next) and "Table Code"
+    (9 pt code) are added for the filter's cells and captions.
+    """
+    _require_pypandoc()
+    default = subprocess.run(
+        [pypandoc.get_pandoc_path(), "--print-default-data-file", "reference.docx"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(default)
+    _rewrite_zip_members(dest, {"word/styles.xml": _patch_reference_styles, "word/document.xml": _patch_reference_section})
+    return dest
+
+
+def _patch_reference_styles(xml: str) -> str:
+    patched, count = _TABLE_STYLE_RE.subn(_REFERENCE_TABLE_STYLE, xml)
+    if count != 1 or "</w:styles>" not in patched:
+        raise RuntimeError("pandoc's default reference.docx no longer has one default \"Table\" style to replace")
+    return patched.replace("</w:styles>", f"{_REFERENCE_TABLE_STYLES}</w:styles>")
+
+
+def _patch_reference_section(xml: str) -> str:
+    patched, count = _SECT_PR_RE.subn(_REFERENCE_SECT_PR, xml)
+    if count != 1:
+        raise RuntimeError(f"pandoc's default reference.docx has {count} sections, expected 1")
+    return patched
+
+
+def _rewrite_zip_members(path: Path, edits: dict[str, Callable[[str], str]]) -> None:
+    """Rewrite the named UTF-8 members of a zip in place, keeping every other member and the order."""
+    with zipfile.ZipFile(path) as source:
+        members = [(info, source.read(info)) for info in source.infolist()]
+    missing = set(edits) - {info.filename for info, _ in members}
+    if missing:
+        raise RuntimeError(f"{path} has no {', '.join(sorted(missing))}")
+    partial = path.with_name(f"{path.name}.part")
+    with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as target:
+        for info, data in members:
+            edit = edits.get(info.filename)
+            target.writestr(info, data if edit is None else edit(data.decode("utf-8")).encode("utf-8"))
+    partial.replace(path)
+
+
+def finish_docx_layout(docx: Path) -> None:
+    """Make every top-level table's widths, borders and cell margins direct formatting, and drop an
+    empty last page.
+
+    Pandoc writes a table's width as a percentage and scales its grid to a fixed 5.5-inch text width,
+    so the grid alone undersizes every column, and Google Docs reads the grid. Here each grid column
+    and cell gets its width in twips of the text width of the section the table sits in (portrait or
+    landscape), and the "Table" style's borders and cell margins are repeated on the table, for
+    importers that ignore table styles. Rows are marked `cantSplit`, so no row is cut across a page
+    break. A document that ends on a landscape table would end with an empty portrait section (a
+    blank page); its last section takes the landscape properties instead.
+    """
+    _rewrite_zip_members(docx, {"word/document.xml": _finish_layout})
+
+
+def _finish_layout(xml: str) -> str:
+    dom = minidom.parseString(xml.encode("utf-8"))
+    body = _child(dom.documentElement, "w:body")
+    if body is None:
+        raise RuntimeError("document.xml has no w:body")
+    _close_trailing_section(body)
+    pending: list[minidom.Element] = []
+    for child in _children(body):
+        if child.tagName == "w:tbl":
+            pending.append(child)
+            continue
+        section = child if child.tagName == "w:sectPr" else _paragraph_section(child)
+        if section is None:
+            continue
+        width = _section_text_width(section)
+        for table in pending:
+            _pin_table(dom, table, width)
+        pending = []
+    if pending:
+        raise RuntimeError("document.xml has tables after its last section properties")
+    return dom.toxml(encoding="UTF-8").decode("utf-8")
+
+
+def _close_trailing_section(body: minidom.Element) -> None:
+    """When an empty section-break paragraph is the last thing before the body's own sectPr, the
+    final section holds nothing: move the break's properties to the end and drop the paragraph.
+    Bookmark ends (pandoc closes a heading's bookmark at the end of its section) do not count."""
+    children = [c for c in _children(body) if c.tagName != "w:bookmarkEnd"]
+    if len(children) < 2 or children[-1].tagName != "w:sectPr":
+        return
+    last_paragraph = children[-2]
+    section = _paragraph_section(last_paragraph)
+    if section is None or _children(last_paragraph, "w:r"):
+        return
+    body.replaceChild(section, children[-1])
+    body.removeChild(last_paragraph)
+
+
+def _children(node: minidom.Node, tag: Optional[str] = None) -> list[minidom.Element]:
+    return [c for c in node.childNodes if c.nodeType == c.ELEMENT_NODE and (tag is None or c.tagName == tag)]
+
+
+def _child(node: minidom.Node, tag: str) -> Optional[minidom.Element]:
+    found = _children(node, tag)
+    return found[0] if found else None
+
+
+def _paragraph_section(node: minidom.Element) -> Optional[minidom.Element]:
+    """The sectPr a paragraph carries in its pPr: it ends a section and describes the pages above it."""
+    if node.tagName != "w:p":
+        return None
+    properties = _child(node, "w:pPr")
+    return None if properties is None else _child(properties, "w:sectPr")
+
+
+def _section_text_width(section: minidom.Element) -> int:
+    size, margins = _child(section, "w:pgSz"), _child(section, "w:pgMar")
+    if size is None or margins is None:
+        raise RuntimeError("a section in document.xml states no page size or margins")
+    return int(size.getAttribute("w:w")) - int(margins.getAttribute("w:left")) - int(margins.getAttribute("w:right"))
+
+
+def _fragment(dom: minidom.Document, xml: str) -> minidom.Element:
+    parsed = minidom.parseString(f'<root xmlns:w="{_W_NS}">{xml}</root>').documentElement.firstChild
+    return dom.importNode(parsed, True)
+
+
+def _insert_before_first(parent: minidom.Element, node: minidom.Element, successors: tuple[str, ...]) -> None:
+    """Insert *node* before the first child named in *successors* (OOXML fixes the child order)."""
+    for existing in _children(parent, node.tagName):
+        parent.removeChild(existing)
+    following = next((c for c in _children(parent) if c.tagName in successors), None)
+    parent.insertBefore(node, following)
+
+
+def _pin_table(dom: minidom.Document, table: minidom.Element, text_width: int) -> None:
+    properties, grid = _child(table, "w:tblPr"), _child(table, "w:tblGrid")
+    if properties is None or grid is None:
+        raise RuntimeError("a table in document.xml has no w:tblPr or w:tblGrid")
+    _insert_before_first(
+        properties,
+        _fragment(dom, _TABLE_BORDERS),
+        ("w:shd", "w:tblLayout", "w:tblCellMar", "w:tblLook", "w:tblCaption", "w:tblDescription"),
+    )
+    _insert_before_first(properties, _fragment(dom, _CELL_MARGINS), ("w:tblLook", "w:tblCaption", "w:tblDescription"))
+    for row in _children(table, "w:tr"):  # a row is never split across two pages
+        row_properties = _child(row, "w:trPr")
+        if row_properties is None:
+            row_properties = dom.createElement("w:trPr")
+            exceptions = _child(row, "w:tblPrEx")
+            row.insertBefore(row_properties, row.firstChild if exceptions is None else exceptions.nextSibling)
+        _insert_before_first(row_properties, dom.createElement("w:cantSplit"), ())
+    table_width, columns = _child(properties, "w:tblW"), _children(grid, "w:gridCol")
+    if table_width is None or table_width.getAttribute("w:type") != "pct" or not columns:
+        return  # pandoc's auto layout: no widths to pin
+    share = int(table_width.getAttribute("w:w")) / _PCT_FULL
+    weights = [int(column.getAttribute("w:w")) for column in columns]
+    twips = [int(text_width * share * weight / sum(weights)) for weight in weights]
+    for column, width in zip(columns, twips):
+        column.setAttribute("w:w", str(width))
+    table_width.setAttribute("w:type", "dxa")
+    table_width.setAttribute("w:w", str(sum(twips)))
+    for row in _children(table, "w:tr"):
+        index = 0
+        for cell in _children(row, "w:tc"):
+            cell_properties = _child(cell, "w:tcPr")
+            if cell_properties is None:
+                cell_properties = dom.createElement("w:tcPr")
+                cell.insertBefore(cell_properties, cell.firstChild)
+            span = _child(cell_properties, "w:gridSpan")
+            columns_spanned = int(span.getAttribute("w:val")) if span is not None else 1
+            cell_width = dom.createElement("w:tcW")
+            cell_width.setAttribute("w:w", str(sum(twips[index : index + columns_spanned])))
+            cell_width.setAttribute("w:type", "dxa")
+            successors = tuple(c.tagName for c in _children(cell_properties) if c.tagName != "w:cnfStyle")
+            _insert_before_first(cell_properties, cell_width, successors)
+            index += columns_spanned
 
 
 def resolve_tectonic() -> Path:

@@ -220,26 +220,35 @@ Supplementary Data as Google Docs and PDFs, Tables S4 and S5 as Google Docs, the
 and S5 CSVs and the S5 histogram) in a `Supplementary data files` subfolder, and the scan of the ethics
 determination.
 
+For v0.5, the active co-author copy is [this Google Doc](https://docs.google.com/document/d/1ZgaFbXmOXkkFMUMuSUR8_STPIjrZzjRZspfjQsmqdjU/edit). Apply corrections to the repository master first, finish all manuscript changes for the session, then sync them to that existing Doc. Preserve its native tables; the .docx from `manuscript build` brings their borders and column widths, so check them after import or formatting changes. Embed the figures in both the master and Google Doc, and keep standalone copies in `v0.5/figures/` for submission. Reuse existing repository figures rather than retaking them; use Chrome for any missing screenshots and preserve their aspect ratios.
+
 1. `git mv` every file changed since the last release into the new `vX.Y/` and copy the unchanged
    ones (`supplementary/`), put the released text back in the old folder with
    `git show <release commit>:<path>`, and relabel the paper's header.
-2. `manuscript build` the paper. Build the Supplementary Data from a copy that starts with a
-   `geometry: [landscape, margin=1.6cm]` YAML block: Tables S2, S7 and S10 are too wide for a portrait
-   page (S7 has 11 columns). Look at both PDFs.
-3. Convert each clean twin, and the S4 and S5 Markdown, to .docx with pandoc
-   (`--shift-heading-level-by=-1`; for S5 point its figure at the PNG) and upload it as a
-   Google Doc: `rclone copyto X.docx gdrive:"X.docx" --drive-root-folder-id <folder id>
-   --drive-import-formats docx`. Do not upload the Markdown itself: Drive's Markdown import prints
-   pandoc superscripts (`^1^`) literally. The same `copyto` with `--ignore-times` replaces a Doc's
-   content and keeps its link.
-   Fix the tables first. Google Docs ignores pandoc's percentage table width and reads its column
-   grid, which pandoc sizes to 5.5 in and fills by equal shares, so a 9-column table prints a word per
-   line (S5 ran to 82 pages). Before converting, give each separator row dashes in proportion to the
-   column's content, never narrower than its longest word, and pass `--columns=1`; after converting,
-   scale every table's `w:gridCol` widths to 9,360 twips (6.5 in) and set table text to 9 pt. Then
-   export the Docs to PDF and look at the table pages.
-4. Upload both PDFs and the ethics scan as files, and the data files into `Supplementary data files`.
-5. Update the Drive `Manuscript_README` Doc (current release, folder contents, version history) the
+2. `manuscript build` the paper and the Supplementary Data. Each build also writes
+   `build/<stem>.docx` (with `--no-pdf` too, and when tectonic fails): A4 with 2 cm margins, tables
+   in 9 pt Arial with borders, columns sized from their content and pinned in twips (Google Docs reads
+   the column grid, not pandoc's percentage width), group rows spanning the table, a table too wide
+   for portrait (Table S7) on its own landscape pages with its caption, and each image kept on the
+   page of its "Figure N." caption (`filters/docx_tables.lua`). The LaTeX PDF has none of that
+   table handling, so build the Supplementary Data PDF from a copy that starts with a
+   `geometry: [landscape, margin=1.6cm]` YAML block: Tables S2, S7 and S10 are too wide for a
+   portrait page (S7 has 11 columns). Look at both PDFs.
+3. Upload each `build/<stem>.docx` as a Google Doc: the paper, the Supplementary Data, and S4 and S5
+   (`manuscript build supplementary/S4_module_sources.md --no-pdf`, the same for S5 after pointing
+   its figure at the PNG): `rclone copyto build/X.docx gdrive:"X.docx" --drive-root-folder-id
+   <folder id> --drive-import-formats docx`. Never convert a clean twin with bare pandoc: v0.5 first
+   went out that way, with borderless tables that broke words mid-word and no figures. Do not upload
+   the Markdown itself: Drive's Markdown import prints pandoc superscripts (`^1^`) literally. The
+   same `copyto` with `--ignore-times` replaces a Doc's content and keeps its link, but it can detach
+   co-authors' comments from their text, so ask before replacing a Doc that has comments.
+4. Export each Google Doc back with `rclone copy gdrive: DIR --drive-root-folder-id <folder id>
+   --drive-export-formats pdf`, render the pages with `pdftoppm -r 70 -png`, and look at every
+   figure and table page before calling the round released. The paper must contain as many images
+   as it has figure captions (`pdfimages -list`; LibreOffice and Docs exports may add an `smask`
+   row per image, which is not a second image).
+5. Upload both PDFs and the ethics scan as files, and the data files into `Supplementary data files`.
+6. Update the Drive `Manuscript_README` Doc (current release, folder contents, version history) the
    same way as step 3, so its link stays the same.
 
 ## Pre-submission checks and journal choice

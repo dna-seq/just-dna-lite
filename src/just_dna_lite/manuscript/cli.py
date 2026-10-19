@@ -13,6 +13,7 @@ from just_dna_lite.manuscript.build import (
     TECTONIC_ENV_VAR,
     build_paths,
     latex_to_pdf,
+    markdown_to_docx,
     markdown_to_latex,
     stale_pdf_note,
     write_clean_twin,
@@ -66,14 +67,14 @@ def build(
         Optional[Path], typer.Option("--out", "-o", file_okay=False, help="Output directory (default: build/ beside PATH)")
     ] = None,
     no_pdf: Annotated[
-        bool, typer.Option("--no-pdf", "--nopdf", help="Stop after the LaTeX; use on a host that cannot render")
+        bool, typer.Option("--no-pdf", "--nopdf", help="Stop after the LaTeX and .docx; use on a host that cannot render")
     ] = False,
     template: Annotated[
         Optional[Path],
         typer.Option("--template", dir_okay=False, help="Pandoc LaTeX template, e.g. a venue's; default: pandoc's article"),
     ] = None,
 ) -> None:
-    """Strip the ledger markers, convert with pandoc to LaTeX, and render the PDF with tectonic."""
+    """Strip the ledger markers, convert with pandoc to LaTeX and .docx, and render the PDF with tectonic."""
     load_env()  # MANUSCRIPT_TECTONIC, TECTONIC_CACHE_DIR from this checkout's .env; exported values win
     paths = build_paths(path, out)
     resource_dir = path.parent
@@ -90,6 +91,12 @@ def build(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"wrote {paths.tex}")
+    try:
+        markdown_to_docx(paths.clean, paths.docx, resource_dir)
+    except RuntimeError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"wrote {paths.docx}")
     if no_pdf:
         note = stale_pdf_note(paths)
         if note is not None:
