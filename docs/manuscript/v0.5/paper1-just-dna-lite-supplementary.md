@@ -2,14 +2,16 @@
 
 **Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring**
 
-**S1. Generation I: OakVar-Based Just-DNA-Seq Platform.** Architecture, pipeline, module types, and repository table for the OakVar-based Generation I system (see combined-manuscript supplement for full detail).
+<!-- @rev I4 rounds=1 by=codex:2026-10-19 -->
+**S1. Generation I: OakVar-Based Just-DNA-Seq Platform.** Generation I implemented Just-DNA-Seq as annotation and report modules for OakVar (Kulaga et al., 2024). Its pipeline converted the VCF, mapped variants to genes, ran database annotators, aggregated their outputs, applied the project's trait modules as postaggregators, and rendered a report. The 2026 reconstruction used nine project postaggregators covering cancer, cardiac disease, coronary artery disease, drug response, longevity, lipid metabolism, thrombophilia, protective alleles and VO2 max; it had no counterpart of Generation II's Pathogenic module. Table S2 lists the installed versions, and Table S8 identifies the software repositories. The Generation I preprint describes the original platform in detail (https://arxiv.org/abs/2403.19087). These stages and annotation resources differ from Generation II's direct module-table joins, so the runtime comparison evaluates the configured workflows rather than equal annotation workloads.
+<!-- @/rev I4 -->
 
-<!-- @rev B28 rounds=4 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-15 -->
-**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table S6): on the primary genome 6,005.4, 6,068.5 and 5,889.3 s on the first night; on the calibration genome 5,995.5 s on the first night and 7,785.3 and 8,281.0 s on the second day; on the second-caller genome 10,627.7 and 8,337.6 s on the second day and 8,325.7 s two days later, repeating a third run that a system update had stopped after 1,277.8 s by restarting the Docker daemon; and with dbSNP alone on the primary genome 7,041.5 s (the warm-up), 3,627.5 and 3,446.8 s; with peak memory of 3,832 to 4,611 MB; OakVar's own step times (on the primary genome, as medians of the three runs, the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). It also keeps the earlier Generation I runs on the calibration genome, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
+<!-- @rev B28 rounds=5 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19 -->
+**S2. Generation I vs Generation II Speed Comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table S6): on Anton Kulaga's published call set 6,005.4, 6,068.5 and 5,889.3 s on the first night; on his 2023 call set 5,995.5 s on the first night and 7,785.3 and 8,281.0 s on the second day; on Livia Zaharia's genome 10,627.7 and 8,337.6 s on the second day and 8,325.7 s two days later, repeating a third run that a system update had stopped after 1,277.8 s by restarting the Docker daemon; and with dbSNP alone on the published call set 7,041.5 s (the warm-up), 3,627.5 and 3,446.8 s; with peak memory of 3,832 to 4,611 MB; OakVar's own step times (on the published call set, as medians of the three runs, the postaggregator step, which runs the Generation I modules, takes 38.9% of a run, the annotators 28.7% and the mapper 17.1%); and the installed OakVar modules, among them dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). It also keeps the earlier Generation I runs on the 2023 call set, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of it is generated into `docs/manuscript/benchmarks/a3/tables.md`.
 <!-- @/rev B28 -->
 
-<!-- @rev J16 rounds=3 by=claude:2026-10-13,claude:2026-10-13,claude:2026-10-15 -->
-Run protocol. After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order, with the machine idle. On a second day, with the desktop in light use, Generation II made five more full runs, after a warm-up, on each of the three genomes Generation I ran on, and Generation I ran twice more on the calibration genome and twice on the second-caller genome, with a third second-caller run two days later on the same kernel and Docker 29.9.0 (earlier runs: 29.8.2); the two systems' runs were not interleaved with each other. The dbSNP-only Generation I series and the Ensembl Generation II series had no warm-up, so the first run of each, which read its database from disk for the first time (OakVar's annotator step took 3,520.3 s, against 608.1 and 574.8 s in the next two runs), is dropped as the warm-up; both first runs are in the repository's record of runs. Generation I ran with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module), with OakVar 2.13.1, the latest release at the time (published 2026-08-30), and the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
+<!-- @rev J16 rounds=5 by=claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,codex:2026-10-19,claude:2026-10-19 -->
+Run protocol. After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order (seed 20261010), with the machine idle. On a second day, with the desktop in light use, Generation II made five more full runs, after a warm-up, on each of the three call sets Generation I ran on, and Generation I ran twice more on the 2023 call set and twice on Livia Zaharia's genome, with a third run on hers two days later on the same kernel and Docker 29.9.0 (earlier runs: 29.8.2); the two systems' runs were not interleaved with each other. The dbSNP-only Generation I series and the Ensembl Generation II series had no warm-up, so the first run of each, which read its database from disk for the first time (OakVar's annotator step took 3,520.3 s, against 608.1 and 574.8 s in the next two runs), is dropped as the warm-up; both first runs are in the repository's record of runs. Generation I ran with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module), with OakVar 2.13.1, the latest release at the time (published 2026-08-30), and the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
 <!-- @/rev J16 -->
 
 <!-- @rev A3d rounds=1 by=claude:2026-10-12 -->
@@ -40,23 +42,23 @@ Run protocol. After one warm-up run, the Generation II runs of each genome were 
 | longevity2reporter | reporter | 0.4.3 | — | 0.4.3 (2025-03-05) | 0.4.0 (2023-04-28) |
 <!-- @/rev A3d -->
 
-<!-- @rev B32 rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13 -->
-**S3. Runtime and Memory on Large PRS Scoring Files.** Runtimes and memory for the 7 genome-wide PGS IDs (1.7 to 6.9M variants) with both PLINK2 inputs; with the original input PLINK2 failed on the four largest (PGS000013, PGS000014, PGS000016 and PGS000017) because a variant appeared twice in its score file ("ALT1 allele … appears multiple times"), the liftover duplicates that the fixed input merges; logs are in the repository. Memory is measured differently per engine: for DuckDB and Polars, the growth of the benchmark process's resident memory during the call, sampled every 10 ms (median over all 100 scores with the fixed input, 5.4 MB and 1,061.2 MB); for PLINK2, the peak resident memory of its own process, sampled every 100 ms (median 511.6 MB, fixed input). The two measures are not directly comparable. The 100 scores are PGS000006 to PGS000106, excluding PGS000085; PGS000001 to PGS000003 ran first as a warm-up. The benchmark harness fixes the list of scores, calls PLINK2 with the same command line as the just-prs script but keeps its log for every score, and includes PLINK2 in the warm-up (`docs/manuscript/benchmarks/a3/prs/`). PLINK2's two inputs: the *original* input is the one the just-prs benchmark script builds, a genotype file from every record, reference calls included, and variant identifiers (in both allele orders) built from each scoring row's first candidate other allele only; the *fixed* input builds the genotype file from the records just-prs reads (FILTER PASS or unset), gives identifiers for every candidate other allele, and sums the weights of identifiers that two scoring rows share after liftover. Both inputs restrict PLINK2 to the autosomes, while just-prs reads every chromosome. <!-- @rev A3i rounds=1 by=claude:2026-10-19 -->just-prs 0.10.1, the version benchmarked, compared a multi-allelic record's alternate alleles as one string and did not check the other allele; 0.10.2 changed both (Section 3.2). The 0.10.2 rerun cited in Section 4.2, with its per-score results and the split of the remaining difference by cause, is in the just-prs repository (`just-prs/benchmarks/results/2026-10-11/`).<!-- @/rev A3i -->
+<!-- @rev B32 rounds=4 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,codex:2026-10-19 -->
+**S3. Runtime and Memory on Large PRS Scoring Files.** Runtimes and memory for the 7 genome-wide PGS IDs (1.7 to 6.9M variants) with both PLINK2 inputs; with the original input PLINK2 failed on the four largest (PGS000013, PGS000014, PGS000016 and PGS000017) because a variant appeared twice in its score file ("ALT1 allele … appears multiple times"), the liftover duplicates that the fixed input merges; logs are in the repository. Memory is measured differently per engine: for DuckDB and Polars, the growth of the benchmark process's resident memory during the call, sampled every 10 ms (median over all 100 scores with the fixed input, 5.4 MB and 1,061.2 MB); for PLINK2, the peak resident memory of its own process, sampled every 100 ms (median 511.6 MB, fixed input). The two measures are not directly comparable. All per-score timings exclude the one-time conversion of the VCF to normalized Parquet or PLINK2 genotype files. The benchmark used PLINK2 v2.0.0-a.6.33LM (28 February 2026), with four compute threads; the Python environment used Python 3.13.16, DuckDB 1.5.5 and Polars 1.44.2. Each engine was timed once for each score after warm-up, so the runtime distribution is across different models, rather than repeated timings of a single model. The 100 scores are PGS000006 to PGS000106, excluding PGS000085; PGS000001 to PGS000003 ran first as a warm-up. The benchmark harness fixes the list of scores, calls PLINK2 with the same command line as the just-prs script but keeps its log for every score, and includes PLINK2 in the warm-up (`docs/manuscript/benchmarks/a3/prs/`). PLINK2's two inputs: the *original* input is the one the just-prs benchmark script builds, a genotype file from every record, reference calls included, and variant identifiers (in both allele orders) built from each scoring row's first candidate other allele only; the *fixed* input builds the genotype file from the records just-prs reads (FILTER PASS or unset), gives identifiers for every candidate other allele, and sums the weights of identifiers that two scoring rows share after liftover. Both inputs restrict PLINK2 to the autosomes, while just-prs reads every chromosome. <!-- @rev A3i rounds=1 by=claude:2026-10-19 -->just-prs 0.10.1, the version benchmarked, compared a multi-allelic record's alternate alleles as one string and did not check the other allele; 0.10.2 changed both (Section 3.2). The 0.10.2 rerun cited in Section 4.2, with its per-score results and the split of the remaining difference by cause, is in the just-prs repository (`just-prs/benchmarks/results/2026-10-11/`).<!-- @/rev A3i -->
 <!-- @/rev B32 -->
 
-<!-- @rev C13c rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
-**S4. Module sources.** For each annotation module the project publishes in the module registry (https://module-registry.just-dna.life, namespace `just-dna-seq`), as of 2026-10-10 18:00 UTC: version, publication date, artifact digest, curator type, how the module was curated, the source databases with their release, and every paper its rows cite (first author, year, PMID, DOI) with the number of rows citing it. Read from the modules' own published files; later versions may differ. Files: `S4_module_sources.md`, `S4_module_sources.csv`, `S4_module_citations.csv`.
+<!-- @rev C13c rounds=3 by=robi:2026-09-25,claude:2026-10-10,codex:2026-10-19 -->
+**S4. Module sources.** For each annotation module the project publishes in the module registry (https://module-registry.just-dna.life, namespace `just-dna-seq`), as of 2026-10-10 18:00 UTC: version, publication date, artifact digest, curator type, how the module was curated, the source databases with their release, and every paper its rows cite (first author, year, PMID, DOI) with the number of rows citing it. Read from the modules' own published files; later versions may differ. Files: `supplementary/S4_module_sources.md`, `supplementary/S4_module_sources.csv`, `supplementary/S4_module_citations.csv`.
 <!-- @/rev C13c -->
 
-<!-- @rev J17 rounds=1 by=claude:2026-10-13 -->
-**S5. PGS Catalog coverage of just-prs.** For every score of the PGS Catalog release of 2026-09-17 (6,991 scores), the harmonized GRCh38 scoring file was read in full and each row classified by whether just-prs can place and match it. 6,910 files are scored as specified, 76 only approximately (for example, at least 10% of the absolute weight on rows it cannot place or match, or dominant or recessive coding that it applies additively) and 5 cannot be scored. Method, rules, threshold sensitivity and per-file values are in Table S5 (`S5_pgs_coverage.md`, `S5_pgs_coverage.csv`).
+<!-- @rev J17 rounds=2 by=claude:2026-10-13,codex:2026-10-19 -->
+**S5. PGS Catalog coverage of just-prs.** For every score of the PGS Catalog release of 2026-09-17 (6,991 scores), the harmonized GRCh38 scoring file was read in full and each row classified by whether just-prs can place and match it. For just-prs 0.10.1, the audit classified 6,910 files as “as specified”, 76 as “approximated” and 5 as “cannot be scored”. The first category is an audit label: it can include files with less than 10% of absolute weight on rows that cannot be placed or matched. The approximated category includes files meeting that threshold or other rules, such as dominant or recessive terms scored additively. These are file-level compatibility categories, without evaluating coverage in a particular genome or validating predictions. Method, rules, threshold sensitivity and per-file values are in Table S5 (`supplementary/S5_pgs_coverage.md`, `supplementary/S5_pgs_coverage.csv`).
 <!-- @/rev J17 -->
 
 <!-- @rev C24a rounds=2 by=robi:2026-09-25,claude:2026-10-13 -->
 **S6. Benchmark hardware and inputs.** The workstation, software versions and input genomes of the annotation benchmark in Section 4.1, recorded at run time (Table S6).
 <!-- @/rev C24a -->
 
-<!-- @rev B23 rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-17 -->
+<!-- @rev B23 rounds=5 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-17,codex:2026-10-19,claude:2026-10-19 -->
 **Table S6.** Benchmark hardware and inputs, recorded at run time (October 2026).
 
 | Parameter | Value |
@@ -65,16 +67,16 @@ Run protocol. After one warm-up run, the Generation II runs of each genome were 
 | RAM | 63 GiB |
 | Storage | SATA SSD, NTFS through the Linux ntfs3 driver (data, caches and outputs) |
 | OS | Linux 7.2 |
-| Generation II | Just-DNA-Lite 0.3.25, 10 modules (versions and digests as in Table S4) |
+| Generation II | Just-DNA-Lite 0.3.25 (commit bb4b294), Python 3.13.16, Polars 1.44.2, polars-bio 0.36.0, DuckDB 1.5.5 and Dagster 1.13.24; 10 modules (versions and digests as in Table S4) |
 | Generation I | OakVar 2.13.1 in Docker (Table S2) |
-| Input: primary | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
-| Input: second caller | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
-| Input: community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
-| Input: calibration | <!-- @rev V15 rounds=1 by=claude:2026-10-19 -->A separate, private call set of the first author's genome: <!-- @/rev V15 -->6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
+| Input: Anton Kulaga, published call set | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
+| Input: Livia Zaharia | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
+| Input: Community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
+| Input: Anton Kulaga, 2023 call set | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
 <!-- @/rev B23 -->
 
 
-<!-- @rev C36b rounds=2 by=robi:2026-09-25,claude:2026-10-13 -->
+<!-- @rev C36b rounds=3 by=robi:2026-09-25,claude:2026-10-13,codex:2026-10-19 -->
 **S7. Comparison with other tools.** The features that Just-DNA-Lite and 22 tools for personal-genome annotation, polygenic scoring and AI-assisted interpretation document for themselves, read on 10 October 2026 from each project's own documentation, README or paper; the evidence for every cell, with links, is in the repository (`docs/manuscript/v0.4/c36-tool-comparison-draft.md`).
 
 **Table S7.** Documented features of Just-DNA-Lite and tools for personal-genome annotation, polygenic scoring and AI-assisted interpretation, as of 10 October 2026. Feature comparison only; no cell is a claim about accuracy, speed or usability.
@@ -188,31 +190,31 @@ Run protocol. After one warm-up run, the Generation II runs of each genome were 
 
 **Cell convention.** "No" means the project's documentation or paper, read in full, describes the tool's scope without the feature; "?" means the material available did not settle it.
 
-**References for Table S7.**
+### References for Table S7
 
 Cariaso, M., & Lennon, G. (2012). SNPedia: a wiki supporting personal genome annotation, interpretation and analysis. *Nucleic Acids Research*, 40(D1), D1308–D1312. doi:10.1093/nar/gkr798.
 
 Chang, C. C., Chow, C. C., Tellier, L. C. A. M., Vattikuti, S., Purcell, S. M., & Lee, J. J. (2015). Second-generation PLINK: rising to the challenge of larger and richer datasets. *GigaScience*, 4, 7. doi:10.1186/s13742-015-0047-8.
 
-† Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107. (Already in the v0.3 reference additions.)
+Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107.
 
 Choi, S. W., & O'Reilly, P. F. (2019). PRSice-2: Polygenic Risk Score software for biobank-scale data. *GigaScience*, 8(7), giz082. doi:10.1093/gigascience/giz082.
 
 Cingolani, P., Platts, A., Wang, L. L., Coon, M., Nguyen, T., Wang, L., Land, S. J., Lu, X., & Ruden, D. M. (2012a). A program for annotating and predicting the effects of single nucleotide polymorphisms, SnpEff: SNPs in the genome of *Drosophila melanogaster* strain w1118; iso-2; iso-3. *Fly*, 6(2), 80–92. doi:10.4161/fly.19695.
 
-Cingolani, P., Patel, V. M., Coon, M., Nguyen, T., Land, S. J., Ruden, D. M., & Lu, X. (2012b). Using *Drosophila melanogaster* as a model for genotoxic chemical mutational studies with a new program, SnpSift. *Frontiers in Genetics*, 3, 35. doi:10.3389/fgene.2012.00035. (Crossref gives no article number; 35 is taken from the DOI suffix.)
+Cingolani, P., Patel, V. M., Coon, M., Nguyen, T., Land, S. J., Ruden, D. M., & Lu, X. (2012b). Using *Drosophila melanogaster* as a model for genotoxic chemical mutational studies with a new program, SnpSift. *Frontiers in Genetics*, 3, 35. doi:10.3389/fgene.2012.00035.
 
 Folkersen, L., Pain, O., Ingason, A., Werge, T., Lewis, C. M., & Austin, J. (2020). Impute.me: an open-source, non-profit tool for using data from direct-to-consumer genetic testing to calculate and interpret polygenic risk scores. *Frontiers in Genetics*, 11, 578. doi:10.3389/fgene.2020.00578.
 
-† Forer, L., Taliun, D., LeFaive, J., Smith, A. V., Boughton, A. P., Coassin, S., Lamina, C., Kronenberg, F., Fuchsberger, C., & Schönherr, S. (2024). Imputation Server PGS: an automated approach to calculate polygenic risk scores on imputation servers. *Nucleic Acids Research*, 52(W1), W70–W77. doi:10.1093/nar/gkae331.
+Forer, L., Taliun, D., LeFaive, J., Smith, A. V., Boughton, A. P., Coassin, S., Lamina, C., Kronenberg, F., Fuchsberger, C., & Schönherr, S. (2024). Imputation Server PGS: an automated approach to calculate polygenic risk scores on imputation servers. *Nucleic Acids Research*, 52(W1), W70–W77. doi:10.1093/nar/gkae331.
 
 Guerra-Assunção, J. A., Conde, L., Moghul, I., Webster, A. P., Ecker, S., Chervova, O., Chatzipantsiou, C., Prieto, P. P., Beck, S., & Herrero, J. (2020). GenomeChronicler: the Personal Genome Project UK genomic report generator pipeline. *Frontiers in Genetics*, 11, 518644. doi:10.3389/fgene.2020.518644.
 
-† Kolosov, N., Reeve, M. P., Della Briotta Parolo, P., Kurki, M. I., Llorens, V., Sipilä, T. P., Herman, A., Molotkov, I., Aavikko, M., Ripatti, S., Palotie, A., Daly, M. J., & Artomov, M. (2026). PGS Browser: a public platform for personalized polygenic score analysis and interpretation. *Nature Communications*, 17, 7806. doi:10.1038/s41467-026-74461-7.
+Kolosov, N., Reeve, M. P., Della Briotta Parolo, P., Kurki, M. I., Llorens, V., Sipilä, T. P., Herman, A., Molotkov, I., Aavikko, M., Ripatti, S., Palotie, A., Daly, M. J., & Artomov, M. (2026). PGS Browser: a public platform for personalized polygenic score analysis and interpretation. *Nature Communications*, 17, 7806. doi:10.1038/s41467-026-74461-7.
 
-† Lambert, S. A., Wingfield, B., Gibson, J. T., et al. (2024). Enhancing the Polygenic Score Catalog with tools for score calculation and ancestry normalization. *Nature Genetics*, 56(10), 1989–1994. doi:10.1038/s41588-024-01937-x.
+Lambert, S. A., Wingfield, B., Gibson, J. T., et al. (2024). Enhancing the Polygenic Score Catalog with tools for score calculation and ancestry normalization. *Nature Genetics*, 56(10), 1989–1994. doi:10.1038/s41588-024-01937-x.
 
-† Li, B., Sangkuhl, K., Keat, K., Whaley, R. M., Woon, M., Verma, S., Dudek, S., Tuteja, S., Verma, A., Whirl-Carrillo, M., Ritchie, M. D., & Klein, T. E. (2023). How to run the Pharmacogenomics Clinical Annotation Tool (PharmCAT). *Clinical Pharmacology & Therapeutics*, 113(5), 1036–1047. doi:10.1002/cpt.2790.
+Li, B., Sangkuhl, K., Keat, K., Whaley, R. M., Woon, M., Verma, S., Dudek, S., Tuteja, S., Verma, A., Whirl-Carrillo, M., Ritchie, M. D., & Klein, T. E. (2023). How to run the Pharmacogenomics Clinical Annotation Tool (PharmCAT). *Clinical Pharmacology & Therapeutics*, 113(5), 1036–1047. doi:10.1002/cpt.2790.
 
 McLaren, W., Gil, L., Hunt, S. E., Riat, H. S., Ritchie, G. R. S., Thormann, A., Flicek, P., & Cunningham, F. (2016). The Ensembl Variant Effect Predictor. *Genome Biology*, 17, 122. doi:10.1186/s13059-016-0974-4.
 
@@ -220,29 +222,29 @@ Page, M. L., Vance, E. L., Cloward, M. E., et al. (2022). The Polygenic Risk Sco
 
 Pagel, K. A., Kim, R., Moad, K., Busby, B., Zheng, L., Tokheim, C., Ryan, M., & Karchin, R. (2020). Integrated informatics analysis of cancer-related variants. *JCO Clinical Cancer Informatics*, 4, 310–317. doi:10.1200/CCI.19.00132.
 
-† Pain, O., Al-Chalabi, A., & Lewis, C. M. (2024). The GenoPred pipeline: a comprehensive and scalable pipeline for polygenic scoring. *Bioinformatics*, 40(10), btae551. doi:10.1093/bioinformatics/btae551.
+Pain, O., Al-Chalabi, A., & Lewis, C. M. (2024). The GenoPred pipeline: a comprehensive and scalable pipeline for polygenic scoring. *Bioinformatics*, 40(10), btae551. doi:10.1093/bioinformatics/btae551.
 
 Pedersen, B. S., Layer, R. M., & Quinlan, A. R. (2016). Vcfanno: fast, flexible annotation of genetic variants. *Genome Biology*, 17, 118. doi:10.1186/s13059-016-0973-5.
 
-† Pedersen, B. S., & de Ridder, J. (2023). Echtvar: compressed variant representation for rapid annotation and filtering of SNPs and indels. *Nucleic Acids Research*, 51(1), e3. doi:10.1093/nar/gkac931.
+Pedersen, B. S., & de Ridder, J. (2023). Echtvar: compressed variant representation for rapid annotation and filtering of SNPs and indels. *Nucleic Acids Research*, 51(1), e3. doi:10.1093/nar/gkac931.
 
 Sangkuhl, K., Whirl-Carrillo, M., Whaley, R. M., et al. (2020). Pharmacogenomics Clinical Annotation Tool (PharmCAT). *Clinical Pharmacology & Therapeutics*, 107(1), 203–210. doi:10.1002/cpt.1568.
 
-† Stadler, M., Gansberger, S., Borik-Heil, L., Griss, J., Okamoto, I., Weninger, W. P., & Wielscher, M. (2026). ACVI-Med, an open source variant interpretation tool for medical genomics. *BMC Bioinformatics*, 27, 85. doi:10.1186/s12859-026-06414-2.
+Stadler, M., Gansberger, S., Borik-Heil, L., Griss, J., Okamoto, I., Weninger, W. P., & Wielscher, M. (2026). ACVI-Med, an open source variant interpretation tool for medical genomics. *BMC Bioinformatics*, 27, 85. doi:10.1186/s12859-026-06414-2.
 
 Wang, K., Li, M., & Hakonarson, H. (2010). ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data. *Nucleic Acids Research*, 38(16), e164. doi:10.1093/nar/gkq603.
 
-† Zhao, W., Wu, C., Fan, Y., et al. (2026). An agentic system for rare disease diagnosis with traceable reasoning. *Nature*, 651(8106), 775–784. doi:10.1038/s41586-025-10097-9.
+Zhao, W., Wu, C., Fan, Y., et al. (2026). An agentic system for rare disease diagnosis with traceable reasoning. *Nature*, 651(8106), 775–784. doi:10.1038/s41586-025-10097-9.
 
 Software without a paper (cite as software, accessed 10 October 2026):
 
-† Costello, N. (2026). GeneChat MCP server [software]. https://github.com/natecostello/genechat-mcp.
+Costello, N. (2026). GeneChat MCP server [software]. https://github.com/natecostello/genechat-mcp.
 
-† GeiserX (2026). Personal-Genome-Pipeline, version 0.8.2 [software]. https://github.com/GeiserX/Personal-Genome-Pipeline.
+GeiserX (2026). Personal-Genome-Pipeline, version 0.8.2 [software]. https://github.com/GeiserX/Personal-Genome-Pipeline.
 
-† KarchinLab (2025). OpenCRAVAT MCP server [software]. https://github.com/KarchinLab/oc-mcp.
+KarchinLab (2025). OpenCRAVAT MCP server [software]. https://github.com/KarchinLab/oc-mcp.
 
-† Oak Bioinformatics (2026). OakVar, version 2.13.1 [software]. https://github.com/rkimoakbioinformatics/oakvar.
+Oak Bioinformatics (2026). OakVar, version 2.13.1 [software]. https://github.com/rkimoakbioinformatics/oakvar.
 <!-- @/rev C36b -->
 
 <!-- @rev J18 rounds=1 by=claude:2026-10-13 -->
@@ -266,26 +268,28 @@ Software without a paper (cite as software, accessed 10 October 2026):
 
 **S9. Sex chromosomes and the mitochondrial genome in just-prs.** How just-prs scores X, Y, the pseudoautosomal regions and the mitochondrial genome (Section 3.2), and a benchmark that includes them (Section 4.2).
 
-<!-- @rev A3f rounds=2 by=claude:2026-10-15,validator:2026-10-15 -->On the sex chromosomes and the mitochondrial genome, both engines count copies of the effect allele. just-prs infers the sample's karyotype from the share of heterozygous calls on the non-pseudoautosomal part of X, relative to the autosomes, and from the number of calls on the non-pseudoautosomal part of Y, relative to those on X. For a man it counts a homozygous call there as one copy and treats a heterozygous call as a no-call, since a single X cannot be heterozygous. The pseudoautosomal regions count as two copies in either sex and the mitochondrial genome as one; when the karyotype cannot be inferred, X and Y are scored as written.<!-- @/rev A3f -->
+<!-- @rev A3f rounds=3 by=claude:2026-10-15,validator:2026-10-15,codex:2026-10-19 -->
+On the sex chromosomes and the mitochondrial genome, both engines count copies of the effect allele. just-prs infers the sample's karyotype from the share of heterozygous calls on the non-pseudoautosomal part of X, relative to the autosomes, and from the number of calls on the non-pseudoautosomal part of Y, relative to those on X. For a man it counts a homozygous call there as one copy and treats a heterozygous call as a no-call, since a single X cannot be heterozygous. The pseudoautosomal regions count as two copies in either sex and the mitochondrial genome as one; when the karyotype cannot be inferred, X and Y are scored as written.
+<!-- @/rev A3f -->
 
-<!-- @rev A3g rounds=3 by=claude:2026-10-15,validator:2026-10-15,claude:2026-10-19 -->
-The comparison in Section 4.2 covers chromosomes 1 to 22. The just-prs project's own benchmark (just-prs 0.10.4) scored 195 PGS Catalog scores on the same genome with X, Y, the pseudoautosomal regions and the mitochondrial genome included: the 100 above and further scores with rows on those chromosomes. The sample was marked male in PLINK2, and just-prs inferred it as male (XY). Against PLINK2 with its X model 1 (half a copy for a heterozygous call on a man's X), Pearson *r* was 0.99999847 and 114 of the 195 scores agreed to within 10⁻³. The largest difference, 2.95 on a PLINK2 score of 854.9 (PGS001108), comes from heterozygous calls on the non-pseudoautosomal part of X, which just-prs treats as no-calls; removing that share leaves a largest remaining difference of 0.14 across the 195 scores. DuckDB and Polars agreed to within 2.27 × 10⁻¹³. This run is not used for timing.
+<!-- @rev A3g rounds=4 by=claude:2026-10-15,validator:2026-10-15,claude:2026-10-19,codex:2026-10-19 -->
+The comparison in Section 4.2 covers chromosomes 1 to 22. The just-prs project's own benchmark (just-prs 0.10.4) scored 195 PGS Catalog scores on the same genome with X, Y, the pseudoautosomal regions and the mitochondrial genome included: the 100 above and further scores with rows on those chromosomes. The sample was marked male in PLINK2, and just-prs inferred it as male (XY). Against PLINK2 with its X model 1 (half a copy for a heterozygous call on a man's X), Pearson *r* was 0.99999847 and 114 of the 195 scores agreed to within 10⁻³. The largest difference, 2.95 on a PLINK2 score of 854.9 (PGS001108), comes from heterozygous calls on the non-pseudoautosomal part of X, which just-prs treats as no-calls; removing that share leaves a largest remaining difference of 0.14 across the 195 scores. DuckDB and Polars agreed to within 2.27 × 10⁻¹³. This run is not used for timing. Its per-score results, settings and software commit are available at https://github.com/dna-seq/just-prs/tree/main/just-prs/benchmarks/results/2026-10-13-sexchr.
 <!-- @/rev A3g -->
 
 **S10. Stage times and resources of the annotation runs.** Stage times, peak memory and CPU use of the full runs of Section 4.1.
 
-<!-- @rev C23 rounds=3 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15 -->
+<!-- @rev C23 rounds=4 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19 -->
 **Table S10.** Stage times and resources of the full annotation runs of Section 4.1 (medians unless stated).<!-- @rev B25 rounds=2 by=claude:2026-10-11,claude:2026-10-12 --> Peak RAM is the resident memory summed over the whole process tree (for Generation I, the container's processes), sampled ten times a second; pages shared between processes count once per process, which overstates the total, while a peak shorter than the sampling interval can be missed.<!-- @/rev B25 --> CPU is user plus system time divided by wall time; it was not recorded for Generation I, which ran inside Docker. Warm and cold runs are in the repository's generated tables.
 
 | Genome | Run | *n* (runs) | Normalize (s) | Annotate (s) | Report (s) | Peak RAM, median (MB) | Peak RAM, max (MB) | CPU (%) |
 |---|---|---|---|---|---|---|---|---|
-| Primary | Generation II, full | 10 | 15.7 | 10.2 | 1.9 | 2,235 | 2,270 | 375 |
-| Primary | Generation I | 3 | — | — | — | 4,610 | 4,611 | — |
-| Second caller | Generation II, full | 10 | 43.4 | 14.6 | 1.8 | 4,436 | 4,514 | 335 |
-| Second caller | Generation I | 3 | — | — | — | 4,529 | 4,529 | — |
+| Anton Kulaga, published call set | Generation II, full | 10 | 15.7 | 10.2 | 1.9 | 2,235 | 2,270 | 375 |
+| Anton Kulaga, published call set | Generation I | 3 | — | — | — | 4,610 | 4,611 | — |
+| Livia Zaharia | Generation II, full | 10 | 43.4 | 14.6 | 1.8 | 4,436 | 4,514 | 335 |
+| Livia Zaharia | Generation I | 3 | — | — | — | 4,529 | 4,529 | — |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
-| Calibration | Generation II, full | 10 | 16.8 | 9.6 | 2.2 | 2,250 | 2,296 | 370 |
-| Calibration | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
+| Anton Kulaga, 2023 call set | Generation II, full | 10 | 16.8 | 9.6 | 2.2 | 2,250 | 2,296 | 370 |
+| Anton Kulaga, 2023 call set | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
 <!-- @/rev C23 -->
 
 <!-- @rev V27 rounds=1 by=claude:2026-10-19 -->

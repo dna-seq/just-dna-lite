@@ -42,26 +42,26 @@ Reports list each matched variant with its reported effect and sources. The just
 Core annotation and scoring run locally on downloaded reference data; optional external AI services introduce a separate data-sharing boundary. The platform is meant for research and education and does not provide diagnoses or establish clinical validity for the associations it reports.
 <!-- @/rev J1 -->
 
-<!-- @rev J2 rounds=1 by=claude:2026-10-13 -->
+<!-- @rev J2 rounds=2 by=claude:2026-10-13,codex:2026-10-19 -->
 **Availability and implementation:** Just-DNA-Lite (AGPL-3.0) and just-prs (MIT) are written in Python and run on Linux, macOS and Windows. Source code: https://github.com/dna-seq/just-dna-lite and https://github.com/dna-seq/just-prs. The two co-author genomes used in the benchmarks are public on Zenodo (records 18370498 and 19487816).
 
 **Contact:** fuellen@uni-rostock.de, robi.tacutu@gmail.com
 
-**Supplementary information:** Supplementary data are available at *Bioinformatics* online.
+**Supplementary information:** Supplementary data accompany this manuscript.
 <!-- @/rev J2 -->
 <!-- AUTHOR TODO: add the archive DOI (Zenodo or Software Heritage) of the submitted software version and test data to the Availability paragraph before submission. -->
 
 ## **1. Introduction**
 
-<!-- @rev C3 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->
-By 2025, manufacturers listed the sequencing consumables for a human genome at US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025), and studies that count the full cost, including labour, equipment and analysis, put a genome at a few thousand dollars (Mordaunt et al., 2024; Ehman et al., 2025), against an estimated $500 million to $1 billion for the first one (NHGRI, 2021). Several companies now offer direct-to-consumer sequencing services (O'Daniel et al., 2025).<!-- @/rev C3 --> <!-- @rev P1 rounds=1 by=claude:2026-10-19 -->Yet researchers and individuals who receive raw variant files (VCFs) containing millions of variants<!-- @/rev P1 --> <!-- @rev C4 rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19 -->often lack an accessible way to annotate them against published databases without specialized bioinformatics expertise, a learning curve that takes time away from the questions they set out to answer (Nelson et al., 2019; Chen et al., 2023; O'Daniel et al., 2025).<!-- @/rev C4 -->
+<!-- @rev C3 rounds=3 by=robi:2026-09-25,claude:2026-10-10,codex:2026-10-19 -->
+By 2025, manufacturers listed the sequencing consumables for a human genome at US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report higher costs after including labour, equipment and analysis, with estimates depending on the workflow and costing scope (Mordaunt et al., 2024; Ehman et al., 2025). NHGRI estimates that the first human genome cost US$500 million to US$1 billion (NHGRI, 2021). Several companies now offer direct-to-consumer sequencing services (O'Daniel et al., 2025).<!-- @/rev C3 --> <!-- @rev P1 rounds=1 by=claude:2026-10-19 -->Yet researchers and individuals who receive raw variant files (VCFs) containing millions of variants<!-- @/rev P1 --> <!-- @rev C4 rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19 -->often lack an accessible way to annotate them against published databases without specialized bioinformatics expertise, a learning curve that takes time away from the questions they set out to answer (Nelson et al., 2019; Chen et al., 2023; O'Daniel et al., 2025).<!-- @/rev C4 -->
 
 <!-- @rev R3 rounds=3 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19 -->
 Existing solutions generally belong to two extremes. Commercial platforms such as DNA Complete (formerly Nebula Genomics) and Dante Labs provide curated reports, but the curation is opaque: users cannot verify which polymorphisms contributed to a score, whether the methodology is appropriate for their ancestry, or how findings were weighted. At the other end, research-grade tools like PLINK, ANNOVAR, and VEP are powerful but demand command-line proficiency and a lengthy setup. <!-- @rev C36a rounds=2 by=robi:2026-09-25,claude:2026-10-13 -->Open-source projects between these extremes each cover part of the task, such as local annotation with installable modules, ancestry-normalized scoring of PGS Catalog models, or access to a genome from an AI assistant. Table S7 compares the documented features of 22 tools for personal-genome annotation, polygenic scoring and AI-assisted interpretation; none of them documents a graphical interface, annotation sets added without code, PGS Catalog scoring and ancestry-matched percentiles together.<!-- @/rev C36a -->
 <!-- @/rev R3 -->
 
-<!-- @rev R4 rounds=3 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19 -->
-Recent progress in the genetics of longevity illustrates the need for such extensible annotation tools. After correction for extrinsic mortality, the intrinsic heritability of lifespan has been estimated at about 50%, against 20–25% in twin studies (Shenhar et al., <!-- @rev V16 rounds=1 by=claude:2026-10-19 -->2026<!-- @/rev V16 -->), and GWAS have repeatedly linked loci such as APOE and FOXO3 to longevity (Broer et al., 2014; Caruso et al., 2022). Databases such as LongevityMap within the Human Ageing Genomic Resources (HAGR) (Tacutu et al., 2017) have compiled thousands of variant-trait associations, but no existing tool makes it straightforward to annotate a personal VCF against these databases transparently and extensibly. More broadly, variant-trait associations are published faster than any single curation team can integrate them, which supports the case for platforms where new annotation modules can be added rapidly.
+<!-- @rev R4 rounds=4 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19,codex:2026-10-19 -->
+Recent progress in the genetics of longevity illustrates the need for such extensible annotation tools. After correction for extrinsic mortality, the intrinsic heritability of lifespan has been estimated at about 50%, against 20–25% in twin studies (Shenhar et al., <!-- @rev V16 rounds=1 by=claude:2026-10-19 -->2026<!-- @/rev V16 -->), and GWAS have repeatedly linked loci such as APOE and FOXO3 to longevity (Broer et al., 2015; Caruso et al., 2022). Databases such as LongevityMap within the Human Ageing Genomic Resources (HAGR) (Tacutu et al., 2018) have compiled thousands of variant-trait associations, but no existing tool makes it straightforward to annotate a personal VCF against these databases transparently and extensibly. More broadly, variant-trait associations are published faster than any single curation team can integrate them, which supports the case for platforms where new annotation modules can be added rapidly.
 <!-- @/rev R4 -->
 
 <!-- @rev J3 rounds=1 by=claude:2026-10-13 -->
@@ -74,8 +74,8 @@ Just-DNA-Lite is a local, open-source platform for annotating a personal genome 
 <!-- @/rev C5 -->
 <!-- @/rev R5 -->
 
-<!-- @rev C6 rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19 -->
-This paper presents the standalone annotation engine, the reusable just-prs scoring library, the web interfaces, and Model Context Protocol (MCP) interfaces for calling these tools programmatically from AI assistants. Together, these components let users discover annotation content, apply it to a genome, compute published polygenic scores, and inspect reports.
+<!-- @rev C6 rounds=4 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19,codex:2026-10-19 -->
+This paper presents an open-source ecosystem comprising the standalone annotation engine, the reusable just-prs scoring library, an open-source registry where users can submit and share their own annotation modules, the web interfaces, and Model Context Protocol (MCP) interfaces for calling these tools programmatically from AI assistants. Together, these components let users contribute and discover annotation content, apply it to a genome, compute published polygenic scores, and inspect reports.
 <!-- @/rev C6 -->
 
 ## **2. System and Methods: Platform Architecture**
@@ -94,9 +94,13 @@ The pipeline is built from Dagster<!-- @rev V8 rounds=1 by=claude:2026-10-19 -->
 <!-- @rev R6 rounds=2 by=robi:2026-09-25,claude:2026-10-19 -->
 2. **Normalization.** The raw VCF undergoes quality filtering (configurable via `modules.yaml`): only variants passing specified FILTER values (by default, PASS and ".") are retained, with optional minimum depth (DP ≥ 10) and quality (QUAL ≥ 20) thresholds. <!-- @rev N4 rounds=1 by=claude:2026-10-10 -->Chromosome names are normalized ("chr7" becomes "7", "chrM" becomes "MT") for consistency with annotation databases.<!-- @/rev N4 --> The normalized data is written as a Parquet file, which is the shared input for all downstream annotations.
 <!-- @/rev R6 -->
-3. <!-- @rev J19 rounds=1 by=claude:2026-10-13 -->**Module annotation.** For each selected annotation module, the pipeline performs a streaming join between the normalized VCF Parquet and the module's lead table (for most modules, `weights.parquet`): by position, with the reference allele required to agree where the module states one, or by rsID for older modules without coordinates.<!-- @/rev J19 --> Polars streaming joins keep peak memory low; for datasets too large to fit in memory, DuckDB handles out-of-core joins with configurable memory limits.
+3. <!-- @rev J19 rounds=1 by=claude:2026-10-13 -->**Module annotation.** For each selected annotation module, the pipeline performs a streaming join between the normalized VCF Parquet and the module's lead table (for most modules, `weights.parquet`): by position, with the reference allele required to agree where the module states one, or by rsID for older modules without coordinates.<!-- @/rev J19 --> <!-- @rev I2 rounds=1 by=codex:2026-10-19 -->The module joins use Polars streaming execution. The optional Ensembl annotation uses DuckDB with configurable memory limits.<!-- @/rev I2 -->
 4. <!-- @rev P2 rounds=1 by=claude:2026-10-19 -->**Ensembl annotation (optional).** When enabled, the pipeline also joins the normalized VCF against the Ensembl Variation database<!-- @rev V9 rounds=1 by=claude:2026-10-19 --> (Dyer et al., 2025)<!-- @/rev V9 --> to add clinical significance labels, consequence types, and cross-references for each variant. The database is cached locally as chromosome-level Parquet files, downloaded from HuggingFace through fsspec.<!-- @/rev P2 -->
 5. **Report generation.** Annotated results are written as Parquet files and rendered as downloadable<!-- @rev V10 rounds=1 by=claude:2026-10-19 --> HTML reports, which a browser can print to PDF<!-- @/rev V10 -->.
+
+<!-- @rev I3 rounds=1 by=codex:2026-10-19 -->
+The current annotation engine also distinguishes called genotypes from inferred homozygous-reference genotypes. For variant-only callsets classified as whole-genome, it can restore a module's authored reference-genotype rows at sites the caller did not emit. Classification requires at least one million sites and at least 75% of the span between the first and last calls on each chromosome, summed across chromosomes, to lie within the configured flank of a call; a restored site must be within 10 kb of a called variant by default. Ambiguously placed module variants are excluded. Where the Genome in a Bottle low-mappability and segmental-duplication mask is available, sites inside it are excluded; otherwise, rows explicitly requiring callability evidence are withheld. Reports label restored rows as inferred and keep their counts separate from called matches. Nearby calls do not establish per-base callability. This annotation procedure is distinct from the optional PRS restoration described in Section 3.2.
+<!-- @/rev I3 -->
 
 <!-- @rev P3 rounds=1 by=claude:2026-10-19 -->
 ### **2.2 Annotation Modules as Data**
@@ -114,8 +118,8 @@ The `just-dna-format` library defines the authored specification and the manifes
 For researchers creating new modules, a separate authoring route accepts `module_spec.yaml` and CSV tables such as `variants.csv` and `studies.csv`. The `just-dna-compiler` library validates and compiles these specifications into Parquet artifacts and a manifest during custom-module registration. Documentation and thumbnails may accompany the module. This route lets authors prepare annotation content <!-- @rev C10 rounds=2 by=robi:2026-09-25,claude:2026-10-10 -->without writing Python code. CSV files are used only for authoring: at runtime the platform reads the compiled Parquet tables, so existing Parquet modules need no CSV files.<!-- @/rev C10 -->
 <!-- @/rev R8 -->
 
-<!-- @rev R9 rounds=3 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19 -->
-Module discovery uses sources configured in `modules.yaml`, with repository defaults and a local working copy for runtime changes. Sources may include HuggingFace datasets, GitHub repositories, HTTP/HTTPS servers, cloud storage, or local paths accessible through fsspec. The `just-dna-registry` service provides a catalogue for browsing and retrieving versioned modules. Artifact manifests provide identity and integrity information. Integrity verification establishes that downloaded content matches the recorded artifact, not that its scientific claims are correct.
+<!-- @rev R9 rounds=4 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19,codex:2026-10-19 -->
+Module discovery uses sources configured in `modules.yaml`, with repository defaults and a local working copy for runtime changes. Sources may include HuggingFace datasets, GitHub repositories, HTTP/HTTPS servers, cloud storage, or local paths accessible through fsspec. The open-source `just-dna-registry` service (https://module-registry.just-dna.life) lets users submit and share their own annotation modules and browse and retrieve versioned modules contributed by others. Artifact manifests provide identity and integrity information. Integrity verification establishes that downloaded content matches the recorded artifact, not that its scientific claims are correct.
 <!-- @/rev R9 -->
 
 ### **2.3 Web Interface and Self-Exploration**
@@ -124,7 +128,15 @@ Module discovery uses sources configured in `modules.yaml`, with repository defa
 The web interface is built with Reflex<!-- @rev V11 rounds=1 by=claude:2026-10-19 --> (Reflex, 2026)<!-- @/rev V11 -->, a Python framework that compiles to React; the whole interface is written in Python. The interface covers file management, module selection (including the optional Ensembl annotation), a sortable and filterable results grid, report download (<!-- @rev V12 rounds=1 by=claude:2026-10-19 -->an HTML report per module<!-- @/rev V12 -->), and self-exploration. Users can browse the full variant table with sorting, filtering, and search, cross-referenced against Ensembl for clinical significance labels, consequence types, and known phenotype associations. All data can be exported as Parquet for downstream analysis in Python, R, DuckDB, or any Arrow-compatible tool.
 <!-- @/rev R10 -->
 
-**Figure 1.** The Just-DNA-Lite web interface showing the annotation results view with module selection, variant data grid, and report download options.
+<!-- @rev N7 rounds=1 by=codex:2026-10-19 -->
+Users can install and run the web interface on their own computers to analyse their personal genomes locally. A hosted demonstration at https://lite.just-dna.life/ provides access using public genomic data only; uploads of private genome files are disabled in this deployment.
+<!-- @/rev N7 -->
+
+<!-- @rev N8 rounds=1 by=codex:2026-10-19 -->
+![](figures/figure-1-annotation-interface.jpg){width=95%}
+
+**Figure 1.** The Just-DNA-Lite web interface showing the selected sample, quality-filter summary, normalized variant grid, and tabs for polygenic scores, annotated files, reports and analysis tools.
+<!-- @/rev N8 -->
 
 ## **3. Algorithm and Implementation: Annotation Modules and Polygenic Scoring**
 
@@ -155,20 +167,26 @@ The default modules originate in Generation I, the OakVar-based Just-DNA-Seq (Ku
 
 ### **3.1 Longevity Variants Module (example)**
 
-<!-- @rev P4 rounds=1 by=claude:2026-10-19 -->
-The Longevity Variants module illustrates how existing variant-trait association databases can be wrapped into the platform's no-code module format. It builds upon the LongevityMap database (Tacutu et al., 2017), which contains 3,144 variant-trait associations in 884 genes. We did not re-annotate or re-validate these variants; our contribution is (1) curation and expansion with post-2017 literature, adding 50 new entries and editing 876 existing records; (2) assignment of weighted scores based on study quality, replication across populations, and statistical significance; and (3) pathway-based categorization for structured browsing.
+<!-- @rev P4 rounds=2 by=claude:2026-10-19,codex:2026-10-19 -->
+The Longevity Variants module illustrates how existing variant-trait association databases can be wrapped into the platform's no-code module format. It builds upon the LongevityMap database (Tacutu et al., 2018), which contains 3,144 variants in 884 genes (build 3, June 2017). We did not re-annotate or re-validate these variants; our contribution is (1) curation and expansion with post-2017 literature, adding 50 new entries and editing 876 existing records; (2) assignment of weighted scores based on study quality, replication across populations, and statistical significance; and (3) pathway-based categorization for structured browsing.
 <!-- @/rev P4 -->
 
-<!-- @rev J8 rounds=2 by=claude:2026-10-13,claude:2026-10-19 -->
-The module's displayed score is the product of two independent weights, *W*_display = *w*_SNP × *w*_genotype. The SNP weight (*w*_SNP) summarizes the strength of statistical evidence for a variant-trait association (number of independent significant studies, reported p-values, number of replicating populations). The genotype weight (*w*_genotype) captures the direction and magnitude of the reported association for a specific genotype: 0 for the reference genotype, ±0.5 or ±1.0 for heterozygous or homozygous carriers of the positively or negatively associated allele. The report groups variants into 12 functional pathway categories, such as insulin/IGF-1 signalling, mTOR, sirtuins and genome maintenance (Figure 2).
+<!-- @rev J8 rounds=4 by=claude:2026-10-13,claude:2026-10-19,codex:2026-10-19,codex:2026-10-19 -->
+The module's displayed score is the product of two component weights, *W*_display = *w*_SNP × *w*_genotype. The SNP weight (*w*_SNP) summarizes the strength of statistical evidence for a variant-trait association (number of independent significant studies, reported p-values, number of replicating populations). The genotype weight (*w*_genotype) captures the direction and magnitude of the reported association for a specific genotype: 0 for the reference genotype, ±0.5 or ±1.0 for heterozygous or homozygous carriers of the positively or negatively associated allele. The report groups variants into 12 functional pathway categories, such as insulin/IGF-1 signalling, mTOR, sirtuins and genome maintenance.
 <!-- @/rev J8 -->
 
-**Figure 2.** Just-DNA-Lite UI: the Longevity Variants report, showing pathway categorization, the per-variant SNP table, and colour-coded weights.
+<!-- @rev N9 rounds=1 by=codex:2026-10-19 -->
+Figure 2 shows the Generation I module domains from which the default set originated.
+
+![](figures/figure-2-module-domains.jpg){width=95%}
+
+**Figure 2.** Historical overview of Generation I module domains, including longevity-associated variants, drug response, cardiovascular traits, cancer and deleterious mutations. The lifespan axis illustrates the original organization of the modules; it does not represent predicted survival or measured effects on lifespan. Labels marked “in progress” describe the historical diagram, rather than the current module catalogue.
+<!-- @/rev N9 -->
 
 ### **3.2 Polygenic Risk Scores**
 
-<!-- @rev J9 rounds=2 by=claude:2026-10-13,claude:2026-10-19 -->
-Polygenic risk scores (PRS) aggregate the effects of many common variants into a single weighted sum, providing a population-relative measure for a given trait (Lambert et al., 2021). We developed the just-prs library (github.com/dna-seq/just-prs) as the PRS computation engine for Just-DNA-Lite; it can also be used on its own (Section 3.2.1). just-prs scores the harmonized scoring files of the PGS Catalog (Lambert et al., 2021): of the 6,991 scores in its September 2026 release, 6,910 can be scored as specified, 76 only approximately and 5 not at all (Table S5).
+<!-- @rev J9 rounds=3 by=claude:2026-10-13,claude:2026-10-19,codex:2026-10-19 -->
+Polygenic risk scores (PRS) aggregate the effects of many common variants into a single weighted sum, providing a population-relative measure for a given trait (Lambert et al., 2021). We developed the just-prs library (github.com/dna-seq/just-prs) as the PRS computation engine for Just-DNA-Lite; it can also be used on its own (Section 3.2.1). just-prs scores the harmonized scoring files of the PGS Catalog (Lambert et al., 2021): a file-level audit of just-prs 0.10.1 against the September 2026 release placed 6,910 of 6,991 files in Table S5's “as specified” category, 76 in “approximated” and 5 in “cannot be scored”. These categories assess scoring-file compatibility, using a 10% absolute-weight threshold for omitted or ambiguous rows. The first category can therefore include files with some omitted weight; it does not establish complete coverage in an individual genome or predictive validity.
 <!-- @/rev J9 -->
 
 <!-- @rev C16 rounds=6 by=robi:2026-09-25,claude:2026-10-10,validator:2026-10-10,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19 -->
@@ -184,7 +202,11 @@ For variant-only whole-genome VCFs, just-prs can optionally count absent scoring
 For consumer arrays (23andMe, AncestryDNA), precomputed linkage disequilibrium (LD) proxy tables estimate untyped scoring variants from typed ones where suitable tables exist. Coverage, and the assumption used to recover each missing locus, remain part of the result's interpretation.
 <!-- @/rev J10 -->
 
-**Figure 3. PRS results in Just-DNA-Lite (just-prs trait view).** For a selected trait, all associated PGS Catalog models are computed and shown together as a consensus distribution with the user's percentile against a 1000 Genomes reference population, alongside per-model variant match rates and quality tiers. Showing the models together, including where they disagree, is deliberate (see Section 5.3).
+<!-- @rev N10 rounds=1 by=codex:2026-10-19 -->
+![](figures/figure-3-prs-trait-view.jpg){width=95%}
+
+**Figure 3. PRS trait view in an earlier Just-DNA-Lite interface.** Multiple PGS Catalog models for one trait are displayed together, with model identifiers, percentile markers and variant match rates. This existing screenshot illustrates the interface layout; its absolute-risk display and inconsistent quality labels require replacement before submission and are not results reported in this paper. Showing models together, including where they disagree, is deliberate (see Section 5.3).
+<!-- @/rev N10 -->
 
 <!-- AUTHOR TODO: Replace the existing images/just_prs_trait_consensus.jpg with a current screenshot for Figure 3. The existing image shows an absolute-risk percentage for intelligence and inconsistent quality labels. Capture a current trait view with the reference population, model IDs, coverage, and settings visible, then embed it here and align the caption with the final image. -->
 
@@ -227,25 +249,25 @@ Because modules are data, new content reaches users through configured repositor
 
 ### **4.1 Annotation Speed**
 
-<!-- @rev B22 rounds=6 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19 -->
-We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on one workstation (<!-- @rev C24b rounds=2 by=robi:2026-09-25,claude:2026-10-13 -->Table S6<!-- @/rev C24b -->). The primary genome was the public whole-genome VCF of one of the co-authors (Zenodo record 18370498, CC0), also used for the PRS benchmark in Section 4.2. Three more inputs vary the caller and the size: a second co-author's public genome, called with DRAGEN (Behera et al., 2024; Zenodo record 19487816, CC-BY-4.0), the HG002 reference sample (Zook et al., 2016) as output by the DeepVariant 1.0.0 whole-genome case study (Poplin et al., 2018), and a separate, private call set of the first author's genome on which the earlier Generation I times were measured (the calibration genome, Supplementary S2).<!-- @rev B27 rounds=2 by=claude:2026-10-11,claude:2026-10-13 --> The benchmark scripts, the record of every run and the script that generates every benchmark table from them are in the repository (`docs/manuscript/benchmarks/a3/`),<!-- @/rev B27 --> so the benchmark can be reproduced on the three public genomes, for Generation I given an OakVar store account (Table S2).
+<!-- @rev B22 rounds=7 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19 -->
+We benchmarked Just-DNA-Lite against the Generation I OakVar-based system on one workstation (<!-- @rev C24b rounds=2 by=robi:2026-09-25,claude:2026-10-13 -->Table S6<!-- @/rev C24b -->). The main input was Anton Kulaga's published whole-genome call set (Zenodo record 18370498, CC0), also used for the PRS benchmark in Section 4.2. Three more inputs vary the caller and the size: Livia Zaharia's public genome, called with DRAGEN (Behera et al., 2024; Zenodo record 19487816, CC-BY-4.0), the HG002 reference sample (Zook et al., 2016) as output by the DeepVariant 1.0.0 whole-genome case study (Poplin et al., 2018), and an earlier, unpublished call set of Anton Kulaga's genome (the 2023 call set), on which the earlier Generation I times were measured (Supplementary S2).<!-- @rev B27 rounds=2 by=claude:2026-10-11,claude:2026-10-13 --> The benchmark scripts, the record of every run and the script that generates every benchmark table from them are in the repository (`docs/manuscript/benchmarks/a3/`),<!-- @/rev B27 --> so the benchmark can be reproduced on the three public genomes, for Generation I given an OakVar store account (Table S2).
 <!-- @/rev B22 -->
 
-<!-- @rev B24 rounds=4 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13 -->
-Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three modes: *warm* runs reuse the sample's quality-filtered table, so the VCF is not read again; *full* runs start from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating system's page cache has been dropped. Generation I, OakVar 2.13.1 with its modules and annotation databases installed from the OakVar store, ran three times on the primary genome and once on the calibration genome with the machine idle. Both systems were also timed on a second day with the desktop in light use (Generation I on the calibration and second-caller genomes), and Generation I with its dbSNP annotator alone was timed against Generation II with Ensembl annotation on. Supplementary S2 gives the run order and the Generation I setup.
+<!-- @rev B24 rounds=5 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19 -->
+Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three modes: *warm* runs reuse the sample's quality-filtered table, so the VCF is not read again; *full* runs start from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating system's page cache has been dropped. Generation I, OakVar 2.13.1 with its modules and annotation databases installed from the OakVar store, ran three times on Anton Kulaga's published call set and once on his 2023 call set with the machine idle. Both systems were also timed on a second day with the desktop in light use (Generation I on the 2023 call set and on Livia Zaharia's genome), and Generation I with its dbSNP annotator alone was timed against Generation II with Ensembl annotation on. Supplementary S2 gives the run order and the Generation I setup.
 <!-- @/rev B24 -->
 
-<!-- @rev C22 rounds=3 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15 -->
+<!-- @rev C22 rounds=4 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19 -->
 **Table 2.** Annotation wall time, from command start to report written: Just-DNA-Lite (Generation II) vs OakVar (Generation I). *n*, number of repeated runs. The last column divides the median Generation I time by the median of the row; a warm run does not read the VCF, so it is not compared. In the last section, the reference is Generation I with its dbSNP annotator alone, and the first run of each series is dropped as its warm-up.
 
 | Genome / run | *n* | Median (min–max), s | Mean ± SEM, s | SD, s | Generation I ÷ this (medians) |
 |---|---|---|---|---|---|
-| **Primary (public, Zenodo 18370498)** |  |  |  |  |  |
+| **Anton Kulaga, published call set (Zenodo 18370498)** |  |  |  |  |  |
 | Generation II, warm | 11 | 16.3 (16.2–17.2) | 16.4 ± 0.1 | 0.3 | — |
 | Generation II, full | 10 | 33.2 (31.9–50.8) | 35.2 ± 1.8 | 5.7 | 181× |
 | Generation II, cold | 3 | 35.9 (35.6–36.0) | 35.9 ± 0.1 | 0.2 | 167× |
 | Generation I (OakVar 2.13.1), full | 3 | 6,005.4 (5,889.3–6,068.5) | 5,987.7 ± 52.5 | 90.9 | 1× (ref.) |
-| **Second caller (public, Zenodo 19487816)** |  |  |  |  |  |
+| **Livia Zaharia (Zenodo 19487816)** |  |  |  |  |  |
 | Generation II, warm | 11 | 20.2 (20.1–20.8) | 20.3 ± 0.1 | 0.2 | — |
 | Generation II, full | 10 | 65.1 (62.0–107.6) | 72.7 ± 5.0 | 15.8 | 128× |
 | Generation II, cold | 3 | 65.6 (65.3–65.7) | 65.5 ± 0.1 | 0.2 | 127× |
@@ -254,24 +276,24 @@ Generation II annotated each genome with the ten modules of Table 1, with Ensemb
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
-| **Calibration (private, the 2023 benchmark file)** |  |  |  |  |  |
+| **Anton Kulaga, 2023 call set (unpublished)** |  |  |  |  |  |
 | Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
 | Generation II, full | 10 | 33.7 (33.0–105.0) | 54.4 ± 9.2 | 29.2 | 231× |
 | Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
 | Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
-| **Primary, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
+| **Anton Kulaga, published call set, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
 | Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
 | Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
 <!-- @/rev C22 -->
 
-<!-- @rev A3a rounds=6 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-19 -->
-On the primary genome, the median full run took 33.2 s against 6,005.4 s for Generation I, an approximately 181-fold speedup; across the three genomes Generation I ran on, it was 128- to 231-fold. Against a whole-genome reference database the gap narrows: Generation II with Ensembl annotation on took a median of 103.1 s and Generation I with dbSNP alone 3,537.2 s, about 34-fold. These ratios apply to these configurations and these inputs, rather than to OakVar generally. A warm run took 16.3 s. The benchmark used SSD storage and a workstation with 63 GiB RAM; it does not directly establish performance on a laptop or on rotational disks. Peak memory of a Just-DNA-Lite run with Ensembl off was 2,054 to 2,270 MB on the primary genome across warm, full and cold runs and at most 4,525 MB on any genome (a cold run of the second-caller genome), against at most 4,611 MB for Generation I. Supplementary Table S10 gives the full runs, and the repository's generated tables (`docs/manuscript/benchmarks/a3/tables.md`) the warm and cold runs. With Ensembl annotation on, peak memory was 5,568 to 5,750 MB.
+<!-- @rev A3a rounds=7 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19 -->
+On Anton Kulaga's published call set, the median full run took 33.2 s against 6,005.4 s for Generation I, an approximately 181-fold speedup; across the three call sets Generation I ran on, it was 128- to 231-fold. Against a whole-genome reference database the gap narrows: Generation II with Ensembl annotation on took a median of 103.1 s and Generation I with dbSNP alone 3,537.2 s, about 34-fold. These ratios apply to these configurations and these inputs, rather than to OakVar generally. A warm run took 16.3 s. The benchmark used SSD storage and a workstation with 63 GiB RAM; it does not directly establish performance on a laptop or on rotational disks. Peak memory of a Just-DNA-Lite run with Ensembl off was 2,054 to 2,270 MB on that call set across warm, full and cold runs and at most 4,525 MB on any genome (a cold run of Livia Zaharia's genome), against at most 4,611 MB for Generation I. Supplementary Table S10 gives the full runs, and the repository's generated tables (`docs/manuscript/benchmarks/a3/tables.md`) the warm and cold runs. With Ensembl annotation on, peak memory was 5,568 to 5,750 MB.
 <!-- @/rev A3a -->
 
 ### **4.2 PRS Computation**
 
-<!-- @rev B29 rounds=7 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19 -->
-We benchmarked just-prs's DuckDB and Polars engines against the external tool PLINK2 (Chang et al., 2015) on 100 PGS Catalog scores (listed in Supplementary S3) using the primary whole-genome VCF of Section 4.1 (4,661,444 records with FILTER PASS or unset, GRCh38; Zenodo 18370498). Engines, timing and memory measurement are those of the benchmark script of just-prs 0.10.1, run through a harness described in Supplementary S3; each observation is a different scoring model applied to the same individual. just-prs 0.10.1 matched genotypes by position alone; the allele check of Section 3.2 came in 0.10.2, and a rerun with it is reported after Table 4.
+<!-- @rev B29 rounds=8 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19 -->
+We benchmarked just-prs's DuckDB and Polars engines against the external tool PLINK2 (Chang et al., 2015) on 100 PGS Catalog scores (listed in Supplementary S3) using Anton Kulaga's published whole-genome VCF of Section 4.1 (4,661,444 records with FILTER PASS or unset, GRCh38; Zenodo 18370498). Engines, timing and memory measurement are those of the benchmark script of just-prs 0.10.1, run through a harness described in Supplementary S3; each observation is a different scoring model applied to the same individual. just-prs 0.10.1 matched genotypes by position alone; the allele check of Section 3.2 came in 0.10.2, and a rerun with it is reported after Table 4.
 <!-- @/rev B29 -->
 
 <!-- @rev A3b rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13 -->
@@ -309,8 +331,8 @@ DuckDB and Polars agreed to within 5.68 × 10⁻¹⁴ on this input. Both apply 
 just-prs 0.10.2 replaced the position match with the allele check of Section 3.2. The just-prs project reran the same 100 scores on the same genome with it, against the same PLINK2 build reading the PASS records; both tools read chromosomes 1 to 22 only. Against PLINK2, Pearson *r* was 0.99999996 and the largest score difference 0.049, for DuckDB and Polars alike; median runtimes were 0.082 s (DuckDB), 0.309 s (Polars) and 0.602 s (PLINK2). Of the remaining absolute difference, 92% came from 30 scores at multi-allelic sites where the effect or other allele is the second or a later alternate allele, and 8% from 15 scores at SNVs where the sample carries a third allele beside the effect allele and just-prs counts the one effect-allele copy. Tables 3 and 4 keep the 0.10.1 run, which used the harness and the fixed list of scores in Supplementary S3.
 <!-- @/rev A3h -->
 
-<!-- @rev B31 rounds=5 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19 -->
-With the fixed input, the median share of a score's variants that were matched was 53% for just-prs (range 22 to 79%) and 51% for PLINK2 (range 22 to 78%); the counts are not the same measure (scoring rows with a called genotype at their position for just-prs, variants processed and matched by identifier for PLINK2). These values describe the benchmark configuration: reference-homozygote restoration, off here, and the LD-proxy estimation of the array workflow (Section 3.2) can raise coverage, and this comparison measures neither. The reported speedups are ratios of median runtimes over the same 100 scores; the medians of the per-score ratios agree with them to the precision shown (Table 3).
+<!-- @rev B31 rounds=6 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,codex:2026-10-19 -->
+With the fixed input, the median share of a score's variants that were matched was 53% for just-prs (range 22 to 79%) and 51% for PLINK2 (range 22 to 78%); the counts are not the same measure (scoring rows with a called genotype at their position for just-prs, variants processed and matched by identifier for PLINK2). These values describe the benchmark configuration: reference-homozygote restoration, off here, and the LD-proxy estimation of the array workflow (Section 3.2) can raise coverage, and this comparison measures neither. The reported speedups are ratios of median runtimes over the same 100 scores; the medians of the per-score ratios agree with them to the precision shown (Table 3). Per-score timings exclude VCF normalization and genotype-file preparation for every engine. They measure scoring from prepared inputs; scoring-file parsing is included for just-prs, and the separately measured PLINK2 score-file preparation is shown in Table 3.
 <!-- @/rev B31 -->
 
 <!-- @rev V2 rounds=2 by=claude:2026-10-19,claude:2026-10-19 -->
@@ -349,7 +371,7 @@ Genomic findings can be misinterpreted or provide false reassurance, particularl
 ### **5.4 Limitations**
 
 <!-- @rev R22 rounds=4 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19 -->
-**Population stratification.** The 1000 Genomes-based percentile distributions provide population-specific reference points (AFR, AMR, EAS, EUR, SAS), but most modules and PGS Catalog scoring files derive from predominantly European cohorts; transferability to non-European populations is a known limitation of the source data, not specific to this platform. **Ancestry selection.** The reference superpopulation is inferred from the genome and can be changed by the user, but five continental superpopulations do not represent admixed or finer-scale ancestry. **Input format.** The platform supports WGS and WES VCFs on GRCh38, and consumer microarray data experimentally (with far lower coverage, which the platform shows to users). The just-prs library can score a GRCh37 sample against the PGS Catalog's harmonized GRCh37 files, but annotation is GRCh38-only and the web interface currently treats every sample as GRCh38; T2T references are not supported. <!-- @rev C2d rounds=4 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-13,claude:2026-10-19 -->**Benchmark scope.** Annotation runtime was measured on four genomes, three of them public, and score agreement on one. These benchmarks describe computational performance; they do not establish predictive accuracy or agreement in rankings across individuals.<!-- @/rev C2d --> <!-- @rev C28 rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19 -->Nor do they test whether annotations are correct, which depends on two things: whether the cited studies are right, and whether each module records their findings faithfully (which variant, allele and genotype, and what the report says about it).<!-- @/rev C28 -->
+**Population stratification.** The 1000 Genomes-based percentile distributions provide population-specific reference points (AFR, AMR, EAS, EUR, SAS), but most modules and PGS Catalog scoring files derive from predominantly European cohorts; transferability to non-European populations is a known limitation of the source data, not specific to this platform. **Ancestry selection.** The reference superpopulation is inferred from the genome and can be changed by the user, but five continental superpopulations do not represent admixed or finer-scale ancestry. **Input format.** The platform supports WGS and WES VCFs on GRCh38, and consumer microarray data experimentally (with far lower coverage, which the platform shows to users). The just-prs library can score a GRCh37 sample against the PGS Catalog's harmonized GRCh37 files, but annotation is GRCh38-only and the web interface currently treats every sample as GRCh38; T2T references are not supported. <!-- @rev C2d rounds=5 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19 -->**Benchmark scope.** Annotation runtime was measured on four whole-genome call sets from three people, three of the call sets public, and score agreement on one. These benchmarks describe computational performance; they do not establish predictive accuracy or agreement in rankings across individuals.<!-- @/rev C2d --> <!-- @rev C28 rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19 -->Nor do they test whether annotations are correct, which depends on two things: whether the cited studies are right, and whether each module records their findings faithfully (which variant, allele and genotype, and what the report says about it).<!-- @/rev C28 -->
 <!-- @/rev R22 -->
 
 ### **5.5 Future Directions**
@@ -361,7 +383,7 @@ Several extensions are underway or planned: GRCh37/hg19 support across annotatio
 ### **5.6 Conclusion**
 
 <!-- @rev R24 rounds=3 by=robi:2026-09-25,claude:2026-10-19,claude:2026-10-19 -->
-Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspectable reports with a portable annotation-module contract and versioned content discovery. Typed MCP tools make the annotation workflow and the PRS engine available to AI assistants. The reported benchmarks, albeit on<!-- @rev A3c rounds=3 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-19 --> four genomes for annotation and one for scoring, show faster annotation than the OakVar-based Generation I system run on the same machine<!-- @/rev A3c --> and close numerical agreement between scoring engines. Evaluation across individuals, reference populations, and matched-variant sets remains necessary to establish the broader reliability of these workflows. The platform provides infrastructure for research and education, without establishing clinical validity for the findings it reports.
+Just-DNA-Lite integrates local variant annotation, polygenic scoring, and inspectable reports with a portable annotation-module contract and versioned content discovery. Typed MCP tools make the annotation workflow and the PRS engine available to AI assistants. The reported benchmarks, albeit on<!-- @rev A3c rounds=4 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-19,claude:2026-10-19 --> four call sets from three people for annotation and one for scoring, show faster annotation than the OakVar-based Generation I system run on the same machine<!-- @/rev A3c --> and close numerical agreement between scoring engines. Evaluation across individuals, reference populations, and matched-variant sets remains necessary to establish the broader reliability of these workflows. The platform provides infrastructure for research and education, without establishing clinical validity for the findings it reports.
 <!-- @/rev R24 -->
 
 ## **Contribution Statements**
@@ -397,8 +419,8 @@ This work was supported by the Ministry of Investments and European Projects, th
 
 ## **Code Availability**
 
-<!-- @rev J15 rounds=1 by=claude:2026-10-13 -->
-**GitHub organization:** https://github.com/dna-seq; Table S8 lists the repositories of both generations.
+<!-- @rev J15 rounds=2 by=claude:2026-10-13,codex:2026-10-19 -->
+**Source code:** Just-DNA-Lite (AGPL-3.0), https://github.com/dna-seq/just-dna-lite; just-prs (MIT), https://github.com/dna-seq/just-prs. Table S8 lists the repositories of both generations.
 <!-- @/rev J15 -->
 
 <!-- @rev P6 rounds=1 by=claude:2026-10-19 -->
@@ -407,8 +429,8 @@ Annotation modules and reference datasets are published to the just-dna-seq orga
 
 ## **Data Availability**
 
-<!-- @rev V3 rounds=2 by=claude:2026-10-19,claude:2026-10-19 -->
-The two personal genomes used in the benchmarks are public on Zenodo: Anton Kulaga's whole-genome VCF (Kulaga, 2026; https://doi.org/10.5281/zenodo.18370498, CC0 1.0) and Livia Zaharia's (Zaharia, 2026; https://doi.org/10.5281/zenodo.19487816, CC BY 4.0). The HG002 VCF is the public output of the DeepVariant 1.0.0 whole-genome case study (https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz). The calibration genome, on which the earlier Generation I times were measured, is a separate call set (DeepVariant 1.3.0) of Anton Kulaga's genome, whose public call set above is the primary input; it is not deposited. The annotation modules of Table 1 are published in the module registry (https://module-registry.just-dna.life, namespace `just-dna-seq`), and the reference datasets the platform downloads are published on HuggingFace (https://huggingface.co/just-dna-seq). The benchmark scripts, the record of every run and the generated tables are in the just-dna-lite repository (`docs/manuscript/benchmarks/a3/`) [and in the archived release, DOI to be added]; the just-prs rerun reported in Section 4.2 is in the just-prs repository (`benchmarks/results/2026-10-11/`). Supplementary Tables S4 and S5 are provided as data files with this article.
+<!-- @rev V3 rounds=4 by=claude:2026-10-19,claude:2026-10-19,codex:2026-10-19,claude:2026-10-19 -->
+The two personal genomes used in the benchmarks are public on Zenodo: Anton Kulaga's whole-genome VCF (Kulaga, 2026; https://doi.org/10.5281/zenodo.18370498, CC0 1.0) and Livia Zaharia's (Zaharia, 2026; https://doi.org/10.5281/zenodo.19487816, CC BY 4.0). The HG002 VCF is the public output of the DeepVariant 1.0.0 whole-genome case study (https://storage.googleapis.com/deepvariant/case-study-outputs/1.0.0/WGS/output/HG002.output.vcf.gz). The 2023 call set of Anton Kulaga's genome (DeepVariant 1.3.0), on which the earlier Generation I times were measured, is not deposited. The annotation modules of Table 1 are published in the module registry (https://module-registry.just-dna.life, namespace `just-dna-seq`), and the reference datasets the platform downloads are published on HuggingFace (https://huggingface.co/just-dna-seq). The benchmark scripts, the record of every run and the generated tables are in the just-dna-lite repository (`docs/manuscript/benchmarks/a3/`) [and in the archived release, DOI to be added]; the just-prs rerun reported in Section 4.2 is in the just-prs repository (`just-prs/benchmarks/results/2026-10-11/`; https://github.com/dna-seq/just-prs/tree/main/just-prs/benchmarks/results/2026-10-11). Supplementary Tables S4 and S5 are provided as data files with this article.
 <!-- @/rev V3 -->
 
 ## **Competing Interests**
@@ -418,37 +440,48 @@ The two personal genomes used in the benchmarks are public on Zenodo: Anton Kula
 
 ## **Ethics Statement**
 
-<!-- @rev V4 rounds=2 by=claude:2026-10-19,claude:2026-10-19 -->
-The two personal genomes analysed belong to two of the authors, Anton Kulaga and Livia Zaharia, each of whom published their own genome on Zenodo under an open licence (see Data Availability) and provided it for this work; the calibration genome is a separate, unpublished call set of Anton Kulaga's genome. HG002 is the Genome in a Bottle reference sample, analysed here through public variant calls (Zook et al., 2016). The Ethics Committee of the Institute of Biochemistry of the Romanian Academy examined the work and determined that it does not constitute research on human subjects and does not require the Committee's approval, and recorded no ethical objection to its conduct or publication (ethics register no. 17, 23 September 2026).
+<!-- @rev V4 rounds=3 by=claude:2026-10-19,claude:2026-10-19,claude:2026-10-19 -->
+The personal genomes analysed are those of two of the authors, Anton Kulaga and Livia Zaharia, each of whom published their whole-genome VCF on Zenodo on their own initiative, under an open licence (see Data Availability); Anton Kulaga's genome is also analysed in an earlier, unpublished call set. Each consents to the publication of the results from their own genome shown in this paper. HG002 is the Genome in a Bottle reference sample, analysed through public variant calls (Zook et al., 2016). No data from the ROGEN cohort were used. The Ethics Committee of the Institute of Biochemistry of the Romanian Academy examined the work and determined that it does not constitute research on human subjects and does not require the Committee's approval (ethics register no. 17, 23 September 2026).
+<!-- AUTHOR TODO: confirm with Livia Zaharia that she consents to publishing the results from her genome, before this statement says so. -->
 <!-- @/rev V4 -->
 
 ## **Bibliography**
 
-*(Carried over from the combined manuscript; to be finalized with 2022–2026 additions.)*
+<!-- @rev C3r rounds=2 by=claude:2026-10-10,codex:2026-10-19 -->
+Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107.
 
-Alteri, E., et al. (2024). The 23andMe data breach. *European Journal of Human Genetics*, 32(11), 1317–1320.
+Ehman, M., et al. (2025). The cost and cost trajectory of genome sequencing and bioinformatics analysis for Indigenous children with suspected rare diseases. *Genetics in Medicine*, 27(11), 101568. doi:10.1016/j.gim.2025.101568.
 
-<!-- @rev C3r rounds=1 by=claude:2026-10-10 -->
-Added in the v0.3 revision (to be merged into the list above): Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107. Ehman, M., et al. (2025). The cost and cost trajectory of genome sequencing and bioinformatics analysis for Indigenous children with suspected rare diseases. *Genetics in Medicine*, 27(11), 101568. doi:10.1016/j.gim.2025.101568. Illumina (2023). Press release, 4 April 2023 ("$200 per genome", sequencing consumables only, 100 Gb per genome); NovaSeq X product page, https://www.illumina.com/systems/sequencing-platforms/novaseq-x-plus/applications/broad-sequencing.html (accessed 10 October 2026). Mordaunt, D. A., et al. (2024). The cost of proband and trio exome and genome analysis in rare disease: a micro-costing study. *Genetics in Medicine*, 26(4), 101058. doi:10.1016/j.gim.2023.101058. National Human Genome Research Institute (2021). The Cost of Sequencing a Human Genome. https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost (accessed 10 October 2026). Nelson, S. C., et al. (2019). Third-Party Genetic Interpretation Tools: A Mixed-Methods Study of Consumer Motivation and Behavior. *American Journal of Human Genetics*, 105(1), 122–131. doi:10.1016/j.ajhg.2019.05.014. O'Daniel, J. M., et al. (2025). Direct-to-Consumer Genetic Testing. *NEJM Evidence*, 4(11), EVIDra2400455. doi:10.1056/EVIDra2400455. Ultima Genomics (2025). Ultima Genomics increases output by over 50% and lowers sequencing costs by a further 20% with the introduction of UG 100 Solaris. PR Newswire, 24 February 2025. Wiewiórka, M., Khamutou, P., Zbysiński, M., & Gambin, T. (2025). polars-bio: fast, scalable, and out-of-core operations on large genomic interval datasets. *Bioinformatics*, 41(12), btaf640. doi:10.1093/bioinformatics/btaf640.
+Illumina (2023). Press release, 4 April 2023 ("$200 per genome", sequencing consumables only, 100 Gb per genome); NovaSeq X product page, https://www.illumina.com/systems/sequencing-platforms/novaseq-x-plus/applications/broad-sequencing.html (accessed 10 October 2026).
+
+Mordaunt, D. A., et al. (2024). The cost of proband and trio exome and genome analysis in rare disease: a micro-costing study. *Genetics in Medicine*, 26(4), 101058. doi:10.1016/j.gim.2023.101058.
+
+National Human Genome Research Institute (2021). The Cost of Sequencing a Human Genome. https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost (accessed 10 October 2026).
+
+Nelson, S. C., et al. (2019). Third-Party Genetic Interpretation Tools: A Mixed-Methods Study of Consumer Motivation and Behavior. *American Journal of Human Genetics*, 105(1), 122–131. doi:10.1016/j.ajhg.2019.05.014.
+
+O'Daniel, J. M., et al. (2025). Direct-to-Consumer Genetic Testing. *NEJM Evidence*, 4(11), EVIDra2400455. doi:10.1056/EVIDra2400455.
+
+Ultima Genomics (2025). Ultima Genomics increases output by over 50% and lowers sequencing costs by a further 20% with the introduction of UG 100 Solaris. PR Newswire, 24 February 2025.
+
+Wiewiórka, M., Khamutou, P., Zbysiński, M., & Gambin, T. (2025). polars-bio: fast, scalable, and out-of-core operations on large genomic interval datasets. *Bioinformatics*, 41(12), btaf640. doi:10.1093/bioinformatics/btaf640.
 
 <!-- @/rev C3r -->
-Annas, G. J., & Elias, S. (2014). 23andMe and the FDA. *NEJM*, 370(11), 985–988.
-
-Association for Molecular Pathology v. Myriad Genetics, Inc., 569 U.S. 576 (2013).
-
 <!-- @rev V18 rounds=1 by=claude:2026-10-19 -->
 Behera, S., et al. (2024). Comprehensive genome analysis and variant detection at scale using DRAGEN. *Nature Biotechnology*, 43(7), 1177–1191. https://doi.org/10.1038/s41587-024-02382-1
 
 <!-- @/rev V18 -->
-Bloss, C. S., Schork, N. J., & Topol, E. J. (2011). Effect of direct-to-consumer genomewide profiling to assess disease risk. *NEJM*, 364(6), 524–534.
-
-Broer, L., et al. (2014). GWAS of longevity in CHARGE consortium confirms APOE and FOXO3 candidacy. *J Gerontol A*, 70(1), 110–118.
+<!-- @rev I5 rounds=1 by=codex:2026-10-19 -->
+Broer, L., et al. (2015). GWAS of longevity in CHARGE consortium confirms APOE and FOXO3 candidacy. *The Journals of Gerontology: Series A*, 70(1), 110–118. https://doi.org/10.1093/gerona/glu166
+<!-- @/rev I5 -->
 
 <!-- @rev V19 rounds=1 by=claude:2026-10-19 -->
 Byrska-Bishop, M., et al. (2022). High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios. *Cell*, 185(18), 3426–3440.e19. https://doi.org/10.1016/j.cell.2022.08.004
 
 <!-- @/rev V19 -->
-Caruso, C., et al. (2022). How important are genes to achieve longevity? *IJMS*, 23(10), 5635.
+<!-- @rev I6 rounds=1 by=codex:2026-10-19 -->
+Caruso, C., et al. (2022). How important are genes to achieve longevity? *International Journal of Molecular Sciences*, 23(10), 5635. https://doi.org/10.3390/ijms23105635
+<!-- @/rev I6 -->
 
 <!-- @rev V20 rounds=1 by=claude:2026-10-19 -->
 Chang, C. C., et al. (2015). Second-generation PLINK: rising to the challenge of larger and richer datasets. *GigaScience*, 4, 7. https://doi.org/10.1186/s13742-015-0047-8
@@ -456,27 +489,29 @@ Chang, C. C., et al. (2015). Second-generation PLINK: rising to the challenge of
 Dagster Labs (2026). Dagster: an orchestration platform for data assets. https://github.com/dagster-io/dagster
 
 <!-- @/rev V20 -->
-Doffman, Z. (2023). 23andMe confirms 6.9 million user records stolen. *Forbes*.
-
 <!-- @rev V21 rounds=1 by=claude:2026-10-19 -->
 Dyer, S. C., et al. (2025). Ensembl 2025. *Nucleic Acids Research*, 53(D1), D948–D957. https://doi.org/10.1093/nar/gkae1071
 
 <!-- @/rev V21 -->
-Green, R. C., & Farahany, N. A. (2014). Regulation: The FDA is overcautious on consumer genomics. *Nature*, 505(7483), 286–287.
-
 <!-- @rev V5 rounds=1 by=claude:2026-10-19 -->
 [dataset] Kulaga, A. (2026). Anton Kulaga genome. Zenodo. https://doi.org/10.5281/zenodo.18370498.
 
 <!-- @/rev V5 -->
-Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform. *arXiv*:2403.19087.
+<!-- @rev I7 rounds=1 by=codex:2026-10-19 -->
+Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform: longevity science for everyone. *arXiv*:2403.19087. https://arxiv.org/abs/2403.19087
+<!-- @/rev I7 -->
 
-Lambert, S. A., et al. (2021). The Polygenic Score Catalog. *Nature Genetics*, 53(4), 420–425.
+<!-- @rev I8 rounds=1 by=codex:2026-10-19 -->
+Lambert, S. A., et al. (2021). The Polygenic Score Catalog as an open database for reproducibility and systematic evaluation. *Nature Genetics*, 53(4), 420–425. https://doi.org/10.1038/s41588-021-00783-5
+<!-- @/rev I8 -->
 
 <!-- @rev V22 rounds=1 by=claude:2026-10-19 -->
 Landrum, M. J., et al. (2018). ClinVar: improving access to variant interpretations and supporting evidence. *Nucleic Acids Research*, 46(D1), D1062–D1067. https://doi.org/10.1093/nar/gkx1153
 
 <!-- @/rev V22 -->
-Manrai, A. K., et al. (2016). Genetic misdiagnoses and the potential for health disparities. *NEJM*, 375(7), 655–665.
+<!-- @rev I9 rounds=1 by=codex:2026-10-19 -->
+Manrai, A. K., et al. (2016). Genetic misdiagnoses and the potential for health disparities. *The New England Journal of Medicine*, 375(7), 655–665. https://doi.org/10.1056/NEJMsa1507092
+<!-- @/rev I9 -->
 
 <!-- @rev V23 rounds=1 by=claude:2026-10-19 -->
 Poplin, R., et al. (2018). A universal SNP and small-indel variant caller using deep neural networks. *Nature Biotechnology*, 36(10), 983–987. https://doi.org/10.1038/nbt.4235
@@ -490,9 +525,13 @@ Reflex (2026). Reflex: web apps in pure Python. https://github.com/reflex-dev/re
 Shenhar, B., Pridham, G., De Oliveira, T. L., Raz, N., Yang, Y., Deelen, J., Hägg, S., & Alon, U. (2026). Heritability of intrinsic human life span is about 50% when confounding factors are addressed. *Science*, 391(6784), 504–510. https://doi.org/10.1126/science.adz1187
 
 <!-- @/rev V24 -->
-Tacutu, R., et al. (2017). Human Ageing Genomic Resources: New and updated databases. *NAR*, 46(D1), D1083–D1090.
+<!-- @rev I10 rounds=1 by=codex:2026-10-19 -->
+Tacutu, R., et al. (2018). Human Ageing Genomic Resources: new and updated databases. *Nucleic Acids Research*, 46(D1), D1083–D1090. https://doi.org/10.1093/nar/gkx1042
+<!-- @/rev I10 -->
 
-Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-consumer genetic tests. *Genetics in Medicine*, 20(12), 1515–1521.
+<!-- @rev I11 rounds=1 by=codex:2026-10-19 -->
+Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-consumer genetic tests highlight the importance of clinical confirmation testing for appropriate patient care. *Genetics in Medicine*, 20(12), 1515–1521. https://doi.org/10.1038/gim.2018.38
+<!-- @/rev I11 -->
 
 <!-- @rev V25 rounds=1 by=claude:2026-10-19 -->
 Whirl-Carrillo, M., et al. (2021). An evidence-based framework for evaluating pharmacogenomics knowledge for personalized medicine. *Clinical Pharmacology & Therapeutics*, 110(3), 563–572. https://doi.org/10.1002/cpt.2350
