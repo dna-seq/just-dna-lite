@@ -9,8 +9,10 @@ Each `vX.Y/` folder is one round. `v0.3/` holds Paper 1 as Robi Tacutu reviewed 
 his suggestions not applied) and stays frozen; `v0.4/` holds the revision that answers the review as
 released to Google Drive on 2026-10-13, with its supplementary tables; `v0.5/` holds the next release
 (copy-edits, the day-2 benchmark, the split-out supplementary, the venue record and ladders, and the
-scan of the ethics committee's determination). A file that has not changed since its round stays in
-that round's folder: Tables S4 and S5 and the tool comparison draft are still in `v0.4/`.
+scan of the ethics committee's determination). Each round is complete: files that did not change are
+copied into the new round, so Tables S4 and S5 are in both `v0.4/supplementary/` and
+`v0.5/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
+where Table S7 cites it.
 
 ## Revision ledger
 
@@ -144,7 +146,7 @@ registry is a live catalogue, so the table is a snapshot with a recorded cutoff.
 
 ```bash
 uv run manuscript s4 snapshot /data/s4-work                    # read-only: list, download, record the UTC time
-uv run manuscript s4 render /data/s4-work -o docs/manuscript/v0.4/supplementary --fetch-bibliography
+uv run manuscript s4 render /data/s4-work -o docs/manuscript/v0.5/supplementary --fetch-bibliography
 uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10   # local builds, no registry
 ```
 
@@ -189,7 +191,7 @@ all. Section 3.2 of Paper 1 quotes its counts. Two steps:
 
 ```bash
 uv run manuscript s5 scan /data/just-dna-cache/s5/work --cache-dir /data/just-dna-cache/s5/GRCh38
-uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.4/supplementary
+uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.5/supplementary
 ```
 
 - **`scan`** records the release from the Catalog REST API (`/rest/info`, `/rest/score/all`) with the
@@ -213,18 +215,26 @@ on real scoring files in `tests/data/manuscript/s5/`).
 ## Releasing a round
 
 Co-authors comment on Google Docs in the project's shared Manuscript folder on Google Drive, one `vX.Y`
-subfolder per round, each holding only what changed in that round (Tables S4 and S5 are still in `v0.4`).
+subfolder per round. Every release is complete, whether or not a part changed: the paper and the
+Supplementary Data as Google Docs and PDFs, Tables S4 and S5 as Google Docs, their data files (the S4
+and S5 CSVs and the S5 histogram) in a `Supplementary data files` subfolder, and the scan of the ethics
+determination.
 
-1. `git mv` every file changed since the last release into the new `vX.Y/`, then put the released text
-   back in the old folder with `git show <release commit>:<path>`, and relabel the paper's header.
-2. `manuscript build` the paper and the supplement, and look at the PDFs.
-3. Convert each clean twin to .docx with pandoc (`--shift-heading-level-by=-1`) and upload it as a
+1. `git mv` every file changed since the last release into the new `vX.Y/` and copy the unchanged
+   ones (`supplementary/`), put the released text back in the old folder with
+   `git show <release commit>:<path>`, and relabel the paper's header.
+2. `manuscript build` the paper. Build the Supplementary Data from a copy that starts with a
+   `geometry: [landscape, margin=1.6cm]` YAML block: Tables S2, S7 and S10 are too wide for a portrait
+   page (S7 has 11 columns). Look at both PDFs.
+3. Convert each clean twin, and the S4 and S5 Markdown, to .docx with pandoc
+   (`--shift-heading-level-by=-1`; for S5 point its figure at the PNG) and upload it as a
    Google Doc: `rclone copyto X.docx gdrive:"X.docx" --drive-root-folder-id <folder id>
    --drive-import-formats docx`. Do not upload the Markdown itself: Drive's Markdown import prints
    pandoc superscripts (`^1^`) literally. The same `copyto` with `--ignore-times` replaces a Doc's
    content and keeps its link.
-4. Upload the paper's PDF as a file. The supplement's PDF stays local while Table S7 (11 columns) does
-   not fit pandoc's portrait layout; the Google Doc renders it.
+4. Upload both PDFs and the ethics scan as files, and the data files into `Supplementary data files`.
+5. Update the Drive `Manuscript_README` Doc (current release, folder contents, version history) the
+   same way as step 3, so its link stays the same.
 
 ## Pre-submission checks and journal choice
 

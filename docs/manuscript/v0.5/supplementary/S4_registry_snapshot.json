@@ -1,0 +1,141 @@
+{
+ "as_of": "2026-10-10T18:00:27.617374Z",
+ "registry_key": "prod",
+ "registry_url": "https://module-registry.just-dna.life",
+ "registry_version": "0.27.0",
+ "format_version": "0.7.1",
+ "namespace": "just-dna-seq",
+ "mirror_repo": "just-dna-seq/annotators",
+ "modules": [
+  {
+   "name": "cancer",
+   "latest_version": "2.0.0",
+   "published_at": "2026-09-26T23:51:34Z",
+   "artifact_digest": "sha256:f626fb73de07268ee0a0a6328842d0043d72e397dfa22a63b6797f9704f69fb6",
+   "content_signature": "sha256:8655e95d75e2c4ccd1583d9836e8438499e4a16c9865e9a8e021b875fdd60ae5",
+   "versions": [
+    "2.0.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "2.0.0",
+   "mirror_digest": "sha256:908e6a81f6d57efe39cc9d4c89435ae03b6872e0da294305d5cb0fcca84cf8ef"
+  },
+  {
+   "name": "cardio",
+   "latest_version": "2.0.0",
+   "published_at": "2026-09-26T23:48:10Z",
+   "artifact_digest": "sha256:5a80ed9951df400ebbb2f2ca7e024cdbbca339a04907f9257b5eb1852a766e55",
+   "content_signature": "sha256:9d51539b535c0b4a5e30c5e02274f1306972f55024cd2d9ccda9d1fcdda8cd11",
+   "versions": [
+    "2.0.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "2.0.0",
+   "mirror_digest": "sha256:85702d9fd3716661e20005295308721619dc2159f07e4790088eb84e945b783d"
+  },
+  {
+   "name": "coronary",
+   "latest_version": "1.1.0",
+   "published_at": "2026-09-26T23:43:59Z",
+   "artifact_digest": "sha256:5e96a2ccbcb306de9f079b1ce11990d95c728066786897aa1b4d36bdb1c4bd3b",
+   "content_signature": "sha256:0b5e35be03dd041e1b4775edcb156e6f3bad29d3e3508d8bb7c47a65181e9081",
+   "versions": [
+    "1.1.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.1.0",
+   "mirror_digest": "sha256:5e96a2ccbcb306de9f079b1ce11990d95c728066786897aa1b4d36bdb1c4bd3b"
+  },
+  {
+   "name": "lipidmetabolism",
+   "latest_version": "1.1.0",
+   "published_at": "2026-09-26T23:44:28Z",
+   "artifact_digest": "sha256:30814dd7460d9e90f71adb61a34696a1f938cc3315db03895c8d5b0774fc6a48",
+   "content_signature": "sha256:381445c7b9a7182b0fe8dba26f8a951ec00d16efb383fd5f1105be1ec61ffe14",
+   "versions": [
+    "1.1.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.1.0",
+   "mirror_digest": "sha256:30814dd7460d9e90f71adb61a34696a1f938cc3315db03895c8d5b0774fc6a48"
+  },
+  {
+   "name": "longevitymap",
+   "latest_version": "1.2.0",
+   "published_at": "2026-09-26T23:44:53Z",
+   "artifact_digest": "sha256:2c6a4d51433e9afaf4a73b30f94045f97068ac252d02643065311809defb886c",
+   "content_signature": "sha256:08af495a411917902dad06bdf22a7233105060347e98974645a679d9162dc97d",
+   "versions": [
+    "1.2.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.2.0",
+   "mirror_digest": "sha256:2c6a4d51433e9afaf4a73b30f94045f97068ac252d02643065311809defb886c"
+  },
+  {
+   "name": "pathogenic",
+   "latest_version": "2.0.0",
+   "published_at": "2026-09-27T00:06:09Z",
+   "artifact_digest": "sha256:540a59613d80e25c873ee3c3c1c8f36005abb1b12d14165ba91f426dca750ed8",
+   "content_signature": "sha256:a2432d65d8768d60d7ee9fd67e28ed826b2e45c3e3e2ce7e66ff28d33b0a2e6b",
+   "versions": [
+    "2.0.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "2.0.0",
+   "mirror_digest": "sha256:30a52528fd9b6a96bb1f96817d0f8a0a49a5d4642708d678cd8e261e0e0db76a"
+  },
+  {
+   "name": "pharmgkb",
+   "latest_version": "1.0.0",
+   "published_at": "2026-09-26T23:45:19Z",
+   "artifact_digest": "sha256:aeb2b46111d3186ff3622cc25d3376b526fa31183c65e8322d18e139e19360a7",
+   "content_signature": "sha256:53685843028785f3f063457d240837870351b56368e8577707d5327ec91cb4e8",
+   "versions": [
+    "1.0.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.0.0",
+   "mirror_digest": "sha256:aeb2b46111d3186ff3622cc25d3376b526fa31183c65e8322d18e139e19360a7"
+  },
+  {
+   "name": "superhuman",
+   "latest_version": "2.4.0",
+   "published_at": "2026-09-26T23:45:05Z",
+   "artifact_digest": "sha256:c64102efadc92c827fe57cba08049e480c56f0d5fbe4588dcd54aafc2c437122",
+   "content_signature": "sha256:edacf509e48c2c9500d2869102ae5e60e5dbe3842a012650d17f9f18636926aa",
+   "versions": [
+    "2.4.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.2.3",
+   "mirror_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "name": "thrombophilia",
+   "latest_version": "1.1.0",
+   "published_at": "2026-09-26T23:44:13Z",
+   "artifact_digest": "sha256:6bd966c7fd96cffae582794977e3fdae8bf05faf66ebc29c239a1b048c2d6c42",
+   "content_signature": "sha256:19c8a0c93476e4720ea3c033636e7de8a8d720471c24b98de5fb09c57633fc44",
+   "versions": [
+    "1.1.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.1.0",
+   "mirror_digest": "sha256:6bd966c7fd96cffae582794977e3fdae8bf05faf66ebc29c239a1b048c2d6c42"
+  },
+  {
+   "name": "vo2max",
+   "latest_version": "1.1.0",
+   "published_at": "2026-09-26T23:44:40Z",
+   "artifact_digest": "sha256:1a743e13710660f465d316d5163452e8695ed9ded09d82f45d1fae19b4e27c24",
+   "content_signature": "sha256:beba0ed44bfdb98457e684799f3b43b212691f2aaa3a75b49771ffa1783ceabc",
+   "versions": [
+    "1.1.0"
+   ],
+   "yanked_versions": [],
+   "mirror_version": "1.1.0",
+   "mirror_digest": "sha256:1a743e13710660f465d316d5163452e8695ed9ded09d82f45d1fae19b4e27c24"
+  }
+ ]
+}
