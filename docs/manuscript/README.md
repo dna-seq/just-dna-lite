@@ -232,6 +232,12 @@ determination.
    --drive-import-formats docx`. Do not upload the Markdown itself: Drive's Markdown import prints
    pandoc superscripts (`^1^`) literally. The same `copyto` with `--ignore-times` replaces a Doc's
    content and keeps its link.
+   Fix the tables first. Google Docs ignores pandoc's percentage table width and reads its column
+   grid, which pandoc sizes to 5.5 in and fills by equal shares, so a 9-column table prints a word per
+   line (S5 ran to 82 pages). Before converting, give each separator row dashes in proportion to the
+   column's content, never narrower than its longest word, and pass `--columns=1`; after converting,
+   scale every table's `w:gridCol` widths to 9,360 twips (6.5 in) and set table text to 9 pt. Then
+   export the Docs to PDF and look at the table pages.
 4. Upload both PDFs and the ethics scan as files, and the data files into `Supplementary data files`.
 5. Update the Drive `Manuscript_README` Doc (current release, folder contents, version history) the
    same way as step 3, so its link stays the same.
