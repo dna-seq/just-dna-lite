@@ -36,7 +36,7 @@ from just_dna_enricher.locations import resolve_clinpgx_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
-from just_dna_pipelines.v1_port.sources import display_meta
+from just_dna_pipelines.v1_port.sources import GENERATION_I_PANEL_AUTHORSHIP, display_meta
 
 MODULE_NAME = "pharmgkb"
 
@@ -170,11 +170,16 @@ def _module_spec_yaml(release: dict[str, object], row_count: int) -> str:
             "color": meta["color"],
             "version": "1.1.0",
         },
+        # Without this the compiler substitutes the format's placeholder defaults, and every row
+        # claimed `curator: ai-module-creator` and `method: literature-review` (as clinvar_panel.py
+        # once did); the published 1.1.0 carries them.
+        "defaults": {
+            "curator": "just-dna-seq",
+            "method": "clinpgx-aggregate",
+        },
         "license": "CC-BY-SA-4.0",
         "genome_build": "GRCh38",
-        "authorship": [
-            {"who": "just-dna-seq", "role": "created", "kind": ["human", "ai"]},
-        ],
+        "authorship": GENERATION_I_PANEL_AUTHORSHIP,
     }
     header = (
         f"# Built by `pipelines v1-port pharmgkb` from the ClinPGx snapshot "

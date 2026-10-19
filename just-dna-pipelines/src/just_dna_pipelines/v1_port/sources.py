@@ -21,6 +21,17 @@ AdapterKind = Literal["coronary", "three_table", "longevitymap", "superhuman", "
 
 _GITHUB_ORG = "dna-seq"
 
+# Who made the database-derived Gen-I modules (cancer, cardio, pathogenic, pharmacogenomics): Olga
+# Borysova designed them, Alex Karmazin and Maria Koval coded them; the port rebuilds them from a current
+# ClinVar or ClinPGx snapshot. No AI authored them. This list once read `just-dna-seq, kind [human, ai]`,
+# which reached the published manifests and Paper 1's Table S4 as "ai;human".
+GENERATION_I_PANEL_AUTHORSHIP: list[dict[str, object]] = [
+    {"who": "Olga Borysova", "role": "created", "kind": ["human_expert"]},
+    {"who": "Alex Karmazin", "role": "created", "kind": ["human"]},
+    {"who": "Maria Koval", "role": "created", "kind": ["human"]},
+    {"who": "just-dna-seq", "role": "edited", "kind": ["human"]},
+]
+
 
 class V1Module(BaseModel):
     """One portable Gen-I module: where its curated data lives and how to read it."""

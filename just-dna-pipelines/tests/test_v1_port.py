@@ -13,7 +13,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
+from just_dna_format.spec import ModuleSpecConfig
 
+from just_dna_pipelines.v1_port import clinvar_panel, pharmgkb
 from just_dna_pipelines.v1_port.adapters import (
     _SUPERHUMAN_CURATION,
     _load_superhuman_curation,
@@ -471,3 +474,18 @@ def test_publish_still_catches_a_partial_weights_compile(tmp_path):
         plan_publish(module_dir, "coronary")
     message = str(excinfo.value)
     assert "annotations.parquet" in message and "studies.parquet" in message
+
+
+@pytest.mark.parametrize("label, render", [
+    ("cardio", lambda: clinvar_panel._module_spec_yaml("cardio", ["MYH7"], {"clinvar_file_date": "x"}, 1)),
+    ("pharmacogenomics", lambda: pharmgkb._module_spec_yaml({"dataset": "x"}, 1)),
+])
+def test_database_derived_ports_credit_their_gen_i_authors_and_state_their_curator(label, render):
+    """The four database-derived Gen-I modules were designed by Olga Borysova and coded by Alex Karmazin and
+    Maria Koval; no AI authored them. Their specs once said `just-dna-seq, kind [human, ai]`, and pharmgkb's
+    stated no curator, so the format's `ai-module-creator` / `literature-review` placeholders were published."""
+    spec = ModuleSpecConfig.model_validate(yaml.safe_load(render()))
+    assert {a.who for a in spec.authorship} >= {"Olga Borysova", "Alex Karmazin", "Maria Koval"}, label
+    assert not any("ai" in a.kind for a in spec.authorship), label
+    placeholder = ModuleSpecConfig.model_fields["defaults"].default_factory()
+    assert (spec.defaults.curator, spec.defaults.method) != (placeholder.curator, placeholder.method), label

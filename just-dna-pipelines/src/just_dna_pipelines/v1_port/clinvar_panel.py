@@ -50,7 +50,7 @@ from just_dna_enricher.locations import resolve_clinvar_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from pydantic import BaseModel, Field
 
-from just_dna_pipelines.v1_port.sources import REGISTRY, display_meta
+from just_dna_pipelines.v1_port.sources import GENERATION_I_PANEL_AUTHORSHIP, REGISTRY, display_meta
 
 #: Review-status floor for every ClinVar module here. 1 = "criteria provided, single submitter" —
 #: it drops only the 0★ submissions that assert no criteria at all. The enricher's own default is 2
@@ -433,9 +433,7 @@ def _module_spec_yaml(
         # (`reference_sha256`, `significance`, the requested gene list) now lives in `clinvar_panel.log`
         # (`clinvar_source_sha256`, `clin_sig`, `panel_genes`), which is hashed into `manifest.logs`
         # and survives the 1.0 removal. See just-dna-format CONSUMER_SUGGESTIONS S114.
-        "authorship": [
-            {"who": "just-dna-seq", "role": "created", "kind": ["human", "ai"]},
-        ],
+        "authorship": GENERATION_I_PANEL_AUTHORSHIP,
     }
     header = (
         f"# Built by `pipelines v1-port clinvar --module {name}` from the ClinVar snapshot\n"
