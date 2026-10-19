@@ -430,53 +430,80 @@ Alteri, E., et al. (2024). The 23andMe data breach. *European Journal of Human G
 
 <!-- @rev C3r rounds=1 by=claude:2026-10-10 -->
 Added in the v0.3 revision (to be merged into the list above): Chen, T., et al. (2023). VCFshiny: an R/Shiny application for interactively analyzing and visualizing genetic variants. *Bioinformatics Advances*, 3(1), vbad107. doi:10.1093/bioadv/vbad107. Ehman, M., et al. (2025). The cost and cost trajectory of genome sequencing and bioinformatics analysis for Indigenous children with suspected rare diseases. *Genetics in Medicine*, 27(11), 101568. doi:10.1016/j.gim.2025.101568. Illumina (2023). Press release, 4 April 2023 ("$200 per genome", sequencing consumables only, 100 Gb per genome); NovaSeq X product page, https://www.illumina.com/systems/sequencing-platforms/novaseq-x-plus/applications/broad-sequencing.html (accessed 10 October 2026). Mordaunt, D. A., et al. (2024). The cost of proband and trio exome and genome analysis in rare disease: a micro-costing study. *Genetics in Medicine*, 26(4), 101058. doi:10.1016/j.gim.2023.101058. National Human Genome Research Institute (2021). The Cost of Sequencing a Human Genome. https://www.genome.gov/about-genomics/fact-sheets/Sequencing-Human-Genome-cost (accessed 10 October 2026). Nelson, S. C., et al. (2019). Third-Party Genetic Interpretation Tools: A Mixed-Methods Study of Consumer Motivation and Behavior. *American Journal of Human Genetics*, 105(1), 122–131. doi:10.1016/j.ajhg.2019.05.014. O'Daniel, J. M., et al. (2025). Direct-to-Consumer Genetic Testing. *NEJM Evidence*, 4(11), EVIDra2400455. doi:10.1056/EVIDra2400455. Ultima Genomics (2025). Ultima Genomics increases output by over 50% and lowers sequencing costs by a further 20% with the introduction of UG 100 Solaris. PR Newswire, 24 February 2025. Wiewiórka, M., Khamutou, P., Zbysiński, M., & Gambin, T. (2025). polars-bio: fast, scalable, and out-of-core operations on large genomic interval datasets. *Bioinformatics*, 41(12), btaf640. doi:10.1093/bioinformatics/btaf640.
+
 <!-- @/rev C3r -->
 Annas, G. J., & Elias, S. (2014). 23andMe and the FDA. *NEJM*, 370(11), 985–988.
+
 Association for Molecular Pathology v. Myriad Genetics, Inc., 569 U.S. 576 (2013).
+
 <!-- @rev V18 rounds=1 by=claude:2026-10-19 -->
 Behera, S., et al. (2024). Comprehensive genome analysis and variant detection at scale using DRAGEN. *Nature Biotechnology*, 43(7), 1177–1191. https://doi.org/10.1038/s41587-024-02382-1
+
 <!-- @/rev V18 -->
 Bloss, C. S., Schork, N. J., & Topol, E. J. (2011). Effect of direct-to-consumer genomewide profiling to assess disease risk. *NEJM*, 364(6), 524–534.
+
 Broer, L., et al. (2014). GWAS of longevity in CHARGE consortium confirms APOE and FOXO3 candidacy. *J Gerontol A*, 70(1), 110–118.
+
 <!-- @rev V19 rounds=1 by=claude:2026-10-19 -->
 Byrska-Bishop, M., et al. (2022). High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios. *Cell*, 185(18), 3426–3440.e19. https://doi.org/10.1016/j.cell.2022.08.004
+
 <!-- @/rev V19 -->
 Caruso, C., et al. (2022). How important are genes to achieve longevity? *IJMS*, 23(10), 5635.
+
 <!-- @rev V20 rounds=1 by=claude:2026-10-19 -->
 Chang, C. C., et al. (2015). Second-generation PLINK: rising to the challenge of larger and richer datasets. *GigaScience*, 4, 7. https://doi.org/10.1186/s13742-015-0047-8
+
 Dagster Labs (2026). Dagster: an orchestration platform for data assets. https://github.com/dagster-io/dagster
+
 <!-- @/rev V20 -->
 Doffman, Z. (2023). 23andMe confirms 6.9 million user records stolen. *Forbes*.
+
 <!-- @rev V21 rounds=1 by=claude:2026-10-19 -->
 Dyer, S. C., et al. (2025). Ensembl 2025. *Nucleic Acids Research*, 53(D1), D948–D957. https://doi.org/10.1093/nar/gkae1071
+
 <!-- @/rev V21 -->
 Green, R. C., & Farahany, N. A. (2014). Regulation: The FDA is overcautious on consumer genomics. *Nature*, 505(7483), 286–287.
+
 <!-- @rev V5 rounds=1 by=claude:2026-10-19 -->
 [dataset] Kulaga, A. (2026). Anton Kulaga genome. Zenodo. https://doi.org/10.5281/zenodo.18370498.
+
 <!-- @/rev V5 -->
 Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform. *arXiv*:2403.19087.
+
 Lambert, S. A., et al. (2021). The Polygenic Score Catalog. *Nature Genetics*, 53(4), 420–425.
+
 <!-- @rev V22 rounds=1 by=claude:2026-10-19 -->
 Landrum, M. J., et al. (2018). ClinVar: improving access to variant interpretations and supporting evidence. *Nucleic Acids Research*, 46(D1), D1062–D1067. https://doi.org/10.1093/nar/gkx1153
+
 <!-- @/rev V22 -->
 Manrai, A. K., et al. (2016). Genetic misdiagnoses and the potential for health disparities. *NEJM*, 375(7), 655–665.
+
 <!-- @rev V23 rounds=1 by=claude:2026-10-19 -->
 Poplin, R., et al. (2018). A universal SNP and small-indel variant caller using deep neural networks. *Nature Biotechnology*, 36(10), 983–987. https://doi.org/10.1038/nbt.4235
+
 Raasveldt, M., & Mühleisen, H. (2019). DuckDB: an embeddable analytical database. *Proceedings of the 2019 International Conference on Management of Data (SIGMOD '19)*, 1981–1984. https://doi.org/10.1145/3299869.3320212
+
 Reflex (2026). Reflex: web apps in pure Python. https://github.com/reflex-dev/reflex
+
 <!-- @/rev V23 -->
 <!-- @rev V24 rounds=1 by=claude:2026-10-19 -->
 Shenhar, B., Pridham, G., De Oliveira, T. L., Raz, N., Yang, Y., Deelen, J., Hägg, S., & Alon, U. (2026). Heritability of intrinsic human life span is about 50% when confounding factors are addressed. *Science*, 391(6784), 504–510. https://doi.org/10.1126/science.adz1187
+
 <!-- @/rev V24 -->
 Tacutu, R., et al. (2017). Human Ageing Genomic Resources: New and updated databases. *NAR*, 46(D1), D1083–D1090.
+
 Tandy-Connor, S., et al. (2018). False-positive results released by direct-to-consumer genetic tests. *Genetics in Medicine*, 20(12), 1515–1521.
+
 <!-- @rev V25 rounds=1 by=claude:2026-10-19 -->
 Whirl-Carrillo, M., et al. (2021). An evidence-based framework for evaluating pharmacogenomics knowledge for personalized medicine. *Clinical Pharmacology & Therapeutics*, 110(3), 563–572. https://doi.org/10.1002/cpt.2350
+
 <!-- @/rev V25 -->
 <!-- @rev V6 rounds=1 by=claude:2026-10-19 -->
 [dataset] Zaharia, L. (2026). Livia Zaharia genome. Zenodo. https://doi.org/10.5281/zenodo.19487816.
+
 <!-- @/rev V6 -->
 <!-- @rev V26 rounds=1 by=claude:2026-10-19 -->
 Zhang, D., et al. (2020). Fast and robust ancestry prediction using principal component analysis. *Bioinformatics*, 36(11), 3439–3446. https://doi.org/10.1093/bioinformatics/btaa152
+
 Zook, J. M., et al. (2016). Extensive sequencing of seven human genomes to characterize benchmark reference materials. *Scientific Data*, 3, 160025. https://doi.org/10.1038/sdata.2016.25
 <!-- @/rev V26 -->
