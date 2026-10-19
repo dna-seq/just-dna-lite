@@ -6,12 +6,15 @@
 the LaTeX and the PDF are derived from them and never edited by hand.
 
 Each `vX.Y/` folder is one round. `v0.3/` holds Paper 1 as Robi Tacutu reviewed it (the Google Doc,
-his suggestions not applied) and stays frozen; `v0.4/` holds the revision that answers the review,
-with its supplementary tables. A file that has not changed since its round stays in that round's folder.
+his suggestions not applied) and stays frozen; `v0.4/` holds the revision that answers the review as
+released to Google Drive on 2026-10-13, with its supplementary tables; `v0.5/` holds the next release
+(copy-edits, the day-2 benchmark, the split-out supplementary, the venue record and ladders, and the
+scan of the ethics committee's determination). A file that has not changed since its round stays in
+that round's folder: Tables S4 and S5 and the tool comparison draft are still in `v0.4/`.
 
 ## Revision ledger
 
-The manuscript sources (`v0.4/paper1-just-dna-lite.md`, `v0.3/paper2-just-module-creator.md`) record,
+The manuscript sources (`v0.5/paper1-just-dna-lite.md`, `v0.3/paper2-just-module-creator.md`) record,
 inside the text, which segments were rewritten in answer to a review and how many rounds each went
 through. The record is a pair of HTML comments around the segment, so GitHub, editors and pandoc show
 nothing. `manuscript ledger strip` writes a clean twin without them for any build that should never
@@ -59,12 +62,12 @@ in, including CRLF line endings and other HTML comments such as `AUTHOR TODO` no
 ### Commands
 
 ```bash
-uv run manuscript ledger lint docs/manuscript/v0.4/paper1-just-dna-lite.md   # exit 1 on any error
+uv run manuscript ledger lint docs/manuscript/v0.5/paper1-just-dna-lite.md   # exit 1 on any error
 uv run manuscript ledger lint --strict docs/manuscript/v0.3/*.md              # warnings fail too
-uv run manuscript ledger strip docs/manuscript/v0.4/paper1-just-dna-lite.md  # writes paper1-just-dna-lite.clean.md beside it
-uv run manuscript ledger strip docs/manuscript/v0.4/paper1-just-dna-lite.md --check   # exit 1 if the twin is missing or stale
-uv run manuscript ledger report docs/manuscript/v0.4/paper1-just-dna-lite.md --html /tmp/heat.html
-uv run manuscript ledger bump docs/manuscript/v0.4/paper1-just-dna-lite.md C3 --by robi:2026-10-12
+uv run manuscript ledger strip docs/manuscript/v0.5/paper1-just-dna-lite.md  # writes paper1-just-dna-lite.clean.md beside it
+uv run manuscript ledger strip docs/manuscript/v0.5/paper1-just-dna-lite.md --check   # exit 1 if the twin is missing or stale
+uv run manuscript ledger report docs/manuscript/v0.5/paper1-just-dna-lite.md --html /tmp/heat.html
+uv run manuscript ledger bump docs/manuscript/v0.5/paper1-just-dna-lite.md C3 --by robi:2026-10-12
 ```
 
 - `report` prints one row per segment (id, rounds, reviewers, line, first words) and totals. With
@@ -99,8 +102,8 @@ inserts markers into the real paper text and checks the round trip.
 
 ```bash
 uv sync                                                                          # dev group: pypandoc-binary, tecto
-uv run manuscript build docs/manuscript/v0.4/paper1-just-dna-lite.md            # → docs/manuscript/v0.4/build/
-uv run manuscript build docs/manuscript/v0.4/paper1-just-dna-lite.md --no-pdf   # stop at the LaTeX
+uv run manuscript build docs/manuscript/v0.5/paper1-just-dna-lite.md            # → docs/manuscript/v0.5/build/
+uv run manuscript build docs/manuscript/v0.5/paper1-just-dna-lite.md --no-pdf   # stop at the LaTeX
 uv run manuscript build PATH --out /tmp/paper --template venue.latex            # elsewhere, venue template
 ```
 
@@ -206,6 +209,22 @@ uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.4
 
 Code: `src/just_dna_lite/manuscript/s5.py`, `cli.py`. Tests: `tests/test_manuscript_s5.py` (offline,
 on real scoring files in `tests/data/manuscript/s5/`).
+
+## Releasing a round
+
+Co-authors comment on Google Docs in the project's shared Manuscript folder on Google Drive, one `vX.Y`
+subfolder per round, each holding only what changed in that round (Tables S4 and S5 are still in `v0.4`).
+
+1. `git mv` every file changed since the last release into the new `vX.Y/`, then put the released text
+   back in the old folder with `git show <release commit>:<path>`, and relabel the paper's header.
+2. `manuscript build` the paper and the supplement, and look at the PDFs.
+3. Convert each clean twin to .docx with pandoc (`--shift-heading-level-by=-1`) and upload it as a
+   Google Doc: `rclone copyto X.docx gdrive:"X.docx" --drive-root-folder-id <folder id>
+   --drive-import-formats docx`. Do not upload the Markdown itself: Drive's Markdown import prints
+   pandoc superscripts (`^1^`) literally. The same `copyto` with `--ignore-times` replaces a Doc's
+   content and keeps its link.
+4. Upload the paper's PDF as a file. The supplement's PDF stays local while Table S7 (11 columns) does
+   not fit pandoc's portrait layout; the Google Doc renders it.
 
 ## Pre-submission checks and journal choice
 

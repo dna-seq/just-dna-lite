@@ -173,7 +173,7 @@ submissions per submitter per month, and rejected ones count).
 ### Paper 1
 
 A working order, not a final choice (set 2026-10-19 with manuscript-journal-select). The files behind it sit
-beside the paper in `v0.4/`: `paper1-just-dna-lite.record.yaml` (priorities and every venue fact, with source
+beside the paper in `v0.5/`: `paper1-just-dna-lite.record.yaml` (priorities and every venue fact, with source
 and date), `paper1-just-dna-lite.journal-ladder.csv` and `paper1-just-dna-lite.preprint-ladder.csv` (sorted and
 chosen rungs in fixed columns), and `paper1-just-dna-lite.venue-requirements.md` (what every venue shares). The authors' priorities,
 in order: speed to a decision, reach (impact factor above 3), a light AI-policy burden; a grant can pay a
