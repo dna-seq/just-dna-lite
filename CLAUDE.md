@@ -765,12 +765,20 @@ not a VCF liftover and cannot be reused for annotation.
 
 ## Manuscript (`docs/manuscript/`)
 
+- **Edit manuscript and planning documents in place.** Never create a new versioned, per-journal or
+  "superseding" copy of the paper or of `manuscript_journal_strategy.md`, and never add pointers to one, without
+  asking first. Venue status lives in `manuscript_journal_strategy.md` ("Venues, October 2026").
 - Rewritten segments of a manuscript carry `<!-- @rev C3 rounds=N by=name:YYYY-MM-DD -->` …
   `<!-- @/rev C3 -->` markers; `uv run manuscript ledger lint|strip|report|bump PATH`. Builds read the
   stripped `<stem>.clean.md` twin, never the marked source. Rules: `docs/manuscript/README.md`.
 - `uv run manuscript build PATH [--out DIR] [--no-pdf] [--template T]`: clean twin → pandoc LaTeX →
   tectonic PDF in `build/` beside PATH (gitignored). `MANUSCRIPT_TECTONIC` overrides the binary,
   `TECTONIC_CACHE_DIR` keeps the TeX bundle off `~/.cache`. A failed render deletes the old PDF.
+- Before submitting, run the `manuscript-integrity-check` skill from the
+  [manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin (desk-reject screens, reference
+  resolution, AI-use disclosure per venue); `manuscript-journal-select` compares venues and
+  `manuscript-journal-adapt` adapts the paper to the chosen one. *Bioinformatics* (ISCB) bars LLM-drafted
+  paper sections.
 
 ## Workspace facts
 

@@ -1,5 +1,7 @@
 # Just-DNA-Lite Manuscript Strategy
 
+> **Venues as of October 2026** are in the last section, [Venues, October 2026](#venues-october-2026). The fit analysis before it still stands.
+
 Assessment of `docs/manuscript/manuscript_draft_v2.md`, focused on weak points, revision ideas, risks, and journals with recent impact factor above 5.
 
 ## Executive Verdict
@@ -160,3 +162,74 @@ For the current draft, the most natural open-source-friendly version would empha
 - Public datasets on HuggingFace/Zenodo where possible.
 - Explicit uncertainty display rather than curated gatekeeping.
 - Article-level usefulness: installability, reproducibility, extensibility, and user control.
+
+## Venues, October 2026
+
+Both papers were entered at EASRP 2026 (a EuroTech Federation student competition with no proceedings) and
+neither reached the final. Nothing is published or under review, so there is no anonymity constraint, and
+both papers can go to arXiv: Paper 1 first, Paper 2 when its journal version is ready (arXiv allows two
+submissions per submitter per month, and rejected ones count).
+
+### Paper 1
+
+*Bioinformatics* (Original Paper) remains the target; the fit analysis above has not changed. The draft is
+being adapted to its author guidelines (structured abstract, length, Supplementary Data as one separate file,
+data availability, ethics and AI-use statements). Fallbacks, in order:
+
+| Order | Venue | Why |
+|---|---|---|
+| 1 | **Bioinformatics** | Best fit for a software paper |
+| 2 | **PLOS Computational Biology** (Software) | Strong open-source fit; asks how AI output was validated, which the tests and benchmark records answer |
+| 3 | **BMC Bioinformatics** | Safest software venue; active reference screening, so references must be clean |
+| Reach | **Genome Biology** | Needs the broader validation from the strategy above |
+| Resource framing only | **Database** | Only if the paper is reframed around the module ecosystem |
+| Not now | **GigaScience**, **CSBJ** | Heaviest disclosure (deposited AI outputs; full prompts) and, for GigaScience, an unsettled editorial board |
+
+If IF > 5 is mandatory: *Bioinformatics*, then *Genome Biology*.
+
+**AI use.** *Bioinformatics* follows the ISCB policy: no drafting of paper sections "from a prompt text", and
+any LLM help declared in the cover letter, in the Methods or Acknowledgements, and in a supplementary note.
+The statement is one factual account from the authors of what the tools did (Claude Code as the main
+assistant, Codex as a second model checking its output), not a count of commits or revision markers and not a
+per-pass record. Where the use goes beyond what the rule allows, that is the authors' decision, named once.
+
+**Ethics.** The Ethics Committee of the Institute of Biochemistry of the Romanian Academy determined that the
+work is not research on human subjects and needs no approval (ethics register no. 17, 23 September 2026).
+
+### Paper 2
+
+| Order | Venue | Why |
+|---|---|---|
+| 1 | **Database** (OUP; journal of the International Society for Biocuration) | Module authoring is AI-assisted curation; low AI friction. IF 3.6, so only if the IF > 5 rule is relaxed |
+| 2 | **Bioinformatics** (Original Paper) | Same journal family as Paper 1 and a fit for tools; needs the evaluation below |
+| 3 | **BMC Bioinformatics** or **PLOS Computational Biology** (Software) | Safe software venues |
+
+Paper 2 needs the evidence a journal asks of an AI-system paper: a comparison against PubMind on overlapping
+variants; several runs per task with their spread and the full denominator of attempts; baselines (a raw
+LLM, a scripted ClinVar draft, a human curator); and the reference-checking results. Variant tables the model
+may have seen in training count as rediscovery; prospective evidence would be papers published after the
+model's cutoff. For Paper 2 the LLM is the research technique, which ISCB lists as acceptable. Submit Paper 1
+first, so Paper 2 can cite a real record.
+
+### AI rules of the candidate venues
+
+Read on 2026-10-15 from each venue's own pages; the sources, with verbatim quotes, are in the
+[manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin
+(`skills/manuscript-integrity-check/references/`). Impact factors are copied from the June 2026 assessment
+above and were not re-checked. These policies changed several times in 2026, so re-read the chosen venue's
+live author guidelines before submitting.
+
+| Venue | IF | Writing help | Disclosure cost | Screening | Note for us |
+|---|---:|---|---|---|---|
+| **Bioinformatics** (OUP/ISCB) | 5.4 | **The only outright ban:** no drafting "from a prompt text"; the only writing aids named are spelling and grammar checkers | Cover letter, Methods or Acknowledgements, and a supplementary note "with sufficient details" | None systematic ("investigate reported instances") | Paper 1's target: strictest rule, lightest surveillance; one disclosure from the authors' account |
+| **Briefings in Bioinformatics** (OUP/ISCB) | 7.7 | Same ISCB ban | Same | None systematic | Same rules as *Bioinformatics* |
+| **CSBJ** (left Elsevier on 31 Jan 2026; now an AAAS Science Partner Journal) | 4.1 | Allowed, but even language editing must be disclosed | Cover letter, Acknowledgments, and Methods **with the full prompts** | iThenticate | Heaviest disclosure. Our edits ran over many conversational sessions, so full prompts are impractical. Drop |
+| **GigaScience** (OUP/BGI) | 3.9 | Allowed with disclosure; no grammar exemption | The tool cited in the text and in the reference list, a usage summary at the end, and AI outputs deposited in GigaDB | "may use tools to detect undeclared or misuse of AI" | Most burdensome open-science venue. BGI dismissed the editorial team in Sept 2025 and 30 of 49 board members resigned (secondary report); the journal still publishes. Drop for now |
+| **Genome Biology**, **Genome Medicine**, **BMC Bioinformatics**, **Scientific Data** (Springer Nature/BMC) | 9.4 / 11.2 / 3.3 / 6.9 | Risk framework: language polish (Green) and "drafting sections based on author input" (Amber) allowed; "writing results or discussion independently" and content "from text prompts" (Red) forbidden | AI Declaration plus Methods (the journal pages still say Methods); even Green use is declared | **Publisher-wide**: nonsense-text detector, irrelevant-reference checker, tortured-phrase tool. Editor guidance calls detectors "far from definitive" | Permissive rules, the most active screening. Fine with clean references and a declaration; Results and Discussion must be ours |
+| **PLOS Computational Biology** | 3.6 | Allowed; rephrasing for clarity is exempt | In the article: tools, what they affected, **how the outputs were validated**; AI-written code must be disclosed | "We may use available AI detection tools" | Moderate. The validation statement is extra work but natural for us (tests, benchmark records) |
+| **PeerJ / PeerJ CS** (T&F) | 3.8 | Allowed, but even copyediting is declared, and both versions must be kept | Methods or Acknowledgments | None named | Moderate; undisclosed use is listed as misconduct |
+| **Patterns**, **Cell Genomics**, **iScience** (Cell Press, Elsevier policy) | 7.4 / 9.0 / 4.1 | Allowed, drafting support included; grammar, spelling and reference tools exempt | A published "Declaration of generative AI…" section; STAR Methods when AI is part of the method | Elsevier's 100+ integrity signals; no AI-text detector named | Low friction on AI; the bar is scientific selectivity |
+| **Nucleic Acids Research**, **Database** (OUP default policy) | 13.1 / 3.6 | Language polish exempt; substantial editing allowed with disclosure | Cover letter and Acknowledgements (Methods if integral): tool, version, use, author oversight | iThenticate; no AI detector | Low friction. Fit limits apply (NAR: web server or database issue; Database: resource framing). Database's 2026 page could only be read in part |
+| **Genome Research** (CSHL Press) | 5.5 | **Most permissive**: refining, editing and grammar tools exempt; generated content allowed with disclosure | Methods: tool, version, description | Plagiarism and image tools; no AI detector | Least AI friction of the IF > 5 group, but the weakest fit (it wants genome biology) |
+| **F1000Research**, **Wellcome Open Research**, **Open Research Europe** | n/a | Allowed; F1000Research bars "text or code generation without rigorous revision" | Methods or Acknowledgments | ImageTwin; no AI detector | Low friction. One F1000Research clause names "computer code" among things AI may not create; ask before relying on it |
+| **eLife** | n/a | Allowed | Materials and Methods | None found | Low friction; no JIF |

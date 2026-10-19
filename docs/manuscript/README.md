@@ -160,7 +160,12 @@ uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10  
   `annotation` layer makes it *Database-derived*; else manifest method `expert-curated` makes it
   *Expert*; an AI-only authorship with a stated (non-default) method makes it *AI-generated*; anything
   else is *Undetermined*. A spec that states no `defaults:` block gets the format's `ai-module-creator`
-  / `literature-review`, which is not a statement (pharmgkb is such a case).
+  / `literature-review`, which is not a statement (the published pharmgkb 1.1.0 is such a case; its
+  build now states `just-dna-seq` / `clinpgx-aggregate`). The `authorship_kinds` column copies the
+  manifests: the published cancer, cardio, pathogenic and pharmacogenomics modules say `ai;human`, a
+  default the port scripts wrote. They are Generation I modules designed by Olga Borysova and coded by
+  Alex (Alexey) Karmazin and Maria Koval (`v1_port.sources.GENERATION_I_PANEL_AUTHORSHIP`); S4 shows that once
+  they are republished and the snapshot is retaken.
 - **Curation notes** are the one hand-written part: `S4_curation.yaml`, beside the output, says how each
   Generation I literature module chose its variants, every note citing keys of its own `references`
   map. `render` prints them as each module's *Curation* line plus a References section, and refuses a
@@ -201,3 +206,15 @@ uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.4
 
 Code: `src/just_dna_lite/manuscript/s5.py`, `cli.py`. Tests: `tests/test_manuscript_s5.py` (offline,
 on real scoring files in `tests/data/manuscript/s5/`).
+
+## Pre-submission checks and journal choice
+
+The [manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin
+(`claude plugin install manuscript-skills@dna-seq`) reviews and adapts the manuscript.
+`manuscript-integrity-check` checks a draft against what journal desks and preprint servers reject:
+references that do not resolve, point to a different work or were retracted, chatbot leftovers and TODOs,
+missing declarations and venue length limits. `manuscript-journal-select` compares venues, and
+`manuscript-journal-adapt` turns the chosen journal's rules into edits and statements, under a guard that
+checks no number, citation or hedge changed. Venue choice and status are in `manuscript_journal_strategy.md`
+("Venues, October 2026"). The plugin's policy data was read on 2026-10-15; re-check the venue's live page
+before submission.
