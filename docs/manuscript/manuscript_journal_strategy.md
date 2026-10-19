@@ -172,20 +172,41 @@ submissions per submitter per month, and rejected ones count).
 
 ### Paper 1
 
-*Bioinformatics* (Original Paper) remains the target; the fit analysis above has not changed. The draft is
-being adapted to its author guidelines (structured abstract, length, Supplementary Data as one separate file,
-data availability, ethics and AI-use statements). Fallbacks, in order:
+A working order, not a final choice (set 2026-10-19 with manuscript-journal-select). The files behind it sit
+beside the paper in `v0.4/`: `paper1-just-dna-lite.record.yaml` (priorities and every venue fact, with source
+and date), `paper1-just-dna-lite.journal-ladder.csv` and `paper1-just-dna-lite.preprint-ladder.csv` (sorted and
+chosen rungs in fixed columns), and `paper1-just-dna-lite.venue-requirements.md` (what every venue shares). The authors' priorities,
+in order: speed to a decision, reach (impact factor above 3), a light AI-policy burden; a grant can pay a
+normal open-access fee. Every figure below was read on the venue's own page on 2026-10-19 unless marked.
 
-| Order | Venue | Why |
-|---|---|---|
-| 1 | **Bioinformatics** | Best fit for a software paper |
-| 2 | **PLOS Computational Biology** (Software) | Strong open-source fit; asks how AI output was validated, which the tests and benchmark records answer |
-| 3 | **BMC Bioinformatics** | Safest software venue; active reference screening, so references must be clean |
-| Reach | **Genome Biology** | Needs the broader validation from the strategy above |
-| Resource framing only | **Database** | Only if the paper is reframed around the module ecosystem |
-| Not now | **GigaScience**, **CSBJ** | Heaviest disclosure (deposited AI outputs; full prompts) and, for GigaScience, an unsettled editorial board |
+**Preprint ladder.** 1. **bioRxiv** (Bioinformatics category): AI use declared in the manuscript; transfers
+directly to *Bioinformatics*, *PLOS Computational Biology* and *NAR Genomics and Bioinformatics*, not to the
+BMC journals, *Cell Reports Methods* or *GPB*. It screens out "announcements of tools or services without data"
+and may close a paper with health-related information and send it to medRxiv, so the preprint must read as a
+software paper with results. 2. **arXiv** q-bio.GN as the fallback (the Generation I preprint, arXiv:2403.19087,
+is there). medRxiv is not a rung: it excludes software announcements and case reports. CC BY keeps every
+journal below open.
 
-If IF > 5 is mandatory: *Bioinformatics*, then *Genome Biology*.
+**Journal ladder.**
+
+| Rung | Venue | Days to first decision (median) | IF | AI-policy burden | Fee | What decides it |
+|---:|---|---:|---:|---|---|---|
+| 1 | **BMC Bioinformatics** (Software) | 5 | 4.4 | moderate | €2,590; DEAL takes 20% off for Rostock | "direct comparison with available related software" |
+| 2 | **Cell Reports Methods** (Research article) | 7 | 5.8 | moderate | US$4,970 | "a comparison of the method with related methods when appropriate, and validation"; under 7,000 words |
+| 3 | **Genome Biology** (Software) | 13 | 9.2 | moderate | €4,690; DEAL 20% off | "a clear advance over the state-of-the-art existing tools in a side-by-side demonstration using the same dataset" |
+| 4 | **Bioinformatics** (Original Paper) | 23, desk rejections included | 5.5 | severe: bars LLM drafting | US$4,376; no OUP agreement for Rostock or Romania | The draft already fits; the AI rule is the authors' decision |
+| 5 | **PLOS Computational Biology** (Software) | 41 | 3.6 | moderate | US$3,165 | Under 3,500 words; rejects software that needs resources "whose persistence is not guaranteed" (HuggingFace-hosted modules) |
+| 6 | **NAR Genomics and Bioinformatics** | 44 | 3.0 (at the floor) | moderate | US$3,035 | Benchmarks against "an adequate number of relevant alternative" methods |
+| 7 | **Genomics, Proteomics & Bioinformatics** | not published | 7.2 | moderate | US$4,050 | Research article under 6,000 words fits |
+
+What the paper already has against these rules: just-prs side by side with PLINK2 on the same genome (runtime,
+score concordance, and the 0.10.2 rerun); annotation side by side with OakVar 2.13.1 (Generation I) on the same
+four VCFs, including OakVar's dbSNP annotator against Ensembl annotation, but timing only; and the documented
+features of 22 tools in Table S7. That meets BMC Bioinformatics' "direct comparison with available related
+software" on performance and functionality. For Genome Biology the annotation half is thinner: OakVar is the
+authors' own former base rather than a state-of-the-art annotator, no run compares what the tools output, and
+HG002 was used for timing, not as ground truth. The Rostock publication fund pays at most €2,000 gross per article in fully open-access
+journals; the grant covers the rest. Not now: **GigaScience** and **CSBJ** (deposited AI outputs; full prompts).
 
 **AI use.** *Bioinformatics* follows the ISCB policy: no drafting of paper sections "from a prompt text", and
 any LLM help declared in the cover letter, in the Methods or Acknowledgements, and in a supplementary note.
