@@ -219,18 +219,42 @@ work is not research on human subjects and needs no approval (ethics register no
 
 ### Paper 2
 
+Priorities confirmed by the authors on 19 October 2026: **fast publication first, with a journal impact
+factor above 3**. The recommended order among the three journals checked is:
+
 | Order | Venue | Why |
 |---|---|---|
-| 1 | **Database** (OUP; journal of the International Society for Biocuration) | Module authoring is AI-assisted curation; low AI friction. IF 3.6, so only if the IF > 5 rule is relaxed |
-| 2 | **Bioinformatics** (Original Paper) | Same journal family as Paper 1 and a fit for tools; needs the evaluation below |
-| 3 | **BMC Bioinformatics** or **PLOS Computational Biology** (Software) | Safe software venues |
+| 1 | **BMC Bioinformatics** (Software) | IF 4.4; the fastest reported first-decision median among these checked candidates. Evaluation consistency and the fee route must be settled. |
+| 2 | **Bioinformatics** (Original Paper) | IF 5.5; fallback, with a longer reported first-decision median and stricter writing-assistance policy. |
 
-Paper 2 needs the evidence a journal asks of an AI-system paper: a comparison against PubMind on overlapping
-variants; several runs per task with their spread and the full denominator of attempts; baselines (a raw
-LLM, a scripted ClinVar draft, a human curator); and the reference-checking results. Variant tables the model
-may have seen in training count as rediscovery; prospective evidence would be papers published after the
-model's cutoff. For Paper 2 the LLM is the research technique, which ISCB lists as acceptable. Submit Paper 1
-first, so Paper 2 can cite a real record.
+Read on each journal's own pages on 2026-10-19. BMC Bioinformatics: median 5 days to first decision, fee
+€2,590 ([metrics](https://link.springer.com/journal/12859),
+[fees](https://link.springer.com/journal/12859/how-to-publish-with-us)); a Rostock corresponding author may get
+the 20% DEAL discount, and the university fund pays at most €2,000 gross, so whether Paper 2 qualifies is
+still open. *Bioinformatics*: median 23 days in 2025, US$4,376
+([About](https://academic.oup.com/bioinformatics/pages/About)). Both medians include desk decisions, so
+they do not measure the time to a decision after external review. *Database* is outside the floor: its
+[About page](https://academic.oup.com/database/pages/About) gives a 2025 IF of 2.7, not the 3.6 used
+earlier, and a median of 63 days. Its scope (annotation methods, automated and semi-automated curation)
+fits the paper closely, so it returns if the authors drop the floor.
+
+**Evaluation to settle before posting.** Paper 2's evaluation table
+(`just-module-creator/docs/manuscript/manuscript.tex`, "plugin version fixed") reports three runs with pair
+recall 0.67, 1.00 and 1.00. The SIRT6 runs committed in just-module-creator (`a`, `b`, `a2`) score 0.33,
+1.00 and 0.33, but they are an earlier preparation round across three plugin builds: commit `fab4db5`
+(31 August 2026) replaced them in the table with a round at a fixed version, and `221b95f` filled in that
+round's runs 2 and 3. The different scores therefore do not show an error in the table. The later round's
+raw modules, prompt, reference and version record are not in the repository; the runbook kept them in the
+gitignored `data/interim/repro-bench-2/`, which is not in the current checkout. Recover and archive them,
+then reproduce the table. If they cannot be found, report the preparation round with its limits or run a
+new, separately identified evaluation. BMC Bioinformatics asks for a "direct comparison with available
+related software"; for an authoring tool that means a matched authoring baseline (a raw model or a
+scripted draft) on the same task.
+
+Make Paper 1 citable first, then let Paper 2 cite its preprint and proceed when its own evidence is ready.
+Paper 2 does not need to wait for Paper 1's journal acceptance; the journals can assess the two distinct
+papers in parallel with the overlap disclosed. Update companion citations when preprint or journal
+identifiers become available, and preserve each paper's software/evidence versions.
 
 ### AI rules of the candidate venues
 

@@ -54,7 +54,7 @@ EMU_PER_POINT = 12700
 PORTRAIT_TEXT_WIDTH = A4_WIDTH_TWIPS - 2 * DOCX_MARGIN_TWIPS
 LANDSCAPE_TEXT_WIDTH = A4_HEIGHT_TWIPS - 2 * DOCX_MARGIN_TWIPS
 SCRIPT_SCALE = 0.65  # superscripts are set at about two thirds of the text size
-_FIGURE_CAPTION_RE = re.compile(r"(?m)^\*\*Figure [0-9]+\.")
+_FIGURE_CAPTION_RE = re.compile(r"(?m)^\*\*Figure S?[0-9]+\.")
 _CAPTION_RE = re.compile(r"^Table S?[0-9]+\.")
 
 
@@ -444,7 +444,7 @@ def test_every_figure_stays_on_the_page_of_its_caption(built: tuple[Path, Path])
     assert len(with_image) == len(_FIGURE_CAPTION_RE.findall(clean.read_text(encoding="utf-8")))
     for index in with_image:
         assert paragraph_style(body[index]) == FIGURE_IMAGE_STYLE
-        assert re.match(r"Figure \d+\.", text_of(body[index + 1]).strip()), text_of(body[index + 1])
+        assert re.match(r"Figure S?\d+\.", text_of(body[index + 1]).strip()), text_of(body[index + 1])
     styles = {s.get(f"{W}styleId"): s for s in read_part(docx, "word/styles.xml").iter(f"{W}style")}
     assert styles[FIGURE_IMAGE_STYLE].find(f"{W}pPr/{W}keepNext") is not None
 

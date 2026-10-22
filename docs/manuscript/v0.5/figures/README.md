@@ -1,11 +1,12 @@
 # Manuscript figures
 
-These standalone figure files are byte-for-byte copies of the existing repository images. The v0.5 master embeds the same files; the Google Doc includes them inline. Keep this directory with the manuscript for submission systems that request figures separately.
+The master embeds these files; keep standalone copies for submission. Figure 2 is a reconstruction of selected fields from an actual report, not an interface screenshot. Its source extract is `../supplementary/S13_worked_report_row.json`; regenerate it with `uv run python scripts/manuscript_report_figure.py` from the repository root.
 
-| Figure | File | Repository source | Status |
+| Figure | File | Source | Status |
 |---|---|---|---|
-| 1 | figure-1-annotation-interface.jpg | images/just_dna_lite_annotations.jpg | Annotation interface; caption describes the visible input grid |
-| 2 | figure-2-module-domains.jpg | images/longevity_risks.jpg | Historical Generation I overview; lifespan axis is conceptual |
-| 3 | figure-3-prs-trait-view.jpg | images/just_prs_trait_consensus.jpg | Draft illustration only: replace before submission because the older interface shows an absolute-risk value for intelligence and inconsistent quality labels |
+| 1 | figure-1-annotation-interface.jpg | images/just_dna_lite_annotations.jpg | Existing annotation interface screenshot |
+| 2 | figure-2-worked-annotation.png and .svg | S13 report extract; author-supplied annotation report | Called FOXO3 genotype, recorded annotation and five study records |
+| 3 | figure-3-prs-trait-view.jpg | images/just_prs_trait_consensus.jpg | Existing draft illustration; requires replacement because it displays an absolute-risk value for intelligence and inconsistent quality labels |
+| S1 | figure-2-module-domains.jpg | images/longevity_risks.jpg | Historical Generation I overview, retained in Supplementary S1 |
 
-Reuse existing repository figures; do not retake screenshots for them. When a new screenshot is needed, use Chrome, preserve the original aspect ratio, and check readability at manuscript width.
+The author's separate PRS reports summarize a computational run of approximately 4,000 scores followed by selection and summary of interesting findings. They are not evidence that PRS calculation was manual. Their provenance is described in Supplementary S13; they do not supply the model-level metadata needed to reproduce every percentile.
