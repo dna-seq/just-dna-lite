@@ -227,6 +227,10 @@ factor above 3**. The recommended order among the three journals checked is:
 | 1 | **BMC Bioinformatics** (Software) | IF 4.4; the fastest reported first-decision median among these checked candidates. Evaluation consistency and the fee route must be settled. |
 | 2 | **Bioinformatics** (Original Paper) | IF 5.5; fallback, with a longer reported first-decision median and stricter writing-assistance policy. |
 
+The files behind it sit beside Paper 2 in just-module-creator's `docs/manuscript/`: `manuscript.record.yaml`
+(priorities and every venue fact, with source and date), `manuscript.journal-ladder.csv` and
+`manuscript.venue-requirements.md` (what every venue shares).
+
 Read on each journal's own pages on 2026-10-19. BMC Bioinformatics: median 5 days to first decision, fee
 €2,590 ([metrics](https://link.springer.com/journal/12859),
 [fees](https://link.springer.com/journal/12859/how-to-publish-with-us)); a Rostock corresponding author may get
