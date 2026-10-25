@@ -1,0 +1,10 @@
+# Only the dashboard, the corrected manuscript, its Word review, the quality comparison and this folder's README are committed. The run's evidence
+# (run/, benchmark/, project/, the analysis and the track-changes copy) stays local: it is large, quotes
+# the reviewer's comments item by item, and project/code is this repository at commit ad0b30a.
+*
+!.gitignore
+!README.md
+!manuscript-dashboard.html
+!corrected-manuscript.md
+!manuscript-review.docx
+!quality-comparison.md
