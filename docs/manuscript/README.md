@@ -11,11 +11,11 @@ released to Google Drive on 2026-10-13, with its supplementary tables; `v0.5/` h
 (copy-edits, the day-2 benchmark, the split-out supplementary, the venue record and ladders, and the
 scan of the ethics committee's determination). The improvement run of 26 October 2026 left its dashboard,
 Word review and corrected version beside the paper (`paper1-just-dna-lite.dashboard.html`, `.review.docx` and
-`.proposed.md`); its evidence stays local in `v0.5/reviews/`. `v0.6/` is the round in progress, opened on
-26 October 2026: the author list and affiliations changed, and the paper now leads with its features and the
-user groups it serves. `v0.6/changes-from-v0.5.md` records every change of the round as "was, now, why", keyed
-to the ledger ids, and is the file to share with co-authors as the round's changelog. Each round is complete:
-files that did not change are copied into the new round, so Tables S4 and S5 are in `v0.4/supplementary/`,
+`.proposed.md`); its evidence stays local in `v0.5/reviews/`. `v0.6/` is the current release, opened and
+released to Google Drive on 26 October 2026: the author list and affiliations changed, and the paper now
+leads with its features and the user groups it serves. `v0.6/changes-from-v0.5.md` records every change of
+the round as "was, now, why", keyed to the ledger ids, and goes to co-authors as the round's changelog (a
+Google Doc beside the paper). Each round is complete: files that did not change are copied into the new round, so Tables S4 and S5 are in `v0.4/supplementary/`,
 `v0.5/supplementary/` and `v0.6/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
 where Table S7 cites it.
 
@@ -226,7 +226,7 @@ Supplementary Data as Google Docs and PDFs, Tables S4 and S5 as Google Docs, the
 and S5 CSVs and the S5 histogram) in a `Supplementary data files` subfolder, and the scan of the ethics
 determination.
 
-For v0.5, the active co-author copy is [this Google Doc](https://docs.google.com/document/d/1ZgaFbXmOXkkFMUMuSUR8_STPIjrZzjRZspfjQsmqdjU/edit). Apply corrections to the repository master first, finish all manuscript changes for the session, then sync them to that existing Doc. Preserve its native tables; the .docx from `manuscript build` brings their borders and column widths, so check them after import or formatting changes. Embed the figures in both the master and Google Doc, and keep standalone copies in `v0.5/figures/` for submission. Reuse existing repository figures rather than retaking them; use Chrome for any missing screenshots and preserve their aspect ratios.
+For v0.6, the active co-author copy is [this Google Doc](https://docs.google.com/document/d/1byTB914X6ueuMcAnWjunEYpOBGUxjJUJD5_znxu8QXA/edit), and the round's changelog is [this one](https://docs.google.com/document/d/1B1fDEsmLhA0GF9TD6QDpiC4A9q4IlqE_Q3KzlSJOsYE/edit). Apply corrections to the repository master first, finish all manuscript changes for the session, then sync them to that existing Doc. Preserve its native tables; the .docx from `manuscript build` brings their borders and column widths, so check them after import or formatting changes. Embed the figures in both the master and Google Doc, and keep standalone copies in `v0.6/figures/` for submission. Reuse existing repository figures rather than retaking them; use Chrome for any missing screenshots and preserve their aspect ratios.
 
 1. `git mv` every file changed since the last release into the new `vX.Y/` and copy the unchanged
    ones (`supplementary/`), put the released text back in the old folder with
@@ -240,10 +240,11 @@ For v0.5, the active co-author copy is [this Google Doc](https://docs.google.com
    table handling, so build the Supplementary Data PDF from a copy that starts with a
    `geometry: [landscape, margin=1.6cm]` YAML block: Tables S2, S7 and S10 are too wide for a
    portrait page (S7 has 11 columns). Look at both PDFs.
-3. Upload each `build/<stem>.docx` as a Google Doc: the paper, the Supplementary Data, and S4 and S5
+3. Upload each `build/<stem>.docx` as a Google Doc: the paper, the Supplementary Data, S4 and S5
    (`manuscript build supplementary/S4_module_sources.md --no-pdf`, the same for S5 after pointing
-   its figure at the PNG): `rclone copyto build/X.docx gdrive:"X.docx" --drive-root-folder-id
-   <folder id> --drive-import-formats docx`. Never convert a clean twin with bare pandoc: v0.5 first
+   its figure at the PNG) and the round's `changes-from-vX.Y.md`, as "1. Changes from vX.Y to vX.Z":
+   `rclone copyto build/X.docx gdrive:"X.docx" --drive-root-folder-id <folder id>
+   --drive-import-formats docx`. Never convert a clean twin with bare pandoc: v0.5 first
    went out that way, with borderless tables that broke words mid-word and no figures. Do not upload
    the Markdown itself: Drive's Markdown import prints pandoc superscripts (`^1^`) literally. The
    same `copyto` with `--ignore-times` replaces a Doc's content and keeps its link, but it can detach
