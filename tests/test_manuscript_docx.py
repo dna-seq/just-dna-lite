@@ -44,7 +44,7 @@ from just_dna_lite.manuscript.build import (
 pytestmark = pytest.mark.skipif(build.pypandoc is None, reason="pypandoc (dev dependency group) is not installed")
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUND = ROOT / "docs/manuscript/v0.5"
+ROUND = ROOT / "docs/manuscript/v0.6"
 PAPER = ROUND / "paper1-just-dna-lite.md"
 SUPPLEMENT = ROUND / "paper1-just-dna-lite-supplementary.md"
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -55,7 +55,7 @@ PORTRAIT_TEXT_WIDTH = A4_WIDTH_TWIPS - 2 * DOCX_MARGIN_TWIPS
 LANDSCAPE_TEXT_WIDTH = A4_HEIGHT_TWIPS - 2 * DOCX_MARGIN_TWIPS
 SCRIPT_SCALE = 0.65  # superscripts are set at about two thirds of the text size
 _FIGURE_CAPTION_RE = re.compile(r"(?m)^\*\*Figure S?[0-9]+\.")
-_CAPTION_RE = re.compile(r"^Table S?[0-9]+\.")
+_CAPTION_RE = re.compile(r"^(?:Table S?|Box )[0-9]+\.")
 
 
 class SourceTable(BaseModel):

@@ -11,14 +11,17 @@ released to Google Drive on 2026-10-13, with its supplementary tables; `v0.5/` h
 (copy-edits, the day-2 benchmark, the split-out supplementary, the venue record and ladders, and the
 scan of the ethics committee's determination). The improvement run of 26 October 2026 left its dashboard,
 Word review and corrected version beside the paper (`paper1-just-dna-lite.dashboard.html`, `.review.docx` and
-`.proposed.md`); its evidence stays local in `v0.5/reviews/`. Each round is complete: files that did not change are
-copied into the new round, so Tables S4 and S5 are in both `v0.4/supplementary/` and
-`v0.5/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
+`.proposed.md`); its evidence stays local in `v0.5/reviews/`. `v0.6/` is the round in progress, opened on
+26 October 2026: the author list and affiliations changed, and the paper now leads with its features and the
+user groups it serves. `v0.6/changes-from-v0.5.md` records every change of the round as "was, now, why", keyed
+to the ledger ids, and is the file to share with co-authors as the round's changelog. Each round is complete:
+files that did not change are copied into the new round, so Tables S4 and S5 are in `v0.4/supplementary/`,
+`v0.5/supplementary/` and `v0.6/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
 where Table S7 cites it.
 
 ## Revision ledger
 
-The manuscript sources (`v0.5/paper1-just-dna-lite.md`, `v0.3/paper2-just-module-creator.md`) record,
+The manuscript sources (`v0.6/paper1-just-dna-lite.md`, `v0.3/paper2-just-module-creator.md`) record,
 inside the text, which segments were rewritten in answer to a review and how many rounds each went
 through. The record is a pair of HTML comments around the segment, so GitHub, editors and pandoc show
 nothing. `manuscript ledger strip` writes a clean twin without them for any build that should never
@@ -33,8 +36,9 @@ The rewritten paragraph.
 ```
 
 - **Id**: the comment it answers. `C1` to `C39` are Robi Tacutu's v0.3 comments in paper order,
-  `N1` to `N5` our own findings. The pattern is capital letters, digits, and an optional lowercase
-  letter: `C3`, `N1`, `C3a`.
+  `N1` to `N5` our own findings. In v0.6, `AU1` to `AU3` are the author-list changes and `F1` onward
+  the segments that put the features and user groups forward. The pattern is capital letters, digits,
+  and an optional lowercase letter: `C3`, `N1`, `C3a`.
 - **Ids are unique per file.** When one comment changed text in several places, give each place a
   letter: `C3a`, `C3b`. Reports group them back under `C3`. Uniqueness lets `bump C3a` name exactly
   one segment, and catches a marker pair copied along with its text by mistake.
@@ -66,12 +70,12 @@ in, including CRLF line endings and other HTML comments such as `AUTHOR TODO` no
 ### Commands
 
 ```bash
-uv run manuscript ledger lint docs/manuscript/v0.5/paper1-just-dna-lite.md   # exit 1 on any error
+uv run manuscript ledger lint docs/manuscript/v0.6/paper1-just-dna-lite.md   # exit 1 on any error
 uv run manuscript ledger lint --strict docs/manuscript/v0.3/*.md              # warnings fail too
-uv run manuscript ledger strip docs/manuscript/v0.5/paper1-just-dna-lite.md  # writes paper1-just-dna-lite.clean.md beside it
-uv run manuscript ledger strip docs/manuscript/v0.5/paper1-just-dna-lite.md --check   # exit 1 if the twin is missing or stale
-uv run manuscript ledger report docs/manuscript/v0.5/paper1-just-dna-lite.md --html /tmp/heat.html
-uv run manuscript ledger bump docs/manuscript/v0.5/paper1-just-dna-lite.md C3 --by robi:2026-10-12
+uv run manuscript ledger strip docs/manuscript/v0.6/paper1-just-dna-lite.md  # writes paper1-just-dna-lite.clean.md beside it
+uv run manuscript ledger strip docs/manuscript/v0.6/paper1-just-dna-lite.md --check   # exit 1 if the twin is missing or stale
+uv run manuscript ledger report docs/manuscript/v0.6/paper1-just-dna-lite.md --html /tmp/heat.html
+uv run manuscript ledger bump docs/manuscript/v0.6/paper1-just-dna-lite.md C3 --by robi:2026-10-12
 ```
 
 - `report` prints one row per segment (id, rounds, reviewers, line, first words) and totals. With
@@ -106,8 +110,8 @@ inserts markers into the real paper text and checks the round trip.
 
 ```bash
 uv sync                                                                          # dev group: pypandoc-binary, tecto
-uv run manuscript build docs/manuscript/v0.5/paper1-just-dna-lite.md            # → docs/manuscript/v0.5/build/
-uv run manuscript build docs/manuscript/v0.5/paper1-just-dna-lite.md --no-pdf   # stop at the LaTeX
+uv run manuscript build docs/manuscript/v0.6/paper1-just-dna-lite.md            # → docs/manuscript/v0.6/build/
+uv run manuscript build docs/manuscript/v0.6/paper1-just-dna-lite.md --no-pdf   # stop at the LaTeX
 uv run manuscript build PATH --out /tmp/paper --template venue.latex            # elsewhere, venue template
 ```
 
@@ -148,7 +152,7 @@ registry is a live catalogue, so the table is a snapshot with a recorded cutoff.
 
 ```bash
 uv run manuscript s4 snapshot /data/s4-work                    # read-only: list, download, record the UTC time
-uv run manuscript s4 render /data/s4-work -o docs/manuscript/v0.5/supplementary --fetch-bibliography
+uv run manuscript s4 render /data/s4-work -o docs/manuscript/v0.6/supplementary --fetch-bibliography
 uv run manuscript s4 render data/interim/v1_port -o /tmp/s4 --as-of 2026-10-10   # local builds, no registry
 ```
 
@@ -193,7 +197,7 @@ all. Section 3.2 of Paper 1 quotes its counts. Two steps:
 
 ```bash
 uv run manuscript s5 scan /data/just-dna-cache/s5/work --cache-dir /data/just-dna-cache/s5/GRCh38
-uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.5/supplementary
+uv run manuscript s5 render /data/just-dna-cache/s5/work -o docs/manuscript/v0.6/supplementary
 ```
 
 - **`scan`** records the release from the Catalog REST API (`/rest/info`, `/rest/score/all`) with the

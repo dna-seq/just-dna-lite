@@ -10,7 +10,7 @@ column got the same width and words broke mid-word. For every table this filter:
     otherwise each column starts at its minimum and the rest is shared out, short columns first
     (see `fill`). Widths go into the ColSpecs, relative to the text width of the page the table
     lands on;
-  * keeps the bold "Table X." paragraph directly before a top-level table on the table's page
+  * keeps the bold "Table X." (or "Box X.") paragraph directly before a top-level table on the table's page
     ("Table Title" style, keep with next);
   * puts a table whose minimum widths exceed the portrait text width on its own landscape pages,
     together with what introduces it: the caption, a heading with at most one paragraph, or a
@@ -395,8 +395,9 @@ local function starts_with_bold(block, word)
   return first ~= nil and first.t == 'Strong' and pandoc.utils.stringify(first):match('^' .. word) ~= nil
 end
 
+-- "Box N." captions a table too (Paper 1's Box 1, kept out of the Table numbering).
 local function is_caption(block)
-  return starts_with_bold(block, 'Table')
+  return starts_with_bold(block, 'Table') or starts_with_bold(block, 'Box')
 end
 
 -- A paragraph holding one image and nothing else but spaces.

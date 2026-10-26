@@ -1,0 +1,54 @@
+# How each literature-curated module chose its variants: the one part of Table S4 that no module file
+# records. Hand-written, every note cites a key under `references`. Rendered by `manuscript s4 render`
+# as each module's "Curation" line and a References section. Database-derived modules need no entry:
+# their selection is the build filter S4 already prints.
+modules:
+  coronary:
+    selection: >-
+      Curated by hand in Generation I: SNPs chosen by p-values from meta-analyses and the number of
+      studies across populations, with risk and protective alleles, gene function and health effects
+      added from PubMed, SNPedia and GeneCards
+    references: [Kulaga2024]
+  lipidmetabolism:
+    selection: >-
+      Curated by hand in Generation I with the same inclusion criteria as the coronary artery disease
+      module
+    references: [Kulaga2024]
+  thrombophilia:
+    selection: >-
+      Curated by hand in Generation I with the same inclusion criteria as the coronary artery disease
+      module
+    references: [Kulaga2024]
+  longevitymap:
+    selection: >-
+      Variants from the LongevityMap database, filtered for significant associations and expanded with
+      meta-analyses published after 2017, then weighted by study evidence in Generation I
+    references: [Tacutu2017, Kulaga2024]
+  vo2max:
+    selection: >-
+      Curated by hand in Generation I from published studies of the oxygen-uptake (VO2max) response to
+      exercise training, mostly candidate-gene and cohort studies; the inclusion criteria were not
+      recorded, and the papers are those listed below
+    references: []
+  superhuman:
+    selection: >-
+      Rare protective and enhancing alleles taken from the Church laboratory's Protective and Enhancing
+      Alleles list in Generation I, each variant checked against the primary literature in the 2026
+      revision (the papers listed below)
+    references: [Church2026, JustSuperhumanGenI]
+references:
+  Kulaga2024: >-
+    Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform: longevity science
+    for everyone. arXiv:2403.19087.
+  Tacutu2017: >-
+    Tacutu, R., et al. (2017). Human Ageing Genomic Resources: new and updated databases. Nucleic Acids
+    Research, 46(D1), D1083-D1090. doi:10.1093/nar/gkx1042.
+  Church2026: >-
+    Church, G. M. (2026). Protective and Enhancing Alleles. Harvard Molecular Technologies.
+    https://arep.med.harvard.edu/gmc/protect.html (list version of 29 March 2026, 87 genes; accessed
+    10 October 2026; archived at
+    https://web.archive.org/web/20260922213032/https://arep.med.harvard.edu/gmc/protect.html).
+  JustSuperhumanGenI: >-
+    dna-seq/just_superhuman, Generation I OakVar module, README: "based on Prof. George Church's
+    Protective and Enhancing Alleles spreadsheet". https://github.com/dna-seq/just_superhuman
+    (accessed 10 October 2026).
