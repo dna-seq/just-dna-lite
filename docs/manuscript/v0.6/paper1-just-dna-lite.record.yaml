@@ -2,33 +2,46 @@
 # fact read for this manuscript, with source and date. Regenerate the ladders and the requirements from it:
 # see paper1-just-dna-lite.venue-requirements.md and the two *-ladder.csv files beside it.
 manuscript: paper1-just-dna-lite.md
-updated: '2026-10-19'
+updated: '2026-10-27'
 priorities:
   journals:
   - speed
   - reach
   - ai
+  - transfer
   preprints:
   - transfer
   - ai
-  jif_floor: above 3
+  jif_floor: 3
   fee: a grant can pay a normal open-access fee
-  preprint: bioRxiv preferred
+  preprint: bioRxiv first; the authors asked on 2026-10-27 for bioRxiv-friendly journals
+  jif_floor_note: above 3, as the authors said; a journal at exactly 3.0 is kept and marked at the floor
+  ai_rules: the authors said on 2026-10-27 that a rule reserving Results and Discussion for the authors is too tough;
+    AI drafted and rewrote passages throughout, Results and Discussion included
 ladders:
   preprints:
   - biorxiv
   - arxiv
   journals:
-  - bmc-bioinformatics
+  - iscience
+  - frontiers-bioinformatics
+  - jamia-open
   - cell-reports-methods
-  - genome-biology
-  - bioinformatics
+  - genomics
   - plos-comp-biol
   - nar-genomics-bioinformatics
-  - gpb
-  checked: '2026-10-19'
-  note: working order, not a final choice; the same as the sorted order since Cell Reports Methods was read live
-    on 2026-10-19
+  - cell-genomics
+  checked: '2026-10-27'
+  note: 'working order, not a final choice (2026-10-27). Generated with --refuse red-line --refuse drafting-ban,
+    because the authors said a rule reserving Results and Discussion for them is too tough: that leaves out Bioinformatics
+    and Bioinformatics Advances (ISCB bars LLM drafting) and BMC Bioinformatics and Genome Biology (Springer Nature
+    reserves Results and Discussion for the authors). Also out: GigaScience (AI outputs deposited), Molecular Systems
+    Biology (AI limited to polishing), eLife and F1000Research (no impact factor), Life Science Alliance (impact
+    factor not verified), Genome Research (Resource articles must add novel biology or technology; USD 5,200). Moved
+    by judgement over the sorted order: Cell Genomics to the last rung (its 5-day median is a desk-inclusive figure
+    and its Technology bar asks for a significant advance over existing methods), Frontiers in Bioinformatics and
+    JAMIA Open up to rungs 2 and 3 (their software article types fit this paper as it is, Frontiers costs a Rostock
+    author nothing, and neither publishes a speed figure).'
 venue_facts:
   genome-biology:
     limits:
@@ -67,6 +80,7 @@ venue_facts:
       evidence_kind: stated-scope
       source: https://link.springer.com/journal/13059/submission-guidelines/software
       checked: 2026-10-19
+    ai_policy_url: https://www.springernature.com/gp/policies/editorial-policies/ai-manuscript-preparation
   bmc-bioinformatics:
     limits:
       abstract_words: 350
@@ -112,6 +126,7 @@ venue_facts:
       evidence_kind: stated-scope
       source: https://link.springer.com/journal/12859/submission-guidelines/software-article
       checked: 2026-10-19
+    ai_policy_url: https://www.springernature.com/gp/policies/editorial-policies/ai-manuscript-preparation
   plos-comp-biol:
     limits:
       body_words: 3500
@@ -151,17 +166,16 @@ venue_facts:
         persistence is not guaranteed' is not considered.
       source_code: required
       software_licence: OSI-compliant
-      preprints: posting on a preprint server does not affect consideration; authors can opt in to bioRxiv posting
-        at submission, and bioRxiv transfers to the journal directly
+      preprints: posting does not affect consideration; on the bioRxiv direct-transfer list
       source: https://journals.plos.org/ploscompbiol/s/submission-guidelines
       checked: 2026-10-19
     editorial_profile:
-      summary: Software articles under 3,500 words describe 'an open-source tool of broad utility that represents
-        a significant advance in providing new biological insights', already widely adopted or with that promise;
-        results must be reproducible by reviewers on the deposited test data.
+      summary: Software must be 'an open-source tool of broad utility that represents a significant advance in providing
+        new biological insights', already widely adopted or likely to be; AI help declared with a description of
+        how its output was checked
       evidence_kind: stated-scope
       source: https://journals.plos.org/ploscompbiol/s/submission-guidelines
-      checked: 2026-10-19
+      checked: '2026-10-27'
   gpb:
     publication_costs:
     - amount: 4050
@@ -189,11 +203,10 @@ venue_facts:
     publication_costs:
     - amount: 4970
       currency: USD
-      route: excluding taxes; the journal is in Cell Press's geographical pricing pilot (price set by the corresponding
-        author's country); whether Projekt DEAL's Elsevier agreement covers this fully open-access title for Rostock
-        was not checked
+      route: excluding taxes; geographical pricing pilot; Projekt DEAL gives fully open-access Cell Press journals
+        15% off for a Rostock corresponding author; the Rostock fund pays up to EUR 2,000 gross
       source: https://www.cell.com/open-access
-      checked: '2026-10-19'
+      checked: '2026-10-27'
     open_science:
       summary: Original code deposited in a repository that mints DOIs, or included as supplemental information,
         before acceptance; a Resource availability section with a data and code availability statement.
@@ -252,14 +265,12 @@ venue_facts:
       checked: 2026-10-19
       evidence_kind: official statistic
     publication_costs:
-    - amount: 3035
+    - amount: 2633
       currency: USD
-      route: the same for Standard, Methods and Application Notes, excluding tax; OUP's read-and-publish search
-        finds no agreement for 'Rostock' or 'Romania' (it lists 64 institutes for 'Max Planck', so the search works);
-        Romania is not on OUP's low- and middle-income list; the Rostock fund pays up to EUR 2,000 gross
-      source: https://academic.oup.com/nargab/pages/author-guidelines
-      checked: '2026-10-19'
-      evidence_kind: OUP's charges calculator, read in the authors' browser
+      route: from DOAJ (OUP calculator did not load); no OUP agreement for Rostock or Romania; the Rostock fund
+        pays up to EUR 2,000 gross
+      source: https://doaj.org/
+      checked: '2026-10-27'
     open_science:
       summary: Software released as open source under an OSI licence, on GitHub and archived in Zenodo before acceptance;
         all data and code underlying a paper released as a condition of publication.
@@ -275,13 +286,286 @@ venue_facts:
     - bioinformatics-advances
     - nar-genomics-bioinformatics
     - plos-comp-biol
+    - iscience
+    - cell-genomics
+    - molecular-systems-biology
+    - life-science-alliance
+    - elife
+    - nar
+    - genome-research
+    - gigascience
+    - frontiers-genetics
+    - frontiers-bioinformatics
     transfers_checked:
     - bioinformatics
     - bioinformatics-note
     - bioinformatics-advances
     - nar-genomics-bioinformatics
     - plos-comp-biol
-    - genome-biology
-    - bmc-bioinformatics
-    - gpb
+    - iscience
+    - cell-genomics
+    - molecular-systems-biology
+    - life-science-alliance
+    - elife
+    - nar
+    - genome-research
+    - gigascience
+    - frontiers-genetics
+    - frontiers-bioinformatics
     - cell-reports-methods
+    - patterns
+    - cell-systems
+    - j-biomed-inform
+    - genomics
+    - database
+    - genes
+    - f1000research
+    - bmc-bioinformatics
+    - genome-biology
+    - human-mutation
+    - briefings-bioinformatics
+    - gpb
+    - jamia
+    - jamia-open
+    transfers_source: https://www.biorxiv.org/submit-a-manuscript
+    transfers_read: '2026-10-27'
+  iscience:
+    jif: 4.5
+    jif_year: 2025
+    review_speed:
+    - metric: submission-to-first-decision (desk accept, desk reject or sent to review)
+      days: 6
+      statistic: median
+      period: a calendar year (the page does not name the year)
+      source: https://www.cell.com/iscience/information-for-authors
+      checked: '2026-10-27'
+      evidence_kind: official statistic
+    - metric: acceptance to online publication
+      days: 4
+      statistic: median
+      source: https://www.cell.com/iscience/information-for-authors
+      checked: '2026-10-27'
+    publication_costs:
+    - amount: 3240
+      currency: USD
+      route: Projekt DEAL's Elsevier agreement (to 31 Dec 2028) gives fully open-access Cell Press journals 15%
+        off for a Rostock corresponding author; the Rostock fund pays up to EUR 2,000 gross, the grant the rest
+      source: https://www.cell.com/open-access
+      checked: '2026-10-27'
+    open_science:
+      preprints: bioRxiv preprints welcome and on the bioRxiv direct-transfer list; Cell Press supports posting
+        only the original submitted version, not revised or accepted versions
+      source: https://www.cell.com/iscience/information-for-authors/journal-policies
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: Research Article only; it must report a significant contribution, and machine-learning or AI methods
+        without benchmarking against similar methods are out of scope
+      evidence_kind: stated-scope
+      source: https://www.cell.com/iscience/information-for-authors/article-types
+      checked: '2026-10-27'
+  cell-genomics:
+    review_speed:
+    - metric: submission-to-first-decision
+      days: 5
+      statistic: median
+      period: a calendar year (not named)
+      source: https://www.cell.com/cell-genomics/information-for-authors
+      checked: '2026-10-27'
+      evidence_kind: official statistic
+    publication_costs:
+    - amount: 8900
+      currency: USD
+      route: Projekt DEAL 15% off for fully open-access Cell Press journals; the Rostock fund pays up to EUR 2,000
+        gross
+      source: https://www.cell.com/open-access
+      checked: '2026-10-27'
+    open_science:
+      preprints: on the bioRxiv direct-transfer list; only the original submitted version may be posted
+      source: https://www.biorxiv.org/submit-a-manuscript
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: Technology articles need significant improvements over existing methods and broad utility, with a
+        step-by-step protocol
+      evidence_kind: stated-scope
+      source: https://www.cell.com/cell-genomics/information-for-authors/article-types
+      checked: '2026-10-27'
+  frontiers-bioinformatics:
+    jif: 3.6
+    jif_year: 2025
+    publication_costs:
+    - amount: 2695
+      currency: CHF
+      author_cost_eur: 0
+      route: the University of Rostock library has a Frontiers agreement (7.5% off, price cap EUR 2,000 gross, invoiced
+        to the library), so a Rostock corresponding author pays nothing
+      source: https://www.ub.uni-rostock.de/en/support-for-researchers/open-access/publisher-discounts/
+      checked: '2026-10-27'
+    open_science:
+      preprints: bioRxiv integration and on the bioRxiv direct-transfer list
+      source: https://www.biorxiv.org/submit-a-manuscript
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: Technology and Code articles present new technology, code or software, or a new application of known
+        software; up to 12,000 words
+      evidence_kind: stated-scope
+      source: https://www.frontiersin.org/journals/bioinformatics/for-authors/article-types
+      checked: '2026-10-27'
+    not_read: no review-speed statistic is published for the journal (2026-10-27)
+  frontiers-genetics:
+    jif: 3.0
+    jif_year: 2025
+    publication_costs:
+    - amount: 3150
+      currency: CHF
+      author_cost_eur: 0
+      route: the Rostock library Frontiers agreement caps the price at EUR 2,000 gross and pays it
+      source: https://www.ub.uni-rostock.de/en/support-for-researchers/open-access/publisher-discounts/
+      checked: '2026-10-27'
+    open_science:
+      preprints: on the bioRxiv direct-transfer list
+      source: https://www.biorxiv.org/submit-a-manuscript
+      checked: '2026-10-27'
+  jamia-open:
+    name: JAMIA Open
+    publisher: OUP (American Medical Informatics Association)
+    jif: 4.7
+    jif_year: 2025
+    oa: full
+    fields:
+    - clinical
+    - data
+    - software
+    article_types:
+    - research
+    - software
+    - review
+    - perspective
+    software_article: true
+    url: https://academic.oup.com/jamiaopen/pages/General_Instructions
+    publication_costs:
+    - amount: 3582
+      currency: USD
+      route: from DOAJ (OUP calculator did not load); no OUP agreement for Rostock or Romania
+      source: https://doaj.org/
+      checked: '2026-10-27'
+    open_science:
+      preprints: authors keep the right to post the Author's Original Version; not on the bioRxiv direct-transfer
+        list
+      source: https://academic.oup.com/jamiaopen/pages/General_Instructions
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: Application Notes describe computer software or algorithm implementations, including web services
+        and mobile applications
+      evidence_kind: stated-scope
+      source: https://academic.oup.com/jamiaopen/pages/General_Instructions
+      checked: '2026-10-27'
+    not_read: no review-speed statistic is published (2026-10-27)
+    writing_help: disclose
+    exempt:
+    - spelling and grammar
+    - formatting references
+    prompts: 'no'
+    screening: plagiarism
+    disclosure_places:
+    - cover letter
+    - Acknowledgements
+    - Methods if integral
+    disclosure_fields:
+    - tool
+    - version
+    - how used
+    - author oversight
+    - dates (recommended)
+    - sections (recommended)
+    extra_burden:
+    - update the disclosure at every revision
+    ai_policy_url: https://academic.oup.com/pages/for-authors/journals/preparing-and-submitting-your-manuscript/ai-principles-for-oxford-journals/policy-on-ai-use-and-disclosure-for-oxford-journals-authors
+    publisher_policy_url: https://academic.oup.com/pages/for-authors/journals/preparing-and-submitting-your-manuscript/ai-principles-for-oxford-journals/policy-on-ai-use-and-disclosure-for-oxford-journals-authors
+  genome-research:
+    review_speed:
+    - metric: average turnaround time for review (all papers), not a first-decision median
+      days: 30
+      statistic: mean
+      source: https://genome.cshlp.org/ifora_overview
+      checked: '2026-10-27'
+    publication_costs:
+    - amount: 5200
+      currency: USD
+      route: USD 1,500 publication service charge plus USD 3,700 open-access charge; Rostock is not on CSHL Press
+        agreements
+      source: https://genome.cshlp.org/publication_fees
+      checked: '2026-10-27'
+    open_science:
+      preprints: preprints are not prior publication; on the bioRxiv direct-transfer list
+      source: https://genome.cshlp.org/ifora_overview
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: Resource articles present useful tools or databases of broad appeal and must include novel biological
+        information or technology
+      evidence_kind: stated-scope
+      source: https://genome.cshlp.org/ifora_mspreparation
+      checked: '2026-10-27'
+  genomics:
+    jif: 3.6
+    review_speed:
+    - metric: submission-to-first-decision (desk rejections included)
+      days: 6
+      statistic: median
+      source: https://www.sciencedirect.com/journal/genomics
+      checked: '2026-10-27'
+      evidence_kind: official statistic
+    - metric: submission to first decision after review
+      days: 64
+      statistic: median
+      source: https://www.sciencedirect.com/journal/genomics
+      checked: '2026-10-27'
+    publication_costs:
+    - amount: 3460
+      currency: USD
+      route: Projekt DEAL gives fully open-access Elsevier journals 20% off; the Rostock fund pays up to EUR 2,000
+        gross
+      source: https://www.sciencedirect.com/journal/genomics
+      checked: '2026-10-27'
+    open_science:
+      preprints: SSRN posting offered; not on the bioRxiv direct-transfer list
+      source: https://www.biorxiv.org/submit-a-manuscript
+      checked: '2026-10-27'
+  life-science-alliance:
+    publication_costs:
+    - amount: 3975
+      currency: USD
+      route: no DEAL agreement named
+      source: https://www.life-science-alliance.org/copyright-license-fee
+      checked: '2026-10-27'
+    open_science:
+      preprints: encouraged; on the bioRxiv direct-transfer list; Review Commons affiliate
+      source: https://www.biorxiv.org/submit-a-manuscript
+      checked: '2026-10-27'
+    not_read: the impact factor is not on the journal pages; about 3.1 from aggregators, not verified (2026-10-27)
+  nar:
+    review_speed:
+    - metric: submission-to-first-decision
+      days: 18
+      statistic: median
+      period: '2025'
+      source: https://academic.oup.com/nar/pages/About
+      checked: '2026-10-27'
+      evidence_kind: official statistic
+    publication_costs:
+    - amount: 4192
+      currency: USD
+      route: from DOAJ; no OUP agreement for Rostock or Romania
+      source: https://doaj.org/
+      checked: '2026-10-27'
+    open_science:
+      preprints: direct submission from bioRxiv
+      source: https://academic.oup.com/nar/pages/author-guidelines
+      checked: '2026-10-27'
+    editorial_profile:
+      summary: 'The Web Server issue takes stand-alone applications from November 2026 (proposal first): they must
+        run on any operating system with a container that runs without installing software, and show novelty or
+        a clear benefit such as usability'
+      evidence_kind: stated-scope
+      source: https://academic.oup.com/nar/pages/submission_webserver
+      checked: '2026-10-27'
+ai_use: drafting
