@@ -688,7 +688,7 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
   `backend_api_url` never returns `""`.
 
-## PRS (`just-prs>=0.10.5`, `prs-ui>=0.3.18`)
+## PRS (`just-prs>=0.11.0`, `prs-ui>=0.4.0`)
 
 `PRSState(PRSComputeStateMixin, LazyFrameGridMixin, rx.State)` is independent of `UploadState` (own grid
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`
@@ -727,9 +727,20 @@ not a VCF liftover and cannot be reused for annotation.
   comparison** adds a left-panel peer (same species, build, ready parquet) in one click, labelled
   `Sample Name (filename)`. Compute stays on `PRSState`; `PRSTraitState` only selects traits and syncs
   PGS IDs. Comparisons are not checkpointed to Dagster.
-- By Trait groups with prs-ui's `trait_group_by`. Search and a contains-filter on either trait column
-  match **both** the mapped and the reported name (`trait_search`), and longevity / lifespan / life span
-  rows also match age, aging and ageing (`_AGING_SEARCH_TOKEN`, whole words, so "imaging" stays out).
+- **Curated score directions come from just-prs, never from here.** `PRSCatalog` pulls the published
+  curation (`just-dna-seq/pgs-catalog` `data/metadata/`, re-pulled after `PRS_CURATION_MAX_AGE_HOURS`)
+  and every result row carries `higher_percentile_means`, `curation_status`, concept, axis, valence and
+  polarity. The prs-ui mixin renders them ("Higher score means" column, Direction badge, green
+  favourable / red only alarming, in-review rows uncoloured) and `build_trait_summary` aggregates on the
+  curated concept axis, listing in-review and uncurated models without counting them. Policy: just-prs
+  AGENTS.md, "Consuming curated directions". Do not recolour or re-derive directions in webui.
+- By Trait groups with prs-ui's `trait_group_by`, default `concept` (curated concept, falling back to the
+  mapped term; `PRSTraitState` and `PRSState` must default alike). Search and a contains-filter on any
+  trait column match **every** name of the group's scores (`trait_search`: mapped and reported names
+  plus `PRSCatalog.search_terms()`, i.e. curated concept labels and aliases, so "night owl" finds
+  chronotype); `also_known_as` shows a short selection. Longevity / lifespan / life span rows also match
+  age, aging and ageing (`_AGING_SEARCH_TOKEN`, whole words, so "imaging" stays out). The page renders
+  its own search box, so it passes `trait_selector(..., show_search=False)`.
   `PRSTraitState.load_traits` passes `eager_value_options_row_limit=0`, like prs-ui.
 - Pass `normalizing=False` to the workbench, **never** `UploadState.vcf_preview_loading` (it locks the
   grids while the Input tab pages). The By PRS extract comes from the mixin; don't reimplement it.

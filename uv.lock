@@ -2266,7 +2266,7 @@ requires-dist = [
     { name = "grpcio-health-checking", specifier = "<1.82" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
     { name = "just-dna-registry", specifier = ">=0.27.0" },
-    { name = "just-prs", specifier = ">=0.10.5" },
+    { name = "just-prs", specifier = ">=0.11.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "typer", specifier = ">=0.27.1" },
@@ -2391,12 +2391,13 @@ wheels = [
 
 [[package]]
 name = "just-prs"
-version = "0.10.5"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "altair" },
     { name = "duckdb" },
     { name = "eliot" },
+    { name = "filelock" },
     { name = "fsspec", extra = ["http"] },
     { name = "httpx" },
     { name = "huggingface-hub" },
@@ -2406,13 +2407,14 @@ dependencies = [
     { name = "psutil" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "rich" },
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/1e/8af0552ffb03ab13d1135957013265357299bc165e0f4af8c98e0235225d/just_prs-0.10.5.tar.gz", hash = "sha256:b45e929bb5fe4f163a0deb8d68764ad9e970f4a2533aa17a886ade945668ca00", size = 426520, upload-time = "2026-10-16T18:16:48.817Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/c8/3907eae6843500b4ee6065bcc1ada37259c704353ae1d3edb1f784df1304/just_prs-0.11.0.tar.gz", hash = "sha256:e29f5ef1e6143458a76605c011c636b8ec908d44639d0642df78a7b45b849589", size = 483266, upload-time = "2026-10-26T23:25:38.514Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/a5/4ddbc31a32cd3a67d8940b13fb5ff66fec0cc0e054618fc1c38f9c669bb2/just_prs-0.10.5-py3-none-any.whl", hash = "sha256:314aca30ed8b150e162a71df7e1e1c0345d16415960b8854a2457299342f1dea", size = 468698, upload-time = "2026-10-16T18:16:47.442Z" },
+    { url = "https://files.pythonhosted.org/packages/07/4d/5e7332064a52a809d1e165650434239e0aaea7818fa17d7d293ca8888dc1/just_prs-0.11.0-py3-none-any.whl", hash = "sha256:f01982ff10628825195db50a205353e59541379ba2555478046c26bd0ab7b288", size = 528892, upload-time = "2026-10-26T23:25:36.739Z" },
 ]
 
 [[package]]
@@ -3153,7 +3155,7 @@ wheels = [
 
 [[package]]
 name = "prs-ui"
-version = "0.3.18"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "just-prs" },
@@ -3163,9 +3165,9 @@ dependencies = [
     { name = "reflex-components-radix" },
     { name = "reflex-mui-datagrid" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/1c/203513c5f12f2aea6a7857291858af5b41f6ae5a95f67c29802ed2bdb7af/prs_ui-0.3.18.tar.gz", hash = "sha256:c3cca36a7f06179b864ec21f27b20d163383531f3e94d12eacf5260f6bb95083", size = 167156, upload-time = "2026-10-12T21:27:00.403Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/1e/fba91ad8b377b8c2910afdc7f4fadc3f520a8330983863bd49a498af60f5/prs_ui-0.4.0.tar.gz", hash = "sha256:ea271b5e016090e65813d502a7dba1efcb9abbd00cce7b36763849387a546c13", size = 181202, upload-time = "2026-10-26T23:25:42.274Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/a0/35d2cfe3014b5bd4eb8ab59e1519571cfb803ad539b3d4b32200a6ee5c9a/prs_ui-0.3.18-py3-none-any.whl", hash = "sha256:69c147aeb3ada6255c43825d131f89417181a70b3d23cc34ac8502f7a5c9f2d4", size = 104007, upload-time = "2026-10-12T21:26:58.357Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/de/70cedce2862072811e05e3acd62fadc5b2414623f53ec1741a655328999e/prs_ui-0.4.0-py3-none-any.whl", hash = "sha256:a4c27b5f2c0d1ea13c61ff0c23311c57903e99a5fe356179a04f05e2920a5653", size = 116080, upload-time = "2026-10-26T23:25:40.665Z" },
 ]
 
 [[package]]
@@ -4862,7 +4864,7 @@ requires-dist = [
     { name = "granian", specifier = ">=2.8.1" },
     { name = "gunicorn", specifier = ">=26.0.0" },
     { name = "just-dna-pipelines", editable = "just-dna-pipelines" },
-    { name = "prs-ui", specifier = ">=0.3.18" },
+    { name = "prs-ui", specifier = ">=0.4.0" },
     { name = "reflex", specifier = "==0.10.0" },
     { name = "reflex-mui-datagrid", specifier = ">=0.3.14" },
 ]

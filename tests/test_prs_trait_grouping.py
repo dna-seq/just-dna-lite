@@ -17,7 +17,7 @@ import re
 import polars as pl
 import pytest
 from prs_ui.components.prs_section import trait_group_by_control
-from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
+from prs_ui.mixin import TRAIT_GROUP_BY_CONCEPT, TRAIT_GROUP_BY_REPORTED
 from prs_ui.pages.traits import trait_selector
 
 from webui.pages.faq import faq_page
@@ -66,8 +66,8 @@ def test_both_states_start_on_the_same_grouping_axis() -> None:
     `PRSTraitState` carries ours and groups the *selector*. One visible toggle drives both, so
     disagreeing defaults would mean the two halves of the tab group differently before anyone
     touches it."""
-    assert PRSTraitState.__fields__["trait_group_by"].default == TRAIT_GROUP_BY_ONTOLOGY
-    assert PRSState.__fields__["trait_group_by"].default == TRAIT_GROUP_BY_ONTOLOGY
+    assert PRSTraitState.__fields__["trait_group_by"].default == TRAIT_GROUP_BY_CONCEPT
+    assert PRSState.__fields__["trait_group_by"].default == TRAIT_GROUP_BY_CONCEPT
 
 
 def _record_builds(monkeypatch) -> list[tuple[str, bool, str]]:
@@ -125,7 +125,7 @@ def test_reselecting_the_same_axis_does_not_reload(monkeypatch) -> None:
     state = PRSTraitState(_reflex_internal_init=True)
     state.traits_loaded = True
 
-    assert list(state.set_trait_group_by(TRAIT_GROUP_BY_ONTOLOGY)) == []
+    assert list(state.set_trait_group_by(TRAIT_GROUP_BY_CONCEPT)) == []
     assert builds == []
 
 
@@ -146,14 +146,14 @@ def test_the_axis_is_remembered_before_the_grid_has_ever_loaded(monkeypatch) -> 
 @pytest.mark.parametrize(
     "value, expected",
     [
-        ("nonsense", TRAIT_GROUP_BY_ONTOLOGY),
-        ("", TRAIT_GROUP_BY_ONTOLOGY),
-        ([], TRAIT_GROUP_BY_ONTOLOGY),
+        ("nonsense", TRAIT_GROUP_BY_CONCEPT),
+        ("", TRAIT_GROUP_BY_CONCEPT),
+        ([], TRAIT_GROUP_BY_CONCEPT),
         (["reported"], TRAIT_GROUP_BY_REPORTED),
         (TRAIT_GROUP_BY_REPORTED, TRAIT_GROUP_BY_REPORTED),
     ],
 )
-def test_an_unusable_value_falls_back_to_the_mapped_ontology(value, expected) -> None:
+def test_an_unusable_value_falls_back_to_the_curated_concept(value, expected) -> None:
     """The control is a segmented control today and a radio group's `list[str]` tomorrow;
     `normalize_trait_group_by` is prs-ui's own leaf and decides, so the axis is always a member
     of the vocabulary rather than whatever the widget sent."""

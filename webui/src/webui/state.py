@@ -3737,7 +3737,7 @@ from prs_ui import PRSComputeStateMixin
 import prs_ui
 import prs_ui.mixin as _prs_ui_mixin
 from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
-from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
+from prs_ui.mixin import TRAIT_GROUP_BY_CONCEPT, TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from prs_ui.mixin import loaded_grid_selection_model as _loaded_grid_selection_model
 from prs_ui.mixin import normalize_trait_group_by, trait_group_label_expr
@@ -3747,6 +3747,7 @@ from just_prs.prs import ReferenceUniverse as _ReferenceUniverse
 from just_prs.prs_catalog import PRSCatalog as _PRSCatalog
 from just_prs.enrich import enrich_prs_result as _enrich_prs_result
 from just_prs.reference import SUPERPOPULATIONS
+from just_prs.trait_search import group_aliases
 from just_prs.viz import FINE_POPULATION_LABELS as _FINE_POPULATION_LABELS
 from just_prs.viz import IGSR_POPULATION_URL as _IGSR_POPULATION_URL
 from just_prs.viz import fine_population_label as _fine_population_label
@@ -5234,10 +5235,11 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 # PRS TRAIT STATE — Grouped-by-trait PRS selection
 # ============================================================================
 
-_TRAIT_TEXT_FIELDS = frozenset({"trait", "trait_efo", "trait_reported"})
+_TRAIT_TEXT_FIELDS = frozenset({"trait", "trait_efo", "trait_reported", "also_known_as"})
 _TRAIT_SEARCH_NOTE = (
-    "A text filter matches both the mapped ontology term and the study's reported trait. "
-    "Longevity and life span also match age, aging, and ageing."
+    "A text filter matches every name of the group's scores: the curated concept and its "
+    "synonyms, the mapped ontology term, and the study's reported trait. Longevity and life "
+    "span also match age, aging, and ageing."
 )
 # Whole words only. The letters "aging" inside "imaging" are not this family.
 _AGING_FAMILY = r"(?i)\b(?:longevity|lifespans?|life spans?|ageing|aging)\b"
@@ -5253,17 +5255,26 @@ def _unique_label_list(column: str) -> pl.Expr:
 def _trait_summary_frame(
     scores: pl.DataFrame,
     group_by: str,
+    terms: pl.DataFrame | None = None,
 ) -> tuple[pl.DataFrame, dict[str, list[str]]]:
-    """Group catalog scores and keep both trait names searchable.
+    """Group catalog scores and keep every name of every score searchable.
 
-    The group label is prs-ui's ``trait_group_label_expr``. ``trait_search``
-    concatenates that label with the mapped term and the reported phenotype.
-    Longevity and life-span rows also carry ``aging ageing``: the catalog names
-    themselves do not contain "age".
+    The group label is prs-ui's ``trait_group_label_expr`` (curated concept by
+    default, falling back to the mapped term). ``trait_search`` concatenates that
+    label with the mapped term, the reported phenotype and, when ``terms`` is given
+    (``PRSCatalog.search_terms()``: catalog names plus each curated concept's labels
+    and aliases), every term of the group's scores, so "night owl" finds chronotype.
+    ``also_known_as`` shows a short selection of those names. Longevity and
+    life-span rows also carry ``aging ageing``: the catalog names themselves do not
+    contain "age".
     """
+    for column in ("concept_label", "curation_status"):
+        if column not in scores.columns:
+            scores = scores.with_columns(pl.lit(None, dtype=pl.Utf8).alias(column))
     labeled = scores.with_columns(trait_group_label_expr(group_by))
     grouped = labeled.group_by("trait").agg(
         pl.col("pgs_id").count().alias("n_models"),
+        (pl.col("curation_status") == "resolved").sum().cast(pl.Int64).alias("n_curated"),
         pl.col("pgs_id").alias("_pgs_list"),
         pl.col("trait_efo_id").first().alias("trait_efo_id"),
         _unique_label_list("trait_efo").alias("trait_efo"),
@@ -5279,13 +5290,29 @@ def _trait_summary_frame(
         if trait:
             mapping[str(trait)] = list(row["_pgs_list"])
 
+    members = labeled.select("pgs_id", "trait")
+    if terms is not None and terms.height:
+        group_terms = (
+            members.join(terms.select("pgs_id", "term"), on="pgs_id", how="inner")
+            .group_by("trait")
+            .agg(pl.col("term").unique().sort().str.join("\n").alias("_terms"))
+        )
+        grouped = grouped.join(group_terms, on="trait", how="left").join(
+            group_aliases(terms, members), on="trait", how="left"
+        )
+    else:
+        grouped = grouped.with_columns(
+            pl.lit(None, dtype=pl.Utf8).alias("_terms"), pl.lit(None, dtype=pl.Utf8).alias("also_known_as")
+        )
     searched = grouped.with_columns(
         pl.col("_pgs_list").list.join(", ").alias("pgs_ids"),
+        pl.col("also_known_as").fill_null(""),
         pl.concat_str(
             [
                 pl.col("trait").fill_null(""),
                 pl.col("trait_efo").fill_null(""),
                 pl.col("trait_reported").fill_null(""),
+                pl.col("_terms").fill_null(""),
             ],
             separator="\n",
         ).alias("trait_search"),
@@ -5299,7 +5326,7 @@ def _trait_summary_frame(
         )
         .otherwise(pl.col("trait_search"))
         .alias("trait_search")
-    ).drop("_pgs_list")
+    ).drop("_pgs_list", "_terms")
 
     other = (
         "trait_efo"
@@ -5308,8 +5335,10 @@ def _trait_summary_frame(
     )
     result = searched.select(
         "trait",
+        "also_known_as",
         other,
         "n_models",
+        "n_curated",
         "avg_variants",
         "min_variants",
         "max_variants",
@@ -5347,11 +5376,15 @@ def _trait_filter_searches_both(filter_model: dict[str, Any] | None) -> dict[str
     return {**filter_model, "items": rewritten}
 
 
-def _build_trait_column_overrides(group_by: str = TRAIT_GROUP_BY_ONTOLOGY) -> dict:
-    reported = normalize_trait_group_by(group_by) == TRAIT_GROUP_BY_REPORTED
+def _build_trait_column_overrides(group_by: str = TRAIT_GROUP_BY_CONCEPT) -> dict:
+    mode = normalize_trait_group_by(group_by)
+    reported = mode == TRAIT_GROUP_BY_REPORTED
     other = "trait_efo" if reported else "trait_reported"
     other_header = "Mapped trait" if reported else "Reported trait"
-    label_header = "Reported trait" if reported else "Mapped trait"
+    label_header = {
+        TRAIT_GROUP_BY_REPORTED: "Reported trait",
+        TRAIT_GROUP_BY_CONCEPT: "Trait (curated concept)",
+    }.get(mode, "Mapped trait")
     return {
         "trait": {
             "minWidth": 200,
@@ -5364,6 +5397,17 @@ def _build_trait_column_overrides(group_by: str = TRAIT_GROUP_BY_ONTOLOGY) -> di
             "flex": 2,
             "headerName": other_header,
             "description": _TRAIT_SEARCH_NOTE,
+        },
+        "also_known_as": {
+            "minWidth": 220,
+            "flex": 2,
+            "headerName": "Also known as",
+            "description": _TRAIT_SEARCH_NOTE,
+        },
+        "n_curated": {
+            "width": 110,
+            "headerName": "Curated",
+            "description": "Scores whose direction is curated and published; only these are counted in the trait summary.",
         },
         "trait_search": {"hide": True},
         "trait_efo_id": {
@@ -5402,7 +5446,7 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     # and binds it to this var, so a state without it crashes the page at compile time.
     # `PRSState` inherits its copy from `PRSComputeStateMixin`; this one is ours because
     # `PRSTraitState` deliberately does not inherit that mixin (compute stays on PRSState).
-    trait_group_by: str = TRAIT_GROUP_BY_ONTOLOGY
+    trait_group_by: str = TRAIT_GROUP_BY_CONCEPT
     trait_query: str = ""
     _ignore_empty_selection_replay: bool = False
 
@@ -5425,11 +5469,12 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         )
         df = lf.select(
             "pgs_id", "trait_reported", "trait_efo", "trait_efo_id", "n_variants",
+            "concept_label", "curation_status",
         ).collect()
 
         # The group label is prs-ui's `trait_group_label_expr`, the same leaf its own
-        # TraitBrowserState groups with. Both names stay on the row for search.
-        result, mapping = _trait_summary_frame(df, self.trait_group_by)
+        # TraitBrowserState groups with. Every name of every score stays on the row for search.
+        result, mapping = _trait_summary_frame(df, self.trait_group_by, _prs_ui_mixin._catalog.search_terms())
         self._trait_to_pgs = mapping
         return result
 

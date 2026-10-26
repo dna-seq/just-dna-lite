@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import polars as pl
+import pytest
 from prs_ui.mixin import TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
 from reflex_mui_datagrid.polars_utils import apply_filter_model
 
@@ -102,3 +103,50 @@ def test_age_filter_finds_longevity_without_tagging_imaging() -> None:
         _trait_filter_searches_both(_contains("trait", "ageing")),
     ).collect()
     assert ageing["trait"].to_list() == ["life span determination trait"]
+
+
+def test_curated_synonyms_find_their_concept_on_the_real_catalog() -> None:
+    """Concept grouping plus `PRSCatalog.search_terms()`: a curated alias that is no catalog
+    name of any score still finds every score of its concept, through the same contains
+    filter the search box applies."""
+    from just_prs import PRSCatalog
+    from just_prs.trait_search import matching_pgs_ids, score_search_terms
+    from prs_ui.mixin import TRAIT_GROUP_BY_CONCEPT
+
+    catalog = PRSCatalog()
+    scores = catalog.scores(genome_build="GRCh38").collect()
+    terms = catalog.search_terms()
+    summary, mapping = _trait_summary_frame(scores, TRAIT_GROUP_BY_CONCEPT, terms)
+    assert set(summary["trait"]) == set(mapping)
+    assert sum(summary["n_models"]) == scores.height
+
+    catalog_only = score_search_terms(scores)
+    concept_terms = catalog.curation_tables()["search_terms"]
+    aliases = concept_terms.filter(pl.col("term_kind") == "alias").sort("cluster", "term")
+    for row in aliases.iter_rows(named=True):
+        if matching_pgs_ids(catalog_only, row["term"]):
+            continue  # also a catalog name: proves nothing about the curated terms
+        concept_ids = set(
+            scores.filter(pl.col("cluster") == row["cluster"])["pgs_id"]
+        )
+        if not concept_ids:
+            continue
+        found = apply_filter_model(
+            summary.lazy(), _trait_filter_searches_both(_contains("trait", row["term"]))
+        ).collect()
+        found_ids = {pgs_id for trait in found["trait"] for pgs_id in mapping[trait]}
+        assert concept_ids <= found_ids
+        label = scores.filter(pl.col("cluster") == row["cluster"])["concept_label"][0]
+        assert label in set(found["trait"])
+        return
+    pytest.skip("no curated alias that is absent from catalog names yet")
+
+
+def test_frames_without_curation_columns_still_group() -> None:
+    """Callers that never joined curation (old caches, fixtures) fall back to the mapped term."""
+    from prs_ui.mixin import TRAIT_GROUP_BY_CONCEPT
+
+    by_concept, _ = _trait_summary_frame(_catalog_rows(), TRAIT_GROUP_BY_CONCEPT)
+    by_ontology, _ = _trait_summary_frame(_catalog_rows(), TRAIT_GROUP_BY_ONTOLOGY)
+    assert by_concept["trait"].sort().to_list() == by_ontology["trait"].sort().to_list()
+    assert by_concept["n_curated"].sum() == 0

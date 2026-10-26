@@ -3322,7 +3322,7 @@ def _prs_trait_browser() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             rx.input(
-                placeholder="Search mapped trait or reported trait",
+                placeholder="Search any trait name or synonym (e.g. night owl, bad cholesterol)",
                 value=PRSTraitState.trait_query,
                 on_change=PRSTraitState.set_trait_query,
                 on_blur=PRSTraitState.apply_trait_query,
@@ -3342,13 +3342,15 @@ def _prs_trait_browser() -> rx.Component:
             width="100%",
         ),
         rx.text(
-            "Search and column filters match both the mapped ontology term and the "
-            "study's reported trait. Age, aging, and ageing also find longevity and "
-            "life span. Group by chooses which name the rows are bundled under.",
+            "Search and column filters match every name of a group's scores: the curated "
+            "concept and its synonyms, the mapped ontology term, and the study's reported "
+            "trait. Age, aging, and ageing also find longevity and life span. Group by "
+            "chooses which name the rows are bundled under; Curated concept puts scores "
+            "that point opposite ways on one axis.",
             size="1",
             color="gray",
         ),
-        trait_selector(PRSTraitState, normalizing=False),
+        trait_selector(PRSTraitState, normalizing=False, show_search=False),
         spacing="2",
         width="100%",
     )
