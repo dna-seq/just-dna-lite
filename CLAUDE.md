@@ -484,6 +484,11 @@ The Catalog talks to one server at a time, chosen in the store selector.
 - **Contract refusals say which side is behind**: `describe_contract_mismatch(url, e.server, e.client)`
   judges by API version then format version, never the registry package version.
   `RegistryState.contract_mismatch` holds the banner text.
+- **Card counts are `manifest.stats` as the compiler wrote it**, projected unchanged by the registry:
+  `variant_count` counts `variants.csv` alone (0 for a `pharm_variants` or phenotype module) and the
+  ClinVar counters count genotype rows. Word them only through `state._catalog_counts` (gene count
+  where `variant_count` is 0, a numberless ClinVar label). Upstream: just-dna-compiler S72, S123/RM300,
+  S125. Tests: `tests/test_registry_catalog_ui.py`.
 - Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`.
 
 ## Immutable (public demo) mode

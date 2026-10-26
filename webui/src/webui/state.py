@@ -6420,6 +6420,85 @@ def _card_blurb(card: Dict[str, Any]) -> Dict[str, str]:
     return {"blurb": short or full, "blurb_title": full or short}
 
 
+def _counted(n: int, noun: str) -> str:
+    """``1 gene``, ``308,990 variants``."""
+    return f"{n:,} {noun}" + ("" if n == 1 else "s")
+
+
+#: Hover text for a module whose ``variant_count`` is 0 because it has no ``variants.csv``.
+_NO_VARIANT_LIST_TITLE = (
+    "This module's rows are not a variant list (for example drug responses or named alleles), and "
+    "the catalog counts variants only in a variant list. Shown instead: how many genes the module reads."
+)
+
+
+def _catalog_counts(stats: Dict[str, Any]) -> Dict[str, str]:
+    """What a Catalog card and the selected-module pane say about a module's size and ClinVar flags.
+
+    Both read ``manifest.stats`` as the compiler wrote it (the registry projects it unchanged), and
+    two of its counters do not mean what they look like beside the word "variants":
+
+    * ``variant_count`` counts distinct variants in ``variants.csv`` alone, so a module led by any
+      other ``LEAD_TABLES`` family (``pharm_variants``, a ``haplotypes`` + combiner phenotype module)
+      publishes ``0`` while it has rows. The listing names no lead table and carries no other
+      per-variant count, so such a module shows the genes it reads (``gene_count`` is a union over
+      every authored table) rather than "0 variants".
+    * ``pathogenic_count`` / ``benign_count`` count genotype rows, one per zygosity, of a flag that
+      also covers likely pathogenic (likely benign), so a ClinVar panel reports about twice its
+      variant count. The listing has no distinct count, so the label names the flag and the hover
+      gives the row counts in their own unit.
+
+    Both are open upstream in just-dna-compiler (S72, and S123 → RM300; S125 for the listing).
+    """
+    variants = int(stats.get("variant_count") or 0)
+    genes = int(stats.get("gene_count") or 0)
+    in_clinvar = int(stats.get("clinvar_count") or 0)
+    pathogenic = int(stats.get("pathogenic_count") or 0)
+    benign = int(stats.get("benign_count") or 0)
+    if variants:
+        count_text, count_title = _counted(variants, "variant"), ""
+        gene_text = _counted(genes, "gene") if genes else ""
+    elif genes:
+        count_text, count_title, gene_text = _counted(genes, "gene"), _NO_VARIANT_LIST_TITLE, ""
+    else:
+        count_text = count_title = gene_text = ""
+    flagged = [
+        (word, n, f"{n:,} flagged {word} or likely {word}")
+        for word, n in (("pathogenic", pathogenic), ("benign", benign))
+        if n
+    ]
+    if flagged:
+        clinvar_text = "ClinVar " + " and ".join(word for word, _, _ in flagged)
+        clinvar_title = (
+            f"Genotype rows in ClinVar: {'; '.join(row for _, _, row in flagged)}. A variant has one "
+            "row per genotype, so these are not variant counts, and the catalog does not say how "
+            "many variants they cover."
+        )
+    elif in_clinvar:
+        clinvar_text = "In ClinVar"
+        clinvar_title = f"{in_clinvar:,} genotype rows are in ClinVar, none flagged pathogenic or benign."
+    else:
+        clinvar_text = clinvar_title = ""
+    return {
+        "count_text": count_text,
+        "count_title": count_title,
+        "gene_text": gene_text,
+        "clinvar_text": clinvar_text,
+        "clinvar_title": clinvar_title,
+    }
+
+
+def _catalog_card(item: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+    """One registry listing item, plus the fields the Catalog grid renders (counts, blurb, logo)."""
+    card = dict(item)
+    card.update(_catalog_counts(item.get("stats") or {}))
+    card.update(_card_blurb(item))
+    # Server-relative logo → absolute URL for the browser (schema 0.3.0 surfacing).
+    logo = item.get("logo_url") or ""
+    card["logo_full"] = (base_url + logo) if logo.startswith("/") else logo
+    return card
+
+
 def _source_tag(info: Optional[ModuleInfo]) -> Dict[str, str]:
     """The analysis picker's source tag: where this module's bytes came from.
 
@@ -6523,6 +6602,7 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
             "namespace": "",
             "catalog_name": name, "title": name, "icon": "database", "color": "#6435c9",
             "has_spec": has_spec, "in_catalog": False,
+            **_catalog_counts({}),
         }
         manifest_path = d / "manifest.json"
         if manifest_path.exists():
@@ -6534,6 +6614,7 @@ def _scan_local_modules() -> List[Dict[str, Any]]:
                 entry["title"] = mf.display.title or name
                 entry["icon"] = mf.display.icon or "database"
                 entry["color"] = mf.display.color or "#6435c9"
+                entry.update(_catalog_counts(mf.stats.model_dump()))
             except Exception:  # noqa: BLE001 - manifest is best-effort metadata
                 pass
         # The compiler leaves manifest identity.version null (marketplace-assigned at publish
@@ -6589,12 +6670,13 @@ class RegistryState(rx.State):
     selected_author: str = ""
     selected_icon: str = "database"
     selected_color: str = "#6435c9"
-    selected_variant_count: int = 0
-    selected_gene_count: int = 0
     selected_logo_url: str = ""          # absolute logo URL (schema 0.3.0), "" → fall back to icon
-    selected_clinvar_count: int = 0
-    selected_pathogenic_count: int = 0
-    selected_benign_count: int = 0
+    # Size and ClinVar labels, as `_catalog_counts` words them ("" → label hidden).
+    selected_count_text: str = ""
+    selected_count_title: str = ""
+    selected_gene_text: str = ""
+    selected_clinvar_text: str = ""
+    selected_clinvar_title: str = ""
     selected_version: str = ""
     selected_versions: List[str] = []
     _remote_versions: List[str] = []
@@ -6787,6 +6869,14 @@ class RegistryState(rx.State):
         self._local_names = names
         self.cards = _cards_with_installed(list(self.cards), names, self._busy_key)
 
+    def _set_selected_counts(self, counts: Dict[str, Any]) -> None:
+        """Copy `_catalog_counts` fields onto the selected-module pane. Call inside ``async with self``."""
+        self.selected_count_text = counts.get("count_text", "")
+        self.selected_count_title = counts.get("count_title", "")
+        self.selected_gene_text = counts.get("gene_text", "")
+        self.selected_clinvar_text = counts.get("clinvar_text", "")
+        self.selected_clinvar_title = counts.get("clinvar_title", "")
+
     # ------------------------------------------------------------------ setters
 
     def set_query(self, value: str) -> None:
@@ -6915,17 +7005,7 @@ class RegistryState(rx.State):
                 self.cards = []
                 self.total = 0
             return
-        items = body.get("items", []) or []
-        for card in items:
-            stats = card.get("stats") or {}
-            card["variant_count"] = int(stats.get("variant_count") or 0)
-            card["gene_count"] = int(stats.get("gene_count") or 0)
-            card["clinvar_count"] = int(stats.get("clinvar_count") or 0)
-            card["pathogenic_count"] = int(stats.get("pathogenic_count") or 0)
-            card.update(_card_blurb(card))
-            # Server-relative logo → absolute URL for the browser (schema 0.3.0 surfacing).
-            logo = card.get("logo_url") or ""
-            card["logo_full"] = (url + logo) if logo.startswith("/") else logo
+        items = [_catalog_card(item, url) for item in body.get("items", []) or []]
         async with self:
             self.cards = _cards_with_installed(items, local_names, self._busy_key)
             self.total = int(body.get("total", 0) or 0)
@@ -7152,7 +7232,7 @@ class RegistryState(rx.State):
             v.get("version"): _trust_word((v.get("resolution") or {}).get("trusted"))
             for v in compatible
         }
-        stats = detail.get("stats") or {}
+        counts = _catalog_counts(detail.get("stats") or {})
         union = list(remote_versions)
         if installed_version and installed_version not in union:
             union.append(installed_version)  # always keep what's actually installed selectable
@@ -7168,11 +7248,7 @@ class RegistryState(rx.State):
             self.selected_author = detail.get("owner") or ""
             self.selected_icon = detail.get("icon") or "database"
             self.selected_color = detail.get("color") or "#6435c9"
-            self.selected_variant_count = int(stats.get("variant_count") or 0)
-            self.selected_gene_count = int(stats.get("gene_count") or 0)
-            self.selected_clinvar_count = int(stats.get("clinvar_count") or 0)
-            self.selected_pathogenic_count = int(stats.get("pathogenic_count") or 0)
-            self.selected_benign_count = int(stats.get("benign_count") or 0)
+            self._set_selected_counts(counts)
             logo = detail.get("logo_url") or ""
             self.selected_logo_url = (url + logo) if logo.startswith("/") else logo
             self._remote_versions = remote_versions
@@ -7207,11 +7283,8 @@ class RegistryState(rx.State):
             self.selected_icon = li.get("icon", "database")
             self.selected_color = li.get("color", "#6435c9")
             self.selected_logo_url = ""
-            self.selected_variant_count = 0
-            self.selected_gene_count = 0
-            self.selected_clinvar_count = 0
-            self.selected_pathogenic_count = 0
-            self.selected_benign_count = 0
+            # Same words as a catalog card, from the module's own manifest (`_scan_local_modules`).
+            self._set_selected_counts(li)
             version = li.get("version", "")
             self.selected_version = version
             self.selected_versions = [version] if version else []

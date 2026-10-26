@@ -39,12 +39,23 @@ _CARD_BLURB_STYLE: dict = {
     "overflowWrap": "anywhere",
 }
 
-# The manifest's ClinVar counts are per genotype row, not per variant (one row per zygosity, so a
-# panel reports roughly twice its variant count), and "pathogenic" includes likely pathogenic.
-_CLINVAR_COUNT_TITLE = (
-    "Genotype rows flagged pathogenic or likely pathogenic (and benign) in ClinVar. "
-    "Each variant has one row per zygosity, so this can exceed the variant count."
-)
+
+def _optional_label(text: rx.Var, title: rx.Var | str = "", red: bool = False) -> rx.Component:
+    """A mini label that is left out when its text is empty.
+
+    The size and ClinVar labels are worded by `state._catalog_counts`, which leaves a label empty
+    rather than writing "0 variants" for a module whose count does not apply.
+    """
+    return rx.cond(
+        text != "",
+        rx.el.span(
+            text,
+            title=title,
+            class_name="ui mini red label" if red else "ui mini label",
+            style={"marginRight": "4px"},
+        ),
+        rx.fragment(),
+    )
 
 
 # ============================================================================
@@ -316,17 +327,10 @@ def _selected_card() -> rx.Component:
                 ),
                 # Stats
                 rx.el.div(
-                    rx.el.span(RegistryState.selected_variant_count, " variants", class_name="ui mini label"),
-                    rx.el.span(RegistryState.selected_gene_count, " genes", class_name="ui mini label", style={"marginLeft": "4px"}),
-                    rx.cond(
-                        RegistryState.selected_clinvar_count > 0,
-                        rx.el.span(
-                            RegistryState.selected_pathogenic_count, " pathogenic / ",
-                            RegistryState.selected_benign_count, " benign",
-                            class_name="ui mini red label", style={"marginLeft": "4px"},
-                            title=_CLINVAR_COUNT_TITLE,
-                        ),
-                        rx.fragment(),
+                    _optional_label(RegistryState.selected_count_text, RegistryState.selected_count_title),
+                    _optional_label(RegistryState.selected_gene_text),
+                    _optional_label(
+                        RegistryState.selected_clinvar_text, RegistryState.selected_clinvar_title, red=True,
                     ),
                     style={"marginTop": "8px"},
                 ),
@@ -573,17 +577,9 @@ def _catalog_card(card: rx.Var[dict]) -> rx.Component:
             style=_CARD_BLURB_STYLE,
         ),
         rx.el.div(
-            rx.el.span(card["variant_count"].to(int), " variants", class_name="ui mini label"),
-            rx.el.span(card["downloads"].to(int), " ↓", class_name="ui mini label", style={"marginLeft": "4px"}),
-            rx.cond(
-                card["clinvar_count"].to(int) > 0,
-                rx.el.span(
-                    card["pathogenic_count"].to(int), " pathogenic",
-                    class_name="ui mini red label", style={"marginLeft": "4px"},
-                    title=_CLINVAR_COUNT_TITLE,
-                ),
-                rx.fragment(),
-            ),
+            _optional_label(card["count_text"].to(str), card["count_title"].to(str)),
+            rx.el.span(card["downloads"].to(int), " ↓", class_name="ui mini label", style={"marginRight": "4px"}),
+            _optional_label(card["clinvar_text"].to(str), card["clinvar_title"].to(str), red=True),
             style={"marginTop": "6px"},
         ),
         # Actions
@@ -1015,9 +1011,8 @@ def _publish_preview() -> rx.Component:
             style={"fontSize": "0.76rem", "color": "#777", "marginTop": "8px", "lineHeight": "1.4"},
         ),
         rx.el.div(
-            rx.el.span(RegistryState.selected_variant_count, " variants", class_name="ui mini label"),
-            rx.el.span(RegistryState.selected_gene_count, " genes", class_name="ui mini label",
-                       style={"marginLeft": "4px"}),
+            _optional_label(RegistryState.selected_count_text, RegistryState.selected_count_title),
+            _optional_label(RegistryState.selected_gene_text),
             style={"marginTop": "6px"},
         ),
         style={"padding": "12px", "border": "1px solid #d6c4e8", "borderRadius": "8px",

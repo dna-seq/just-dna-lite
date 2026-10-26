@@ -1,19 +1,147 @@
-"""Module catalog: uninstall must update the installed list immediately; Get busy is per-card."""
+"""Module catalog: uninstall must update the installed list immediately; Get busy is per-card.
+
+Card counts: the registry projects ``manifest.stats`` unchanged, where ``variant_count`` counts
+``variants.csv`` alone and the ClinVar counters count genotype rows. A card must never say "0
+variants" for a module that has rows, nor show a pathogenic number larger than its variant count.
+"""
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
+from just_dna_format.manifest import Stats
 
 from webui.pages.registry import _CARD_BLURB_STYLE
 from webui.state import (
+    _NO_VARIANT_LIST_TITLE,
     RegistryState,
     _card_blurb,
     _cards_with_installed,
+    _catalog_card,
+    _catalog_counts,
     _local_key,
     _without_local_module,
 )
 
 LONG = "GWAS-significant common variants in genes with established roles " * 8
+REGISTRY_URL = "https://registry.example"
+
+
+def _listing_item(name: str, **stats: int) -> dict[str, Any]:
+    """A registry listing item as `GET /api/v1/modules` returns it: `stats` is a `manifest.Stats`."""
+    assert set(stats) <= set(Stats.model_fields), f"not a manifest.Stats field: {set(stats) - set(Stats.model_fields)}"
+    return {
+        "namespace": "just-dna-seq",
+        "name": name,
+        "title": name,
+        "description": f"The {name} module.",
+        "short_description": "",
+        "logo_url": f"/api/v1/modules/just-dna-seq/{name}/versions/1.0.0/logo",
+        "downloads": 7,
+        "stats": Stats(**stats).model_dump(),
+    }
+
+
+# One listing item per lead-table family, shaped like the production listing on 2026-10-26.
+WEIGHTS = _listing_item("longevitymap", variant_count=528, weights_rows=1022, gene_count=272, study_count=671)
+PHARM_VARIANTS = _listing_item("pharmgkb", variant_count=0, weights_rows=0, gene_count=35)
+PHENOTYPE = _listing_item("fut2_secretor", variant_count=0, weights_rows=0, gene_count=1, study_count=12)
+CLINVAR_PANEL = _listing_item(
+    "pathogenic", variant_count=308990, weights_rows=618629, gene_count=4793,
+    clinvar_count=617822, pathogenic_count=617822,
+)
+# A curated weights module where some variants are ClinVar-pathogenic (FMO3 in the smell module).
+PARTLY_PATHOGENIC = _listing_item(
+    "smell", variant_count=31, weights_rows=67, gene_count=6, clinvar_count=52, pathogenic_count=52,
+)
+ALL_FAMILIES = [WEIGHTS, PHARM_VARIANTS, PHENOTYPE, CLINVAR_PANEL, PARTLY_PATHOGENIC]
+
+
+@pytest.mark.parametrize(
+    ("item", "count_text", "gene_text", "clinvar_text"),
+    [
+        (WEIGHTS, "528 variants", "272 genes", ""),
+        # No variants.csv, so variant_count is 0 although the module has rows: show its genes.
+        (PHARM_VARIANTS, "35 genes", "", ""),
+        (PHENOTYPE, "1 gene", "", ""),
+        # 617,822 pathogenic genotype rows over 308,990 variants: the row count is not shown as a
+        # number beside the variant count.
+        (CLINVAR_PANEL, "308,990 variants", "4,793 genes", "ClinVar pathogenic"),
+        (PARTLY_PATHOGENIC, "31 variants", "6 genes", "ClinVar pathogenic"),
+    ],
+    ids=["weights", "pharm_variants", "phenotype", "clinvar_panel", "partly_pathogenic"],
+)
+def test_catalog_card_counts_per_lead_family(
+    item: dict[str, Any], count_text: str, gene_text: str, clinvar_text: str,
+) -> None:
+    card = _catalog_card(item, REGISTRY_URL)
+    assert card["count_text"] == count_text
+    assert card["gene_text"] == gene_text
+    assert card["clinvar_text"] == clinvar_text
+    stats = item["stats"]
+    # The hover names what the gene count stands in for, and only where it stands in.
+    assert card["count_title"] == ("" if stats["variant_count"] else _NO_VARIANT_LIST_TITLE)
+    if clinvar_text:
+        assert f"{stats['pathogenic_count']:,} flagged pathogenic or likely pathogenic" in card["clinvar_title"]
+        assert "Genotype rows" in card["clinvar_title"]
+    else:
+        assert card["clinvar_title"] == ""
+
+
+@pytest.mark.parametrize("item", ALL_FAMILIES, ids=lambda i: i["name"])
+def test_no_card_says_zero_or_more_pathogenic_than_variants(item: dict[str, Any]) -> None:
+    """The two defects seen on the public catalog: "0 variants" on modules with rows, and
+    "617,822 pathogenic" beside "308,990 variants"."""
+    card = _catalog_card(item, REGISTRY_URL)
+    assert card["count_text"] and not card["count_text"].startswith("0 ")
+    # The ClinVar label carries no number at all, so it cannot outnumber the variants.
+    assert not any(ch.isdigit() for ch in card["clinvar_text"])
+    # The variant count shown is the listing's distinct count, never a row count.
+    if item["stats"]["variant_count"]:
+        assert card["count_text"] == f"{item['stats']['variant_count']:,} variants"
+        assert f"{item['stats']['weights_rows']:,}" not in card["count_text"]
+
+
+@pytest.mark.parametrize(
+    ("stats", "clinvar_text"),
+    [
+        ({"variant_count": 4, "clinvar_count": 6, "benign_count": 6}, "ClinVar benign"),
+        (
+            {"variant_count": 4, "clinvar_count": 8, "pathogenic_count": 2, "benign_count": 6},
+            "ClinVar pathogenic and benign",
+        ),
+        # In ClinVar but flagged neither way (uncertain significance).
+        ({"variant_count": 4, "clinvar_count": 3}, "In ClinVar"),
+        ({"variant_count": 4}, ""),
+    ],
+)
+def test_catalog_counts_clinvar_label(stats: dict[str, int], clinvar_text: str) -> None:
+    counts = _catalog_counts(Stats(**stats).model_dump())
+    assert counts["clinvar_text"] == clinvar_text
+    assert bool(counts["clinvar_title"]) == bool(clinvar_text)
+
+
+@pytest.mark.parametrize("stats", [{}, Stats().model_dump(), {"variant_count": None, "gene_count": None}])
+def test_catalog_counts_hide_labels_when_the_manifest_says_nothing(stats: dict[str, Any]) -> None:
+    """A manifest with no stats (or a pre-stats one) renders no labels rather than zeros."""
+    assert set(_catalog_counts(stats).values()) == {""}
+
+
+def test_catalog_counts_read_fields_the_format_publishes() -> None:
+    """A rename in `manifest.Stats` would silently turn every count to 0 here."""
+    assert {"variant_count", "gene_count", "clinvar_count", "pathogenic_count", "benign_count"} <= set(
+        Stats.model_fields
+    )
+
+
+def test_catalog_card_keeps_the_listing_item_and_resolves_its_logo() -> None:
+    card = _catalog_card(WEIGHTS, REGISTRY_URL)
+    assert card["logo_full"] == REGISTRY_URL + WEIGHTS["logo_url"]
+    assert card["blurb"] == WEIGHTS["description"]
+    assert "count_text" not in WEIGHTS
+    hosted = _catalog_card({**WEIGHTS, "logo_url": "https://cdn.example/logo.png"}, REGISTRY_URL)
+    assert hosted["logo_full"] == "https://cdn.example/logo.png"
 
 
 @pytest.mark.parametrize(
