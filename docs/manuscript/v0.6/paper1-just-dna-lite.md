@@ -63,7 +63,7 @@ Just-DNA-Lite is a local, open-source platform for annotating a personal genome 
 The resulting workflow lets users choose published annotation content, apply it to their own genome and inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source registry, and Model Context Protocol (MCP) interfaces make the annotation and scoring operations available to AI assistants. People with different needs enter this workflow at different points: the main features are listed below, and Box 1 names the user groups and where each starts.
 <!-- @/rev C6 -->
 
-<!-- @rev F1 rounds=1 by=claude:2026-10-26 -->
+<!-- @rev F1 rounds=2 by=claude:2026-10-26,claude:2026-10-26 -->
 **Key features.**
 
 - **A cleaned PGS Catalog, ready to use.** just-prs mirrors the PGS Catalog's harmonized scoring files as Parquet, with cleaned metadata in which genome-build labels are normalized and published performance metrics are parsed into numbers. Its reference distributions cover 6,117 scores for 778 traits in five 1000 Genomes superpopulations. Each distribution is audited before release; 860 scores were withheld, 847 of them because every public test genome fell at the 0th or 100th percentile, which shows that a real genome's score would not be on the reference scale. Each result gives its percentile in the reference population matched to the genome's inferred ancestry, its coverage and a quality label (Section 3.2).
@@ -136,7 +136,7 @@ Module discovery uses sources configured in `modules.yaml`, with repository defa
 
 ### **2.3 Web Interface and Self-Exploration**
 
-<!-- @rev R10 rounds=5 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-13,codex:2026-10-19,claude:2026-10-26 -->
+<!-- @rev R10 rounds=6 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-13,codex:2026-10-19,claude:2026-10-26,claude:2026-10-26 -->
 The interface covers file management, module selection (including the optional Ensembl annotation), a sortable and filterable results grid, report download (<!-- @rev V12 rounds=2 by=claude:2026-10-19,claude:2026-10-26 -->one HTML report per run, with a section for each selected module<!-- @/rev V12 -->), self-exploration, and a Module Catalog from which registry modules are installed (Figure 1a). Each report section opens with summary counts, and each matched variant opens to the module's conclusion and its sources (Figure 1b). Users can browse the full variant table with sorting, filtering, and search, cross-referenced against Ensembl for clinical-significance flags, the variant class and whether a phenotype or disease association is recorded. All data can be exported as Parquet for downstream analysis in Python, R, DuckDB, or any Arrow-compatible tool. The web interface is built with Reflex<!-- @rev V11 rounds=1 by=claude:2026-10-19 --> (Reflex, 2026)<!-- @/rev V11 -->, a Python framework that compiles to React; the whole interface is written in Python.
 <!-- @/rev R10 -->
 
@@ -144,7 +144,7 @@ The interface covers file management, module selection (including the optional E
 Users can install and run the web interface on their own computers to analyse their personal genomes locally. A hosted demonstration at https://lite.just-dna.life/ provides access using public genomic data only; uploads of private genome files are disabled in this deployment.
 <!-- @/rev N7 -->
 
-<!-- @rev N8 rounds=1 by=codex:2026-10-19 -->
+<!-- @rev N8 rounds=2 by=codex:2026-10-19,claude:2026-10-26 -->
 ![](figures/figure-1-catalog-and-report.png){width=100%}
 
 **Figure 1. The Just-DNA-Lite web interface on the public demonstration.** (**a**) The Module Catalog, which lists the modules published in just-dna-registry. The panel on the left shows the selected module's publishing account, version picker, variant and gene counts and the button that installs it; each card gives a module's publishing account, version, variant count and downloads (here from the accounts `eric-mods`, `just-dna-seq` and `ksuha-dna`). (**b**) The Longevity Variants section of an HTML report for Anton Kulaga's public genome. It opens with counts of matched variants, of positive and negative associations and of inferred genotypes, and the summed module weight. Each table row gives the called genotype, the module's alleles, zygosity, weight and buttons that open a prepared question in an external AI assistant; the first row is an inferred homozygous-reference genotype (Section 2.1). The FOXO3 rs2802292 row is open to the module's conclusion, curation method and direction and to the first two of its five linked studies, each with its PubMed ID, population and design. Both panels were captured at https://lite.just-dna.life/ on 26 October 2026 and are cropped.
@@ -192,7 +192,7 @@ The module's displayed score is the product of two component weights, *W*_displa
 <!-- @/rev J8 -->
 
 <!-- @rev N9 rounds=3 by=codex:2026-10-19,codex:2026-10-19,codex:2026-10-19 -->
-<!-- @rev T3 rounds=2 by=codex:2026-10-19,claude:2026-10-26 -->
+<!-- @rev T3 rounds=3 by=codex:2026-10-19,claude:2026-10-26,claude:2026-10-26 -->
 **A report in use.** In a stored Longevity Variants report for Anton Kulaga's public genome, FOXO3 rs2802292 is called G/T and appears in the insulin-signalling category with a module weight of 0.475. The expanded row shows the genotype's direction (Protective) and weight, the module's stored conclusion and five linked study records from Japanese-American, Southern Italian, Han Chinese and Danish populations. The stored Danish-study conclusion distinguishes survival to old age from survival during old age. The reader can therefore inspect which finding and population underlie the annotation. The weight ranks the curated association; it is not a predicted change in lifespan. Figure 1b shows this row as the report renders it, and Supplementary S13 preserves the extracted row and its provenance.
 <!-- @/rev T3 -->
 
@@ -205,7 +205,7 @@ Figure 2 traces this report row from the called genotype to its linked studies.
 
 ### **3.2 Polygenic Risk Scores**
 
-<!-- @rev T4 rounds=1 by=codex:2026-10-19 -->
+<!-- @rev T4 rounds=2 by=codex:2026-10-19,claude:2026-10-26 -->
 For traits with several published models, the interface displays the scores together, each with its percentile, coverage and quality label, beside a summary across the models and the reference population, so that users can inspect agreement and disagreement (Figure 3).
 <!-- @/rev T4 -->
 
@@ -230,13 +230,11 @@ For variant-only whole-genome VCFs, just-prs can optionally count absent scoring
 For consumer arrays (23andMe, AncestryDNA), which, as of October 2026, the just-prs library reads but the platform's web upload does not (Section 5.4), precomputed linkage disequilibrium (LD) proxy tables estimate untyped scoring variants from typed ones where suitable tables exist. Coverage, and the assumption used to recover each missing locus, remain part of the result's interpretation.
 <!-- @/rev J10 -->
 
-<!-- @rev N10 rounds=2 by=codex:2026-10-19,claude:2026-10-26 -->
-![](figures/figure-3-prs-trait-view.jpg){width=95%}
+<!-- @rev N10 rounds=3 by=codex:2026-10-19,claude:2026-10-26,claude:2026-10-26 -->
+![](figures/figure-3-prs-ldl-trait-view.png){width=85%}
 
-**Figure 3. PRS trait view in an earlier Just-DNA-Lite interface.** Multiple PGS Catalog models for one trait are displayed together, with model identifiers, percentile markers and variant-match rates. This existing screenshot illustrates the interface layout; its absolute-risk display and inconsistent quality labels require replacement before submission and are not results reported in this paper. Showing models together, including where they disagree, is deliberate (see Section 5.3).
+**Figure 3. Polygenic scores for one trait in the current web interface.** The trait report for low-density lipoprotein (LDL) cholesterol on Anton Kulaga's public genome. just-prs computed all 101 PGS Catalog models mapped to this trait. The summary cards give the median percentile over the 94 models rated High or Moderate quality, the most reliable of them, their number, absolute risk (shown only when such a model has risk data; none here) and the spread of the models' percentiles. The chart places each model's score, normalized separately, on the reference distribution of the genome's inferred superpopulation (European), and the table lists each model's percentile, matched variants and quality label (the first ten rows, sorted by percentile). Showing all models, including where they disagree, is deliberate (Section 5.3). Captured at https://lite.just-dna.life/ on 26 October 2026 and cropped above the report's note on reading the quality labels.
 <!-- @/rev N10 -->
-
-<!-- AUTHOR TODO: Replace the existing images/just_prs_trait_consensus.jpg with a current screenshot for Figure 3. The existing image shows an absolute-risk percentage for intelligence and inconsistent quality labels. Capture a current trait view with the reference population, model IDs, coverage, and settings visible, then embed it here and align the caption with the final image. -->
 
 ### **3.2.1 Standalone PRS Use and MCP Access**
 
@@ -273,7 +271,7 @@ The platform includes several additional modules curated by hand from the publis
 Because modules are data, new content reaches users through configured repositories or `just-dna-registry` without changes to the annotation engine or a new application release, while evidence review and scientific curation stay with module contributors. <!-- @rev D1 rounds=4 by=claude:2026-10-10,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26 -->Rather than embedding its own assistant, the platform exposes its operations to the AI assistants authors already use. Modules can be drafted in such an assistant through the just-module-creator plugin (github.com/dna-seq/just-module-creator); the result is the same kind of artifact, validated and compiled the same way. Its manifest can mark it as AI-generated through its authorship entries, which tag each contributor as human or AI. Through the platform's MCP server, the assistant can then install the draft, annotate a genome with it and inspect the result (Section 3.2.1).<!-- @/rev D1 -->
 <!-- @/rev J14 -->
 
-<!-- @rev F4 rounds=1 by=claude:2026-10-26 -->
+<!-- @rev F4 rounds=2 by=claude:2026-10-26,claude:2026-10-26 -->
 The registry works like an app store for this content. A researcher claims a namespace and publishes a compiled module; each published version is immutable and identified by its digest. Users browse the registry in the web interface's Module Catalog (Figure 1a), install a module with one action and apply it in their next run. On 26 October 2026 the public registry held 24 modules from five publishing accounts: the ten modules of Table 1 and fourteen others, including modules on APOE type, ABO and Rh blood groups, FUT2 secretor status, HFE iron storage, lactose tolerance, ADHD-associated loci and the genetics of placebo response. Some of these combine several variants into one result, such as a blood group or an APOE type, instead of reporting each variant alone. The catalogue therefore grows as researchers publish modules, not with releases of the platform.
 <!-- @/rev F4 -->
 

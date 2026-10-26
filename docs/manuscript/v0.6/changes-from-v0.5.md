@@ -35,9 +35,9 @@ forward. No limitation or caveat was removed.
 
 | Id | Where | Was | Now | Why |
 |---|---|---|---|---|
-| C2a | Abstract | Described the ecosystem in general terms; no number; no user groups | Four features with their numbers (6,117 scores for 778 traits with ancestry-matched percentiles and 860 broken scores withheld; 24 registry modules from five publishers; whole-genome annotation in 33 to 65 s, 128 to 231 times faster than Generation I; web UI, AI assistants via MCP and skills, Python libraries) and the user groups | A reader of the Abstract alone did not learn what the software does better than alternatives, how large its catalogue is, or who it serves. The v0.5 improvement run had flagged "The Abstract states no measured result" (ST-10) but left it as an open decision |
+| C2a | Abstract | Described the ecosystem in general terms; no user groups | One paragraph on the ecosystem (the platform, no-code modules, just-dna-registry as an app store, just-module-creator, just-prs alone or inside the platform), evidence linked to each variant's sources, MCP access and the public demonstration; no result numbers, headings or disclaimers (198 words, the "Alternative A" text, committed by the abstract-revision session in 8656195) | Author's request: the Abstract should make readers want the features, not retell the paper. An interim v0.6 version that listed four features with their numbers was replaced; the numbers stay in the Key features list (F1) and the body |
 | C6 | Introduction, last paragraph | Ended on MCP access | Adds that users enter the workflow at different points and points to the feature list and Box 1 | Lead-in to the two new items below |
-| F1 | Introduction, new "Key features" list | Not present | Six features: cleaned PGS Catalog; app store for modules; speed; three ways in; evidence a reader can follow; local processing. Each points to the section with the evidence | A platform paper needs a feature summary a reader can find in one place |
+| F1 | Introduction, new "Key features" list | Not present | Six features (the evidence item says each variant leads to "its sources": the pharmacogenomics module cites ClinPGx annotations, not study rows): cleaned PGS Catalog; app store for modules; speed; three ways in; evidence a reader can follow; local processing. Each points to the section with the evidence | A platform paper needs a feature summary a reader can find in one place |
 | F2 | Introduction, new Box 1 | Not present | Five user groups (people with their own genome; researchers; bioinformaticians and developers; AI-assistant users; educators and students), what each can do, where each starts | v0.5 never said who the tool is for. A box, not a table, so Tables 1 to 4 keep their numbers |
 | F3 | Section 3.2, new paragraph "A catalogue that works out of the box" | The cleaned catalogue was not described; only the scoring-file compatibility audit (Table S5) | How the metadata are cleaned; the 2 September 2026 audit of reference distributions (6,117 of 6,977 pass, 860 withheld and why); 778 EFO traits; the rules behind the High, Moderate, Low and Very low quality labels; direction-of-effect annotation for 2,282 scores, AI-assisted and pending expert review | The quality control that makes the catalogue usable out of the box is real work that the paper did not mention |
 | F4 | Section 3.4, new paragraph | The registry was described as a service, with no size or examples | How publishing and installing work; the registry on 26 October 2026 (24 modules, five accounts, examples beyond Table 1); modules that combine several variants into one result (blood group, APOE type) | Shows that the ecosystem already grows beyond the authors' own modules |
@@ -61,7 +61,23 @@ forward. No limitation or caveat was removed.
 | PyPI libraries | PyPI: just-prs 0.10.5, prs-ui 0.3.18, just-prs-mcp 0.5.0, just-dna-format 0.7.1, just-dna-compiler 0.7.2, just-dna-registry 0.27.0. The annotation pipeline itself is not on PyPI, so the paper does not claim it is |
 | Codex support | just-module-creator ships `.codex-plugin`; the MCP servers document Codex setup |
 
-## 3. Open points for the authors
+## 3. New Figures 1 and 3 from the public demonstration
+
+Requested by Anton Kulaga on 26 October 2026, after the v0.5 review showed that the simulated referees
+judged the screenshots only for errors and that the paper never showed the interface at its best. Both
+figures were captured at https://lite.just-dna.life/ on 26 October 2026; `figures/README.md` records how.
+
+| Id | Where | Was | Now | Why |
+|---|---|---|---|---|
+| N8 | Figure 1 and caption | Screenshot of the Input tab (sample list, quality-filter counts, raw variant grid). Its sample list showed nine uploads labelled with other people's names and family roles | (a) The Module Catalog with Longevity Map selected: publishing accounts, versions, variant counts, downloads, install button. (b) The Longevity Variants section of a report on Anton Kulaga's public genome: summary counts, an inferred genotype row, the AI-explain buttons, and the FOXO3 rs2802292 row opened to its conclusion and linked studies | Shows the two features readers asked to see (a finished report; the app store), and removes the names that two referees, the figures check and the policy check all flagged in v0.5 |
+| N10 | Figure 3 and caption | Screenshot of an earlier PRS view showing an absolute-risk value for intelligence and inconsistent quality labels; the caption said it had to be replaced; an AUTHOR TODO asked for a new one | The current trait report for LDL cholesterol with all 101 models scored: summary across the 94 rated High or Moderate, the distribution chart with each model's position, and the per-model table with percentile, matched variants and quality label | The old image was a placeholder by its own caption. LDL cholesterol has many models and published discrimination data, so the view shows the quality labels at work and links to the Lipid Metabolism module |
+| (none) | AUTHOR TODO after Figure 3 | Present | Removed | Done |
+| R10 | Section 2.3 | Cited Figure 1 for "self-exploration" | Names the Module Catalog (Figure 1a) and says what a report section shows (Figure 1b) | The text now matches the figure |
+| T4 | Section 3.2, first paragraph | Models shown "with their coverage and reference population" | Adds each model's percentile and quality label and the summary across models | Matches the new Figure 3 |
+| T3 | Section 3.1, "A report in use" | Pointed to Supplementary S13 only | Also points to Figure 1b, where the same row is shown as the report renders it | Links the reconstruction (Figure 2) to the real interface |
+| F1, F4 | Key features; Section 3.4 | No figure for the catalogue | Cite Figure 1a; the "evidence" feature cites Figures 1b, 2 and 3 | |
+
+## 4. Open points for the authors
 
 - **Anton's SecvADN affiliation** was dropped on the reading that "Anton has IBAR and IBIMA" means only
   those two. He is still listed as a SecvADN co-founder under Competing Interests.
@@ -74,8 +90,22 @@ forward. No limitation or caveat was removed.
   sentence says so. Remove it if that caveat weakens the paragraph more than the feature helps.
 - **Module examples** (F4) leave out the personality, cognition and aggression modules in the registry,
   to avoid a reviewer reading the paper as endorsing genetic prediction of behaviour.
-- **Venue length**: the Abstract grew from 195 to 252 words. The venue record
+- **Venue length**: the Abstract is 198 words. The venue record
   (`paper1-just-dna-lite.venue-requirements.md`) lists limits from 100 (Genome Biology) to 350 words
-  (BMC Bioinformatics); 252 fits BMC Bioinformatics (350) and PLOS Computational Biology (300) but not
+  (BMC Bioinformatics); 198 fits BMC Bioinformatics (350) and PLOS Computational Biology (300) but not
   Bioinformatics (150) or Genome Biology (100), so trim when the venue is chosen.
-- **Figure 3** still carries the v0.5 AUTHOR TODO (replace the screenshot); unchanged in this round.
+- **The public demonstration accepts uploads.** On 26 October 2026 https://lite.just-dna.life/ showed an
+  "Add Sample / Select VCF" form and six samples: the two public genomes and four other uploads from 27 and
+  29 September (file names such as `NG13RC2LEB.mm2.sortdup.bqsr.hc` and `LB2BBH2510.GRCh38.deepvariant.norm`;
+  who uploaded them was not checked), visible to every visitor; its user id is `anonymous`, not the `public` of immutable mode. Section 2.3 says
+  uploads are disabled there, and the landing page says "Nothing is sent to a server". Turn immutable mode
+  on and remove the visitors' files, or change the sentence. The figures crop the sample list out.
+- **Catalog cards miscount some modules.** Pharmacogenomics, FUT2 secretor, HFE, APOE type and Blood Groups
+  show "0 variants", and the ClinVar panels show more "pathogenic" than variants (Pathogenic: 308,990
+  variants, 617,822 pathogenic; Cancer: 70,638 and 141,316). Figure 1a was framed to show cards whose
+  counts are right; fix the counts before a referee opens the catalog.
+- **The trait report still shows an absolute risk for fluid intelligence.** On Anton Kulaga's genome the
+  intelligence report gives "86.8% (pop. avg: 64.0%)" and a 1.36× relative risk, the problem that retired the
+  old Figure 3. Absolute risk for a quantitative trait has no meaning; gate it on a binary outcome.
+- **Quality labels render in lower case with underscores** in the trait report (`moderate`, `very_low`),
+  while Section 3.2 writes them as words (Moderate, Very low).
