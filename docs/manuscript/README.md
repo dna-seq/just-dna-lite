@@ -9,7 +9,9 @@ Each `vX.Y/` folder is one round. `v0.3/` holds Paper 1 as Robi Tacutu reviewed 
 his suggestions not applied) and stays frozen; `v0.4/` holds the revision that answers the review as
 released to Google Drive on 2026-10-13, with its supplementary tables; `v0.5/` holds the next release
 (copy-edits, the day-2 benchmark, the split-out supplementary, the venue record and ladders, and the
-scan of the ethics committee's determination). Each round is complete: files that did not change are
+scan of the ethics committee's determination). The improvement run of 26 October 2026 left its dashboard,
+Word review and corrected version beside the paper (`paper1-just-dna-lite.dashboard.html`, `.review.docx` and
+`.proposed.md`); its evidence stays local in `v0.5/reviews/`. Each round is complete: files that did not change are
 copied into the new round, so Tables S4 and S5 are in both `v0.4/supplementary/` and
 `v0.5/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
 where Table S7 cites it.
