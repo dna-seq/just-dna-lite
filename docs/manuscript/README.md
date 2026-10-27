@@ -15,7 +15,11 @@ Word review and corrected version beside the paper (`paper1-just-dna-lite.dashbo
 released to Google Drive on 26 October 2026: the author list and affiliations changed, and the paper now
 leads with its features and the user groups it serves. `v0.6/changes-from-v0.5.md` records every change of
 the round as "was, now, why", keyed to the ledger ids, and goes to co-authors as the round's changelog (a
-Google Doc beside the paper). Each round is complete: files that did not change are copied into the new round, so Tables S4 and S5 are in `v0.4/supplementary/`,
+Google Doc beside the paper). The improvement run of 27 October 2026 (manuscript-skills 0.29.1, edits applied
+by default) edited `v0.6/paper1-just-dna-lite.md` and its supplement in place and left beside the paper its
+dashboard, a Word review that holds only the authors' decisions and questions (`.review.docx`), a workbook of
+every applied edit with its before, after and reason (`.changes.xlsx`) and the corrected version
+(`.proposed.md`); its evidence stays local in `v0.6/reviews/`. Each round is complete: files that did not change are copied into the new round, so Tables S4 and S5 are in `v0.4/supplementary/`,
 `v0.5/supplementary/` and `v0.6/supplementary/`. The tool comparison draft, the evidence behind Table S7, stays in `v0.4/`,
 where Table S7 cites it.
 
