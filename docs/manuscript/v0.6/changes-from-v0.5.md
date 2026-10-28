@@ -91,7 +91,41 @@ lost its referent. No manuscript-skills stage flagged it.
 | N11a | Introduction, fourth paragraph (inside R4) | Opened directly on "Recent progress in the genetics of longevity" | One sentence first: the authors' starting point was longevity research, Generation I was built to read a genome against longevity studies (Kulaga et al., 2024), and longevity remains the most extensive expert-curated module (Section 3.1, Table 1: 528 variants, against at most 74 in the other expert modules) | Gives the reader the reason for the turn to longevity, in the place the turn happens |
 | N11b | Section 1.2, first paragraph (inside C5) | "whose first generation (Generation I) was a set of annotation and report modules for OakVar" | Adds "built for longevity research" | Connects the platform's history to the motivation; Section 3's sentence on the default modules now recalls it rather than introducing it |
 
-## 5. Open points for the authors
+## 5. Polygenic scores as a feature, and each detail in its section
+
+Requested by Anton Kulaga on 28 October 2026. The first Key feature was "A cleaned PGS Catalog, ready to
+use", which presented just-prs as a tidied dataset: the PGS Catalog is data, and the feature is the engine
+that computes its models and what it adds to each result (ancestry, an ancestry-matched percentile,
+coverage, a quality label, the trait view). The item also carried Methods detail (Parquet, build labels,
+parsed metrics) and Results (860 withheld, 847 for scale), and the speed item carried a PLINK2 comparison
+whose fairness depends on a configuration stated only in Section 4.2. The rule applied throughout: the
+Introduction says what a feature does and why it matters, with at most a rounded figure and a pointer;
+Sections 2 and 3 say how it works; Section 4 holds what was measured, beside the configuration that makes
+the measurement fair. No number changed and no caveat was dropped: everything taken out of the Introduction
+was already in Section 3 or 4, or is moved there.
+
+| Id | Where | Was | Now | Why |
+|---|---|---|---|---|
+| C2a | Abstract, just-prs sentence | "places each PGS Catalog score that passes its reference-distribution audit within a reference population …" | "computes PGS Catalog scores from a cleaned copy of the Catalog, places each within a reference population …, labels its quality and shows all models for a trait side by side" | The audit is a Methods detail; the cleaned copy and the quality labels are features and were missing. Eight words longer |
+| F1 | Key features, first item | "A cleaned PGS Catalog, ready to use": Parquet mirror, build-label normalization, metric parsing, 860 scores withheld and why | "Polygenic scores with the context to read them": just-prs computes the Catalog's models and adds ancestry, a percentile in the matching reference population, coverage, a quality label and the trait view (Figure 3); one scale figure (6,117 scores across 778 traits); points to Sections 3.2 and 4.3 | The contribution is the engine and its context, not the data. How the data are prepared is Methods (Section 3.2); how many scores passed the audit is a result (Section 4.3) |
+| F1 | Key features, app store | Ended on the registry's contents on 26 October 2026 | Ends on a pointer to Table 1 and Section 3.4, where that count already is | A dated count is a result; the Introduction names the feature |
+| F1 | Key features, Fast | Medians and ranges (33 to 65 s, 128 to 231 times, 16 to 20 s warm, 0.08 s) and the PLINK2 comparison with its thread and process-start caveat | "about a minute", "more than a hundred times faster than the Generation I workflow", "a typical polygenic score in under a tenth of a second" (DuckDB, the default engine: median 0.082 s), so all models for a trait can be scored together | A comparison that needs its configuration to be fair belongs beside it in Section 4.2; the Introduction keeps rounded figures that need no caveat |
+| J9 | Section 3.2, second paragraph | The file-level audit's counts (6,910, 76 and 5 of 6,991) | What the audit does and its three categories, with the 10% rule and the additive-scoring rule from Table S5; counts in Section 4.3 | Procedure in Methods, outcome in Results |
+| F3 | Section 3.2, "A catalogue that works out of the box" | The reference-distribution audit described through its outcome (6,117 of 6,977 passed; 847 withheld because …) | The withholding rules stated as rules; adds that the files are stored as Parquet (from F1); counts in Section 4.3 | Same |
+| F3 | Section 3.2, quality-label paragraph | Did not say how models are grouped into a trait | Curated concepts can join several Catalog trait terms (oestrogen-receptor-positive and -negative breast cancer fall under breast cancer); the trait view groups by concept, else by the mapped EFO term, and users can switch to the mapped or reported trait | The trait view is a main just-prs feature. Checked in prs-ui (`trait_group_label_expr`, default `concept`) and in the published `score_annotations.parquet` (the breast cancer concept spans nine Catalog trait terms) |
+| V14 | Section 3.2.2 | Ended with the leave-one-out accuracy | Ends with how missing sites are handled and a pointer to Section 4.4 | Classifier accuracy is a result |
+| ST5 | Section 4, opening | Speed, memory, engine agreement | Adds the two audits (4.3) and the leave-one-out test (4.4); none tests annotation correctness or prediction | Section 4 now holds every measured result about the polygenic features |
+| F6 | New Section 4.3, PGS Catalog Coverage | Not present | The file-level counts (from J9) and the reference-distribution counts (from F3 and F1), unchanged; "the other 13" names the remainder (860 − 847) | Moved, not new |
+| F7 | New Section 4.4, Ancestry Classification | Not present | The leave-one-out result from V14, unchanged | Moved, not new |
+| R24 | Conclusion | "It offers a cleaned PGS Catalog, with ancestry-matched percentiles for 6,117 scores and quality labels" | "It offers polygenic scoring of the PGS Catalog with the context to read each result (ancestry-matched percentiles for 6,117 scores, coverage, quality labels and every model for a trait side by side)" | Same reframing as F1 |
+
+## 6. Open points for the authors
+
+- **Section structure.** The headings still follow a software-paper template ("System and Methods",
+  "Algorithm and Implementation", "Benchmarking and Validation"), and Section 3 mixes method with results:
+  the worked report in 3.1 and Figure 2, the dated module counts of Table 1 and the registry snapshot in
+  3.4. iScience, top of the ladder, expects Results, Discussion and STAR Methods. Moving to that layout is
+  a journal-adaptation step, not done here.
 
 - **Anton's SecvADN affiliation** was dropped on the reading that "Anton has IBAR and IBIMA" means only
   those two. He is still listed as a SecvADN co-founder under Competing Interests.
