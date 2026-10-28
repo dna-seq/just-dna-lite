@@ -220,11 +220,16 @@ another server, so arXiv first would close them.
 | 7 | **NAR Genomics and Bioinformatics** (Application Note, Methods) | 44 | 3.0, at the floor | OUP default | yes | US$2,633 (DOAJ); no agreement | benchmarks against "an adequate number of relevant alternative" methods |
 | 8 | **Cell Genomics** (Technology) | 5, desk decisions included | 8.4 | Elsevier policy | yes | US$8,900, 15% off under DEAL | "significant improvements over existing methods", a step-by-step protocol; the reach rung |
 
-Every journal's validation rules were read on 27 and 28 October 2026. iScience, Cell Reports Methods (its
-comparison rule is met by the PLINK2 benchmark), PLOS Computational Biology, JAMIA Open and Frontiers in
-Bioinformatics fit; Cell Genomics (a "significant improvement" Technology bar), Genomics (its Guide for Authors
-could not be read) and NAR Genomics and Bioinformatics (a Methods Paper needs benchmarks showing a significant
-improvement) depend on a condition, so the sorted order puts them last. Before these rules were read, the
+Every journal's validation rules were read on 27 and 28 October 2026 (Genomics' Guide for Authors in the
+authors' own browser), and each condition the paper can settle was checked against the v0.6 text. iScience,
+Genomics, PLOS Computational Biology, JAMIA Open and Frontiers in Bioinformatics state no validation rule for a
+software paper, and Cell Reports Methods' comparison-and-validation rule is met (Section 4.2 against PLINK2,
+Section 4.4 for the ancestry call): all six fit. Two meet their bar only in part, so the sorted order puts
+them last: Cell Genomics' Technology bar asks for "significant improvements to existing methods", and the paper
+compares annotation only with its own Generation I, not with ANNOVAR or VEP; NAR Genomics and Bioinformatics'
+Methods Papers need benchmarks against several state-of-the-art tools and large-scale computing, while an
+Application Note would mean cutting to 3,000 words. On the preprint side the paper names its two genome
+donors, which bioRxiv's and medRxiv's rules against identifying people do not allow for. Before these rules were read, the
 sorted order put Cell Genomics first on its 5-day median; it is last because that figure is mostly desk
 decisions and its Technology bar is the highest here. Frontiers in Bioinformatics and JAMIA Open sit above
 journals with a published speed because their software article types fit the paper as it is. Elsevier's policy

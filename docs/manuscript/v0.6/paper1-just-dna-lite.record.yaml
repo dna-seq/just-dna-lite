@@ -25,6 +25,65 @@ priorities:
   # annotation speed compared with Generation I. Read from the manuscript on 2026-10-28, not a new promise.
   validation_available:
   - benchmark
+# Each venue's checkable conditions, read against the v0.6 manuscript on 2026-10-28: met, partly or not, with the
+# passage that shows it. A met condition fits; partly stays "Depends" with the gap named.
+conditions:
+  cell-reports-methods:
+    comparison-and-validation:
+      met: true
+      evidence: "Section 4.2 compares just-prs with PLINK2, an established related method, on 100 PGS Catalog scores, and
+        Section 4.4 validates the ancestry call (leave-one-out, 2,566 of 2,575 reference individuals assigned their own
+        superpopulation). The 'limitations of the study' subsection the journal asks for is a formatting step."
+      checked: 2026-10-28
+  cell-genomics:
+    technology-bar:
+      met: partly
+      evidence: "Section 4.1 compares annotation only with the authors' own Generation I (128- to 231-fold faster), and
+        Section 4.2 compares just-prs with PLINK2 (the scores agree; about seven times faster with PLINK2 on four threads
+        and just-prs on sixteen). Missing: a comparison of annotation with the established tools the Introduction names,
+        ANNOVAR and VEP, on which an improvement over existing methods would rest."
+      checked: 2026-10-28
+  nar-genomics-bioinformatics:
+    methods-benchmarks:
+      met: partly
+      evidence: "Section 4.2 benchmarks against one alternative tool, PLINK2, and shows neither a statistically
+        significant improvement over several state-of-the-art tools nor large-scale (HPC or cloud) use, which a Methods
+        Paper needs. As an Application Note the benchmarks are only encouraged, but the paper would have to be cut to
+        3,000 words and three figures or tables."
+      checked: 2026-10-28
+    open-source-deposit:
+      met: true
+      evidence: "Code Availability: the code is on GitHub under OSI licences (AGPL-3.0 and MIT) and runs with two commands
+        (uv sync, uv run start) or as a container. The Zenodo archive is due before acceptance, with the other archiving."
+      checked: 2026-10-28
+  biorxiv:
+    tool-with-data:
+      met: true
+      evidence: "Sections 4.1 and 4.2 report data from applying the software: annotation runs on four genomes and 100
+        polygenic scores compared with PLINK2."
+      checked: 2026-10-28
+    identifiable-individual:
+      met: false
+      evidence: "The paper names its two genome donors, the authors Anton Kulaga and Livia Zaharia, beside their published
+        VCFs and results from them; their consent is stated, but bioRxiv's pages give no exception for a person's own
+        released data, so its screeners may decline it or ask for the names to go."
+      checked: 2026-10-28
+  medrxiv:
+    computational-results:
+      met: true
+      evidence: "Sections 4.1 and 4.2 report data from applying the software: annotation runs on four genomes and 100
+        polygenic scores compared with PLINK2."
+      checked: 2026-10-28
+    ethics-oversight:
+      met: true
+      evidence: "The Ethics Statement gives the determination of the Ethics Committee of the Institute of Biochemistry of
+        the Romanian Academy that the work is not research on human subjects (ethics register no. 17, 23 September 2026)."
+      checked: 2026-10-28
+    identifiers:
+      met: false
+      evidence: "The paper names its two genome donors, the authors, beside their whole-genome VCFs and results; medRxiv
+        counts real names tied to a person's data as direct identifiers."
+      checked: 2026-10-28
 # The study design as the manuscript shows it, a draft until the authors confirm it (no `confirmed`). What the
 # paper reports is what preprint servers screen on: disease-risk modules and risk scores for diseases are
 # health-related information, and the benchmarks run on the authors' own published genomes.
