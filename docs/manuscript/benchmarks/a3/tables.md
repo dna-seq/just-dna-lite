@@ -22,11 +22,6 @@ Wall time is `cli_wall_s`: the whole command, from start to report written, for 
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
-| **Anton Kulaga, 2023 call set (unpublished)** |  |  |  |  |  |
-| Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
-| Generation II, full | 10 | 33.7 (33.0–105.0) | 54.4 ± 9.2 | 29.2 | 231× |
-| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
-| Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
 | **Anton Kulaga, published call set, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
 | Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
 | Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
@@ -49,10 +44,6 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 | Community reference | Generation II, warm | 11 | — | 10.6 | 1.8 | — | 12.6 | 2,740 (2,803) | 1,471 | 586 |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | — | 33.7 | 2,893 (2,925) | 1,076 | 363 |
 | Community reference | Generation II, cold | 3 | 21.3 | 10.7 | 1.8 | — | 34.1 | 2,843 (2,844) | 995 | 334 |
-| Anton Kulaga, 2023 call set | Generation II, warm | 11 | — | 9.5 | 2.1 | — | 11.8 | 2,117 (2,216) | 1,169 | 562 |
-| Anton Kulaga, 2023 call set | Generation II, full | 10 | 16.8 | 9.6 | 2.2 | — | 28.9 | 2,250 (2,296) | 953 | 370 |
-| Anton Kulaga, 2023 call set | Generation II, cold | 3 | 17.1 | 9.5 | 2.2 | — | 29.1 | 2,209 (2,347) | 891 | 341 |
-| Anton Kulaga, 2023 call set | Generation I (OakVar 2.13.1), full | 3 | — | — | — | — | — | 3,837 (3,838) | 1,862 | not measured |
 
 ## Table S6. Machine and inputs
 
@@ -71,7 +62,6 @@ RSS is the sum over the command's whole process tree (Generation I: the containe
 | Anton Kulaga, published call set (Zenodo 18370498) | 6,079,744 | 4,616,002 | 1,463,742 | DeepVariant 1.1.0 | 21598da4f77d8237577662ab89e8a55d |
 | Livia Zaharia (Zenodo 19487816) | 5,064,598 | 4,104,611 | 959,987 | DRAGEN 13.021.779.4.4.4 | 43afb27df1c6dd00a007db78435ef171 |
 | Community reference (HG002, DeepVariant case study) | 7,753,721 | 6,476,847 | 1,276,874 | DeepVariant 1.0.0 | 29d00cf5e84ae8971cb868200b574268 |
-| Anton Kulaga, 2023 call set (unpublished) | 6,138,868 | 4,724,429 | 1,414,439 | DeepVariant 1.3.0 | fd01f293655f606482ecfa70c9976d11 |
 
 ## Table 4 (fixed benchmark inputs (primary)). PRS runtime per PGS ID
 
@@ -111,19 +101,13 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 | just-prs DuckDB ↔ PLINK2 | 96 | 0.999859 | 21.4 (PGS000012) | 0.000658 |
 | just-prs Polars ↔ PLINK2 | 96 | 0.999859 | 21.4 (PGS000012) | 0.000658 |
 
-## S2. Generation I runs, steps, hardware factor and module versions
+## S2. Generation I runs, steps and module versions
 
 | Series | Genome | Mode | Started | Wall time, s | Peak RSS, MB | Load before | Used in |
 |---|---|---|---|---|---|---|---|
-| 2023 (old workstation) | Anton Kulaga, 2023 call set | full | 2023-02-17 | 5651 | — | — | — |
-| 2023 (old workstation) | Anton Kulaga, 2023 call set | full | 2023-02-19 | 6803 | — | — | — |
-| 2023 (old workstation) | Anton Kulaga, 2023 call set | full | 2023-05-07 | 7662 | — | — | — |
 | 2026 (this machine) | Anton Kulaga, published call set | full | 2026-10-11 06:10 UTC | 6,005.4 | 4,611 | 0.53 | Table 2 |
 | 2026 (this machine) | Anton Kulaga, published call set | full | 2026-10-11 07:50 UTC | 6,068.5 | 4,610 | 1.28 | Table 2 |
 | 2026 (this machine) | Anton Kulaga, published call set | full | 2026-10-11 09:31 UTC | 5,889.3 | 4,610 | 1.28 | Table 2 |
-| 2026 (this machine) | Anton Kulaga, 2023 call set | full | 2026-10-11 11:10 UTC | 5,995.5 | 3,838 | 1.03 | Table 2 |
-| 2026 (this machine) | Anton Kulaga, 2023 call set | full | 2026-10-13 01:35 UTC | 7,785.3 | 3,832 | 1.09 | Table 2 |
-| 2026 (this machine) | Anton Kulaga, 2023 call set | full | 2026-10-13 03:45 UTC | 8,281.0 | 3,837 | 1.32 | Table 2 |
 | 2026 (this machine) | Livia Zaharia | full | 2026-10-13 10:11 UTC | 10,627.7 | 4,529 | 1.05 | Table 2 |
 | 2026 (this machine) | Livia Zaharia | full | 2026-10-13 13:08 UTC | 8,337.6 | 4,488 | 1.33 | Table 2 |
 | 2026 (this machine) | Livia Zaharia | full | 2026-10-15 18:50 UTC | 8,325.7 | 4,529 | 1.36 | Table 2 |
@@ -158,12 +142,6 @@ PLINK2 failed on 4 (PGS000013, PGS000014, PGS000016, PGS000017).
 |   longevity2reporter | 0.1 |  |
 | reporter | 0.2 | 0.0% |
 | runtime | 6,002.3 | 100.0% |
-
-| Anton Kulaga, 2023 call set | Old workstation, s | This machine (median), s | Old ÷ new |
-|---|---|---|---|
-| Generation I, full | 6,705.3 (mean of 3, 2023) | 7,785.3 | 0.86 |
-| Generation II, 'normal' (2023 tables) vs warm (2026) | 38.9 (mean of 11) | 16.2 | 2.40 |
-| Generation II, 'normal' (2023 tables) vs full (2026) | 38.9 (mean of 11) | 33.7 | 1.15 |
 
 | OakVar module | Type | Version | Data source |
 |---|---|---|---|
@@ -256,11 +234,6 @@ just-prs 0.10.4 (9f2cca0); PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 4,6
 | Generation II, warm | 11 | 17.0 (16.9–17.2) | 17.0 ± 0.0 | 0.1 | — |
 | Generation II, full | 5 | 38.4 (38.2–38.5) | 38.3 ± 0.1 | 0.1 | — |
 | Generation II, cold | 3 | 41.9 (41.7–42.0) | 41.8 ± 0.1 | 0.2 | — |
-| **Anton Kulaga, 2023 call set (unpublished)** |  |  |  |  |  |
-| Generation II, warm | 11 | 16.2 (16.1–16.4) | 16.2 ± 0.0 | 0.1 | — |
-| Generation II, full | 10 | 33.7 (33.0–105.0) | 54.4 ± 9.2 | 29.2 | 231× |
-| Generation II, cold | 3 | 36.7 (36.7–36.9) | 36.7 ± 0.1 | 0.1 | 212× |
-| Generation I (OakVar 2.13.1), full | 3 | 7,785.3 (5,995.5–8,281.0) | 7,353.9 ± 694.1 | 1,202.2 | 1× (ref.) |
 | **Anton Kulaga, published call set, against a whole-genome reference database (first run of each dropped)** |  |  |  |  |  |
 | Generation II, full + Ensembl | 2 | 103.1 (64.2–142.0) | 103.1 ± 38.9 | 55.0 | 34× |
 | Generation I (OakVar 2.13.1), dbSNP only | 2 | 3,537.2 (3,446.8–3,627.5) | 3,537.2 ± 90.3 | 127.8 | 1× (ref.) |
@@ -274,8 +247,6 @@ just-prs 0.10.4 (9f2cca0); PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 4,6
 | Livia Zaharia | Generation II, full | 10 | 43.4 | 14.6 | 1.8 | 4,436 | 4,514 | 335 |
 | Livia Zaharia | Generation I | 3 | — | — | — | 4,529 | 4,529 | — |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
-| Anton Kulaga, 2023 call set | Generation II, full | 10 | 16.8 | 9.6 | 2.2 | 2,250 | 2,296 | 370 |
-| Anton Kulaga, 2023 call set | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
 
 ## Paper Table S6
 
@@ -290,7 +261,6 @@ just-prs 0.10.4 (9f2cca0); PLINK v2.0.0-a.6.33LM 64-bit Intel (28 Feb 2026); 4,6
 | Input: Anton Kulaga, published call set | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
 | Input: Livia Zaharia | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
 | Input: Community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
-| Input: Anton Kulaga, 2023 call set | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
 
 ## Paper Table 4
 
@@ -342,7 +312,6 @@ Every engine scored every ID.
 ## Numbers quoted in the text
 
 - Anton Kulaga, published call set: Generation I median 6,005.4 s; Generation II full median 33.2 s, cold 35.9 s, warm 16.3 s; ratios full 181×, cold 167×, warm 368× (warm is not like-for-like)
-- Anton Kulaga, 2023 call set: Generation I median 7,785.3 s; Generation II full median 33.7 s, cold 36.7 s, warm 16.2 s; ratios full 231×, cold 212×, warm 480× (warm is not like-for-like)
 - Generation II peak RAM, Anton Kulaga, published call set, all warm/full/cold runs: 2,054–2,270 MB
 - Generation II peak RAM, every full run on every genome: max 4,514 MB
 - Generation II peak RAM, every warm/full/cold run on every genome: max 4,525 MB
@@ -358,12 +327,11 @@ Every engine scored every ID.
 - Generation II Ensembl join step, night-2 runs in order: 97.8 s, 61.3 s, 32.1 s
 - Every Generation II full or cold run: 31.9–107.6 s; with Ensembl, pair runs: 64.2–142.0 s
 - Every Generation I full run: 5,889.3–10,627.7 s (1.6–3.0 h); dbSNP only, pair runs: 3,446.8–3,627.5 s
-- Full-run ratio over the three genomes Generation I ran on: 128–231×, mean 180×
+- Full-run ratio over the 2 genomes Generation I ran on: 128–181×, mean 155×
+- Generation I peak RAM, every run (full and dbSNP only): 3,837–4,611 MB
 - Generation II full runs, Anton Kulaga, published call set: n=10, 31.9–50.8 s (slowest 1.6× the fastest), CPU 250–387%
-- Generation II full runs, Anton Kulaga, 2023 call set: n=10, 33.0–105.0 s (slowest 3.2× the fastest), CPU 122–376%
 - Generation II full runs, Livia Zaharia: n=10, 62.0–107.6 s (slowest 1.7× the fastest), CPU 214–347%
 - Generation I full runs, Anton Kulaga, published call set: n=3, dates 2026-10-11; slowest is 3% slower than fastest
-- Generation I full runs, Anton Kulaga, 2023 call set: n=3, dates 2026-10-11, 2026-10-13; slowest is 38% slower than fastest
 - Generation I full runs, Livia Zaharia: n=3, dates 2026-10-13, 2026-10-15; slowest is 28% slower than fastest
 - PRS fixed, duckdb: matched / total per ID, median 53% (range 22–79%), n=100
 - PRS fixed, polars: matched / total per ID, median 53% (range 22–79%), n=100

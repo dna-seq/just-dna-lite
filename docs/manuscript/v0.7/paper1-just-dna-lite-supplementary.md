@@ -12,12 +12,12 @@
 **Figure S1.** Historical overview of Generation I module domains, including longevity-associated variants, drug response, cardiovascular traits, cancer and deleterious mutations. The lifespan axis illustrates the original organization of the modules; it does not represent predicted survival or measured effects on lifespan. Labels marked “in progress” describe the historical diagram, rather than the current module catalogue.
 <!-- @/rev T3 -->
 
-<!-- @rev B28 rounds=7 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-26,claude:2026-10-27 -->
-**S2. Generation I vs Generation II speed comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table S6) took 6,005.4, 6,068.5 and 5,889.3 s on Anton Kulaga's published call set on the first night; 5,995.5 s on his 2023 call set on the first night and 7,785.3 and 8,281.0 s on the second day; 10,627.7 and 8,337.6 s on Livia Zaharia's genome on the second day and 8,325.7 s two days later, repeating a third run that a system update had stopped after 1,277.8 s by restarting the Docker daemon; and, with dbSNP alone on the published call set, 7,041.5 s (the warm-up), 3,627.5 and 3,446.8 s. Their peak memory was 3,832 to 4,611 MB. In OakVar's own step times on the published call set (medians of the three runs), the postaggregator step, which runs the Generation I modules, took 38.9% of a run, the annotators 28.7% and the mapper 17.1%. The installed OakVar modules include dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). This section also keeps the earlier Generation I runs on the 2023 call set, made on another workstation with the OakVar and module versions of the time (2023-02-17: 5,651 s; 2023-02-19: 6,803 s; 2023-05-07: 7,662 s), reported in earlier drafts. The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of these values are generated into `docs/manuscript/benchmarks/a3/tables.md`.
+<!-- @rev B28 rounds=8 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28 -->
+**S2. Generation I vs Generation II speed comparison.** The individual 2026 Generation I runs (OakVar 2.13.1 on the workstation of Table S6) took 6,005.4, 6,068.5 and 5,889.3 s on Anton Kulaga's published call set on the first night; 10,627.7 and 8,337.6 s on Livia Zaharia's genome on the second day and 8,325.7 s two days later, repeating a third run that a system update had stopped after 1,277.8 s by restarting the Docker daemon; and, with dbSNP alone on the published call set, 7,041.5 s (the warm-up), 3,627.5 and 3,446.8 s. Their peak memory was 3,837 to 4,611 MB. In OakVar's own step times on the published call set (medians of the three runs), the postaggregator step, which runs the Generation I modules, took 38.9% of a run, the annotators 28.7% and the mapper 17.1%. The installed OakVar modules include dbSNP 156.0.1, ClinVar 2026.10.01, gnomAD 2.2.0 (data v2.1), SIFT 1.3.0, GENCODE 46.1.1 and the nine Generation I postaggregators, 0.1.0 to 0.1.2 (Table S2). The speedup reflects the architectural differences described in the main text; this comparison does not isolate their individual contributions. All of these values are generated into `docs/manuscript/benchmarks/a3/tables.md`.
 <!-- @/rev B28 -->
 
-<!-- @rev J16 rounds=7 by=claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,codex:2026-10-19,claude:2026-10-19,claude:2026-10-26,claude:2026-10-27 -->
-**Run protocol.** After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order (seed 20261010), with the machine idle. On a second day, with the desktop in light use, Generation II made five more full runs, after a warm-up, on each of the three call sets Generation I ran on, and Generation I ran twice more on the 2023 call set and twice on Livia Zaharia's genome, with a third run on hers two days later on the same kernel and Docker 29.9.0 (earlier runs: 29.8.2); the two systems' runs were not interleaved with each other. The dbSNP-only Generation I series and the Ensembl Generation II series had no separate warm-up run, so the first run of each, which read its database from disk for the first time (OakVar's annotator step took 3,520.3 s, against 608.1 and 574.8 s in the next two runs), is dropped as the warm-up; both first runs are in the repository's record of runs. Generation I ran with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module), with OakVar 2.13.1, the latest release at the time (published 2026-08-30), and the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
+<!-- @rev J16 rounds=8 by=claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,codex:2026-10-19,claude:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28 -->
+**Run protocol.** After one warm-up run, the Generation II runs of each genome were interleaved in a seeded random order (seed 20261010), with the machine idle. On a second day, with the desktop in light use, Generation II made five more full runs, after a warm-up, on each of the two call sets Generation I ran on, and Generation I ran twice on Livia Zaharia's genome, with a third run on hers two days later on the same kernel and Docker 29.9.0 (earlier runs: 29.8.2); the two systems' runs were not interleaved with each other. The dbSNP-only Generation I series and the Ensembl Generation II series had no separate warm-up run, so the first run of each, which read its database from disk for the first time (OakVar's annotator step took 3,520.3 s, against 608.1 and 574.8 s in the next two runs), is dropped as the warm-up; both first runs are in the repository's record of runs. Generation I ran with no warm-up, using its nine postaggregator modules (it has no counterpart of the Pathogenic module), with OakVar 2.13.1, the latest release at the time (published 2026-08-30), and the Generation I modules and annotation databases installed from the OakVar store in October 2026, in a Docker image that adds one compatibility line for the store's dbSNP annotator. Some store versions of the Generation I modules differ from those on GitHub; Table S2 lists the versions that ran beside both. All 2026 runs, Generation I included, used the same workstation.
 <!-- @/rev J16 -->
 
 <!-- @rev A3d rounds=2 by=claude:2026-10-12,claude:2026-10-26 -->
@@ -68,7 +68,7 @@ The 0.10.1 run, which the 0.10.2 rerun supersedes, also scored chrX, which its P
 **S6. Benchmark hardware and inputs.** The workstation, software versions and input genomes of the annotation benchmark in Section 4.1, recorded at run time (Table S6).
 <!-- @/rev C24a -->
 
-<!-- @rev B23 rounds=5 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-17,codex:2026-10-19,claude:2026-10-19 -->
+<!-- @rev B23 rounds=6 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-17,codex:2026-10-19,claude:2026-10-19,claude:2026-10-28 -->
 **Table S6.** Benchmark hardware and inputs, recorded at run time (October 2026).
 
 | Parameter | Value |
@@ -82,7 +82,6 @@ The 0.10.1 run, which the 0.10.2 rerun supersedes, also scored chrX, which its P
 | Input: Anton Kulaga, published call set | 6,079,744 records (4,616,002 SNVs), DeepVariant 1.1.0, GRCh38 |
 | Input: Livia Zaharia | 5,064,598 records (4,104,611 SNVs), DRAGEN 13.021.779.4.4.4, GRCh38 |
 | Input: Community reference | 7,753,721 records (6,476,847 SNVs), DeepVariant 1.0.0, GRCh38 |
-| Input: Anton Kulaga, 2023 call set | 6,138,868 records (4,724,429 SNVs), DeepVariant 1.3.0, GRCh38 |
 <!-- @/rev B23 -->
 
 
@@ -292,7 +291,7 @@ The comparison in Section 4.2 covers chromosomes 1 to 22. The just-prs project's
 
 **S10. Stage times and resources of the annotation runs.** Stage times, peak memory and CPU use of the full runs of Section 4.1.
 
-<!-- @rev C23 rounds=5 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-26 -->
+<!-- @rev C23 rounds=6 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-26,claude:2026-10-28 -->
 **Table S10.** Stage times and resources of the full annotation runs of Section 4.1 (medians unless stated). The stage times are those of the Dagster job; the wall time in Table 2 also includes about 5 s of Python start-up and module discovery.<!-- @rev B25 rounds=2 by=claude:2026-10-11,claude:2026-10-12 --> Peak RAM is the resident memory summed over the whole process tree (for Generation I, the container's processes), sampled ten times a second; pages shared between processes count once per process, which overstates the total, while a peak shorter than the sampling interval can be missed.<!-- @/rev B25 --> CPU is user plus system time divided by wall time; it was not recorded for Generation I, which ran inside Docker. Generation I has no counterpart of the three Generation II stages, so its stage cells are dashes; S2 gives OakVar's own steps. Warm and cold runs are in the repository's generated tables.
 
 | Genome | Run | *n* (runs) | Normalize (s) | Annotate (s) | Report (s) | Peak RAM, median (MB) | Peak RAM, max (MB) | CPU (%) |
@@ -302,8 +301,6 @@ The comparison in Section 4.2 covers chromosomes 1 to 22. The just-prs project's
 | Livia Zaharia | Generation II, full | 10 | 43.4 | 14.6 | 1.8 | 4,436 | 4,514 | 335 |
 | Livia Zaharia | Generation I | 3 | — | — | — | 4,529 | 4,529 | — |
 | Community reference | Generation II, full | 5 | 20.9 | 10.6 | 1.8 | 2,893 | 2,925 | 363 |
-| Anton Kulaga, 2023 call set | Generation II, full | 10 | 16.8 | 9.6 | 2.2 | 2,250 | 2,296 | 370 |
-| Anton Kulaga, 2023 call set | Generation I | 3 | — | — | — | 3,837 | 3,838 | — |
 <!-- @/rev C23 -->
 
 <!-- @rev V27 rounds=2 by=claude:2026-10-19,claude:2026-10-27 -->

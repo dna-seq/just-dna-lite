@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Generate every benchmark table of Paper 1 (Tables 2-5, S2, S3, S6) from the committed A3 files.
 
-Inputs, all in docs/manuscript/benchmarks/a3/: runs.csv, inputs.json, env.json, historical.csv,
+Inputs, all in docs/manuscript/benchmarks/a3/: runs.csv, inputs.json, env.json,
 oakvar/steps-*.tsv, oakvar/installed-2.13.1.json, prs/results-*/{fixed,original}/benchmark_results.csv,
 prs/sexchr-*/benchmark_{per_pgs,metadata}.csv (just-prs's own benchmark with X, Y, PAR and MT, copied in).
 Output: tables.md beside them. No number in the paper's Sections 4.1, 4.2 or S2-S3 is typed by hand;
 each one is in tables.md.
+
+The run records keep a fourth genome (key `calibration`, an unpublished call set) and its 2023 Generation I
+times (historical.csv). It is a private genome that cannot be published, so the authors took it out of the
+paper on 2026-10-28: no table here reads its runs, its input row or historical.csv.
 
 Standard library only:
 
@@ -20,12 +24,11 @@ from collections import defaultdict
 from pathlib import Path
 
 A3 = Path(__file__).resolve().parent.parent
-GENOMES = ("primary", "second_caller", "community_reference", "calibration")
+GENOMES = ("primary", "second_caller", "community_reference")
 GENOME_LABEL = {
     "primary": "Anton Kulaga, published call set (Zenodo 18370498)",
     "second_caller": "Livia Zaharia (Zenodo 19487816)",
     "community_reference": "Community reference (HG002, DeepVariant case study)",
-    "calibration": "Anton Kulaga, 2023 call set (unpublished)",
 }
 
 
@@ -92,6 +95,8 @@ FAILED = {
 def load_runs() -> dict[tuple[str, str, str], list[dict]]:
     groups = defaultdict(list)
     for r in csv.DictReader((A3 / "runs.csv").open()):
+        if r["genome"] not in GENOMES:
+            continue
         if r["exit"] != "0":
             assert r["run_dir"] in FAILED, r
             continue
@@ -100,7 +105,7 @@ def load_runs() -> dict[tuple[str, str, str], list[dict]]:
 
 
 def failed_runs() -> list[dict]:
-    return [r for r in csv.DictReader((A3 / "runs.csv").open()) if r["exit"] != "0"]
+    return [r for r in csv.DictReader((A3 / "runs.csv").open()) if r["exit"] != "0" and r["genome"] in GENOMES]
 
 
 def col(rows: list[dict], name: str) -> list[float]:
@@ -307,12 +312,8 @@ def table_sexchr() -> str:
 
 
 def s2(runs) -> str:
-    hist = list(csv.DictReader((A3 / "historical.csv").open()))
     rows = []
-    for h in hist:
-        if h["tool"] == "oakvar":
-            rows.append(["2023 (old workstation)", short("calibration"), "full", h["date"], h["value_s"], "—", "—", "—"])
-    for g, t in (("primary", "full"), ("calibration", "full"), ("second_caller", "full"), ("primary", "dbsnp_only")):
+    for g, t in (("primary", "full"), ("second_caller", "full"), ("primary", "dbsnp_only")):
         for r in sorted(runs.get(("oakvar", g, t), []), key=lambda r: r["started_at"]):
             used = "warm-up, dropped" if in_pair_series(r) and r["order"] == "0" else "Table 2"
             rows.append(["2026 (this machine)", short(g), t, r["started_at"][:16].replace("T", " ") + " UTC",
@@ -334,21 +335,6 @@ def s2(runs) -> str:
             step_rows.append([f"  {name}", f(st.median(vals)), ""])
     steps_table = table([f"OakVar step / module ({short('primary')}, median of 3)", "Seconds", "Share"], step_rows)
 
-    old_oak = [float(h["value_s"]) for h in hist if h["tool"] == "oakvar"]
-    old_jdl = next(h for h in hist if h["tool"] == "jdl" and h["run_type"] == "normal")
-    new_oak = st.median(col(runs[("oakvar", "calibration", "full")], "cli_wall_s"))
-    new_warm = st.median(col(runs[("jdl", "calibration", "warm")], "cli_wall_s"))
-    new_full = st.median(col(runs[("jdl", "calibration", "full")], "cli_wall_s"))
-    factor_rows = [
-        ["Generation I, full", f"{f(st.mean(old_oak))} (mean of {len(old_oak)}, 2023)", f(new_oak),
-         f"{st.mean(old_oak) / new_oak:.2f}"],
-        ["Generation II, 'normal' (2023 tables) vs warm (2026)", f"{old_jdl['mean_s']} (mean of {old_jdl['n']})",
-         f(new_warm), f"{float(old_jdl['mean_s']) / new_warm:.2f}"],
-        ["Generation II, 'normal' (2023 tables) vs full (2026)", f"{old_jdl['mean_s']} (mean of {old_jdl['n']})",
-         f(new_full), f"{float(old_jdl['mean_s']) / new_full:.2f}"],
-    ]
-    factor_table = table([short("calibration"), "Old workstation, s", "This machine (median), s", "Old ÷ new"], factor_rows)
-
     installed = json.loads((A3 / "oakvar" / "installed-2.13.1.json").read_text())
     used = {"dbsnp", "clinvar", "omim", "ncbigene", "pubmed", "gnomad", "sift", "cardioboost", "vcf-converter",
             "gencode", "vcfinfo", "tagsampler", "longevity2reporter"}
@@ -356,7 +342,7 @@ def s2(runs) -> str:
                 for m in sorted(installed, key=lambda m: (m["type"], m["name"]))
                 if m["name"] in used or m["name"].startswith("just_")]
     mod_table = table(["OakVar module", "Type", "Version", "Data source"], mod_rows)
-    return "\n\n".join([runs_table, steps_table, factor_table, mod_table])
+    return "\n\n".join([runs_table, steps_table, mod_table])
 
 
 def s3(config: str) -> str:
@@ -477,7 +463,7 @@ def quoted(runs) -> str:
     """Every number the paper's prose quotes, with where it comes from."""
     med = lambda k: st.median(col(runs[k], "cli_wall_s"))  # noqa: E731
     lines = []
-    for g in ("primary", "calibration"):
+    for g in ("primary",):
         oak = med(("oakvar", g, "full"))
         lines += [
             f"- {short(g)}: Generation I median {f(oak)} s; Generation II full median {f(med(('jdl', g, 'full')))} s, "
@@ -534,15 +520,19 @@ def quoted(runs) -> str:
         f"- Every Generation I full run: {f(min(g1))}–{f(max(g1))} s ({min(g1) / 3600:.1f}–{max(g1) / 3600:.1f} h); "
         f"dbSNP only, pair runs: {f(min(oak_p))}–{f(max(oak_p))} s",
     ]
-    three = [med(("oakvar", g, "full")) / med(("jdl", g, "full")) for g in ("primary", "calibration", "second_caller")]
-    lines.append(f"- Full-run ratio over the three genomes Generation I ran on: {min(three):.0f}–{max(three):.0f}×, "
-                 f"mean {st.mean(three):.0f}×")
-    for g in ("primary", "calibration", "second_caller"):
+    oak_genomes = [g for g in GENOMES if ("oakvar", g, "full") in runs]
+    ratios_g1 = [med(("oakvar", g, "full")) / med(("jdl", g, "full")) for g in oak_genomes]
+    lines.append(f"- Full-run ratio over the {len(oak_genomes)} genomes Generation I ran on: "
+                 f"{min(ratios_g1):.0f}–{max(ratios_g1):.0f}×, mean {st.mean(ratios_g1):.0f}×")
+    lines.append(f"- Generation I peak RAM, every run (full and dbSNP only): "
+                 f"{f(min(x for k, rs in runs.items() if k[0] == 'oakvar' for x in col(rs, 'peak_rss_mb')), 0)}–"
+                 f"{f(max(x for k, rs in runs.items() if k[0] == 'oakvar' for x in col(rs, 'peak_rss_mb')), 0)} MB")
+    for g in oak_genomes:
         w = col(runs[("jdl", g, "full")], "cli_wall_s")
         cpu = col(runs[("jdl", g, "full")], "cpu_pct")
         lines.append(f"- Generation II full runs, {short(g)}: n={len(w)}, {f(min(w))}–{f(max(w))} s "
                      f"(slowest {max(w) / min(w):.1f}× the fastest), CPU {min(cpu):.0f}–{max(cpu):.0f}%")
-    for g in ("primary", "calibration", "second_caller"):
+    for g in oak_genomes:
         rs = runs.get(("oakvar", g, "full"), [])
         w = col(rs, "cli_wall_s")
         lines.append(f"- Generation I full runs, {short(g)}: n={len(rs)}, dates "
@@ -586,7 +576,7 @@ def main() -> None:
     for config, label in (("fixed", "fixed benchmark inputs (primary)"), ("original", "original benchmark inputs")):
         parts += [f"## Table 4 ({label}). PRS runtime per PGS ID", table4(config),
                   f"## Table 5 ({label}). Score concordance", table5(config)]
-    parts += ["## S2. Generation I runs, steps, hardware factor and module versions", s2(runs)]
+    parts += ["## S2. Generation I runs, steps and module versions", s2(runs)]
     for config in ("fixed", "original"):
         parts += [f"## S3 ({config}). Large scoring files: time and memory", s3(config)]
     parts += [f"## PRS with X, Y, PAR and MT: score concordance (just-prs benchmark, {short('primary')})", table_sexchr()]
