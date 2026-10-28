@@ -5,7 +5,7 @@
 # Regenerate the ladders and the requirements from it: see paper1-just-dna-lite.venue-requirements.md and the two
 # *-ladder.csv files beside it.
 manuscript: paper1-just-dna-lite.md
-updated: '2026-10-27'
+updated: '2026-10-28'
 priorities:
   journals:
   - speed
@@ -21,6 +21,18 @@ priorities:
   jif_floor_note: above 3, as the authors said; a journal at exactly 3.0 is kept and marked at the floor
   ai_rules: the authors said on 2026-10-27 that a rule reserving Results and Discussion for the authors is too tough;
     AI drafted and rewrote passages throughout, Results and Discussion included
+  # What the paper already has (Section 4): just-prs compared with PLINK2 on 100 PGS Catalog scores, and the
+  # annotation speed compared with Generation I. Read from the manuscript on 2026-10-28, not a new promise.
+  validation_available:
+  - benchmark
+# The study design as the manuscript shows it, a draft until the authors confirm it (no `confirmed`). What the
+# paper reports is what preprint servers screen on: disease-risk modules and risk scores for diseases are
+# health-related information, and the benchmarks run on the authors' own published genomes.
+study:
+  designs:
+  - software-tool
+  health_information: true
+  human_data: author-self-released
 ladders:
   preprints:
   - biorxiv

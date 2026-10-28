@@ -199,6 +199,13 @@ Bioinformatics and Cell Genomics on this ladder, not to JAMIA Open, Cell Reports
 ([list](https://www.biorxiv.org/submit-a-manuscript)). Every journal below accepts a manuscript already on
 bioRxiv. The Cell Press journals (iScience, Cell Reports Methods, Cell Genomics) allow only the original
 submitted version on the server: do not post revised versions once the paper is under review there.
+The servers' screening rules, read on 28 October 2026, explain the Generation I paper's round trip: bioRxiv
+sends clinical papers to medRxiv and keeps an epidemiology paper only if it "contains no health-related
+information", and medRxiv's screeners ask whether a paper is "a clinical research manuscript", with
+"Announcements of tools or services" out of scope, so a tool paper that reports disease risk can be sent from
+one to the other and back. arXiv states no such rule, which is why the regenerated preprint ladder sorts it
+first; the order stays bioRxiv first, because both bioRxiv and medRxiv refuse a manuscript already posted on
+another server, so arXiv first would close them.
 
 **Journal ladder.**
 
@@ -213,8 +220,13 @@ submitted version on the server: do not post revised versions once the paper is 
 | 7 | **NAR Genomics and Bioinformatics** (Application Note, Methods) | 44 | 3.0, at the floor | OUP default | yes | US$2,633 (DOAJ); no agreement | benchmarks against "an adequate number of relevant alternative" methods |
 | 8 | **Cell Genomics** (Technology) | 5, desk decisions included | 8.4 | Elsevier policy | yes | US$8,900, 15% off under DEAL | "significant improvements over existing methods", a step-by-step protocol; the reach rung |
 
-The sorted order would put Cell Genomics first on its 5-day median; it is last because that figure is mostly
-desk decisions and its Technology bar is the highest here. Frontiers in Bioinformatics and JAMIA Open sit above
+Every journal's validation rules were read on 27 and 28 October 2026. iScience, Cell Reports Methods (its
+comparison rule is met by the PLINK2 benchmark), PLOS Computational Biology, JAMIA Open and Frontiers in
+Bioinformatics fit; Cell Genomics (a "significant improvement" Technology bar), Genomics (its Guide for Authors
+could not be read) and NAR Genomics and Bioinformatics (a Methods Paper needs benchmarks showing a significant
+improvement) depend on a condition, so the sorted order puts them last. Before these rules were read, the
+sorted order put Cell Genomics first on its 5-day median; it is last because that figure is mostly desk
+decisions and its Technology bar is the highest here. Frontiers in Bioinformatics and JAMIA Open sit above
 journals with a published speed because their software article types fit the paper as it is. Elsevier's policy
 also advises keeping a record of the AI tools used, which editors may ask to see; it requires none, and nothing
 is deposited.
