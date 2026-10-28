@@ -110,6 +110,26 @@ If a build ever needs it from a clone of this repository, commit it deliberately
 Code: `src/just_dna_lite/manuscript/ledger.py`. Tests: `tests/test_manuscript_ledger.py`, which
 inserts markers into the real paper text and checks the round trip.
 
+## What changed since a round, word by word
+
+A segment's marker says only that something in it was rewritten, so a paragraph that kept nine of its
+ten sentences reads as rewritten. `rounds-diff` compares the clean text of consecutive rounds and gives
+each word of the newest round the round that last changed it; words carried unchanged from the base round
+get none:
+
+```bash
+uv run manuscript rounds-diff v0.3=docs/manuscript/v0.3/paper1-just-dna-lite.md \
+  v0.4=docs/manuscript/v0.4/paper1-just-dna-lite.md v0.5=docs/manuscript/v0.5/paper1-just-dna-lite.md \
+  v0.6=docs/manuscript/v0.6/paper1-just-dna-lite.md --out /tmp/rounds.json
+```
+
+The JSON lists `spans` (consecutive words from one round, with offsets into the newest clean text, the
+Markdown, the text as the Doc shows it, eight words of context each side and the section) and `deletions`
+(text a round removed with nothing in its place, anchored where it stood), so a script can colour the
+newest Google Doc by round. Words and punctuation are compared apart, so a changed superscript does not
+colour the name beside it. Text moved to another place counts as changed in the round that moved it.
+Code: `src/just_dna_lite/manuscript/rounds_diff.py`. Tests: `tests/test_manuscript_rounds_diff.py`.
+
 ## Building the PDF
 
 ```bash

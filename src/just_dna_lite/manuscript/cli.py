@@ -19,6 +19,7 @@ from just_dna_lite.manuscript.build import (
     write_clean_twin,
 )
 from just_dna_lite.manuscript.ledger import LedgerError, ledger_app
+from just_dna_lite.manuscript.rounds_diff import rounds_diff
 from just_dna_lite.manuscript.s4 import (
     BIBLIOGRAPHY_JSON,
     CITATIONS_CSV,
@@ -111,6 +112,31 @@ def build(
     typer.echo(f"wrote {result.pdf} ({pages})")
     for character, count in result.missing_characters.items():
         typer.echo(f"warning: {character} is missing from the font and left blank ({count}x); see {paths.log}", err=True)
+
+
+@app.command("rounds-diff")
+def rounds_diff_command(
+    masters: Annotated[
+        list[str],
+        typer.Argument(metavar="ROUND=PATH...", help="Masters from the base round to the newest, e.g. v0.3=docs/manuscript/v0.3/paper1-just-dna-lite.md"),
+    ],
+    out: Annotated[Path, typer.Option("--out", "-o", dir_okay=False, help="Where the JSON of spans goes")],
+) -> None:
+    """Mark each word of the newest round with the round that last changed it; base-round words stay unmarked."""
+    pairs: list[tuple[str, Path]] = []
+    for item in masters:
+        name, sep, path = item.partition("=")
+        if not sep or not Path(path).is_file():
+            raise typer.BadParameter(f"{item!r} is not ROUND=PATH to an existing file", param_hint="ROUND=PATH")
+        pairs.append((name, Path(path)))
+    try:
+        result = rounds_diff(pairs)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="ROUND=PATH") from exc
+    out.write_text(result.model_dump_json(indent=1), encoding="utf-8")
+    shares = ", ".join(f"{name}: {n:,}" for name, n in result.words_by_round.items())
+    typer.echo(f"{result.words:,} words; unchanged since {result.base}: {result.unchanged_words:,}; {shares}")
+    typer.echo(f"wrote {out} ({len(result.spans):,} spans, {len(result.deletions):,} deletions)")
 
 
 @s4_app.command("snapshot")
