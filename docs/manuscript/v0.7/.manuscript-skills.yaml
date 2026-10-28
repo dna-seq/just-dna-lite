@@ -69,5 +69,8 @@ coauthors:
         Supplementary Table S4. Module sources (v0.7): https://docs.google.com/document/d/1Ry0MGrNYNiCuO5Z0pvHF5jFxCzYIlGhDU-JOLzUGuT8/edit
         '1. Supplementary Data: Just-DNA-Lite (v0.7)': https://docs.google.com/document/d/1X1eWukEm5_pgYI5QzzaEHTSwdsV60dSQ_JYDwkQzg3c/edit
         '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring (v0.7)': https://docs.google.com/document/d/1tdYc2Ng9yycUCUI6Zj_-m6PPcajPaRt0bA517kawudM/edit
+      circulated:
+      - date: '2026-10-28'
+        commit: d85c7f9
 other_models:
 - codex/gpt-6.1-sol
