@@ -1,0 +1,4 @@
+# Who is a person in this project's revision marks (manuscript-revision-marks).
+humans = ["robi", "usanov", "antonkulaga"]
+# The Sonnet claim validator that checked rewritten segments in v0.4.
+agents = ["validator"]
