@@ -1,7 +1,8 @@
 {
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
-    "just-module-creator@dna-seq": true
+    "just-module-creator@dna-seq": true,
+    "manuscript-skills@dna-seq": true
   },
   "extraKnownMarketplaces": {
     "dna-seq": {
