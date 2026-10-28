@@ -7,6 +7,7 @@ Each requirement is listed with the venues that ask for it; "every venue" means 
 - Sections to add (one a single venue requires costs the others little):
   - [ ] Background and Significance (JAMIA Open (Application Note))
   - [ ] Data Availability Statement (JAMIA Open (Application Note))
+  - [ ] Data availability (NAR Genomics and Bioinformatics)
 - Rules the editors check on arrival, to check against the draft:
   - [ ] Studies involving humans name the approving committee in STAR Methods, or the committee that granted an exemption (iScience)
   - [ ] Sex or gender and age reported for human participants, or the reason they are not (iScience)
@@ -20,6 +21,11 @@ Each requirement is listed with the venues that ask for it; "every venue" means 
   - [ ] Identifying information only when essential, with written informed consent given after the person has seen the manuscript (JAMIA Open (Application Note))
   - [ ] A Data Availability Statement, with public datasets cited in the references with the [dataset] tag (JAMIA Open (Application Note))
   - [ ] Alt text under the legend of each figure (JAMIA Open (Application Note))
+  - [ ] Data and code for the reviewers at submission; raw data deposited at resubmission (Cell Reports Methods)
+  - [ ] Editors weigh the fit to scope, the advance in the context of the field and the support for the conclusions (Cell Reports Methods and Cell Genomics)
+  - [ ] Only contributions whose novel bioinformatics components are open source are considered (NAR Genomics and Bioinformatics)
+  - [ ] Software without an OSI-recognised licence is not reviewed (NAR Genomics and Bioinformatics)
+  - [ ] Datasets and software or code available with the initial submission, so that they can be vetted in review (Cell Genomics)
   - [ ] A manuscript already posted on another preprint server is not posted (so posting on arXiv first closes bioRxiv and medRxiv for it) (bioRxiv)
   - [ ] No narrative reviews (bioRxiv)
   - [ ] No announcements of tools or services without data (bioRxiv)
@@ -35,9 +41,10 @@ Each requirement is listed with the venues that ask for it; "every venue" means 
 
 These wait until the venue is chosen, or follow the ladder's first choice.
 
-- Length of the body: recorded limits are Frontiers in Bioinformatics, 12000; JAMIA Open (Application Note), 2000; Cell Reports Methods, 7000; PLOS Computational Biology (Software), 3500; Cell Genomics, 8000 words; other venues' limits are unknown. Keep this as a venue-specific choice until those rules are checked; no shared cap is established.
-- Length of the abstract: recorded limits are JAMIA Open (Application Note), 150; Genomics, 250; PLOS Computational Biology (Software), 300 words; other venues' limits are unknown. Keep this as a venue-specific choice until those rules are checked; no shared cap is established.
-- Abstract headings differ: JAMIA Open (Application Note): Objectives, Materials and Methods, Results, Discussion, Conclusion; Genomics: no headings (unstructured). The other venues' headings are unknown.
+- Length of the body: recorded limits are iScience, 8000 (recommended); Frontiers in Bioinformatics, 12000; JAMIA Open (Application Note), 2000; Cell Reports Methods, 7000; PLOS Computational Biology (Software), 3500; Cell Genomics, 8000 words; NAR Genomics and Bioinformatics sets none; other venues' limits are unknown. Keep this as a venue-specific choice until those rules are checked; no shared cap is established.
+- Length of the abstract: recorded limits are iScience, 150; JAMIA Open (Application Note), 150; Cell Reports Methods, 150; Genomics, 250; PLOS Computational Biology (Software), 300; NAR Genomics and Bioinformatics, 200; Cell Genomics, 150 words; other venues' limits are unknown. Keep this as a venue-specific choice until those rules are checked; no shared cap is established.
+- Abstract headings differ: iScience: no headings (unstructured); JAMIA Open (Application Note): Objectives, Materials and Methods, Results, Discussion, Conclusion; Cell Reports Methods: no headings (unstructured); Genomics: no headings (unstructured); NAR Genomics and Bioinformatics: no headings (unstructured); Cell Genomics: no headings (unstructured). The other venues' headings are unknown.
+- Body sections: Introduction, Materials and methods, Results, Discussion, set by NAR Genomics and Bioinformatics; iScience, Frontiers in Bioinformatics, JAMIA Open (Application Note), Cell Reports Methods, Genomics, PLOS Computational Biology (Software), Cell Genomics, bioRxiv and arXiv set none or are not researched for it. Keep this as a venue-specific choice until those rules are checked.
 - Rules that only some venues state; a section order, a format or a reference style waits for the choice:
   - No particular format for the first submission: a title, the authors and affiliations, a summary and enough experimental information to interpret the results (iScience)
   - A cover letter, seen only by the editors, that explains the background, the conceptual advance and the significance of the work, and a completed declaration of interests form (iScience)
@@ -45,20 +52,41 @@ These wait until the venue is chosen, or follow the ladder's first choice.
   - The project link, the operating system, the programming language and any restriction on non-academic use stated in the article (Frontiers in Bioinformatics)
   - The code placed online in a repository with a DOI or URI for retrieval (Frontiers in Bioinformatics)
   - A link to a publicly accessible code repository, and a Jupyter notebook with working code examples where one applies (JAMIA Open (Application Note))
+  - No particular format for the first submission: a title, the authors and affiliations, a summary and enough experimental information to interpret the results; a cover letter, seen only by the editors, on the background, the conceptual advance and the significance; a completed declaration of interests form; at most 20 MB of files in all (Cell Reports Methods and Cell Genomics)
   - The sections Introduction, Design and Implementation, Results, and Availability and Future Directions; the title names the software (PLOS Computational Biology (Software))
   - A cover letter that explains how the Software criteria are met (PLOS Computational Biology (Software))
+  - A text abstract of one paragraph of at most 200 words, without subheadings, citations, URLs or non-standard abbreviations; a graphical abstract is optional; Results and Discussion may be combined (NAR Genomics and Bioinformatics)
+  - After the Data availability statement: a supplementary data statement when there is supplementary material, then Acknowledgements, an Author contributions statement, Funding and Conflict of interest (NAR Genomics and Bioinformatics)
+  - An Application Note is at most 3,000 words with 3 figures or tables and 30 references (NAR Genomics and Bioinformatics)
 - Not needed until after the first review:
   - A summary of one paragraph of at most 150 words, without novelty claims such as 'novel' or 'first' (iScience)
   - A limitations-of-the-study subsection within the Discussion, specific to the paper, and a Resource availability section with lead contact, materials availability, and data and code availability (iScience)
+  - The revision follows the Cell Press structure: a summary of one paragraph of at most 150 words; up to 10 keywords; an Introduction without subheadings; Results under informative subheadings; Discussion, ending with a required 'limitations of the study' subsection that names the conditions the method needs and where related methods might be preferable; Resource availability (lead contact, materials availability, data and code availability); Author contributions; Declaration of interests; the declaration of generative AI use when AI was used; STAR Methods with a key resources table; numbered superscript references (Cell Reports Methods)
+  - A Motivation section at final submission: the problem that prompted the method and how the method addresses it (Cell Reports Methods)
+  - The revision follows the Cell Press structure: a summary of one paragraph of at most 150 words; up to 10 keywords; an Introduction without subheadings; Results under informative subheadings; Discussion; Resource availability (lead contact, materials availability, data and code availability); Author contributions; Declaration of interests; the declaration of generative AI use when AI was used; STAR Methods with a key resources table; numbered superscript references (Cell Genomics)
+  - A Technology article is under 7,000 words with up to 7 display items, has a Design section between the Introduction and the Results (the issues that prompted the technology, the rationale, the development, the options considered) and a step-by-step protocol in the supplement (Cell Genomics)
 
 ## At the end, once the code, data and results are final
 
 Done earlier, these have to be done twice.
 
 - Software and availability:
+  - [ ] All original code deposited in a repository that mints DOIs, or in the supplement, before acceptance, its DOI in the paper (iScience)
+  - [ ] A data and code availability statement in three parts (data, code, additional information) under Resource availability (iScience)
+  - [ ] Datasets and program code cited in the references, with persistent identifiers such as DOIs (iScience)
+  - [ ] Data and code for the reviewers at the first submission (Cell Reports Methods)
+  - [ ] All original code deposited in a repository that mints DOIs, or in the supplement, before acceptance (Cell Reports Methods and Cell Genomics)
+  - [ ] A data and code availability statement under Resource availability (Cell Reports Methods and Cell Genomics)
   - [ ] OSI-compliant source code (PLOS Computational Biology (Software))
   - [ ] Documentation (PLOS Computational Biology (Software))
   - [ ] Test data (PLOS Computational Biology (Software))
+  - [ ] Code on GitHub and archived in Zenodo before acceptance; not on the authors' own servers (NAR Genomics and Bioinformatics)
+  - [ ] An OSI-recognised licence, or the paper is not reviewed (NAR Genomics and Bioinformatics)
+  - [ ] Simple commands that deploy the software on the reference datasets (NAR Genomics and Bioinformatics)
+  - [ ] A Docker container in BioContainers when deployment compiles binaries (NAR Genomics and Bioinformatics)
+  - [ ] A public web service kept up for two years, without registration (NAR Genomics and Bioinformatics)
+  - [ ] All data and software code public as a condition of publication, with a data availability statement (NAR Genomics and Bioinformatics)
+  - [ ] Datasets and software or code made available with the initial submission (Cell Genomics)
 - Where the AI-use statement goes (one statement, placed everywhere a venue asks):
   - [ ] Titled declaration after Declaration of interests (published) (iScience, Cell Reports Methods and Cell Genomics)
   - [ ] Methods or STAR Methods when AI is part of the research design or methods (iScience, Cell Reports Methods and Cell Genomics)
@@ -118,14 +146,10 @@ The strictest rule on the list is Frontiers in Bioinformatics's: AI help is allo
 
 Neither the catalogue nor what was read for this manuscript covers these, so a venue listed here may still have a rule:
 
-- iScience (https://www.cell.com/iscience/information-for-authors/journal-policies): the length of the body, the length of the abstract, the abstract headings, the required sections and its software and availability rules. The page could not be read: plain download: blocked (HTTP 403); headless browser: blocked (challenge page); Internet Archive: no archived copy.
 - Frontiers in Bioinformatics (https://www.frontiersin.org/journals/bioinformatics/about): the length of the abstract, the abstract headings, the required sections and its software and availability rules.
 - JAMIA Open (Application Note) (https://academic.oup.com/jamiaopen/pages/General_Instructions): its software and availability rules.
-- Cell Reports Methods (https://www.cell.com/cell-reports-methods/information-for-authors/journal-policies): the length of the abstract, the abstract headings, the required sections, the rules checked on arrival, the other rules of its author guidelines and its software and availability rules. The page could not be read: plain download: blocked (HTTP 403); headless browser: blocked (challenge page); Internet Archive: no archived copy.
 - Genomics (https://www.sciencedirect.com/journal/genomics/publish/guide-for-authors): the length of the body, the required sections, the rules checked on arrival, the other rules of its author guidelines and its software and availability rules.
 - PLOS Computational Biology (Software) (https://journals.plos.org/ploscompbiol/s/ethical-publishing-practice): the abstract headings, the required sections and the rules checked on arrival.
-- NAR Genomics and Bioinformatics (https://academic.oup.com/nargab/pages/author-guidelines): the length of the body, the length of the abstract, the abstract headings, the required sections, the rules checked on arrival, the other rules of its author guidelines and its software and availability rules. The page could not be read: plain download: blocked (HTTP 403); headless browser: blocked (challenge page); Internet Archive: no archived copy.
-- Cell Genomics (https://www.cell.com/cell-genomics/information-for-authors/journal-policies): the length of the abstract, the abstract headings, the required sections, the rules checked on arrival, the other rules of its author guidelines and its software and availability rules. The page could not be read: plain download: blocked (HTTP 403); headless browser: blocked (challenge page); Internet Archive: no archived copy.
 - bioRxiv (https://www.biorxiv.org/about/FAQ): the length of the body, the length of the abstract, the abstract headings, the required sections, the other rules of its author guidelines and its software and availability rules.
 - arXiv (https://info.arxiv.org/help/submit/index.html): the length of the body, the length of the abstract, the abstract headings, the required sections, the other rules of its author guidelines and its software and availability rules.
 
