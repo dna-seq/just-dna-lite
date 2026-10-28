@@ -232,6 +232,17 @@ determination.
 
 For v0.6, the active co-author copy is [this Google Doc](https://docs.google.com/document/d/1byTB914X6ueuMcAnWjunEYpOBGUxjJUJD5_znxu8QXA/edit), and the round's changelog is [this one](https://docs.google.com/document/d/1B1fDEsmLhA0GF9TD6QDpiC4A9q4IlqE_Q3KzlSJOsYE/edit). Apply corrections to the repository master first, finish all manuscript changes for the session, then sync them to that existing Doc. Preserve its native tables; the .docx from `manuscript build` brings their borders and column widths, so check them after import or formatting changes. Embed the figures in both the master and Google Doc, and keep standalone copies in `v0.6/figures/` for submission. Reuse existing repository figures rather than retaking them; use Chrome for any missing screenshots and preserve their aspect ratios.
 
+The [manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin's `manuscript-coauthors` skill
+runs these steps from the settings saved in `v0.6/.manuscript-skills.yaml` (the `coauthors` block: rclone remote
+`gdrive`, the shared Manuscript folder by its id, what each release uploads and under which title, and for each
+round its base commit, Doc links and the commits the co-authors received). `rounds.py pull 0.6 --go` exports the
+round's Docs and merges the co-authors' comments into `v0.6/comments.yaml` (ids continue the project's `C<n>`);
+`comments.py status` says how the next round answers each; `comments.py changelog` writes the changelog from the
+round's base with Why taken from the comments and `--seen` marking what changed since the draft the co-authors
+read; `rounds.py push 0.7` prints the builds and uploads of steps 2, 3 and 5 and runs them with `--go`, refusing to
+replace a Doc that already has comments. Step 4, looking at the exported pages, stays by hand, and so does the
+landscape build of the Supplementary Data PDF that step 5 uploads (`push` lists it as not found until it exists).
+
 1. `git mv` every file changed since the last release into the new `vX.Y/` and copy the unchanged
    ones (`supplementary/`), put the released text back in the old folder with
    `git show <release commit>:<path>`, and relabel the paper's header.

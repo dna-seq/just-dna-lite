@@ -1,0 +1,28 @@
+# Co-authors' comments on this round, kept by manuscript-coauthors (comments.py).
+# status: open | addressed | partly | declined | not-on-point. now: the next round's passage that
+# answers it, verbatim. why: what was done and why, or why not. next: what could still be done.
+round: '0.6'
+master: paper1-just-dna-lite.md
+sources:
+- doc: https://docs.google.com/document/d/1byTB914X6ueuMcAnWjunEYpOBGUxjJUJD5_znxu8QXA/edit
+  file: '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk
+    Scoring (v0.6).docx'
+  pulled: '2026-10-28T10:25:05Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1nVJCMSkGc0Fw91mkjoCwWugDTYvn26rZ0zObUEPOVWw/edit
+  file: '1. Supplementary Data: Just-DNA-Lite (v0.6).docx'
+  pulled: '2026-10-28T10:25:08Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1ws3MYjey7GNVMbwdYAMQC2XkIZ7sglXMwVt8pHIrg6Y/edit
+  file: Supplementary Table S5. PGS Catalog coverage of just-prs (v0.6).docx
+  pulled: '2026-10-28T10:25:11Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1UOgJigPcL8wYrz8spTqu5xK6O7pHpM25Dmz5lVjLbpg/edit
+  file: Supplementary Table S4. Module sources (v0.6).docx
+  pulled: '2026-10-28T10:25:15Z'
+  items: 0
+  new: 0
+items: []

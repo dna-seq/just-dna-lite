@@ -797,6 +797,13 @@ not a VCF liftover and cannot be reused for annotation.
   (keep-with-next styles). This is docx-only: the LaTeX PDF still squeezes Table S7.
   Never hand-convert a clean twin with bare pandoc: that is how v0.5 reached co-authors with
   borderless, word-per-line tables. Tests: `tests/test_manuscript_docx.py`.
+- Rounds go to co-authors on Google Drive through the `manuscript-coauthors` skill (manuscript-skills ≥ 0.42),
+  whose settings sit in `v0.6/.manuscript-skills.yaml` (`coauthors`: rclone remote `gdrive`, the shared
+  Manuscript folder's id, each round's Docs, base commit and circulation commits). Before revising a round,
+  pull the co-authors' comments on the previous one (`rounds.py pull`) into `vX.Y/comments.yaml`, ids `C<n>`
+  continuing the project's numbering (`C1`–`C39` are Robi's v0.3 comments); name answering segments after
+  them (`@rev C41`). `rounds.py push X.Y` builds and uploads a release (a dry run without `--go`; never over a
+  Doc with comments without asking). Release steps: `docs/manuscript/README.md`, "Releasing a round".
 - Before submitting, run the `manuscript-integrity-check` skill from the
   [manuscript-skills](https://github.com/dna-seq/manuscript-skills) plugin (desk-reject screens, reference
   resolution, AI-use disclosure per venue); `manuscript-journal-select` compares venues and
