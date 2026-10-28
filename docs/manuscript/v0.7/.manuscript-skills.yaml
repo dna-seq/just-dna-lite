@@ -1,0 +1,66 @@
+# Manuscript Skills: choices for this manuscript project.
+schema_version: 1
+manuscripts:
+- paper1-just-dna-lite.md
+- paper1-just-dna-lite-supplementary.md
+code_roots:
+- ../../..
+output_dir: reviews
+related_manuscripts:
+- ../../../../just-module-creator/docs/manuscript/manuscript.tex
+settings:
+  reports: file
+  edits: apply
+  versions: in-place
+  keep: everything
+coauthors:
+  drive: rclone
+  remote: gdrive
+  folder_id: 1xdSIuRR_lGklF_vEIqVXqvLGW23FUluX
+  round_folder: v{round}
+  build: uv run manuscript build {file} --no-pdf
+  release:
+    docs:
+    - 'paper1-just-dna-lite.md=1. Just-DNA-Lite: a Local-First, Open-Source Platform
+      for Personal Genome Annotation and Polygenic Risk Scoring (v{round})'
+    - 'paper1-just-dna-lite-supplementary.md=1. Supplementary Data: Just-DNA-Lite
+      (v{round})'
+    - supplementary/S4_module_sources.md=Supplementary Table S4. Module sources (v{round})
+    - supplementary/S5_pgs_coverage.md=Supplementary Table S5. PGS Catalog coverage
+      of just-prs (v{round})
+    - build/changes-from-v{previous}.xlsx=1. Changes from v{previous} to v{round}
+    files:
+    - 'build/paper1-just-dna-lite.pdf=1. Just-DNA-Lite: a Local-First, Open-Source
+      Platform for Personal Genome Annotation and Polygenic Risk Scoring (v{round}).pdf'
+    - 'build/paper1-just-dna-lite-supplementary.pdf=1. Supplementary Data: Just-DNA-Lite
+      (v{round}).pdf'
+    - ethics biochemistry.jpeg=Ethics committee determination, IBAR (scan).jpeg
+    - figures/*=Figures/
+    - supplementary/*.csv=Supplementary data files/
+    - supplementary/S13_worked_report_row.json=Supplementary data files/
+    - supplementary/S5_unplaceable_weight_histogram.*=Supplementary data files/
+  rounds:
+    '0.5':
+      base: 54e9cc7
+      released: '2026-10-19'
+      docs:
+        '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring (v0.5)': https://docs.google.com/document/d/1ZgaFbXmOXkkFMUMuSUR8_STPIjrZzjRZspfjQsmqdjU/edit
+        '1. Supplementary Data: Just-DNA-Lite (v0.5)': https://docs.google.com/document/d/1XGwRBSGg43Cgy8DnjkaqXFQ4hUNjMMEZL3NcMU0Mvpw/edit
+        Supplementary Table S5. PGS Catalog coverage of just-prs (v0.5): https://docs.google.com/document/d/1eOxZ5Ld-i0tFopSAF-9jOe0OUFQAFue4jvA0ATTvrTg/edit
+        Supplementary Table S4. Module sources (v0.5): https://docs.google.com/document/d/1v_nZ7YVOzztG-MQQrCgqNxAQLE4Q3p_ftgfgEs4VOTs/edit
+    '0.6':
+      base: 966c29f
+      released: '2026-10-26'
+      docs:
+        '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring (v0.6)': https://docs.google.com/document/d/1byTB914X6ueuMcAnWjunEYpOBGUxjJUJD5_znxu8QXA/edit
+        '1. Supplementary Data: Just-DNA-Lite (v0.6)': https://docs.google.com/document/d/1nVJCMSkGc0Fw91mkjoCwWugDTYvn26rZ0zObUEPOVWw/edit
+        1. Changes from v0.5 to v0.6: https://docs.google.com/spreadsheets/d/1B4QAZfjK8XzKZL5BKtCjx_bKFwlUDTHesRDZhDVm5i4/edit
+        Supplementary Table S5. PGS Catalog coverage of just-prs (v0.6): https://docs.google.com/document/d/1ws3MYjey7GNVMbwdYAMQC2XkIZ7sglXMwVt8pHIrg6Y/edit
+        Supplementary Table S4. Module sources (v0.6): https://docs.google.com/document/d/1UOgJigPcL8wYrz8spTqu5xK6O7pHpM25Dmz5lVjLbpg/edit
+      circulated:
+      - date: '2026-10-26'
+        commit: d68909d
+    '0.7':
+      base: 05a5634
+other_models:
+- codex/gpt-6.1-sol

@@ -25,4 +25,109 @@ sources:
   pulled: '2026-10-28T10:25:15Z'
   items: 0
   new: 0
-items: []
+- doc: https://docs.google.com/spreadsheets/d/1B4QAZfjK8XzKZL5BKtCjx_bKFwlUDTHesRDZhDVm5i4/edit
+  file: open-points.yaml
+  pulled: '2026-10-28T16:58:25Z'
+  items: 6
+  new: 6
+items:
+- id: C39
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: 'v0.6 changes workbook, Open points for the authors|2026-10-26|Anton''s SecvADN affiliation was dropped '
+  anchor: Kulaga Anton^1,2,†^
+  context_before: ''
+  context_after: ''
+  comment: Anton's SecvADN affiliation was dropped on the reading that "Anton has IBAR and IBIMA" means only those
+    two. He is still listed as a SecvADN co-founder under Competing Interests.
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: "Confirm Anton Kulaga's affiliations: IBIMA and IBAR only, or SecvADN as well."
+  decision: true
+- id: C40
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: v0.6 changes workbook, Open points for the authors|2026-10-26|Karmazin keeps SecvADN beside HEALES. Dr
+  anchor: Karmazin Alexey^3,4^
+  context_before: ''
+  context_after: ''
+  comment: Karmazin keeps SecvADN beside HEALES. Drop SecvADN if HEALES should be his only affiliation.
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: "Confirm Alexey Karmazin's affiliations: HEALES and SecvADN, or HEALES only."
+  decision: true
+- id: C41
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: 'v0.6 changes workbook, Open points for the authors|2026-10-26|Spelling: the paper keeps "Alina Fedorov'
+  anchor: Alina Fedorova
+  context_before: ''
+  context_after: ''
+  comment: 'Spelling: the paper keeps "Alina Fedorova", as in every earlier version (the request wrote "Fyodorova").'
+  where: Contribution Statements
+  line: 476
+  status: open
+  now: ''
+  why: ''
+  next: "Confirm the spelling of Alina Fedorova's name in the Acknowledgments (Fedorova or Fyodorova)."
+  decision: true
+- id: C42
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: 'v0.6 changes workbook, Open points for the authors|2026-10-26|Trait count: the request remembered abou'
+  anchor: for 6,117 scores across 778 traits
+  context_before: ''
+  context_after: ''
+  comment: 'Trait count: the request remembered about 600 traits; the published data give 778 EFO traits among the
+    6,117 scores. The paper uses 778.'
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 84
+  status: open
+  now: ''
+  why: ''
+  next: "Confirm 778 traits (distinct EFO ids among the 6,117 published scores), or say which count the paper should use."
+  decision: true
+- id: C43
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: v0.6 changes workbook, Open points for the authors|2026-10-26|Direction annotations (F3) are AI-assist
+  anchor: annotated from the source publications by AI agents
+  context_before: ''
+  context_after: ''
+  comment: Direction annotations (F3) are AI-assisted and none is yet marked as reviewed by a person; the sentence
+    says so. Remove it if that caveat weakens the paragraph more than the feature helps.
+  where: 3.2 Polygenic Risk Scores
+  line: 232
+  status: open
+  now: ''
+  why: ''
+  next: "Keep or remove the sentence saying the 2,282 direction annotations are AI-made and pending expert review."
+  decision: true
+- id: C44
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: v0.6 changes workbook, Open points for the authors|2026-10-26|Module examples (F4) leave out the perso
+  anchor: The fourteen beyond Table 1 include modules on APOE type
+  context_before: ''
+  context_after: ''
+  comment: Module examples (F4) leave out the personality, cognition and aggression modules in the registry, to
+    avoid a reviewer reading the paper as endorsing genetic prediction of behaviour.
+  where: 3.4 Growing the Module Ecosystem
+  line: 290
+  status: open
+  now: ''
+  why: ''
+  next: "Keep the behaviour modules out of the registry examples, or name them."
+  decision: true

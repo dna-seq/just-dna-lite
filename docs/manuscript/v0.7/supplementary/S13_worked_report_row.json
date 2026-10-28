@@ -1,0 +1,88 @@
+{
+  "description": "Extract of a real stored report row, inspected 2026-10-19; not a new benchmark or biological validation.",
+  "input": {
+    "source": "https://zenodo.org/records/18370498",
+    "sha256": "0ff74f990742954dff79d214118592f7b46481ecfdc381e769d48b717ab8acd5",
+    "checksum_match": "docs/manuscript/benchmarks/a3/inputs.json:primary.sha256"
+  },
+  "stored_report": {
+    "repository_relative_path": "data/output/users/anonymous/antonkulaga/reports/report_20260927_015129.html",
+    "sha256": "c14c43dd0083ef9b16e782517f88bcd8a15ea71eefe45e01f6715e05147b2e4a"
+  },
+  "reported_module_provenance": {
+    "module": "longevitymap",
+    "version": null,
+    "digest_prefix": "7ac6a922f7f4",
+    "source": "just-dna-seq/annotators",
+    "integrity_verified": false
+  },
+  "row": {
+    "rsid": "rs2802292",
+    "gene": "FOXO3",
+    "chrom": "6",
+    "start": 108587315,
+    "genome_build": "GRCh38",
+    "ref": "G",
+    "alt": "T",
+    "genotype": "G/T",
+    "genotype_evidence": "called",
+    "category": "insulin",
+    "weight": 0.475,
+    "displayed_direction": "Protective",
+    "conclusion": "4 SNPs previously reported to be associated with longevity were verified in this study. 4 novel SNPs (rs12206094, rs13220810, rs7762395, and rs9486902 (corrected P-values 0.001–0.044)) and two haplotypes(corrected P-values: 0.01–0.03) associated with longevity were found in this study. FOXO3A was a candidate longevity gene for survival from younger ages to old age, yet not during old age."
+  },
+  "studies": [
+    {
+      "pmid": "19415983",
+      "population": "Italian (Southern)",
+      "study_design": "FOXO3A polymorphisms (rs2802292, rs2764264, and rs13217795) were analyzed for longevity associations in 281 long-lived men (age range 90-108 years) and 195 controls (age range 18-48 years) from the Southern Italian Centenarian Study.",
+      "conclusion": "rs2802288, a proxy of rs2802292, showed the best allelic association--minor allele frequency (MAF) = 0.49; p = 0.003; odds ratio (OR) = 1.51; 95% confidence interval (CI), 1.15-1.98)."
+    },
+    {
+      "pmid": "19793722",
+      "population": "Chinese (Han)",
+      "study_design": "Six tagging SNPs from FOXO1A and FOXO3A were selected and genotyped in 1817 centenarians and younger individuals",
+      "conclusion": "All 3 SNPs of FOXO3A were associated with longevity in both genders (P = 0.005-0.001)"
+    },
+    {
+      "pmid": "18765803",
+      "population": "American of Japanese origin",
+      "study_design": "Nested-case control study of 5 candidate longevity genes in 8006 Japanese American men from the Honolulu Heart Program and 3741 men part of the Honolulu Asia Aging Study",
+      "conclusion": "Genetic variation in the FOXO3A gene was associated with longevity"
+    },
+    {
+      "pmid": "20884733",
+      "population": "Chinese (Han)",
+      "study_design": "Three SNPs in FOXO1A and three in FOXO3A were analyzed in a sample of 760 centenarians (578 female and 182 male) and 1060 middle-age controls (378 female and 682 male)",
+      "conclusion": "All three SNPs in FOXO3A were positively associated with longevity in both genders, even at ages 92-110 (odds ratio [OR] = 1.61–1.73, p = .0002–0.005; dominant model)"
+    },
+    {
+      "pmid": "20849522",
+      "population": "Danish",
+      "study_design": "15 SNPs that covered FOXO3A common variation were examined in 1089 oldest old and 736 middle-aged for longevity association by longitudinal study design as well as case-control study design",
+      "conclusion": "4 SNPs previously reported to be associated with longevity were verified in this study. 4 novel SNPs (rs12206094, rs13220810, rs7762395, and rs9486902 (corrected P-values 0.001–0.044)) and two haplotypes(corrected P-values: 0.01–0.03) associated with longevity were found in this study. FOXO3A was a candidate longevity gene for survival from younger ages to old age, yet not during old age."
+    }
+  ],
+  "crosschecks": {
+    "normalized_genotype": [
+      {
+        "chrom": "6",
+        "start": 108587315,
+        "ref": "G",
+        "alt": "T",
+        "genotype": [
+          "G",
+          "T"
+        ]
+      }
+    ],
+    "matching_registered_module": "just-dna-seq/longevitymap@1.2.0",
+    "module_note": "The registered copy reproduces this row and five study records; it is not used to infer an unstated version in the stored report."
+  },
+  "author_supplied_report": {
+    "url": "https://drive.google.com/file/d/1GN3_GwlYOBQtXHfHzC75RAYv7eJkeScQ/view",
+    "file_name": "anton_report_20260820_043216.html",
+    "sha256": "e15f675318b32c2951ce3682dc8a1d9c0e611888bf2a8d1c9935760e0d8a130c",
+    "row_matches_stored_extract": true
+  }
+}

@@ -1,0 +1,194 @@
+# Venue selection record for Paper 1 (manuscript-journal-select): the authors' priorities, the ladders, the AI use
+# and the routes that pay a fee for these authors (cost_routes). Every venue fact read for this paper (fees, review
+# times, rules, impact factors, bioRxiv's transfer list) now lives in the manuscript-skills venue catalogue with its
+# page and date (0.30, 2026-10-27); `venues.py stale --record THIS_FILE` lists what is old enough to re-read.
+# Regenerate the ladders and the requirements from it: see paper1-just-dna-lite.venue-requirements.md and the two
+# *-ladder.csv files beside it.
+manuscript: paper1-just-dna-lite.md
+updated: '2026-10-28'
+priorities:
+  journals:
+  - speed
+  - reach
+  - ai
+  - transfer
+  preprints:
+  - transfer
+  - ai
+  jif_floor: 3
+  fee: a grant can pay a normal open-access fee
+  preprint: bioRxiv first; the authors asked on 2026-10-27 for bioRxiv-friendly journals
+  jif_floor_note: above 3, as the authors said; a journal at exactly 3.0 is kept and marked at the floor
+  ai_rules: the authors said on 2026-10-27 that a rule reserving Results and Discussion for the authors is too tough;
+    AI drafted and rewrote passages throughout, Results and Discussion included
+  # What the paper already has (Section 4): just-prs compared with PLINK2 on 100 PGS Catalog scores, and the
+  # annotation speed compared with Generation I. Read from the manuscript on 2026-10-28, not a new promise.
+  validation_available:
+  - benchmark
+# Each venue's checkable conditions, read against the v0.6 manuscript on 2026-10-28: met, partly or not, with the
+# passage that shows it. A met condition fits; partly stays "Depends" with the gap named.
+conditions:
+  cell-reports-methods:
+    comparison-and-validation:
+      met: true
+      evidence: "Section 4.2 compares just-prs with PLINK2, an established related method, on 100 PGS Catalog scores, and
+        Section 4.4 validates the ancestry call (leave-one-out, 2,566 of 2,575 reference individuals assigned their own
+        superpopulation). The 'limitations of the study' subsection the journal asks for is a formatting step."
+      checked: 2026-10-28
+  cell-genomics:
+    technology-bar:
+      met: partly
+      evidence: "Section 4.1 compares annotation only with the authors' own Generation I (128- to 231-fold faster), and
+        Section 4.2 compares just-prs with PLINK2 (the scores agree; about seven times faster with PLINK2 on four threads
+        and just-prs on sixteen). Missing: a comparison of annotation with the established tools the Introduction names,
+        ANNOVAR and VEP, on which an improvement over existing methods would rest."
+      checked: 2026-10-28
+  nar-genomics-bioinformatics:
+    methods-benchmarks:
+      met: partly
+      evidence: "Section 4.2 benchmarks against one alternative tool, PLINK2, and shows neither a statistically
+        significant improvement over several state-of-the-art tools nor large-scale (HPC or cloud) use, which a Methods
+        Paper needs. As an Application Note the benchmarks are only encouraged, but the paper would have to be cut to
+        3,000 words and three figures or tables."
+      checked: 2026-10-28
+    open-source-deposit:
+      met: true
+      evidence: "Code Availability: the code is on GitHub under OSI licences (AGPL-3.0 and MIT) and runs with two commands
+        (uv sync, uv run start) or as a container. The Zenodo archive is due before acceptance, with the other archiving."
+      checked: 2026-10-28
+  biorxiv:
+    tool-with-data:
+      met: true
+      evidence: "Sections 4.1 and 4.2 report data from applying the software: annotation runs on four genomes and 100
+        polygenic scores compared with PLINK2."
+      checked: 2026-10-28
+    identifiable-individual:
+      met: false
+      evidence: "The paper names its two genome donors, the authors Anton Kulaga and Livia Zaharia, beside their published
+        VCFs and results from them; their consent is stated, but bioRxiv's pages give no exception for a person's own
+        released data, so its screeners may decline it or ask for the names to go."
+      checked: 2026-10-28
+  medrxiv:
+    computational-results:
+      met: true
+      evidence: "Sections 4.1 and 4.2 report data from applying the software: annotation runs on four genomes and 100
+        polygenic scores compared with PLINK2."
+      checked: 2026-10-28
+    ethics-oversight:
+      met: true
+      evidence: "The Ethics Statement gives the determination of the Ethics Committee of the Institute of Biochemistry of
+        the Romanian Academy that the work is not research on human subjects (ethics register no. 17, 23 September 2026)."
+      checked: 2026-10-28
+    identifiers:
+      met: false
+      evidence: "The paper names its two genome donors, the authors, beside their whole-genome VCFs and results; medRxiv
+        counts real names tied to a person's data as direct identifiers."
+      checked: 2026-10-28
+# The study design as the manuscript shows it, a draft until the authors confirm it (no `confirmed`). What the
+# paper reports is what preprint servers screen on: disease-risk modules and risk scores for diseases are
+# health-related information, and the benchmarks run on the authors' own published genomes.
+study:
+  designs:
+  - software-tool
+  health_information: true
+  human_data: author-self-released
+ladders:
+  preprints:
+  - biorxiv
+  - arxiv
+  journals:
+  - iscience
+  - frontiers-bioinformatics
+  - jamia-open
+  - cell-reports-methods
+  - genomics
+  - plos-comp-biol
+  - nar-genomics-bioinformatics
+  - cell-genomics
+  checked: '2026-10-27'
+  note: 'working order, not a final choice (2026-10-27). Generated with --refuse red-line --refuse drafting-ban,
+    because the authors said a rule reserving Results and Discussion for them is too tough: that leaves out Bioinformatics
+    and Bioinformatics Advances (ISCB bars LLM drafting) and BMC Bioinformatics and Genome Biology (Springer Nature
+    reserves Results and Discussion for the authors). Also out: GigaScience (AI outputs deposited), Molecular Systems
+    Biology (AI limited to polishing), eLife and F1000Research (no impact factor), Life Science Alliance (impact
+    factor not verified), Genome Research (Resource articles must add novel biology or technology; USD 5,200). Moved
+    by judgement over the sorted order: Cell Genomics to the last rung (its 5-day median is a desk-inclusive figure
+    and its Technology bar asks for a significant advance over existing methods), Frontiers in Bioinformatics and
+    JAMIA Open up to rungs 2 and 3 (their software article types fit this paper as it is, Frontiers costs a Rostock
+    author nothing, and neither publishes a speed figure).'
+cost_routes:
+  # What these authors (corresponding author at the University of Rostock; co-authors in Romania) would pay after
+  # the agreements and funds that cover them. The journals' own fees are in the venue catalogue.
+  genome-biology:
+    route: Projekt DEAL covers the University of Rostock (20% off, billed centrally); no Springer Nature agreement covers
+      BMC fees for Romanian institutions
+    source: https://link.springer.com/journal/13059/how-to-publish-with-us
+    checked: 2026-10-19
+  bmc-bioinformatics:
+    route: Projekt DEAL covers the University of Rostock (20% off, billed centrally); no Springer Nature agreement covers
+      BMC fees for Romanian institutions
+    source: https://link.springer.com/journal/12859/how-to-publish-with-us
+    checked: 2026-10-19
+  plos-comp-biol:
+    route: PLOS's flat-fee institutional agreements list no University of Rostock or Romanian institution
+    source: https://plos.org/fees/
+    checked: 2026-10-19
+  gpb:
+    route: OUP's read-and-publish search finds no agreement for 'Rostock' or 'Romania' (it lists 64 institutes for 'Max
+      Planck', so the search works); Romania is not on OUP's low- and middle-income list
+    source: https://academic.oup.com/gpb/pages/general-instructions
+    checked: 2026-10-19
+  bioinformatics:
+    route: OUP's read-and-publish search finds no agreement for 'Rostock' or 'Romania'; Romania is not on OUP's low- and
+      middle-income list
+    source: https://academic.oup.com/bioinformatics/pages/author-guidelines
+    checked: 2026-10-19
+  nar-genomics-bioinformatics:
+    route: no OUP agreement for Rostock or Romania; the Rostock fund pays up to EUR 2,000 gross
+    source: https://academic.oup.com/nargab/pages/author-guidelines
+    checked: 2026-10-27
+  nar:
+    route: no OUP agreement for Rostock or Romania
+    source: https://academic.oup.com/nar/pages/author-guidelines
+    checked: 2026-10-27
+  jamia-open:
+    route: no OUP agreement for Rostock or Romania
+    source: https://academic.oup.com/jamiaopen/pages/General_Instructions
+    checked: 2026-10-27
+  iscience:
+    route: Projekt DEAL's Elsevier agreement (to 31 Dec 2028) gives a Rostock corresponding author 15% off; the Rostock
+      fund pays up to EUR 2,000 gross, the grant the rest
+    source: https://www.cell.com/open-access
+    checked: 2026-10-27
+  cell-reports-methods:
+    route: Projekt DEAL gives a Rostock corresponding author 15% off; the Rostock fund pays up to EUR 2,000 gross
+    source: https://www.cell.com/open-access
+    checked: 2026-10-27
+  cell-genomics:
+    route: Projekt DEAL gives a Rostock corresponding author 15% off; the Rostock fund pays up to EUR 2,000 gross
+    source: https://www.cell.com/open-access
+    checked: 2026-10-27
+  genomics:
+    route: Projekt DEAL gives a Rostock corresponding author 20% off; the Rostock fund pays up to EUR 2,000 gross
+    source: https://www.sciencedirect.com/journal/genomics
+    checked: 2026-10-27
+  frontiers-bioinformatics:
+    author_cost_eur: 0
+    route: the University of Rostock library has a Frontiers agreement (7.5% off, price cap EUR 2,000 gross, invoiced
+      to the library), so a Rostock corresponding author pays nothing; list price CHF 2,695
+    source: https://www.ub.uni-rostock.de/en/support-for-researchers/open-access/publisher-discounts/
+    checked: 2026-10-27
+  frontiers-genetics:
+    author_cost_eur: 0
+    route: the Rostock library Frontiers agreement caps the price at EUR 2,000 gross and pays it; list price CHF 3,150
+    source: https://www.ub.uni-rostock.de/en/support-for-researchers/open-access/publisher-discounts/
+    checked: 2026-10-27
+  genome-research:
+    route: the University of Rostock is not on CSHL Press agreements
+    source: https://genome.cshlp.org/publication_fees
+    checked: 2026-10-27
+  life-science-alliance:
+    route: no Projekt DEAL agreement is named
+    source: https://www.life-science-alliance.org/copyright-license-fee
+    checked: 2026-10-27
+ai_use: drafting

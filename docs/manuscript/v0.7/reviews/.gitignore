@@ -1,0 +1,5 @@
+# manuscript-skills run folders: the evidence of each run (stage reports, referee and reader workspaces with
+# copies of the manuscript, checks, before/after records) stays local. The deliverables are handed over beside
+# the paper: paper1-just-dna-lite.dashboard.html, .review.docx, .changes.xlsx and .proposed.md.
+*
+!.gitignore
