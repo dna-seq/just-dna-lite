@@ -77,7 +77,21 @@ figures were captured at https://lite.just-dna.life/ on 26 October 2026; `figure
 | T3 | Section 3.1, "A report in use" | Pointed to Supplementary S13 only | Also points to Figure 1b, where the same row is shown as the report renders it | Links the reconstruction (Figure 2) to the real interface |
 | F1, F4 | Key features; Section 3.4 | No figure for the catalogue | Cite Figure 1a; the "evidence" feature cites Figures 1b, 2 and 3 | |
 
-## 4. Open points for the authors
+## 4. Why longevity: a bridge in the Introduction
+
+Requested by Anton Kulaga on 28 October 2026. The Introduction argued for personal-genome annotation in
+general for three paragraphs, then opened the fourth with "Recent progress in the genetics of longevity
+illustrates the need for such extensible annotation tools", without saying why longevity. The reason
+(Generation I was built around longevity) appeared only in Section 3. Since v0.5 the paragraph before had
+ended on the Table S7 comparison rather than on "extensibility", so "such extensible annotation tools" had
+lost its referent. No manuscript-skills stage flagged it.
+
+| Id | Where | Was | Now | Why |
+|---|---|---|---|---|
+| N11a | Introduction, fourth paragraph (inside R4) | Opened directly on "Recent progress in the genetics of longevity" | One sentence first: the authors' starting point was longevity research, Generation I was built to read a genome against longevity studies (Kulaga et al., 2024), and longevity remains the most extensive expert-curated module (Section 3.1, Table 1: 528 variants, against at most 74 in the other expert modules) | Gives the reader the reason for the turn to longevity, in the place the turn happens |
+| N11b | Section 1.2, first paragraph (inside C5) | "whose first generation (Generation I) was a set of annotation and report modules for OakVar" | Adds "built for longevity research" | Connects the platform's history to the motivation; Section 3's sentence on the default modules now recalls it rather than introducing it |
+
+## 5. Open points for the authors
 
 - **Anton's SecvADN affiliation** was dropped on the reading that "Anton has IBAR and IBIMA" means only
   those two. He is still listed as a SecvADN co-founder under Competing Interests.
