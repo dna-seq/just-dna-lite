@@ -61,6 +61,13 @@ coauthors:
       - date: '2026-10-26'
         commit: d68909d
     '0.7':
-      base: 05a5634
+      base: 4f3c41a
+      released: '2026-10-28'
+      docs:
+        1. Changes from v0.6 to v0.7: https://docs.google.com/spreadsheets/d/1BiD600JCeXuku_uNs5hNjrwnuzHphva7k7eM1yd3bI0/edit
+        Supplementary Table S5. PGS Catalog coverage of just-prs (v0.7): https://docs.google.com/document/d/1xE-Elz6HrT20zG_fV1aLeYFca-db3LAHT9dKFuqMXoc/edit
+        Supplementary Table S4. Module sources (v0.7): https://docs.google.com/document/d/1Ry0MGrNYNiCuO5Z0pvHF5jFxCzYIlGhDU-JOLzUGuT8/edit
+        '1. Supplementary Data: Just-DNA-Lite (v0.7)': https://docs.google.com/document/d/1X1eWukEm5_pgYI5QzzaEHTSwdsV60dSQ_JYDwkQzg3c/edit
+        '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring (v0.7)': https://docs.google.com/document/d/1tdYc2Ng9yycUCUI6Zj_-m6PPcajPaRt0bA517kawudM/edit
 other_models:
 - codex/gpt-6.1-sol
