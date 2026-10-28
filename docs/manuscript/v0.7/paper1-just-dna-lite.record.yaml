@@ -5,7 +5,7 @@
 # Regenerate the ladders and the requirements from it: see paper1-just-dna-lite.venue-requirements.md and the two
 # *-ladder.csv files beside it.
 manuscript: paper1-just-dna-lite.md
-updated: '2026-10-28'
+updated: '2026-10-28'  # refreshed for v0.7 by run 20261028T165906Z-154d8220
 priorities:
   journals:
   - speed
@@ -25,7 +25,8 @@ priorities:
   # annotation speed compared with Generation I. Read from the manuscript on 2026-10-28, not a new promise.
   validation_available:
   - benchmark
-# Each venue's checkable conditions, read against the v0.6 manuscript on 2026-10-28: met, partly or not, with the
+# Each venue's checkable conditions, read against the v0.6 manuscript on 2026-10-28 and again against v0.7 on 2026-10-28
+# (the passages are unchanged in v0.7): met, partly or not, with the
 # passage that shows it. A met condition fits; partly stays "Depends" with the gap named.
 conditions:
   cell-reports-methods:
@@ -99,13 +100,13 @@ ladders:
   journals:
   - iscience
   - frontiers-bioinformatics
-  - jamia-open
   - cell-reports-methods
   - genomics
   - plos-comp-biol
+  - jamia-open
   - nar-genomics-bioinformatics
   - cell-genomics
-  checked: '2026-10-27'
+  checked: '2026-10-28'
   note: 'working order, not a final choice (2026-10-27). Generated with --refuse red-line --refuse drafting-ban,
     because the authors said a rule reserving Results and Discussion for them is too tough: that leaves out Bioinformatics
     and Bioinformatics Advances (ISCB bars LLM drafting) and BMC Bioinformatics and Genome Biology (Springer Nature
@@ -115,7 +116,13 @@ ladders:
     by judgement over the sorted order: Cell Genomics to the last rung (its 5-day median is a desk-inclusive figure
     and its Technology bar asks for a significant advance over existing methods), Frontiers in Bioinformatics and
     JAMIA Open up to rungs 2 and 3 (their software article types fit this paper as it is, Frontiers costs a Rostock
-    author nothing, and neither publishes a speed figure).'
+    author nothing, and neither publishes a speed figure). 2026-10-28 (v0.7): JAMIA Open moved from the third to the sixth
+    choice, below PLOS Computational Biology. Its Application Note allows 2,000 words, 3 figures and 2 tables (a
+    Research and Applications article 4,000 words), and v0.7 has about 8,000 words of running text in Sections 1 to 5
+    with 3 figures and 4 tables, so it does not fit the paper as it is; Cell Reports Methods (third) and Genomics
+    (fourth) take it with little or no cut. Cell Reports Methods goes above Genomics on reach (5.8 against 3.6) at
+    about the same speed (7 and 6 days to a first decision, both with desk decisions) and the same AI burden. PLOS Computational Biology''s Software articles (3,500 words) would also need the
+    paper halved; it stays above JAMIA Open by the sorted order (a published speed and a direct bioRxiv transfer).'
 cost_routes:
   # What these authors (corresponding author at the University of Rostock; co-authors in Romania) would pay after
   # the agreements and funds that cover them. The journals' own fees are in the venue catalogue.
