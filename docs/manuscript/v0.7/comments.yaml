@@ -43,170 +43,83 @@ sources:
   pulled: '2026-11-01T18:58:01Z'
   items: 6
   new: 6
+- doc: https://docs.google.com/document/d/1xE-Elz6HrT20zG_fV1aLeYFca-db3LAHT9dKFuqMXoc/edit
+  file: Supplementary Table S5. PGS Catalog coverage of just-prs (v0.7).docx
+  pulled: '2026-11-01T20:41:31Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1Ry0MGrNYNiCuO5Z0pvHF5jFxCzYIlGhDU-JOLzUGuT8/edit
+  file: Supplementary Table S4. Module sources (v0.7).docx
+  pulled: '2026-11-01T20:41:35Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1X1eWukEm5_pgYI5QzzaEHTSwdsV60dSQ_JYDwkQzg3c/edit
+  file: '1. Supplementary Data: Just-DNA-Lite (v0.7).docx'
+  pulled: '2026-11-01T20:41:38Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1tdYc2Ng9yycUCUI6Zj_-m6PPcajPaRt0bA517kawudM/edit
+  file: '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk
+    Scoring (v0.7).docx'
+  pulled: '2026-11-01T20:41:41Z'
+  items: 106
+  new: 14
 items:
-- id: C118
+- id: C124
   kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C39
-    (still open in v0.
+  author: Livia Zaharia
+  date: '2026-11-01T20:13:05Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:13:05Z|so the way it is written feels too convo
   master: paper1-just-dna-lite.md
-  anchor: Kulaga Anton^1,2,†^
-  context_before: ''
-  context_after: ''
-  comment: Carried from v0.6 C39 (still open in v0.7). Anton's SecvADN affiliation was dropped on the reading that
-    "Anton has IBAR and IBIMA" means only those two. He is still listed as a SecvADN co-founder under Competing
-    Interests.
+  anchor: 'consuming versus authoring: this paper covers how a compiled module or a published score is discovered,
+    computed against a genome, and reported, including from an AI assistant that calls these operations as typed
+    tools. The companion paper covers the other direction — an assistant producing new annotation content: the authoring
+    plugin, the enrichment and compilation toolchain, and how modules are published and'
+  context_before: just-dna-format, and the module registry. The boundary with the companion paper is
+  context_after: 'versioned. It is Creating and Sharing Genomic Annotation Modules with AI: The'
+  comment: so the way it is written feels too convolute- split into simpler sentences or simple stuff like one presents
+    the workflow to verify and another produces new references to verify against
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
-  line: 6
+  line: 3
   status: open
   now: ''
   why: ''
-  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well.'
-  category: Submission package
-  severity: minor
-  stage: final
-  decision: true
-- id: C119
-  kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C40
-    (still open in v0.
-  master: paper1-just-dna-lite.md
-  anchor: Karmazin Alexey^3,4^
-  context_before: ''
-  context_after: ''
-  comment: Carried from v0.6 C40 (still open in v0.7). Karmazin keeps SecvADN beside HEALES. Drop SecvADN if HEALES
-    should be his only affiliation.
-  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
-  line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only.'
-  category: Submission package
-  severity: minor
-  stage: final
-  decision: true
-- id: C120
-  kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C41
-    (still open in v0.
-  master: paper1-just-dna-lite.md
-  anchor: Alina Fedorova
-  context_before: ''
-  context_after: ''
-  comment: 'Carried from v0.6 C41 (still open in v0.7). Spelling: the paper keeps "Alina Fedorova", as in every
-    earlier version (the request wrote "Fyodorova").'
-  where: Contribution Statements
-  line: 471
-  status: open
-  now: ''
-  why: ''
-  next: Confirm the spelling of Alina Fedorova's name in the Acknowledgments (Fedorova or Fyodorova).
-  category: Submission package
-  severity: minor
-  stage: final
-  decision: true
-- id: C121
-  kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C42
-    (still open in v0.
-  master: paper1-just-dna-lite.md
-  anchor: for 6,117 scores across 778 traits
-  context_before: ''
-  context_after: ''
-  comment: 'Carried from v0.6 C42 (still open in v0.7). Trait count: the request remembered about 600 traits; the
-    published data give 778 EFO traits among the 6,117 scores. The paper uses 778.'
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 84
-  status: open
-  now: ''
-  why: ''
-  next: Confirm 778 traits (distinct EFO ids among the 6,117 published scores), or say which count the paper should
-    use.
-  category: Numbers and statistics
+  next: 'The draft note at the top (it leaves before submission) is the only place that says how this paper and
+    the companion paper divide the work, and Livia finds it convoluted. Say it in two plain sentences, here and
+    where the Abstract or Section 1.2 needs it (C125): this paper presents the workflow that applies published modules
+    and scores to a genome and reports the result; the companion paper presents how new modules are written, checked
+    and published.'
+  category: Story and structure
   severity: minor
   stage: writing
-  decision: true
-- id: C122
-  kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C43
-    (still open in v0.
-  master: paper1-just-dna-lite.md
-  anchor: annotated from the source publications by AI agents
-  context_before: ''
-  context_after: ''
-  comment: Carried from v0.6 C43 (still open in v0.7). Direction annotations (F3) are AI-assisted and none is yet
-    marked as reviewed by a person; the sentence says so. Remove it if that caveat weakens the paragraph more than
-    the feature helps.
-  where: 3.2 Polygenic Risk Scores
-  line: 232
-  status: open
-  now: ''
-  why: ''
-  next: Keep or remove the sentence saying the 2,282 direction annotations are AI-made and pending expert review.
-  category: Claims and evidence
-  severity: minor
-  stage: writing
-  decision: true
-- id: C123
-  kind: comment
-  author: v0.6 changes workbook, Open points for the authors
-  date: '2026-10-26'
-  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C44
-    (still open in v0.
-  master: paper1-just-dna-lite.md
-  anchor: The fourteen beyond Table 1 include modules on APOE type
-  context_before: ''
-  context_after: ''
-  comment: Carried from v0.6 C44 (still open in v0.7). Module examples (F4) leave out the personality, cognition
-    and aggression modules in the registry, to avoid a reviewer reading the paper as endorsing genetic prediction
-    of behaviour.
-  where: 3.4 Growing the Module Ecosystem
-  line: 290
-  status: open
-  now: ''
-  why: ''
-  next: Keep the behaviour modules out of the registry examples, or name them.
-  category: Ethics, privacy and scope
-  severity: minor
-  stage: writing
-  decision: true
-- id: S1
+  gap:
+    verdict: missed
+    miss_reason: judged-differently
+    owner: manuscript-prose-edit
+    note: The run left the draft note at the top unedited as a working note that leaves before submission; Livia
+      reads it as the one statement of what this paper covers against the companion paper, and finds it convoluted.
+- id: S22
   kind: suggestion
   author: G Fue
   date: '2026-10-31T10:11:42Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T10:11:42Z|4 1 ,*
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T10:11:42Z|4 1
   master: paper1-just-dna-lite.md
   anchor: 'Authors: Kulaga Anton1,2,†, Usanov Nikolay3,4,†, Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva
-    Malvina4, Zaharia Livia1, Fuellen Georg1,*, Tacutu Robi2,*'
+    Malvina4, Zaharia Livia1, Fuellen Georg1, Tacutu Robi2,*'
   context_before: 'mirror: paper2-just-module-creator.md). See docs/manuscript/v0.3/manuscript-strategy-v0.3.md
     and, for venues, docs/manuscript/manuscript_journal_strategy.md (section “Venues, October 2026”).'
   context_after: 'Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing Research, Rostock'
-  comment: 'Suggested edits: insert “4”; delete “1”; delete “,*”.'
+  comment: 'Suggested edits: insert “4”; delete “1”.'
   edits:
   - inserted: '4'
   - deleted: '1'
-  - deleted: ',*'
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
   line: 6
   status: open
   now: ''
   why: ''
-  next: 'Decide the author marks and affiliations. Georg''s edit does two things: it changes Livia Zaharia''s affiliation
-    from 1 (Rostock University Medical Center) to 4 (SecvADN SRL), and it removes the co-supervising asterisk from
-    his own name (as he asks in C45). Accepting it leaves Robi Tacutu the only co-supervising author, so the footnote
-    ''* Co-supervising authors.'' becomes singular, and a SecvADN affiliation for Livia Zaharia belongs in Competing
-    Interests (the run''s decision D11 already asks for every author''s competing interests). Confirm both with
-    Georg and Livia.'
+  next: 'What remains of Georg''s S1 after its asterisk part was accepted in the Doc: Livia Zaharia''s affiliation
+    from 1 to 4. Decide it with S1.'
   category: Submission package
   severity: minor
   stage: final
@@ -214,14 +127,14 @@ items:
   gap:
     verdict: missed
     miss_reason: input-missing
-    note: 'Georg''s own role and affiliation marks: only the authors could know.'
+    note: 'The rest of Georg''s author-line edit, Livia Zaharia''s affiliation: only the authors could know.'
 - id: C45
   kind: comment
   author: G Fue
   date: '2026-11-01T08:28:44Z'
   key: paper1-just-dna-lite.md|G Fue|2026-11-01T08:28:44Z|I feel much better without the asterisk.
   master: paper1-just-dna-lite.md
-  anchor: 1,*,
+  anchor: 1,
   context_before: Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva Malvina4, Zaharia Livia1, Fuellen
     Georg
   context_after: 'Tacutu Robi2,* Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing'
@@ -305,6 +218,41 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-prose-edit
     note: 'Same ambiguity: uploaded to the Internet.'
+- id: C125
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:23:37Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:23:37Z|so maybe it is a good ideea to mention i
+  master: paper1-just-dna-lite.md
+  anchor: DNA-Li
+  context_before: SecvADN SRL † These authors contributed equally. * Co-supervising authors. Abstract Just-
+  context_after: te is the core of an open-source ecosystem for reading a personal
+  comment: |-
+    so maybe it is a good ideea to mention in the abstract part what i wrote in the draft text above- because you start describing the system- which is accurate but how about beginning with something like this paper presents just dna lite, an open core...that is used to....providing a methodology or workflow to researchers by....
+    it is closely related to paper.... where we present how new features can be added....
+    @antonkulaga@gmail.com
+  where: Abstract
+  line: 29
+  status: open
+  now: ''
+  why: ''
+  next: Should the Abstract open by saying what the paper presents and for whom ('This paper presents Just-DNA-Lite,
+    an open core ... used to ..., giving researchers a workflow to ...') and name the companion paper on adding
+    new modules? Georg asks for a problem statement first (C46); the two combine as one sentence of problem and
+    one of what the paper presents. Livia asks Anton to weigh in. The Abstract is already longer than most ladder
+    venues allow (the run's decision on length).
+  category: Story and structure
+  severity: major
+  stage: writing
+  decision: true
+  gap:
+    verdict: partly
+    findings:
+    - ST-15
+    miss_reason: judged-differently
+    owner: manuscript-story
+    note: The story stage put the Abstract's opening to the authors and recommended keeping it; it did not offer
+      opening on what the paper presents and naming the companion paper.
 - id: C47
   kind: comment
   author: G Fue
@@ -321,7 +269,8 @@ items:
   now: ''
   why: ''
   next: 'Answered by accepting S2 (''uploaded to the Internet''): ''uploaded'' alone can mean copying the file onto
-    one''s own computer.'
+    one''s own computer. Livia''s reply proposes ''uploaded to a publicly accessible location'' (the Internet, a
+    server and the like); either removes the ambiguity.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -330,6 +279,10 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-prose-edit
     note: '''Does not have to be uploaded'' leaves open uploaded where; Georg reads it as onto your own computer.'
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T20:14:37Z'
+    text: maybe just say uploaded on a publicly accessible location. (includes internet, serv and other such) @antonkulaga@gmail.com
 - id: S3
   kind: suggestion
   author: G Fue
@@ -381,6 +334,63 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: Georg's rewording of the Abstract's modules sentence.
+- id: S23
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:15:57Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:15:57Z|(further called PGS)
+  master: paper1-just-dna-lite.md
+  anchor: Every matched variant links to its reported effect and its sources. Polygenic scores come from just-prs,
+    a library that also works on its own. It computes PGS Catalog scores from a cleaned copy of the Catalog, places
+    each within a reference population matched to the genome’s inferred ancestry, labels its quality and shows all
+    models for a trait side by side, so users see where the models agree and differ.
+  context_before: literature and public databases inside the AI assistant a researcher already uses.
+  context_after: AI assistants can also run annotation and scoring through Model Context Protocol
+  comment: 'Suggested edits: insert “(further called PGS)”.'
+  edits:
+  - inserted: ' (further called PGS)'
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: Define the abbreviation where the Abstract first uses it, 'polygenic scores (PGS)', so that 'PGS Catalog'
+    reads. C126 asks the same for every abbreviation.
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: caught
+    findings:
+    - ST-7
+    note: The story stage flagged the Abstract's undefined abbreviations, the PGS Catalog among them; the applied
+      fix spelled out VCF only.
+- id: C126
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:16:56Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:16:56Z|stephanie and benjamin nagged me to defi
+  master: paper1-just-dna-lite.md
+  anchor: ''
+  context_before: matched variant links to its reported effect and its sources. Polygenic scores
+  context_after: come from just-prs, a library that also works on its own. It
+  comment: stephanie and benjamin nagged me to define weird abbreviations before using them
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: 'Spell out every abbreviation at its first use, in the Abstract and again in the body: PGS (S23), MCP (Model
+    Context Protocol), GRCh38, T2T and PRS. VCF is already spelled out in the Abstract.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: caught
+    findings:
+    - ST-7
+    note: 'Same as defining PGS: the story stage flagged the Abstract''s undefined abbreviations and the fix stopped
+      at VCF.'
 - id: C48
   kind: comment
   author: G Fue
@@ -413,6 +423,40 @@ items:
     - ST-7
     note: The story stage named the PGS Catalog as undefined in the Abstract; the applied fix defined only VCF,
       so 'the Catalog' stayed bare.
+- id: C127
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:20:56Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:20:56Z|it does need a bit of rephrasing like ma
+  master: paper1-just-dna-lite.md
+  anchor: differ
+  context_before: trait side by side, so users see where the models agree and
+  context_after: . AI assistants can also run annotation and scoring through Model Context
+  comment: |-
+    it does need a bit of rephrasing
+    like maybe for every variant there is a risk associated with it according to publicly available databases and studies. It uses a template of a catalog to store them in order according to the findings...or some sort like that
+    @antonkulaga@gmail.com
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: 'Rewrite the just-prs sentence for a reader new to polygenic scores: first what a score is (the published
+    weights of many variants, added up for one genome), then where the scores come from (the PGS Catalog), then
+    what just-prs adds (a matched reference population, a quality label, every model for a trait side by side).
+    Livia''s draft describes a risk per variant, which is closer to the annotation modules; keep the score as a
+    sum over many variants. Livia asks Anton to check the wording.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: partly
+    findings:
+    - ST-7
+    miss_reason: skill-did-not-look
+    owner: manuscript-story
+    note: The story stage flagged the Catalog as undefined, not that the just-prs sentence never says what a polygenic
+      score adds up.
 - id: C49
   kind: comment
   author: G Fue
@@ -442,6 +486,66 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-story
     note: The referees asked the Abstract for a measured result and its scope, not for a closing research-use line.
+- id: C128
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:24:27Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:24:27Z|would it be weird if i called it The pro
+  master: paper1-just-dna-lite.md
+  anchor: Background and Significance
+  context_before: demonstration lets anyone try the platform on public genomes. 1. Introduction 1.1
+  context_after: Researchers who receive raw variant files (VCFs) containing millions of variants can
+  comment: would it be weird if i called it The problem?
+  where: 1.1 Background and Significance
+  line: 41
+  status: open
+  now: ''
+  why: ''
+  next: Keep 'Background and Significance' while JAMIA Open is on the ladder, which asks for a section of that name;
+    elsewhere 'The problem' is possible. Decide it with the journal.
+  category: Story and structure
+  severity: info
+  stage: journal
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: A heading Livia would rename; JAMIA Open asks for 'Background and Significance', which the journal stage
+      checked.
+- id: S24
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:27:22Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:27:22Z|Thereof there is a lack of interpretatio
+  master: paper1-just-dna-lite.md
+  anchor: Researchers who receive raw variant files (VCFs) containing millions of variants can find it hard to annotate
+    them against published databases without bioinformatics and programming expertise (Chen et al., 2023), and acquiring
+    that expertise takes time away from the questions they set out to answer. Many consumers who download their
+    raw data from a testing company take it to third-party interpretation tools (Nelson et al., 2019; O’Daniel et
+    al., 2025).
+  context_before: try the platform on public genomes. 1. Introduction 1.1 Background and Significance
+  context_after: 'That raw data can now come from sequencing: several companies offer direct-to-consumer'
+  comment: 'Suggested edits: insert “Thereof there is a lack of interpretation both in scientific circles but also
+    consumer wise.”.'
+  edits:
+  - inserted: 'Thereof there is a lack of interpretation both in scientific circles but also consumer wise. '
+  where: 1.1 Background and Significance
+  line: 45
+  status: open
+  now: ''
+  why: ''
+  next: 'Accept the link Livia adds between the researchers'' and the consumers'' sentences (C129; Georg''s C50
+    asks for the same link), in plainer words: ''Interpretation is therefore lacking for researchers and consumers
+    alike.'''
+  category: Story and structure
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: judged-differently
+    owner: manuscript-story
+    note: The link between the researchers' and the consumers' sentences, which Georg also missed; the connected-paragraphs
+      test repaired other links in Section 1.1 and passed this one.
 - id: C50
   kind: comment
   author: G Fue
@@ -458,7 +562,8 @@ items:
   now: ''
   why: ''
   next: 'Join the two sentences of the first paragraph by saying consumers face the same barrier, for example ''The
-    same barrier faces consumers: many who download their raw data from a testing company...''.'
+    same barrier faces consumers: many who download their raw data from a testing company...''. Livia''s S24 adds
+    such a link (C129).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -468,6 +573,23 @@ items:
     owner: manuscript-story
     note: The story stage's connected-paragraphs test repaired two links in Section 1.1, but not this one between
       the researchers' and the consumers' sentences.
+- id: C129
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:27:43Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:27:43Z|i added this to make the connection
+  master: paper1-just-dna-lite.md
+  anchor: ''
+  context_before: expertise takes time away from the questions they set out to answer.
+  context_after: Many consumers who download their raw data from a testing company take
+  comment: i added this to make the connection
+  where: 1.1 Background and Significance
+  line: 48
+  status: not-on-point
+  now: ''
+  why: Explains Livia's suggested sentence S24, which links the researchers' and the consumers' sentences, the link
+    Georg's C50 asks for.
+  next: ''
 - id: S4
   kind: suggestion
   author: G Fue
@@ -496,7 +618,8 @@ items:
   next: 'Accept ''raw variant data'' and ''whole-genome DNA sequencing''; decline ''mostly'' and keep ''can'': most
     consumers'' raw data still come from genotyping arrays (23andMe, AncestryDNA, the consumer formats Sections
     3.2 and 5.4 name), and no source in the paragraph says sequencing is now the main source. Result: ''That raw
-    variant data can now come from whole-genome DNA sequencing: ...''.'
+    variant data can now come from whole-genome DNA sequencing: ...''. Livia''s S25 adds an ''s'' inside this edit
+    (''mostly comes'').'
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -504,6 +627,48 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: A more precise wording of the sequencing sentence that Georg prefers.
+- id: S25
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:28:06Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:28:06Z|s While T , . B
+  master: paper1-just-dna-lite.md
+  anchor: 'That raw data can now come from sequencing: several companies offer direct-to-consumer sequencing services
+    (O’Daniel et al., 2025). The National Human Genome Research Institute (NHGRI) estimates that the first human
+    genome cost US$500 million to US$1 billion (NHGRI, 2021). By 2025, manufacturers advertised the sequencing of
+    a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report
+    higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing
+    scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  context_before: to third-party interpretation tools (Nelson et al., 2019; O’Daniel et al., 2025).
+  context_after: Existing solutions for reading a personal genome generally belong to two extremes.
+  comment: 'Suggested edits: insert “s”; insert “While”; replace “T” with “T”; insert “,”; replace “. B” with “b”.'
+  edits:
+  - inserted: s
+  - inserted: 'While '
+  - deleted: T
+    inserted: T
+  - inserted: ','
+  - deleted: . B
+    inserted: ' b'
+  where: 1.1 Background and Significance
+  line: 52
+  status: open
+  now: ''
+  why: ''
+  next: 'Two edits in one. Accept the merge of the two cost sentences into one contrast: ''While the National Human
+    Genome Research Institute (NHGRI) estimates that the first human genome cost US$500 million to US$1 billion
+    (NHGRI, 2021), by 2025 manufacturers advertised the sequencing of a human genome for US$80 to US$200 (...)''.
+    The ''s'' sits inside Georg''s pending S4 (''raw variant data now mostly comes from whole-genome DNA sequencing'')
+    and follows it: S4''s triage keeps ''can now come'' and declines ''mostly'', since most consumers'' raw data
+    still come from genotyping arrays, and with that wording the ''s'' is not needed.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: Livia joins the two cost sentences into one contrast; the paragraph's link to the one before was repaired
+      by the story stage.
 - id: S5
   kind: suggestion
   author: G Fue
@@ -614,6 +779,9 @@ items:
   - author: Anton Kulaga
     date: '2026-11-01T18:20:08Z'
     text: it means without writing code
+  - author: Livia Zaharia
+    date: '2026-11-01T20:31:58Z'
+    text: well if it makes it clearer we can say without human coding skills to edit the code directly
   where: 1.1 Background and Significance
   line: 55
   status: open
@@ -621,7 +789,8 @@ items:
   why: ''
   next: 'Write ''annotation sets that users add as data tables, without writing code'' here and in the Abstract,
     and say once why it matters: a researcher who curates variants can publish them without programming (Section
-    2.2). It does not mean a manual literature search; Anton''s reply (''it means without writing code'') confirms.'
+    2.2). It does not mean a manual literature search; Anton''s reply (''it means without writing code'') confirms.
+    Livia''s reply proposes ''without the coding skills to edit the code directly''.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -656,6 +825,36 @@ items:
     miss_reason: judged-differently
     owner: manuscript-story
     note: A missing link in the longevity paragraph of Section 1.1, which the connected-paragraphs test passed.
+- id: S26
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:34:12Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:34:12Z|both
+  master: paper1-just-dna-lite.md
+  anchor: Such a platform has to be easy to use, transparent in its methods and extensible without code. It also
+    has to protect privacy. Genomic data are among the most sensitive personal information, and uploading them to
+    third-party servers carries risks that individuals and regulations such as the General Data Protection Regulation
+    (GDPR) seek to avoid.
+  context_before: them, so a platform should let new annotation modules be added quickly.
+  context_after: 1.2 Overview of Just-DNA-Lite Just-DNA-Lite is a local, open-source platform for annotating
+  comment: 'Suggested edits: insert “both”.'
+  edits:
+  - inserted: 'both '
+  where: 1.1 Background and Significance
+  line: 64
+  status: open
+  now: ''
+  why: ''
+  next: 'Accept ''risks that both individuals and regulations ... seek to avoid'': the smallest answer to Georg''s
+    C55 about the same ''and''.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-prose-edit
+    note: The 'and' Georg also questioned in the privacy sentence; the prose stage did not read it.
 - id: C55
   kind: comment
   author: G Fue
@@ -673,7 +872,8 @@ items:
   why: ''
   next: 'The ''and'' makes regulations the subject of ''seek to avoid''. Rewrite: ''Genomic data are among the most
     sensitive personal information, so uploading them to third-party servers carries risks that individuals want
-    to avoid and that regulations such as the General Data Protection Regulation (GDPR) are meant to limit.'''
+    to avoid and that regulations such as the General Data Protection Regulation (GDPR) are meant to limit.'' Livia''s
+    S26 (''both individuals and regulations'') is a smaller fix of the same ''and''.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -713,34 +913,33 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: '''Local-based'' instead of ''local''.'
-- id: S7
+- id: S27
   kind: suggestion
   author: G Fue
   date: '2026-11-01T07:07:31Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:07:31Z|Researchers People
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:07:31Z|Researchers People citizen scientists,
   master: paper1-just-dna-lite.md
   anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
     inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
     comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
     registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
-    as tools instead of writing their own analysis code. People with different needs enter this workflow at different
+    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
     points; Box 1 names the user groups and where each starts.
   context_before: I, and Figure S1 gives a historical overview of its module domains.
   context_after: Key features. Polygenic scores with the context to read them. The PGS
-  comment: 'Suggested edits: insert “Researchers”; replace “People” with “, incl. citizen scientists,”.'
+  comment: 'Suggested edits: insert “Researchers”; replace “People” with “, inc”; insert “citizen scientists,”.'
   edits:
   - inserted: Researchers
   - deleted: People
-    inserted: ', incl. citizen scientists,'
+    inserted: ', inc'
+  - inserted: ' citizen scientists,'
   where: 1.2 Overview of Just-DNA-Lite
   line: 78
   status: open
   now: ''
   why: ''
-  next: 'Follows the decision in C58 (naming the first user group researchers, including citizen scientists). If
-    accepted, fix the grammar of the edit, which reads ''Researchers, incl. citizen scientists, with different needs
-    enter this workflow'': write ''Researchers, including citizen scientists, enter this workflow at different points,
-    depending on their needs; Box 1 names...''. If not, keep ''People''.'
+  next: Georg's S7 as the Doc now holds it, with Livia's 'including' (S28); follows the decision on naming the first
+    user group (C58, C130).
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -748,14 +947,47 @@ items:
     verdict: missed
     miss_reason: skill-did-not-look
     owner: manuscript-policy-fit
-    note: 'Same framing in Section 1.2: researchers, including citizen scientists, instead of people.'
+    note: Georg's reframing of Section 1.2 to researchers, including citizen scientists, as the Doc now holds it.
+- id: S28
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:35:29Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:35:29Z|l .
+  master: paper1-just-dna-lite.md
+  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
+    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
+    points; Box 1 names the user groups and where each starts.
+  context_before: I, and Figure S1 gives a historical overview of its module domains.
+  context_after: Key features. Polygenic scores with the context to read them. The PGS
+  comment: 'Suggested edits: replace “l” with “luding”; delete “.”.'
+  edits:
+  - deleted: l
+    inserted: luding
+  - deleted: .
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 78
+  status: open
+  now: ''
+  why: ''
+  next: Livia's edit of Georg's suggestion S27 ('incl.' to 'including'); follows the decision on naming the first
+    user group (C58, C130).
+  category: Writing and clarity
+  severity: info
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: Livia's edit of Georg's suggested 'incl.' to 'including'.
 - id: C56
   kind: comment
   author: G Fue
   date: '2026-11-01T07:10:29Z'
   key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:10:29Z|see also below
   master: paper1-just-dna-lite.md
-  anchor: ''
+  anchor: l.
   context_before: scoring operations as tools instead of writing their own analysis code. People
   context_after: with different needs enter this workflow at different points; Box 1 names
   comment: see also below
@@ -822,7 +1054,8 @@ items:
   now: ''
   why: ''
   next: 'Probably points to Georg''s Abstract edit in S3 (''without the need of a software update''); use the same
-    wording here: ''without the need of a new software release''.'
+    wording here: ''without the need of a new software release''. Livia''s reply adds that modules are versioned,
+    so a new version of a module reaches users without a software release either; say so here.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -830,6 +1063,11 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: Points to the rewording of 'no software update' suggested in the Abstract.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T20:38:28Z'
+    text: '@antonkulaga@gmail.com actually i have a point here- don''t we have versions- like you can update your
+      module- so maybe it should be mentioned?'
 - id: C58
   kind: comment
   author: G Fue
@@ -854,7 +1092,8 @@ items:
     scientists)"'') and in S7, S9, S11, S18, S20 and S21 (C110: ''citizen scientists are researchers, too.''). It
     changes whom the paper says the platform is for, which also bears on the ethics framing of the worked examples
     (the run''s decisions D1 and D2). If yes, apply it in one pass, with Box 1''s first row as ''Researchers, including
-    citizen scientists, with a genome from a sequencing provider''.'
+    citizen scientists, with a genome from a sequencing provider''. Livia''s C130 would call the group users instead,
+    since it includes genomic enthusiasts.'
   category: Story and structure
   severity: major
   stage: writing
@@ -894,6 +1133,36 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-policy-fit
     note: 'Same framing as the question on Box 1: researchers, including citizen scientists, instead of people.'
+- id: C130
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:40:23Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:40:23Z|maybe use the term users? since research
+  master: paper1-just-dna-lite.md
+  anchor: h a genome from a sequencing provide
+  context_before: user starts. User What they can do Where to start People wit
+  context_after: r Read their own VCF (on the GRCh38 human reference genome) against
+  comment: maybe use the term users? since researchers imply that they have some more knowledge in the area- i thought
+    this first category was also for the generic genomic enthusiast population
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 97
+  status: open
+  now: ''
+  why: ''
+  next: 'Livia would call the first group users rather than researchers (Georg''s C58): ''researchers'' implies
+    expertise, and the group includes genomic enthusiasts. Decide one name for Box 1''s first group and use it in
+    Section 1.2, the Discussion and the Conclusion: ''People'' or ''Users with a genome from a sequencing provider'',
+    or ''Researchers, including citizen scientists''.'
+  category: Story and structure
+  severity: major
+  stage: writing
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-policy-fit
+    note: Livia would call the first user group users, genomic enthusiasts included, against Georg's 'researchers';
+      no stage asked who the paper says its users are.
 - id: S10
   kind: suggestion
   author: G Fue
@@ -2921,5 +3190,214 @@ items:
     owner: manuscript-journal-adapt
     note: The run placed the AI-use statement and judged its content complete; it did not consider bringing the
       substance of Supplementary Note S11 into the paper.
+- id: C118
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C39
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: Kulaga Anton^1,2,†^
+  context_before: ''
+  context_after: ''
+  comment: Carried from v0.6 C39 (still open in v0.7). Anton's SecvADN affiliation was dropped on the reading that
+    "Anton has IBAR and IBIMA" means only those two. He is still listed as a SecvADN co-founder under Competing
+    Interests.
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well.'
+  category: Submission package
+  severity: minor
+  stage: final
+  decision: true
+- id: C119
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C40
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: Karmazin Alexey^3,4^
+  context_before: ''
+  context_after: ''
+  comment: Carried from v0.6 C40 (still open in v0.7). Karmazin keeps SecvADN beside HEALES. Drop SecvADN if HEALES
+    should be his only affiliation.
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only.'
+  category: Submission package
+  severity: minor
+  stage: final
+  decision: true
+- id: C120
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C41
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: Alina Fedorova
+  context_before: ''
+  context_after: ''
+  comment: 'Carried from v0.6 C41 (still open in v0.7). Spelling: the paper keeps "Alina Fedorova", as in every
+    earlier version (the request wrote "Fyodorova").'
+  where: Contribution Statements
+  line: 471
+  status: open
+  now: ''
+  why: ''
+  next: Confirm the spelling of Alina Fedorova's name in the Acknowledgments (Fedorova or Fyodorova).
+  category: Submission package
+  severity: minor
+  stage: final
+  decision: true
+- id: C121
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C42
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: for 6,117 scores across 778 traits
+  context_before: ''
+  context_after: ''
+  comment: 'Carried from v0.6 C42 (still open in v0.7). Trait count: the request remembered about 600 traits; the
+    published data give 778 EFO traits among the 6,117 scores. The paper uses 778.'
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 84
+  status: open
+  now: ''
+  why: ''
+  next: Confirm 778 traits (distinct EFO ids among the 6,117 published scores), or say which count the paper should
+    use.
+  category: Numbers and statistics
+  severity: minor
+  stage: writing
+  decision: true
+- id: C122
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C43
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: annotated from the source publications by AI agents
+  context_before: ''
+  context_after: ''
+  comment: Carried from v0.6 C43 (still open in v0.7). Direction annotations (F3) are AI-assisted and none is yet
+    marked as reviewed by a person; the sentence says so. Remove it if that caveat weakens the paragraph more than
+    the feature helps.
+  where: 3.2 Polygenic Risk Scores
+  line: 232
+  status: open
+  now: ''
+  why: ''
+  next: Keep or remove the sentence saying the 2,282 direction annotations are AI-made and pending expert review.
+  category: Claims and evidence
+  severity: minor
+  stage: writing
+  decision: true
+- id: C123
+  kind: comment
+  author: v0.6 changes workbook, Open points for the authors
+  date: '2026-10-26'
+  key: paper1-just-dna-lite.md|v0.6 changes workbook, Open points for the authors|2026-10-26|Carried from v0.6 C44
+    (still open in v0.
+  master: paper1-just-dna-lite.md
+  anchor: The fourteen beyond Table 1 include modules on APOE type
+  context_before: ''
+  context_after: ''
+  comment: Carried from v0.6 C44 (still open in v0.7). Module examples (F4) leave out the personality, cognition
+    and aggression modules in the registry, to avoid a reviewer reading the paper as endorsing genetic prediction
+    of behaviour.
+  where: 3.4 Growing the Module Ecosystem
+  line: 290
+  status: open
+  now: ''
+  why: ''
+  next: Keep the behaviour modules out of the registry examples, or name them.
+  category: Ethics, privacy and scope
+  severity: minor
+  stage: writing
+  decision: true
+- id: S1
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T10:11:42Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T10:11:42Z|4 1 ,*
+  master: paper1-just-dna-lite.md
+  anchor: 'Authors: Kulaga Anton1,2,†, Usanov Nikolay3,4,†, Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva
+    Malvina4, Zaharia Livia1, Fuellen Georg1,*, Tacutu Robi2,*'
+  context_before: 'mirror: paper2-just-module-creator.md). See docs/manuscript/v0.3/manuscript-strategy-v0.3.md
+    and, for venues, docs/manuscript/manuscript_journal_strategy.md (section “Venues, October 2026”).'
+  context_after: 'Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing Research, Rostock'
+  comment: 'Suggested edits: insert “4”; delete “1”; delete “,*”.'
+  edits:
+  - inserted: '4'
+  - deleted: '1'
+  - deleted: ',*'
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: 'Decide the author marks and affiliations. Georg''s edit does two things: it changes Livia Zaharia''s affiliation
+    from 1 (Rostock University Medical Center) to 4 (SecvADN SRL), and it removes the co-supervising asterisk from
+    his own name (as he asks in C45). Accepting it leaves Robi Tacutu the only co-supervising author, so the footnote
+    ''* Co-supervising authors.'' becomes singular, and a SecvADN affiliation for Livia Zaharia belongs in Competing
+    Interests (the run''s decision D11 already asks for every author''s competing interests). Confirm both with
+    Georg and Livia. In the Doc the asterisk part was accepted; S22 holds the rest.'
+  category: Submission package
+  severity: minor
+  stage: final
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: input-missing
+    note: 'Georg''s own role and affiliation marks: only the authors could know.'
+- id: S7
+  kind: suggestion
+  author: G Fue
+  date: '2026-11-01T07:07:31Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:07:31Z|Researchers People
+  master: paper1-just-dna-lite.md
+  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
+    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. People with different needs enter this workflow at different
+    points; Box 1 names the user groups and where each starts.
+  context_before: I, and Figure S1 gives a historical overview of its module domains.
+  context_after: Key features. Polygenic scores with the context to read them. The PGS
+  comment: 'Suggested edits: insert “Researchers”; replace “People” with “, incl. citizen scientists,”.'
+  edits:
+  - inserted: Researchers
+  - deleted: People
+    inserted: ', incl. citizen scientists,'
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 78
+  status: open
+  now: ''
+  why: ''
+  next: 'Follows the decision in C58 (naming the first user group researchers, including citizen scientists). If
+    accepted, fix the grammar of the edit, which reads ''Researchers, incl. citizen scientists, with different needs
+    enter this workflow'': write ''Researchers, including citizen scientists, enter this workflow at different points,
+    depending on their needs; Box 1 names...''. If not, keep ''People''. The Doc now holds it as S27, with Livia''s
+    ''including'' (S28).'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-policy-fit
+    note: 'Same framing in Section 1.2: researchers, including citizen scientists, instead of people.'
 gap_run: 20261028T165906Z-154d8220
-gap_matched_by: Claude (Opus 5.5) on 1 November 2026, after Georg Fuellen's comments arrived, from the run's dashboard
+gap_matched_by: Claude (Opus 5.5) on 1 November 2026, after Georg Fuellen's and Livia Zaharia's comments arrived,
+  from the run's dashboard
