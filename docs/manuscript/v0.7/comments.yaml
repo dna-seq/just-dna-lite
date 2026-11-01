@@ -1263,12 +1263,10 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: answered: an author added to Section 3.1 how the displayed weight
-    is built (W_display = w_SNP × w_genotype, each weight explained). Carry it into v0.8''s master, set as a display
-    formula (Livia''s C136). Give the rule behind the weights, or cite where it is defined: Section 3.1 lists the
-    inputs of w_SNP (''number of independent significant studies, reported p-values, number of replicating populations'')
-    but not how they combine. If the Generation I paper (Kulaga et al., 2024) defines it, cite the section; if not,
-    add the rule to Supplementary S1.'
+  next: 'Give the rule behind the weights, or cite where it is defined: Section 3.1 lists the inputs of w_SNP (''number
+    of independent significant studies, reported p-values, number of replicating populations'') but not how they
+    combine. If the Generation I paper (Kulaga et al., 2024) defines it, cite the section; if not, add the rule
+    to Supplementary S1.'
   category: Methods and reproducibility
   severity: major
   stage: writing
@@ -1301,15 +1299,16 @@ items:
   status: open
   now: ''
   why: ''
-  next: Set W_display = w_SNP × w_genotype as a display formula on its own line and define each term after it. The
-    paragraph was added in the Doc (C70) and has to reach v0.8's master first.
+  next: Set W_display = w_SNP × w_genotype as a display formula on its own line and define each term after it.
   category: Writing and clarity
   severity: minor
   stage: writing
   gap:
     verdict: missed
-    miss_reason: later-decision
-    note: The formula paragraph was written in the Doc after the run, to answer Georg's C70; the run never saw it.
+    miss_reason: skill-did-not-look
+    owner: manuscript-prose-edit
+    note: A formula with four terms set inline in running text; no stage suggested setting it apart and explaining
+      its terms after it.
 - id: C137
   kind: comment
   author: Livia Zaharia
@@ -1352,10 +1351,9 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: Section 3.1''s new paragraph (C70) says what the weight is. Carry
-    it into v0.8''s master. Say what the weight is in the same sentence: ''The weight is the module''s curation
-    score, the strength of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose
-    (0.5 for one copy); it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
+  next: 'Say what the weight is in the same sentence: ''The weight is the module''s curation score, the strength
+    of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose (0.5 for one copy);
+    it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3625,9 +3623,8 @@ items:
   - inserted: -based
   where: 1.2 Overview of Just-DNA-Lite
   line: 73
-  status: declined
+  status: open
   now: ''
-  why: 'Rejected in the Doc by 1 November, 22:10 UTC: Section 1.2 keeps ''a local, open-source platform''.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3635,6 +3632,8 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: '''Local-based'' instead of ''local''.'
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''Python-based'', in Section 1.2), as rounds.py sync confirms.
+    Carry it into v0.8''s master.'
 - id: S27
   kind: suggestion
   author: G Fue
