@@ -64,6 +64,27 @@ sources:
   pulled: '2026-11-01T20:41:41Z'
   items: 106
   new: 14
+- doc: https://docs.google.com/document/d/1xE-Elz6HrT20zG_fV1aLeYFca-db3LAHT9dKFuqMXoc/edit
+  file: Supplementary Table S5. PGS Catalog coverage of just-prs (v0.7).docx
+  pulled: '2026-11-01T22:10:21Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1Ry0MGrNYNiCuO5Z0pvHF5jFxCzYIlGhDU-JOLzUGuT8/edit
+  file: Supplementary Table S4. Module sources (v0.7).docx
+  pulled: '2026-11-01T22:10:25Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1X1eWukEm5_pgYI5QzzaEHTSwdsV60dSQ_JYDwkQzg3c/edit
+  file: '1. Supplementary Data: Just-DNA-Lite (v0.7).docx'
+  pulled: '2026-11-01T22:10:29Z'
+  items: 0
+  new: 0
+- doc: https://docs.google.com/document/d/1tdYc2Ng9yycUCUI6Zj_-m6PPcajPaRt0bA517kawudM/edit
+  file: '1. Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk
+    Scoring (v0.7).docx'
+  pulled: '2026-11-01T22:10:32Z'
+  items: 108
+  new: 18
 items:
 - id: C124
   kind: comment
@@ -98,67 +119,6 @@ items:
     owner: manuscript-prose-edit
     note: The run left the draft note at the top unedited as a working note that leaves before submission; Livia
       reads it as the one statement of what this paper covers against the companion paper, and finds it convoluted.
-- id: S22
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T10:11:42Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T10:11:42Z|4 1
-  master: paper1-just-dna-lite.md
-  anchor: 'Authors: Kulaga Anton1,2,†, Usanov Nikolay3,4,†, Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva
-    Malvina4, Zaharia Livia1, Fuellen Georg1, Tacutu Robi2,*'
-  context_before: 'mirror: paper2-just-module-creator.md). See docs/manuscript/v0.3/manuscript-strategy-v0.3.md
-    and, for venues, docs/manuscript/manuscript_journal_strategy.md (section “Venues, October 2026”).'
-  context_after: 'Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing Research, Rostock'
-  comment: 'Suggested edits: insert “4”; delete “1”.'
-  edits:
-  - inserted: '4'
-  - deleted: '1'
-  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
-  line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'What remains of Georg''s S1 after its asterisk part was accepted in the Doc: Livia Zaharia''s affiliation
-    from 1 to 4. Decide it with S1.'
-  category: Submission package
-  severity: minor
-  stage: final
-  decision: true
-  gap:
-    verdict: missed
-    miss_reason: input-missing
-    note: 'The rest of Georg''s author-line edit, Livia Zaharia''s affiliation: only the authors could know.'
-- id: C45
-  kind: comment
-  author: G Fue
-  date: '2026-11-01T08:28:44Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-11-01T08:28:44Z|I feel much better without the asterisk.
-  master: paper1-just-dna-lite.md
-  anchor: 1,
-  context_before: Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva Malvina4, Zaharia Livia1, Fuellen
-    Georg
-  context_after: 'Tacutu Robi2,* Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing'
-  comment: I feel much better without the asterisk.
-  replies:
-  - author: G Fue
-    date: '2026-11-01T08:30:56Z'
-    text: Same thing as with https://www.aging-us.com/article/206431 ; Franziskas also wants to go for the Dr rer
-      hum in Rostock
-  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
-  line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'Same change as S1: remove the asterisk after ''Fuellen Georg^1,*^'' and decide who the corresponding author
-    is (C64). Georg''s reply names https://www.aging-us.com/article/206431 as the precedent; ask him which role
-    he wants recorded.'
-  category: Submission package
-  severity: minor
-  stage: final
-  gap:
-    verdict: missed
-    miss_reason: input-missing
-    note: Who carries the corresponding-author mark is the authors' decision.
 - id: C46
   kind: comment
   author: G Fue
@@ -189,35 +149,6 @@ items:
     - ST-8
     note: The story stage found the Abstract has no problem statement and proposed one sentence from the Introduction;
       left for the authors.
-- id: S2
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T11:16:51Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T11:16:51Z|to the Internet
-  master: paper1-just-dna-lite.md
-  anchor: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published
-    evidence on the user’s own computer. Its web platform annotates a whole-genome variant file (VCF) and computes
-    polygenic risk scores locally, so the genome does not have to be uploaded.
-  context_before: Society) SecvADN SRL † These authors contributed equally. * Co-supervising authors. Abstract
-  context_after: What the platform reports comes from modules, versioned tables of variant-trait associations
-  comment: 'Suggested edits: insert “to the Internet”.'
-  edits:
-  - inserted: ' to the Internet'
-  where: Abstract
-  line: 29
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''so the genome does not have to be uploaded to the Internet''. S10 and S19 make
-    the same edit in Box 1 and Section 5.2.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: skill-did-not-look
-    owner: manuscript-prose-edit
-    note: 'Same ambiguity: uploaded to the Internet.'
 - id: C125
   kind: comment
   author: Livia Zaharia
@@ -253,176 +184,6 @@ items:
     owner: manuscript-story
     note: The story stage put the Abstract's opening to the authors and recommended keeping it; it did not offer
       opening on what the paper presents and naming the companion paper.
-- id: C47
-  kind: comment
-  author: G Fue
-  date: '2026-11-01T07:08:40Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:08:40Z|you can just upload to your computer...
-  master: paper1-just-dna-lite.md
-  anchor: ''
-  context_before: risk scores locally, so the genome does not have to be uploaded
-  context_after: . What the platform reports comes from modules, versioned tables of variant-trait
-  comment: you can just upload to your computer...
-  where: Abstract
-  line: 31
-  status: open
-  now: ''
-  why: ''
-  next: 'Answered by accepting S2 (''uploaded to the Internet''): ''uploaded'' alone can mean copying the file onto
-    one''s own computer. Livia''s reply proposes ''uploaded to a publicly accessible location'' (the Internet, a
-    server and the like); either removes the ambiguity.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: skill-did-not-look
-    owner: manuscript-prose-edit
-    note: '''Does not have to be uploaded'' leaves open uploaded where; Georg reads it as onto your own computer.'
-  replies:
-  - author: Livia Zaharia
-    date: '2026-11-01T20:14:37Z'
-    text: maybe just say uploaded on a publicly accessible location. (includes internet, serv and other such) @antonkulaga@gmail.com
-- id: S3
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T11:18:37Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T11:18:37Z|no coding involved out programming modul
-  master: paper1-just-dna-lite.md
-  anchor: What the platform reports comes from modules, versioned tables of variant-trait associations that researchers
-    write without programming. Ready-made modules cover longevity, disease predisposition and drug response. Researchers
-    publish new ones to just-dna-registry, an open registry that works like an app store, where others browse, install
-    and apply them with no software update. The just-module-creator plugin drafts modules from the literature and
-    public databases inside the AI assistant a researcher already uses.
-  context_before: risk scores locally, so the genome does not have to be uploaded.
-  context_after: Every matched variant links to its reported effect and its sources. Polygenic
-  comment: 'Suggested edits: insert “no coding involved”; delete “out programming”; insert “modules”; delete “ones”;
-    insert “users”; delete “others”; insert “out the need of a”; delete “no”; insert “employing”; delete “inside”;
-    insert “an”; delete “the”; insert “of the”; delete “a”; insert “’s choice”; delete “”; delete “already uses”.'
-  edits:
-  - inserted: ' no coding involved'
-  - deleted: out programming
-  - inserted: modules
-  - deleted: ones
-  - inserted: users
-  - deleted: others
-  - inserted: out the need of a
-  - deleted: 'no '
-  - inserted: employing
-  - deleted: inside
-  - inserted: 'an '
-  - deleted: 'the '
-  - inserted: 'of the '
-  - deleted: 'a '
-  - inserted: ’s choice
-  - deleted: ' '
-  - deleted: already uses
-  where: Abstract
-  line: 31
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edits (''write with no coding involved'', ''publish new modules'', ''where users browse'',
-    ''without the need of a software update'') except one: ''employing an AI assistant of the researcher''s choice''
-    says the plugin works in any assistant, while Section 3.2.1 says just-module-creator ''adds module-authoring
-    skills for Claude Code and Codex''. Write ''employing an AI assistant such as Claude Code or Codex'', or keep
-    ''of the researcher''s choice'' only if the plugin is known to run in others.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: wording-preference
-    note: Georg's rewording of the Abstract's modules sentence.
-- id: S23
-  kind: suggestion
-  author: Livia Zaharia
-  date: '2026-11-01T20:15:57Z'
-  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:15:57Z|(further called PGS)
-  master: paper1-just-dna-lite.md
-  anchor: Every matched variant links to its reported effect and its sources. Polygenic scores come from just-prs,
-    a library that also works on its own. It computes PGS Catalog scores from a cleaned copy of the Catalog, places
-    each within a reference population matched to the genome’s inferred ancestry, labels its quality and shows all
-    models for a trait side by side, so users see where the models agree and differ.
-  context_before: literature and public databases inside the AI assistant a researcher already uses.
-  context_after: AI assistants can also run annotation and scoring through Model Context Protocol
-  comment: 'Suggested edits: insert “(further called PGS)”.'
-  edits:
-  - inserted: ' (further called PGS)'
-  where: Abstract
-  line: 33
-  status: open
-  now: ''
-  why: ''
-  next: Define the abbreviation where the Abstract first uses it, 'polygenic scores (PGS)', so that 'PGS Catalog'
-    reads. C126 asks the same for every abbreviation.
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: caught
-    findings:
-    - ST-7
-    note: The story stage flagged the Abstract's undefined abbreviations, the PGS Catalog among them; the applied
-      fix spelled out VCF only.
-- id: C126
-  kind: comment
-  author: Livia Zaharia
-  date: '2026-11-01T20:16:56Z'
-  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:16:56Z|stephanie and benjamin nagged me to defi
-  master: paper1-just-dna-lite.md
-  anchor: ''
-  context_before: matched variant links to its reported effect and its sources. Polygenic scores
-  context_after: come from just-prs, a library that also works on its own. It
-  comment: stephanie and benjamin nagged me to define weird abbreviations before using them
-  where: Abstract
-  line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'Spell out every abbreviation at its first use, in the Abstract and again in the body: PGS (S23), MCP (Model
-    Context Protocol), GRCh38, T2T and PRS. VCF is already spelled out in the Abstract.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: caught
-    findings:
-    - ST-7
-    note: 'Same as defining PGS: the story stage flagged the Abstract''s undefined abbreviations and the fix stopped
-      at VCF.'
-- id: C48
-  kind: comment
-  author: G Fue
-  date: '2026-10-31T16:02:43Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:02:43Z|which Catalog?
-  master: paper1-just-dna-lite.md
-  anchor: the Catalog
-  context_before: its own. It computes PGS Catalog scores from a cleaned copy of
-  context_after: ', places each within a reference population matched to the genome’s inferred'
-  comment: which Catalog?
-  replies:
-  - author: Anton Kulaga
-    date: '2026-11-01T18:18:21Z'
-    text: we claned PGS catalog as it has mistakes in metadata and some garbage PRS-ses
-  where: Abstract
-  line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'Write ''a cleaned copy of the PGS Catalog'': the paper also has a ''Module Catalog'' (Section 2.3), so
-    ''the Catalog'' is ambiguous. Anton''s reply gives the reason for cleaning (''it has mistakes in metadata and
-    some garbage PRS-ses''); if a clause fits, say what cleaning means as Section 3.2 does: metadata normalized,
-    and 860 of 6,977 scores withheld because their reference distributions failed the audit.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: caught
-    findings:
-    - ST-7
-    note: The story stage named the PGS Catalog as undefined in the Abstract; the applied fix defined only VCF,
-      so 'the Catalog' stayed bare.
 - id: C127
   kind: comment
   author: Livia Zaharia
@@ -524,7 +285,7 @@ items:
     raw data from a testing company take it to third-party interpretation tools (Nelson et al., 2019; O’Daniel et
     al., 2025).
   context_before: try the platform on public genomes. 1. Introduction 1.1 Background and Significance
-  context_after: 'That raw data can now come from sequencing: several companies offer direct-to-consumer'
+  context_after: 'That raw variant data now mostly come from whole-genome DNA sequencing: several'
   comment: 'Suggested edits: insert “Thereof there is a lack of interpretation both in scientific circles but also
     consumer wise.”.'
   edits:
@@ -590,85 +351,37 @@ items:
   why: Explains Livia's suggested sentence S24, which links the researchers' and the consumers' sentences, the link
     Georg's C50 asks for.
   next: ''
-- id: S4
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T16:08:22Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:08:22Z|variant can mostly whole-genome DNA
-  master: paper1-just-dna-lite.md
-  anchor: 'That raw data can now come from sequencing: several companies offer direct-to-consumer sequencing services
-    (O’Daniel et al., 2025). The National Human Genome Research Institute (NHGRI) estimates that the first human
-    genome cost US$500 million to US$1 billion (NHGRI, 2021). By 2025, manufacturers advertised the sequencing of
-    a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report
-    higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing
-    scope (Mordaunt et al., 2024; Ehman et al., 2025).'
-  context_before: to third-party interpretation tools (Nelson et al., 2019; O’Daniel et al., 2025).
-  context_after: Existing solutions for reading a personal genome generally belong to two extremes.
-  comment: 'Suggested edits: insert “variant”; delete “can”; insert “mostly”; insert “whole-genome DNA”.'
-  edits:
-  - inserted: 'variant '
-  - deleted: 'can '
-  - inserted: 'mostly '
-  - inserted: 'whole-genome DNA '
-  where: 1.1 Background and Significance
-  line: 52
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept ''raw variant data'' and ''whole-genome DNA sequencing''; decline ''mostly'' and keep ''can'': most
-    consumers'' raw data still come from genotyping arrays (23andMe, AncestryDNA, the consumer formats Sections
-    3.2 and 5.4 name), and no source in the paragraph says sequencing is now the main source. Result: ''That raw
-    variant data can now come from whole-genome DNA sequencing: ...''. Livia''s S25 adds an ''s'' inside this edit
-    (''mostly comes'').'
-  category: Claims and evidence
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: wording-preference
-    note: A more precise wording of the sequencing sentence that Georg prefers.
-- id: S25
+- id: S29
   kind: suggestion
   author: Livia Zaharia
   date: '2026-11-01T20:28:06Z'
-  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:28:06Z|s While T , . B
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:28:06Z|s
   master: paper1-just-dna-lite.md
-  anchor: 'That raw data can now come from sequencing: several companies offer direct-to-consumer sequencing services
-    (O’Daniel et al., 2025). The National Human Genome Research Institute (NHGRI) estimates that the first human
-    genome cost US$500 million to US$1 billion (NHGRI, 2021). By 2025, manufacturers advertised the sequencing of
-    a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report
-    higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing
-    scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  anchor: 'That raw variant data now mostly come from whole-genome DNA sequencing: several companies offer direct-to-consumer
+    sequencing services (O’Daniel et al., 2025). While The National Human Genome Research Institute (NHGRI) estimates
+    that the first human genome cost US$500 million to US$1 billion (NHGRI, 2021), by 2025, manufacturers advertised
+    the sequencing of a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory
+    studies report higher costs after including labour, computing and analysis, with estimates depending on the
+    workflow and costing scope (Mordaunt et al., 2024; Ehman et al., 2025).'
   context_before: to third-party interpretation tools (Nelson et al., 2019; O’Daniel et al., 2025).
   context_after: Existing solutions for reading a personal genome generally belong to two extremes.
-  comment: 'Suggested edits: insert “s”; insert “While”; replace “T” with “T”; insert “,”; replace “. B” with “b”.'
+  comment: 'Suggested edits: insert “s”.'
   edits:
   - inserted: s
-  - inserted: 'While '
-  - deleted: T
-    inserted: T
-  - inserted: ','
-  - deleted: . B
-    inserted: ' b'
   where: 1.1 Background and Significance
   line: 52
   status: open
   now: ''
   why: ''
-  next: 'Two edits in one. Accept the merge of the two cost sentences into one contrast: ''While the National Human
-    Genome Research Institute (NHGRI) estimates that the first human genome cost US$500 million to US$1 billion
-    (NHGRI, 2021), by 2025 manufacturers advertised the sequencing of a human genome for US$80 to US$200 (...)''.
-    The ''s'' sits inside Georg''s pending S4 (''raw variant data now mostly comes from whole-genome DNA sequencing'')
-    and follows it: S4''s triage keeps ''can now come'' and declines ''mostly'', since most consumers'' raw data
-    still come from genotyping arrays, and with that wording the ''s'' is not needed.'
+  next: The 's' left from S25 ('data ... comes'). The paper treats 'data' as plural ('Genomic data are'), so keep
+    'come'.
   category: Writing and clarity
-  severity: minor
+  severity: info
   stage: writing
   gap:
     verdict: missed
     miss_reason: wording-preference
-    note: Livia joins the two cost sentences into one contrast; the paragraph's link to the one before was repaired
-      by the story stage.
+    note: Livia's 's' left from the cost-sentence edit.
 - id: S5
   kind: suggestion
   author: G Fue
@@ -882,162 +595,6 @@ items:
     miss_reason: judged-differently
     owner: manuscript-story
     note: A conjunction that does not work in Section 1.1, which the story stage read and left.
-- id: S6
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T16:25:24Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:25:24Z|-based
-  master: paper1-just-dna-lite.md
-  anchor: Just-DNA-Lite is a local, open-source platform for annotating a personal genome and computing polygenic
-    scores. We developed it as a ground-up rewrite of Just-DNA-Seq (Kulaga et al., 2024), whose first generation
-    (Generation I), built for longevity research, was a set of annotation and report modules for OakVar, a Python
-    variant-analysis framework derived from OpenCRAVAT (Pagel et al., 2020). Just-DNA-Lite (Generation II) removes
-    the OakVar dependency entirely and uses a standalone annotation engine. It also replaces Python annotation plugins
-    with declarative modules discoverable from configured sources (Section 2.2). Supplementary S1 describes Generation
-    I, and Figure S1 gives a historical overview of its module domains.
-  context_before: General Data Protection Regulation (GDPR) seek to avoid. 1.2 Overview of Just-DNA-Lite
-  context_after: The resulting workflow lets users choose published annotation content, apply it to
-  comment: 'Suggested edits: insert “-based”.'
-  edits:
-  - inserted: -based
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 73
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''replaces Python-based annotation plugins''.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: wording-preference
-    note: '''Local-based'' instead of ''local''.'
-- id: S27
-  kind: suggestion
-  author: G Fue
-  date: '2026-11-01T07:07:31Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:07:31Z|Researchers People citizen scientists,
-  master: paper1-just-dna-lite.md
-  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
-    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
-    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
-    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
-    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
-    points; Box 1 names the user groups and where each starts.
-  context_before: I, and Figure S1 gives a historical overview of its module domains.
-  context_after: Key features. Polygenic scores with the context to read them. The PGS
-  comment: 'Suggested edits: insert “Researchers”; replace “People” with “, inc”; insert “citizen scientists,”.'
-  edits:
-  - inserted: Researchers
-  - deleted: People
-    inserted: ', inc'
-  - inserted: ' citizen scientists,'
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 78
-  status: open
-  now: ''
-  why: ''
-  next: Georg's S7 as the Doc now holds it, with Livia's 'including' (S28); follows the decision on naming the first
-    user group (C58, C130).
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: skill-did-not-look
-    owner: manuscript-policy-fit
-    note: Georg's reframing of Section 1.2 to researchers, including citizen scientists, as the Doc now holds it.
-- id: S28
-  kind: suggestion
-  author: Livia Zaharia
-  date: '2026-11-01T20:35:29Z'
-  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:35:29Z|l .
-  master: paper1-just-dna-lite.md
-  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
-    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
-    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
-    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
-    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
-    points; Box 1 names the user groups and where each starts.
-  context_before: I, and Figure S1 gives a historical overview of its module domains.
-  context_after: Key features. Polygenic scores with the context to read them. The PGS
-  comment: 'Suggested edits: replace “l” with “luding”; delete “.”.'
-  edits:
-  - deleted: l
-    inserted: luding
-  - deleted: .
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 78
-  status: open
-  now: ''
-  why: ''
-  next: Livia's edit of Georg's suggestion S27 ('incl.' to 'including'); follows the decision on naming the first
-    user group (C58, C130).
-  category: Writing and clarity
-  severity: info
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: wording-preference
-    note: Livia's edit of Georg's suggested 'incl.' to 'including'.
-- id: C56
-  kind: comment
-  author: G Fue
-  date: '2026-11-01T07:10:29Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:10:29Z|see also below
-  master: paper1-just-dna-lite.md
-  anchor: l.
-  context_before: scoring operations as tools instead of writing their own analysis code. People
-  context_after: with different needs enter this workflow at different points; Box 1 names
-  comment: see also below
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 78
-  status: open
-  now: ''
-  why: ''
-  next: Points to C58 and S9 (Box 1's first row); answer it with the decision in C58.
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: skill-did-not-look
-    owner: manuscript-policy-fit
-    note: Points to the same reframing of who the paper is for.
-- id: S8
-  kind: suggestion
-  author: G Fue
-  date: '2026-10-31T16:36:05Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:36:05Z|do not need to these nothing
-  master: paper1-just-dna-lite.md
-  anchor: Polygenic scores with the context to read them. The PGS Catalog publishes polygenic score models as scoring
-    files; just-prs computes them for a genome and adds what a reader needs to judge each result. It infers the
-    genome’s ancestry, places each score as a percentile in the matching 1000 Genomes reference population, reports
-    how much of the score the genome covers, labels the result’s quality and groups all models for a trait so that
-    their agreement and disagreement are visible. The scoring files, cleaned metadata and audited reference distributions,
-    for 6,117 scores across 778 traits, are downloaded on first use, so users assemble nothing (Sections 3.2 and
-    4.3).
-  context_before: Box 1 names the user groups and where each starts. Key features.
-  context_after: 'An app store for annotation modules. Modules are data: versioned tables of'
-  comment: 'Suggested edits: insert “do not need to”; insert “these”; delete “nothing”.'
-  edits:
-  - inserted: 'do not need to '
-  - inserted: these
-  - deleted: nothing
-  where: 1.2 Overview of Just-DNA-Lite
-  line: 84
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''so users do not need to assemble these''.'
-  category: Writing and clarity
-  severity: minor
-  stage: writing
-  gap:
-    verdict: missed
-    miss_reason: wording-preference
-    note: '''Users do not need to assemble these'' instead of ''users assemble nothing''.'
 - id: C57
   kind: comment
   author: G Fue
@@ -1093,7 +650,8 @@ items:
     changes whom the paper says the platform is for, which also bears on the ethics framing of the worked examples
     (the run''s decisions D1 and D2). If yes, apply it in one pass, with Box 1''s first row as ''Researchers, including
     citizen scientists, with a genome from a sequencing provider''. Livia''s C130 would call the group users instead,
-    since it includes genomic enthusiasts.'
+    since it includes genomic enthusiasts. In the Doc, Section 1.2 now reads ''Researchers, including citizen scientists''
+    (S7, S27, S28 accepted); Box 1 (S9) and Livia''s C130 are still open.'
   category: Story and structure
   severity: major
   stage: writing
@@ -1328,6 +886,71 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-story
     note: '''The two MCP servers'' in Box 1 come before the paper says which two.'
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T20:42:08Z'
+    text: |-
+      actually agree with georg- these paper crazy people want exactly like in legislation to always mention to what you a re refering even though you did mention them before somewhere
+      @antonkulaga@gmail.com
+- id: C131
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:44:48Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:44:48Z|could we have some nice schemas? i think
+  master: paper1-just-dna-lite.md
+  anchor: A web application is the main interface, and typed MCP tools serve AI assistants (Section 3.2.1).
+  context_before: the application code, and columnar storage with streaming operations limits memory use.
+  context_after: 2.1 Annotation Pipeline The standalone annotation engine uses polars-bio for VCF reading
+  comment: |-
+    could we have some nice schemas? i think in some cases they would be helpful for reviewers- honestly sometimes i do have to read the text multiple times to get the meaning so some graphics may be helpful
+    @antonkulaga@gmail.com
+  where: '2. System and Methods: Platform Architecture'
+  line: 107
+  status: open
+  now: ''
+  why: ''
+  next: 'Add an overview diagram at the start of Section 2: a VCF goes through quality filtering into the annotation
+    engine, which joins it with the modules (and optionally Ensembl) and writes the report; the PGS Catalog''s scoring
+    files go through just-prs to percentiles; the web interface, the MCP servers and the Python libraries call the
+    same operations. Livia asks Anton; which figures the paper has is the authors'' decision.'
+  category: Figures and tables
+  severity: major
+  stage: writing
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: The figures stage proposed one new figure, a speed chart; no stage asked whether the methods need a diagram,
+      though both co-authors found Sections 2 and 3 hard to follow.
+- id: C132
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:47:24Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:47:24Z|also not 100% related to thi subject but
+  master: paper1-just-dna-lite.md
+  anchor: 2.1 Annotation Pipeline
+  context_before: the main interface, and typed MCP tools serve AI assistants (Section 3.2.1).
+  context_after: The standalone annotation engine uses polars-bio for VCF reading (a genomics library
+  comment: |-
+    also not 100% related to thi subject but to the general paper- put a page counter on the document- maybe footer?
+    is footer with notes at the base accepted in the format? like not to search for reference somewhere in the back of the text but while you read
+  where: 2.1 Annotation Pipeline
+  line: 110
+  status: open
+  now: ''
+  why: ''
+  next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. References
+    follow the journal's style (author and year in the text, the list at the end), so footnote references are not
+    an option for the ladder venues.
+  category: Submission package
+  severity: minor
+  stage: final
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-journal-adapt
+    note: 'Page and line numbers in the copies the co-authors read: no stage looked at the Doc build''s layout.'
 - id: C62
   kind: comment
   author: G Fue
@@ -1356,6 +979,11 @@ items:
     owner: manuscript-integrity-check
     note: 'The paper says an indel written differently does not match, without saying what that costs: a real carrier
       can be left out of the report.'
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:16:11Z'
+    text: i think it is because it means it is skipping some data- but maybe it should be explained- i mean the
+      genetic notation in a simple version @antonkulaga@gmail.com
 - id: C63
   kind: comment
   author: G Fue
@@ -1414,6 +1042,48 @@ items:
     miss_reason: input-missing
     note: Georg writes that these sections are beyond what a corresponding or senior author could vouch for; a decision
       only the authors can take, and a sign of the opaque passages above.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:19:59Z'
+    text: |-
+      i just think we should have some simple genomics explanation paragraphs.since i don't know if reviewers are specialiezed similar in both informatics and genomics
+      @antonkulaga@gmail.com
+- id: C133
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:22:08Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:22:08Z|nice schema feeling-please insert each p
+  master: paper1-just-dna-lite.md
+  anchor: 'For researchers creating new modules, a separate authoring route accepts module_spec.yaml and CSV tables
+    such as variants.csv and studies.csv. The just-dna-compiler library validates and compiles these specifications
+    into Parquet artifacts and a manifest during custom-module registration. Documentation and thumbnails may accompany
+    the module. CSV files are used only for authoring: at runtime the platform reads the compiled Parquet tables,
+    so existing Parquet modules need no CSV files.'
+  context_before: and studies.parquet when available; other module families have a different lead table.
+  context_after: The just-dna-format library defines the authored specification and the manifest, integrity and
+  comment: |-
+    nice schema feeling-please insert
+    each paragraph from this section would be nice and explained with a a schema- tink of it a mini slideshow silde
+  where: 2.2 Annotation Modules as Data
+  line: 141
+  status: open
+  now: ''
+  why: ''
+  next: 'A diagram for Section 2.2: a module''s authored files (module_spec.yaml, variants.csv, studies.csv) compiled
+    into its Parquet tables and manifest, published to the registry and installed by users. The open proposal to
+    show one real module''s files in the supplement fits beside it.'
+  category: Figures and tables
+  severity: minor
+  stage: writing
+  decision: true
+  gap:
+    verdict: partly
+    findings:
+    - ST-11
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: The story stage proposed showing one real module's files in the supplement, not a diagram of the module
+      format.
 - id: C65
   kind: comment
   author: G Fue
@@ -1462,30 +1132,62 @@ items:
     owner: manuscript-integrity-check
     note: The interface has no feature called self-exploration (the code uses the word only in a disclaimer); the
       text-versus-code check did not test this feature list.
-- id: C67
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:27:56Z'
+    text: i think it is a weird naming of a process we know
+- id: C134
   kind: comment
-  author: G Fue
-  date: '2026-10-31T19:49:54Z'
-  key: paper1-just-dna-lite.md|G Fue|2026-10-31T19:49:54Z|(?)
+  author: Livia Zaharia
+  date: '2026-11-01T21:29:36Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:29:36Z|while the name of web interface is corre
   master: paper1-just-dna-lite.md
-  anchor: 'on'
-  context_before: private genome files are disabled there. Figure 1. The Just-DNA-Lite web interface
-  context_after: the public demonstration. (a) The Module Catalog, which lists the modules published
-  comment: (?)
+  anchor: Users can install and run the web interface
+  context_before: in Python with Reflex (Reflex, 2026), a framework that compiles to React.
+  context_after: on their own computers to analyse their personal genomes locally. A hosted
+  comment: while the name of web interface is correct- maybe call it UI? since when i read web interface i am thinking
+    more of somewhat like the demo site since that is live online
   where: 2.3 Web Interface and Self-Exploration
-  line: 165
+  line: 159
   status: open
   now: ''
   why: ''
-  next: Write 'Figure 1. The Just-DNA-Lite web interface, as served by the public demonstration (https://lite.just-dna.life/).'
-  category: Figures and tables
+  next: Say once in Section 2.3 that the web interface runs on the user's own computer, and call the hosted site
+    'the public demonstration' everywhere, so the two are not confused; 'UI' works too if the authors prefer it.
+  category: Writing and clarity
   severity: minor
   stage: writing
   gap:
     verdict: missed
     miss_reason: skill-did-not-look
-    owner: manuscript-figures
-    note: The figures stage reviewed Figure 1's legibility, not the wording of its caption's first sentence.
+    owner: manuscript-story
+    note: '''Web interface'' names both the local application and, to a reader, the hosted site; no reader stopped
+      at it.'
+- id: C135
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:26:44Z'
+  key: 'paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:26:44Z|we should check deployment to make sure '
+  master: paper1-just-dna-lite.md
+  anchor: are disabled there
+  context_before: at https://lite.just-dna.life/ runs on public genomes only; uploads of private genome files
+  context_after: . Figure 1. The Just-DNA-Lite web interface elements. (a) The Module Catalog,
+  comment: we should check deployment to make sure it is so
+  where: 2.3 Web Interface and Self-Exploration
+  line: 159
+  status: open
+  now: ''
+  why: ''
+  next: 'Check the hosted demonstration: the text says uploads of private genome files are disabled there. Confirm
+    that https://lite.just-dna.life/ runs in immutable mode (docs/IMMUTABLE_MODE.md) before submission.'
+  category: Claims and evidence
+  severity: minor
+  stage: now
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-reporting-check
+    note: The reporting check found the demonstration site answering, not whether uploads are disabled there.
 - id: C68
   kind: comment
   author: G Fue
@@ -1561,10 +1263,12 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Give the rule behind the weights, or cite where it is defined: Section 3.1 lists the inputs of w_SNP (''number
-    of independent significant studies, reported p-values, number of replicating populations'') but not how they
-    combine. If the Generation I paper (Kulaga et al., 2024) defines it, cite the section; if not, add the rule
-    to Supplementary S1.'
+  next: 'In the Doc by 1 November, 22:10 UTC: answered: an author added to Section 3.1 how the displayed weight
+    is built (W_display = w_SNP × w_genotype, each weight explained). Carry it into v0.8''s master, set as a display
+    formula (Livia''s C136). Give the rule behind the weights, or cite where it is defined: Section 3.1 lists the
+    inputs of w_SNP (''number of independent significant studies, reported p-values, number of replicating populations'')
+    but not how they combine. If the Generation I paper (Kulaga et al., 2024) defines it, cite the section; if not,
+    add the rule to Supplementary S1.'
   category: Methods and reproducibility
   severity: major
   stage: writing
@@ -1574,6 +1278,65 @@ items:
     owner: manuscript-reporting-check
     note: How the longevity module's weights come from study quality, replication and significance is not described;
       the run asked this only of the other expert modules.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:34:57Z'
+    text: i actually agree with georg.maybe just explain how those parameters are influenced- quality can be high
+      medium low (and how does that change), replication no or true/false-maybe have a table on how these variables
+      are edited
+- id: C136
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:35:41Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:35:41Z|put formulas separately nicely and expla
+  master: paper1-just-dna-lite.md
+  anchor: W_display = w_SNP × w_genotype. The SNP weight (w_SNP) summarizes the strength of
+  context_before: browsing. The module’s displayed score is the product of two component weights,
+  context_after: statistical evidence for a variant-trait association (number of independent significant studies,
+    reported
+  comment: put formulas separately nicely and explain the terms after since complex math in a large text is hard
+    to process
+  where: 3.1 Longevity Variants Module (example)
+  line: 206
+  status: open
+  now: ''
+  why: ''
+  next: Set W_display = w_SNP × w_genotype as a display formula on its own line and define each term after it. The
+    paragraph was added in the Doc (C70) and has to reach v0.8's master first.
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: later-decision
+    note: The formula paragraph was written in the Doc after the run, to answer Georg's C70; the run never saw it.
+- id: C137
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:37:26Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:37:26Z|maybe put the image before and say figur
+  master: paper1-just-dna-lite.md
+  anchor: A report in use. In a stored Longevity Variants report for Anton Kulaga’s public genome, FOXO3 rs2802292
+    is called G/T and appears in the insulin-signalling category with a module weight of 0.475. Fi
+  context_before: functional pathway categories, such as insulin/IGF-1 signalling, mTOR, sirtuins and genome maintenance.
+  context_after: gure 1b shows this row as the report renders it, Figure 2
+  comment: maybe put the image before and say figure... a report in use- since i was reading and was wondering was
+    is this about
+  where: 3.1 Longevity Variants Module (example)
+  line: 211
+  status: open
+  now: ''
+  why: ''
+  next: 'Open ''A report in use.'' with the figure, for example ''Figure 1b shows a stored report row for Anton
+    Kulaga''s public genome: ...'', so the reader knows what the paragraph is about before the details.'
+  category: Story and structure
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-story
+    note: '''A report in use.'' starts on details before saying what it shows; no reader stopped at it.'
 - id: C71
   kind: comment
   author: G Fue
@@ -1589,9 +1352,10 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Say what the weight is in the same sentence: ''The weight is the module''s curation score, the strength
-    of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose (0.5 for one copy);
-    it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
+  next: 'In the Doc by 1 November, 22:10 UTC: Section 3.1''s new paragraph (C70) says what the weight is. Carry
+    it into v0.8''s master. Say what the weight is in the same sentence: ''The weight is the module''s curation
+    score, the strength of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose
+    (0.5 for one copy); it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1631,6 +1395,11 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-figures
     note: The figures stage asked to redraw Figure 2 at print size, not to export it as vector graphics.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:39:42Z'
+    text: i think they are screenshots to show live from the interface/output of the platform but should be mentioned
+      as such like screen shot of report made by our platform...
 - id: C73
   kind: comment
   author: G Fue
@@ -1658,6 +1427,10 @@ items:
     - PE-5
     note: The prose stage found that Section 3.2 shows the trait view before defining a polygenic score and proposed
       swapping the paragraphs; left for the authors.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:39:51Z'
+    text: i subscribe
 - id: C74
   kind: comment
   author: G Fue
@@ -1708,6 +1481,66 @@ items:
     owner: manuscript-prose-edit
     note: The '10% or more of its absolute weight on rows that cannot be placed' clause does not parse for a reader;
       nothing read it for sense.
+- id: C138
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:42:35Z'
+  key: 'paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:42:35Z|a schema- like a json of the content of '
+  master: paper1-just-dna-lite.md
+  anchor: A prepared catalogue.
+  context_before: additively) or “cannot be scored” (Table S5). Section 4.3 gives the counts.
+  context_after: The scoring files, metadata and reference distributions that just-prs reads are prepared
+  comment: a schema- like a json of the content of the catalog and what is supposed to store- graphical aids are
+    most wellcom in such descriptive parts
+  where: 3.2 Polygenic Risk Scores
+  line: 230
+  status: open
+  now: ''
+  why: ''
+  next: A small figure or table of what the prepared catalogue holds for each score (its scoring file, cleaned metadata,
+    reference distribution, and the ancestry model) and where each part comes from. It is also the place to say
+    what the PGS Catalog is (C48).
+  category: Figures and tables
+  severity: minor
+  stage: writing
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: No stage asked for a picture of what the prepared catalogue holds.
+- id: C139
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:44:31Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:44:31Z|and another general ideea- present first
+  master: paper1-just-dna-lite.md
+  anchor: The scoring files, metadata and reference distributions that just-prs reads are prepared once, stored
+    as Pa
+  context_before: be scored” (Table S5). Section 4.3 gives the counts. A prepared catalogue.
+  context_after: rquet and downloaded on first use from HuggingFace (datasets just-dna-seq/pgs-catalog and just-dna-seq/prs-percentiles),
+  comment: |-
+    and another general ideea- present first the simple structure then take each component and explain there what particular cases and specific genomic things that can happen there- it feel sthat text has a lot of content but is not structured but hard to follow
+    so restructure and insert graphics
+  where: 3.2 Polygenic Risk Scores
+  line: 230
+  status: open
+  now: ''
+  why: ''
+  next: Open Section 3.2 with the whole path in four plain steps (take a published score, match it to the genome,
+    place the result among the matched reference population, label its quality), then one part per step with its
+    special cases. Defining a polygenic score before the trait view (the run's open proposal) is the first move.
+  category: Story and structure
+  severity: major
+  stage: writing
+  gap:
+    verdict: partly
+    findings:
+    - PE-5
+    miss_reason: skill-did-not-look
+    owner: manuscript-story
+    note: The prose stage proposed defining a polygenic score before the trait view, not opening Section 3.2 on
+      the whole path.
 - id: C76
   kind: comment
   author: G Fue
@@ -1980,6 +1813,10 @@ items:
     owner: manuscript-journal-adapt
     note: The run flagged the length against the venues' limits and left cutting until a journal is chosen; it did
       not propose moving technical paragraphs to the supplement.
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:45:32Z'
+    text: '@antonkulaga@gmail.com you can combine this ideea with the one i wrote above about restructuring'
 - id: C86
   kind: comment
   author: G Fue
@@ -2150,6 +1987,47 @@ items:
     owner: manuscript-integrity-check
     note: '''Should give equivalent results'' invites the question what was tested; the run did not ask for a positive
       statement of what was.'
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:52:25Z'
+    text: |-
+      make a table with was tested and what not or usage-why so much text when i can see tables which are usually easier to read
+      @antonkulaga@gmail.com
+- id: C140
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:55:12Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:55:12Z|can we put more specific genomic parts t
+  master: paper1-just-dna-lite.md
+  anchor: Ancestry Inferenc
+  context_before: not test each interface separately, nor the accuracy of assistant-generated explanations. 3.2.2
+  context_after: e The reference superpopulation is chosen by a k-nearest-neighbour classifier on principal
+  comment: can we put more specific genomic parts to a technical annex and leave a general simple explanation in
+    places like this?
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T21:55:24Z'
+    text: '@antonkulaga@gmail.com'
+  where: 3.2.2 Ancestry Inference
+  line: 272
+  status: open
+  now: ''
+  why: ''
+  next: Should technical detail move to a supplementary note, leaving a plain explanation in the main text? In Section
+    3.2.2, keep two or three sentences on how the reference population is chosen and move the panel, kinship, pruning
+    and FRAPOSA details. The same choice covers Livia's C146 and C147 and Georg's C85 and C100.
+  category: Misplaced detail
+  severity: minor
+  stage: writing
+  decision: true
+  gap:
+    verdict: partly
+    findings:
+    - JA-7
+    miss_reason: skill-did-not-look
+    owner: manuscript-journal-adapt
+    note: The run flagged the length against the venues' limits, not that technical detail could move to a supplementary
+      note.
 - id: S13
   kind: suggestion
   author: G Fue
@@ -2302,6 +2180,34 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-prose-edit
     note: A missing 'and then' in Section 3.3, in text the prose stage did not edit.
+- id: C141
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:56:54Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:56:54Z|i am curious actually where the tables a
+  master: paper1-just-dna-lite.md
+  anchor: Table S4 gives each m
+  context_before: Church laboratory’s Protective and Enhancing Alleles list, checked against the primary literature).
+  context_after: odule’s curation and every source it cites. These modules work by joining
+  comment: i am curious actually where the tables are? can we have them in the text or like i said previously we
+    have a page limit?
+  where: 3.3 Additional Trait Annotation Modules
+  line: 281
+  status: open
+  now: ''
+  why: ''
+  next: Table S4 is a separate Doc of this round ('Supplementary Table S4. Module sources'). Say at first mention
+    where each supplementary table is, and decide with the page limit whether a short version belongs in the main
+    text.
+  category: Figures and tables
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: The figures stage checked that supplementary items are cited, not that a reader of the paper's Doc can
+      tell where they are.
 - id: S15
   kind: suggestion
   author: G Fue
@@ -2364,6 +2270,25 @@ items:
     owner: manuscript-integrity-check
     note: The text assumes module authors already use an AI assistant and does not say what happens when they do
       not.
+- id: C142
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T21:58:41Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T21:58:41Z|i searched- there is no figure called ta
+  master: paper1-just-dna-lite.md
+  anchor: Table 1
+  context_before: 'registry held 24 modules from five publishing accounts: the ten modules of'
+  context_after: ', ten more from the first author’s own account and four from'
+  comment: i searched- there is no figure called table 1 in the document here- maybe it is in supplements- other
+    wise you have issues with image and text correlation
+  where: 3.4 Growing the Module Ecosystem
+  line: 290
+  status: not-on-point
+  now: ''
+  why: Table 1 is in the Doc, at the start of Section 3, right after the sentence that first cites it ('...drug-response
+    associations (Table 1)'), captioned 'Table 1. Annotation modules published by the Just-DNA-Lite project in the
+    module registry'.
+  next: ''
 - id: C96
   kind: comment
   author: G Fue
@@ -2426,6 +2351,22 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-prose-edit
     note: A parenthesis that makes the speed sentence of Section 4.1 read, in text the prose stage did not edit.
+- id: C143
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T22:02:03Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T22:02:03Z|this one exists- so table 1 has to be fo
+  master: paper1-just-dna-lite.md
+  anchor: Table 2
+  context_before: call sets Generation I ran on, it was 128- to 181-fold (
+  context_after: ). Most Generation I runs on Livia Zaharia’s genome were made with
+  comment: this one exists- so table 1 has to be found somewhere here
+  where: 4.1 Annotation Speed
+  line: 302
+  status: not-on-point
+  now: ''
+  why: 'Follows C142: Table 1 is at the start of Section 3.'
+  next: ''
 - id: C97
   kind: comment
   author: G Fue
@@ -2537,6 +2478,33 @@ items:
     findings:
     - PE-3
     note: 'Same as the question on ''warm'': the run modes are defined only later in Section 4.1.'
+- id: C144
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T22:03:10Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T22:03:10Z|so we have this species- maybe put to co
+  master: paper1-just-dna-lite.md
+  anchor: Supplementary Table S10
+  context_before: of Livia Zaharia’s genome), against at most 4,611 MB for Generation I.
+  context_after: gives the full runs, and the repository’s generated tables (docs/manuscript/benchmarks/a3/tables.md)
+    the warm
+  comment: so we have this species- maybe put to compare the contents to be sure about numbering as well
+  where: 4.1 Annotation Speed
+  line: 304
+  status: open
+  now: ''
+  why: ''
+  next: Renumber the supplementary tables in the order the paper first cites them (an open point of the run's figures
+    stage), then check every 'Table S' reference against the Supplementary Data.
+  category: Figures and tables
+  severity: minor
+  stage: final
+  gap:
+    verdict: caught
+    findings:
+    - FG-18
+    note: The figures stage found the supplementary tables numbered out of order and left renumbering for the final
+      stage.
 - id: C100
   kind: comment
   author: G Fue
@@ -2594,6 +2562,62 @@ items:
     miss_reason: judged-differently
     owner: manuscript-story
     note: The story stage kept speed as a headline; that most readers will not care about it was never weighed.
+- id: C145
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T22:03:57Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T22:03:57Z|not in paper
+  master: paper1-just-dna-lite.md
+  anchor: Table S6
+  context_before: benchmarked Just-DNA-Lite against the Generation I OakVar-based system on one workstation (
+  context_after: ). The main input was Anton Kulaga’s published whole-genome call set (Zenodo
+  comment: not in paper
+  where: 4.1 Annotation Speed
+  line: 308
+  status: open
+  now: ''
+  why: ''
+  next: Table S6 is in the Supplementary Data Doc (Section S2). Cite it as 'Supplementary Data, Table S6' so a reader
+    of the paper's Doc knows where to look.
+  category: Figures and tables
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: 'Same as Table S4: the paper does not say that Table S6 is in the Supplementary Data.'
+- id: C146
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T22:07:07Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T22:07:07Z|can we have a technical annex where we d
+  master: paper1-just-dna-lite.md
+  anchor: 'Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in
+    three modes: warm runs reuse the sample’s quality-filtered table, so the VCF is not read again; full runs'
+  context_before: public genomes, for Generation I given an OakVar store account (Table S2).
+  context_after: start from a fresh instance and read the VCF, as every OakVar
+  comment: |-
+    can we have a technical annex where we describe the experiments and present here only the results?
+    i mean describin what kind of runs is a good ideea but describing how the machine was idle or not feels a bit like reading a log file of the run- which is interesting if debugging but might be too technic
+  where: 4.1 Annotation Speed
+  line: 312
+  status: open
+  now: ''
+  why: ''
+  next: 'Follows C140: keep the run modes and the results in Section 4.1 and move how the machine was used during
+    the runs (idle, light use, page cache) to the supplementary note on the benchmark.'
+  category: Misplaced detail
+  severity: minor
+  stage: writing
+  gap:
+    verdict: partly
+    findings:
+    - FG-12
+    miss_reason: skill-did-not-look
+    owner: manuscript-story
+    note: The run proposed moving Table 2's warm and cold rows to the supplement, not the run-by-run detail around
+      them.
 - id: C102
   kind: comment
   author: G Fue
@@ -2619,6 +2643,34 @@ items:
     miss_reason: skill-did-not-look
     owner: manuscript-story
     note: '''Page cache'' is used without saying what it holds.'
+- id: C147
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T22:09:47Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T22:09:47Z|my suggestion- explain SHORTLY what is i
+  master: paper1-just-dna-lite.md
+  anchor: PRS Computation
+  context_before: dbSNP only 2 3,537.2 (3,446.8–3,627.5) 3,537.2 ± 90.3 127.8 1× (ref.) 4.2
+  context_after: The two just-prs engines agreed closely on the benchmark genome, while agreement
+  comment: my suggestion- explain SHORTLY what is involved here and what you are looking at- seems to me accuraccuracy
+    or likelihood and then do a table with the technical results and then for more details for the advised reader
+    please read technical annex section...
+  where: 4.2 PRS Computation
+  line: 339
+  status: open
+  now: ''
+  why: ''
+  next: Open Section 4.2 with one plain sentence on what is compared and why (the same score computed by just-prs
+    and by PLINK2 on one genome should agree), then the table, then a pointer to Supplementary S3 for the matching
+    details; follows C140.
+  category: Story and structure
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-story
+    note: Section 4.2 opens on the engines without saying in plain words what is compared and why.
 - id: C103
   kind: comment
   author: G Fue
@@ -3159,6 +3211,15 @@ items:
     owner: manuscript-journal-adapt
     note: The run asked only for contribution roles in a standard format, not whether each listed contribution meets
       authorship criteria.
+  replies:
+  - author: Anton Kulaga
+    date: '2026-11-01T21:14:54Z'
+    text: Thanks for this comment, it pushed Livia to actually contribute to the text ;-)
+  - author: Livia Zaharia
+    date: '2026-11-01T21:49:28Z'
+    text: |-
+      I mean I actually asked about it- and I did put comments which in my opinion are obvious and makeeasier to read through the paper
+      however I am wondering -does publication has  a maximum mandatory length? since I see we already have 27 pages
 - id: C117
   kind: comment
   author: G Fue
@@ -3190,6 +3251,543 @@ items:
     owner: manuscript-journal-adapt
     note: The run placed the AI-use statement and judged its content complete; it did not consider bringing the
       substance of Supplementary Note S11 into the paper.
+- id: S22
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T10:11:42Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T10:11:42Z|4 1
+  master: paper1-just-dna-lite.md
+  anchor: 'Authors: Kulaga Anton1,2,†, Usanov Nikolay3,4,†, Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva
+    Malvina4, Zaharia Livia1, Fuellen Georg1, Tacutu Robi2,*'
+  context_before: 'mirror: paper2-just-module-creator.md). See docs/manuscript/v0.3/manuscript-strategy-v0.3.md
+    and, for venues, docs/manuscript/manuscript_journal_strategy.md (section “Venues, October 2026”).'
+  context_after: 'Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing Research, Rostock'
+  comment: 'Suggested edits: insert “4”; delete “1”.'
+  edits:
+  - inserted: '4'
+  - deleted: '1'
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted, with S1. Carry it into v0.8''s master. What remains of Georg''s
+    S1 after its asterisk part was accepted in the Doc: Livia Zaharia''s affiliation from 1 to 4. Decide it with
+    S1.'
+  category: Submission package
+  severity: minor
+  stage: final
+  decision: true
+  gap:
+    verdict: missed
+    miss_reason: input-missing
+    note: 'The rest of Georg''s author-line edit, Livia Zaharia''s affiliation: only the authors could know.'
+- id: C45
+  kind: comment
+  author: G Fue
+  date: '2026-11-01T08:28:44Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T08:28:44Z|I feel much better without the asterisk.
+  master: paper1-just-dna-lite.md
+  anchor: 1,
+  context_before: Borysova Olga4, Karmazin Alexey3,4, Koval Maria4, Pushkareva Malvina4, Zaharia Livia1, Fuellen
+    Georg
+  context_after: 'Tacutu Robi2,* Affiliations: Institute for Biostatistics and Informatics in Medicine and Ageing'
+  comment: I feel much better without the asterisk.
+  replies:
+  - author: G Fue
+    date: '2026-11-01T08:30:56Z'
+    text: Same thing as with https://www.aging-us.com/article/206431 ; Franziskas also wants to go for the Dr rer
+      hum in Rostock
+  where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
+  line: 6
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved after the asterisk edit (S1, S22) was accepted. Same change
+    as S1: remove the asterisk after ''Fuellen Georg^1,*^'' and decide who the corresponding author is (C64). Georg''s
+    reply names https://www.aging-us.com/article/206431 as the precedent; ask him which role he wants recorded.'
+  category: Submission package
+  severity: minor
+  stage: final
+  gap:
+    verdict: missed
+    miss_reason: input-missing
+    note: Who carries the corresponding-author mark is the authors' decision.
+- id: S2
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T11:16:51Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T11:16:51Z|to the Internet
+  master: paper1-just-dna-lite.md
+  anchor: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published
+    evidence on the user’s own computer. Its web platform annotates a whole-genome variant file (VCF) and computes
+    polygenic risk scores locally, so the genome does not have to be uploaded.
+  context_before: Society) SecvADN SRL † These authors contributed equally. * Co-supervising authors. Abstract
+  context_after: What the platform reports comes from modules, versioned tables of variant-trait associations
+  comment: 'Suggested edits: insert “to the Internet”.'
+  edits:
+  - inserted: ' to the Internet'
+  where: Abstract
+  line: 29
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: answered in other words: the Abstract now says ''does not have to
+    be uploaded to a third-party server''. Carry it into v0.8''s master. S10 and S19 (Box 1, Section 5.2) are still
+    pending in the Doc. Accept Georg''s edit: ''so the genome does not have to be uploaded to the Internet''. S10
+    and S19 make the same edit in Box 1 and Section 5.2.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-prose-edit
+    note: 'Same ambiguity: uploaded to the Internet.'
+- id: C47
+  kind: comment
+  author: G Fue
+  date: '2026-11-01T07:08:40Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:08:40Z|you can just upload to your computer...
+  master: paper1-just-dna-lite.md
+  anchor: ''
+  context_before: risk scores locally, so the genome does not have to be uploaded
+  context_after: . What the platform reports comes from modules, versioned tables of variant-trait
+  comment: you can just upload to your computer...
+  where: Abstract
+  line: 31
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved: the Abstract now says ''uploaded to a third-party server''
+    (S2). Answered by accepting S2 (''uploaded to the Internet''): ''uploaded'' alone can mean copying the file
+    onto one''s own computer. Livia''s reply proposes ''uploaded to a publicly accessible location'' (the Internet,
+    a server and the like); either removes the ambiguity.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-prose-edit
+    note: '''Does not have to be uploaded'' leaves open uploaded where; Georg reads it as onto your own computer.'
+  replies:
+  - author: Livia Zaharia
+    date: '2026-11-01T20:14:37Z'
+    text: maybe just say uploaded on a publicly accessible location. (includes internet, serv and other such) @antonkulaga@gmail.com
+- id: S3
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T11:18:37Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T11:18:37Z|no coding involved out programming modul
+  master: paper1-just-dna-lite.md
+  anchor: What the platform reports comes from modules, versioned tables of variant-trait associations that researchers
+    write without programming. Ready-made modules cover longevity, disease predisposition and drug response. Researchers
+    publish new ones to just-dna-registry, an open registry that works like an app store, where others browse, install
+    and apply them with no software update. The just-module-creator plugin drafts modules from the literature and
+    public databases inside the AI assistant a researcher already uses.
+  context_before: risk scores locally, so the genome does not have to be uploaded.
+  context_after: Every matched variant links to its reported effect and its sources. Polygenic
+  comment: 'Suggested edits: insert “no coding involved”; delete “out programming”; insert “modules”; delete “ones”;
+    insert “users”; delete “others”; insert “out the need of a”; delete “no”; insert “employing”; delete “inside”;
+    insert “an”; delete “the”; insert “of the”; delete “a”; insert “’s choice”; delete “”; delete “already uses”.'
+  edits:
+  - inserted: ' no coding involved'
+  - deleted: out programming
+  - inserted: modules
+  - deleted: ones
+  - inserted: users
+  - deleted: others
+  - inserted: out the need of a
+  - deleted: 'no '
+  - inserted: employing
+  - deleted: inside
+  - inserted: 'an '
+  - deleted: 'the '
+  - inserted: 'of the '
+  - deleted: 'a '
+  - inserted: ’s choice
+  - deleted: ' '
+  - deleted: already uses
+  where: Abstract
+  line: 31
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''no coding involved'', ''without the need of a software
+    update''). Carry it into v0.8''s master. Accept Georg''s edits (''write with no coding involved'', ''publish
+    new modules'', ''where users browse'', ''without the need of a software update'') except one: ''employing an
+    AI assistant of the researcher''s choice'' says the plugin works in any assistant, while Section 3.2.1 says
+    just-module-creator ''adds module-authoring skills for Claude Code and Codex''. Write ''employing an AI assistant
+    such as Claude Code or Codex'', or keep ''of the researcher''s choice'' only if the plugin is known to run in
+    others.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: Georg's rewording of the Abstract's modules sentence.
+- id: S23
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:15:57Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:15:57Z|(further called PGS)
+  master: paper1-just-dna-lite.md
+  anchor: Every matched variant links to its reported effect and its sources. Polygenic scores come from just-prs,
+    a library that also works on its own. It computes PGS Catalog scores from a cleaned copy of the Catalog, places
+    each within a reference population matched to the genome’s inferred ancestry, labels its quality and shows all
+    models for a trait side by side, so users see where the models agree and differ.
+  context_before: literature and public databases inside the AI assistant a researcher already uses.
+  context_after: AI assistants can also run annotation and scoring through Model Context Protocol
+  comment: 'Suggested edits: insert “(further called PGS)”.'
+  edits:
+  - inserted: ' (further called PGS)'
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''Polygenic scores (further called PGS)''). Carry it into
+    v0.8''s master. The PGS Catalog itself is still not explained (C48). Define the abbreviation where the Abstract
+    first uses it, ''polygenic scores (PGS)'', so that ''PGS Catalog'' reads. C126 asks the same for every abbreviation.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: caught
+    findings:
+    - ST-7
+    note: The story stage flagged the Abstract's undefined abbreviations, the PGS Catalog among them; the applied
+      fix spelled out VCF only.
+- id: C126
+  kind: comment
+  author: Livia Zaharia
+  date: '2026-11-01T20:16:56Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:16:56Z|stephanie and benjamin nagged me to defi
+  master: paper1-just-dna-lite.md
+  anchor: ''
+  context_before: matched variant links to its reported effect and its sources. Polygenic scores
+  context_after: come from just-prs, a library that also works on its own. It
+  comment: stephanie and benjamin nagged me to define weird abbreviations before using them
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved after S23 was accepted; MCP, GRCh38, T2T and PRS are still
+    to spell out at first use. Spell out every abbreviation at its first use, in the Abstract and again in the body:
+    PGS (S23), MCP (Model Context Protocol), GRCh38, T2T and PRS. VCF is already spelled out in the Abstract.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: caught
+    findings:
+    - ST-7
+    note: 'Same as defining PGS: the story stage flagged the Abstract''s undefined abbreviations and the fix stopped
+      at VCF.'
+- id: C48
+  kind: comment
+  author: G Fue
+  date: '2026-10-31T16:02:43Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:02:43Z|which Catalog?
+  master: paper1-just-dna-lite.md
+  anchor: the Catalog
+  context_before: its own. It computes PGS Catalog scores from a cleaned copy of
+  context_after: ', places each within a reference population matched to the genome’s inferred'
+  comment: which Catalog?
+  replies:
+  - author: Anton Kulaga
+    date: '2026-11-01T18:18:21Z'
+    text: we claned PGS catalog as it has mistakes in metadata and some garbage PRS-ses
+  where: Abstract
+  line: 33
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved after ''Polygenic scores (further called PGS)'' (S23) was
+    accepted, but the Abstract still does not say what the PGS Catalog is; the authors asked on 2 November that
+    it be explained, for example: ''It computes the scores published in the Polygenic Score (PGS) Catalog, an open
+    database where each score is deposited with its variants and their weights, from a cleaned copy of the Catalog''.
+    Write ''a cleaned copy of the PGS Catalog'': the paper also has a ''Module Catalog'' (Section 2.3), so ''the
+    Catalog'' is ambiguous. Anton''s reply gives the reason for cleaning (''it has mistakes in metadata and some
+    garbage PRS-ses''); if a clause fits, say what cleaning means as Section 3.2 does: metadata normalized, and
+    860 of 6,977 scores withheld because their reference distributions failed the audit.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: caught
+    findings:
+    - ST-7
+    note: The story stage named the PGS Catalog as undefined in the Abstract; the applied fix defined only VCF,
+      so 'the Catalog' stayed bare.
+- id: S4
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T16:08:22Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:08:22Z|variant can mostly whole-genome DNA
+  master: paper1-just-dna-lite.md
+  anchor: 'That raw data can now come from sequencing: several companies offer direct-to-consumer sequencing services
+    (O’Daniel et al., 2025). The National Human Genome Research Institute (NHGRI) estimates that the first human
+    genome cost US$500 million to US$1 billion (NHGRI, 2021). By 2025, manufacturers advertised the sequencing of
+    a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report
+    higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing
+    scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  context_before: to third-party interpretation tools (Nelson et al., 2019; O’Daniel et al., 2025).
+  context_after: Existing solutions for reading a personal genome generally belong to two extremes.
+  comment: 'Suggested edits: insert “variant”; delete “can”; insert “mostly”; insert “whole-genome DNA”.'
+  edits:
+  - inserted: 'variant '
+  - deleted: 'can '
+  - inserted: 'mostly '
+  - inserted: 'whole-genome DNA '
+  where: 1.1 Background and Significance
+  line: 52
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted, ''mostly'' included, against the advice below; the authors''
+    call. Carry it into v0.8''s master. Accept ''raw variant data'' and ''whole-genome DNA sequencing''; decline
+    ''mostly'' and keep ''can'': most consumers'' raw data still come from genotyping arrays (23andMe, AncestryDNA,
+    the consumer formats Sections 3.2 and 5.4 name), and no source in the paragraph says sequencing is now the main
+    source. Result: ''That raw variant data can now come from whole-genome DNA sequencing: ...''. Livia''s S25 adds
+    an ''s'' inside this edit (''mostly comes'').'
+  category: Claims and evidence
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: A more precise wording of the sequencing sentence that Georg prefers.
+- id: S25
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:28:06Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:28:06Z|s While T , . B
+  master: paper1-just-dna-lite.md
+  anchor: 'That raw data can now come from sequencing: several companies offer direct-to-consumer sequencing services
+    (O’Daniel et al., 2025). The National Human Genome Research Institute (NHGRI) estimates that the first human
+    genome cost US$500 million to US$1 billion (NHGRI, 2021). By 2025, manufacturers advertised the sequencing of
+    a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report
+    higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing
+    scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  context_before: to third-party interpretation tools (Nelson et al., 2019; O’Daniel et al., 2025).
+  context_after: Existing solutions for reading a personal genome generally belong to two extremes.
+  comment: 'Suggested edits: insert “s”; insert “While”; replace “T” with “T”; insert “,”; replace “. B” with “b”.'
+  edits:
+  - inserted: s
+  - inserted: 'While '
+  - deleted: T
+    inserted: T
+  - inserted: ','
+  - deleted: . B
+    inserted: ' b'
+  where: 1.1 Background and Significance
+  line: 52
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted except its ''s'', which stays pending as S29; the Doc now
+    reads ''While The National Human Genome Research Institute'', so lower-case ''the''. Carry it into v0.8''s master.
+    Two edits in one. Accept the merge of the two cost sentences into one contrast: ''While the National Human Genome
+    Research Institute (NHGRI) estimates that the first human genome cost US$500 million to US$1 billion (NHGRI,
+    2021), by 2025 manufacturers advertised the sequencing of a human genome for US$80 to US$200 (...)''. The ''s''
+    sits inside Georg''s pending S4 (''raw variant data now mostly comes from whole-genome DNA sequencing'') and
+    follows it: S4''s triage keeps ''can now come'' and declines ''mostly'', since most consumers'' raw data still
+    come from genotyping arrays, and with that wording the ''s'' is not needed.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: Livia joins the two cost sentences into one contrast; the paragraph's link to the one before was repaired
+      by the story stage.
+- id: S6
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T16:25:24Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:25:24Z|-based
+  master: paper1-just-dna-lite.md
+  anchor: Just-DNA-Lite is a local, open-source platform for annotating a personal genome and computing polygenic
+    scores. We developed it as a ground-up rewrite of Just-DNA-Seq (Kulaga et al., 2024), whose first generation
+    (Generation I), built for longevity research, was a set of annotation and report modules for OakVar, a Python
+    variant-analysis framework derived from OpenCRAVAT (Pagel et al., 2020). Just-DNA-Lite (Generation II) removes
+    the OakVar dependency entirely and uses a standalone annotation engine. It also replaces Python annotation plugins
+    with declarative modules discoverable from configured sources (Section 2.2). Supplementary S1 describes Generation
+    I, and Figure S1 gives a historical overview of its module domains.
+  context_before: General Data Protection Regulation (GDPR) seek to avoid. 1.2 Overview of Just-DNA-Lite
+  context_after: The resulting workflow lets users choose published annotation content, apply it to
+  comment: 'Suggested edits: insert “-based”.'
+  edits:
+  - inserted: -based
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 73
+  status: declined
+  now: ''
+  why: 'Rejected in the Doc by 1 November, 22:10 UTC: Section 1.2 keeps ''a local, open-source platform''.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: '''Local-based'' instead of ''local''.'
+- id: S27
+  kind: suggestion
+  author: G Fue
+  date: '2026-11-01T07:07:31Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:07:31Z|Researchers People citizen scientists,
+  master: paper1-just-dna-lite.md
+  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
+    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
+    points; Box 1 names the user groups and where each starts.
+  context_before: I, and Figure S1 gives a historical overview of its module domains.
+  context_after: Key features. Polygenic scores with the context to read them. The PGS
+  comment: 'Suggested edits: insert “Researchers”; replace “People” with “, inc”; insert “citizen scientists,”.'
+  edits:
+  - inserted: Researchers
+  - deleted: People
+    inserted: ', inc'
+  - inserted: ' citizen scientists,'
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 78
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted, with Livia''s ''including'' (S28). Carry it into v0.8''s
+    master. Georg''s S7 as the Doc now holds it, with Livia''s ''including'' (S28); follows the decision on naming
+    the first user group (C58, C130).'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-policy-fit
+    note: Georg's reframing of Section 1.2 to researchers, including citizen scientists, as the Doc now holds it.
+- id: S28
+  kind: suggestion
+  author: Livia Zaharia
+  date: '2026-11-01T20:35:29Z'
+  key: paper1-just-dna-lite.md|Livia Zaharia|2026-11-01T20:35:29Z|l .
+  master: paper1-just-dna-lite.md
+  anchor: The resulting workflow lets users choose published annotation content, apply it to their own genome and
+    inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Peoplel. with different needs enter this workflow at different
+    points; Box 1 names the user groups and where each starts.
+  context_before: I, and Figure S1 gives a historical overview of its module domains.
+  context_after: Key features. Polygenic scores with the context to read them. The PGS
+  comment: 'Suggested edits: replace “l” with “luding”; delete “.”.'
+  edits:
+  - deleted: l
+    inserted: luding
+  - deleted: .
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 78
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted. Carry it into v0.8''s master. Livia''s edit of Georg''s
+    suggestion S27 (''incl.'' to ''including''); follows the decision on naming the first user group (C58, C130).'
+  category: Writing and clarity
+  severity: info
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: Livia's edit of Georg's suggested 'incl.' to 'including'.
+- id: C56
+  kind: comment
+  author: G Fue
+  date: '2026-11-01T07:10:29Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-11-01T07:10:29Z|see also below
+  master: paper1-just-dna-lite.md
+  anchor: l.
+  context_before: scoring operations as tools instead of writing their own analysis code. People
+  context_after: with different needs enter this workflow at different points; Box 1 names
+  comment: see also below
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 78
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved after S7 was accepted. Points to C58 and S9 (Box 1''s first
+    row); answer it with the decision in C58.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-policy-fit
+    note: Points to the same reframing of who the paper is for.
+- id: S8
+  kind: suggestion
+  author: G Fue
+  date: '2026-10-31T16:36:05Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T16:36:05Z|do not need to these nothing
+  master: paper1-just-dna-lite.md
+  anchor: Polygenic scores with the context to read them. The PGS Catalog publishes polygenic score models as scoring
+    files; just-prs computes them for a genome and adds what a reader needs to judge each result. It infers the
+    genome’s ancestry, places each score as a percentile in the matching 1000 Genomes reference population, reports
+    how much of the score the genome covers, labels the result’s quality and groups all models for a trait so that
+    their agreement and disagreement are visible. The scoring files, cleaned metadata and audited reference distributions,
+    for 6,117 scores across 778 traits, are downloaded on first use, so users assemble nothing (Sections 3.2 and
+    4.3).
+  context_before: Box 1 names the user groups and where each starts. Key features.
+  context_after: 'An app store for annotation modules. Modules are data: versioned tables of'
+  comment: 'Suggested edits: insert “do not need to”; insert “these”; delete “nothing”.'
+  edits:
+  - inserted: 'do not need to '
+  - inserted: these
+  - deleted: nothing
+  where: 1.2 Overview of Just-DNA-Lite
+  line: 84
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''so users do not need to assemble these''). Carry it into
+    v0.8''s master. Accept Georg''s edit: ''so users do not need to assemble these''.'
+  category: Writing and clarity
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: wording-preference
+    note: '''Users do not need to assemble these'' instead of ''users assemble nothing''.'
+- id: C67
+  kind: comment
+  author: G Fue
+  date: '2026-10-31T19:49:54Z'
+  key: paper1-just-dna-lite.md|G Fue|2026-10-31T19:49:54Z|(?)
+  master: paper1-just-dna-lite.md
+  anchor: 'on'
+  context_before: private genome files are disabled there. Figure 1. The Just-DNA-Lite web interface
+  context_after: the public demonstration. (a) The Module Catalog, which lists the modules published
+  comment: (?)
+  where: 2.3 Web Interface and Self-Exploration
+  line: 165
+  status: open
+  now: ''
+  why: ''
+  next: 'In the Doc by 1 November, 22:10 UTC: resolved: Figure 1''s title now reads ''The Just-DNA-Lite web interface
+    elements.'' Write ''Figure 1. The Just-DNA-Lite web interface, as served by the public demonstration (https://lite.just-dna.life/).'''
+  category: Figures and tables
+  severity: minor
+  stage: writing
+  gap:
+    verdict: missed
+    miss_reason: skill-did-not-look
+    owner: manuscript-figures
+    note: The figures stage reviewed Figure 1's legibility, not the wording of its caption's first sentence.
 - id: C118
   kind: comment
   author: v0.6 changes workbook, Open points for the authors
@@ -3347,12 +3945,14 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Decide the author marks and affiliations. Georg''s edit does two things: it changes Livia Zaharia''s affiliation
-    from 1 (Rostock University Medical Center) to 4 (SecvADN SRL), and it removes the co-supervising asterisk from
-    his own name (as he asks in C45). Accepting it leaves Robi Tacutu the only co-supervising author, so the footnote
-    ''* Co-supervising authors.'' becomes singular, and a SecvADN affiliation for Livia Zaharia belongs in Competing
-    Interests (the run''s decision D11 already asks for every author''s competing interests). Confirm both with
-    Georg and Livia. In the Doc the asterisk part was accepted; S22 holds the rest.'
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted (Livia Zaharia''s affiliation is 4, the asterisk is off Georg''s
+    name). Carry it into v0.8''s master. Check that the footnote reads ''* Co-supervising author.'' Decide the author
+    marks and affiliations. Georg''s edit does two things: it changes Livia Zaharia''s affiliation from 1 (Rostock
+    University Medical Center) to 4 (SecvADN SRL), and it removes the co-supervising asterisk from his own name
+    (as he asks in C45). Accepting it leaves Robi Tacutu the only co-supervising author, so the footnote ''* Co-supervising
+    authors.'' becomes singular, and a SecvADN affiliation for Livia Zaharia belongs in Competing Interests (the
+    run''s decision D11 already asks for every author''s competing interests). Confirm both with Georg and Livia.
+    In the Doc the asterisk part was accepted; S22 holds the rest.'
   category: Submission package
   severity: minor
   stage: final
@@ -3385,11 +3985,12 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Follows the decision in C58 (naming the first user group researchers, including citizen scientists). If
-    accepted, fix the grammar of the edit, which reads ''Researchers, incl. citizen scientists, with different needs
-    enter this workflow'': write ''Researchers, including citizen scientists, enter this workflow at different points,
-    depending on their needs; Box 1 names...''. If not, keep ''People''. The Doc now holds it as S27, with Livia''s
-    ''including'' (S28).'
+  next: 'In the Doc by 1 November, 22:10 UTC: accepted: Section 1.2 reads ''Researchers, including citizen scientists,
+    with different needs enter this workflow''. Carry it into v0.8''s master. Follows the decision in C58 (naming
+    the first user group researchers, including citizen scientists). If accepted, fix the grammar of the edit, which
+    reads ''Researchers, incl. citizen scientists, with different needs enter this workflow'': write ''Researchers,
+    including citizen scientists, enter this workflow at different points, depending on their needs; Box 1 names...''.
+    If not, keep ''People''. The Doc now holds it as S27, with Livia''s ''including'' (S28).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3399,5 +4000,5 @@ items:
     owner: manuscript-policy-fit
     note: 'Same framing in Section 1.2: researchers, including citizen scientists, instead of people.'
 gap_run: 20261028T165906Z-154d8220
-gap_matched_by: Claude (Opus 5.5) on 1 November 2026, after Georg Fuellen's and Livia Zaharia's comments arrived,
+gap_matched_by: Claude (Opus 5.5) on 1 and 2 November 2026, after Georg Fuellen's and Livia Zaharia's comments arrived,
   from the run's dashboard
