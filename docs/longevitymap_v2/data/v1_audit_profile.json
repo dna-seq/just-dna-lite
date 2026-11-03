@@ -1,0 +1,53 @@
+{
+ "rows": 1022,
+ "rsids": 528,
+ "genes": 272,
+ "category": {
+  "other": 483,
+  "inflammation": 118,
+  "genome_maintenance": 107,
+  "insulin": 95,
+  "antioxidant": 52,
+  "mitochondria": 50,
+  "lipids": 47,
+  "tumor-suppressor": 24,
+  "sirtuin": 14,
+  "heat-shock": 14,
+  "renin-angiotensin": 9,
+  "mtor": 9
+ },
+ "state": {
+  "protective": 975,
+  "risk": 47
+ },
+ "weight_min_median_max": [
+  -1.0,
+  0.14,
+  1.0
+ ],
+ "distinct_conclusions": 79,
+ "study_rows": 671,
+ "study_pmids": 126,
+ "stat_significance": {
+  "significant": 571,
+  "not_significant": 100
+ },
+ "top_pmids_by_rsids": {
+  "22279548": 280,
+  "24462499": 33,
+  "22533364": 27,
+  "22234866": 20,
+  "20011587": 18
+ },
+ "study_rsids": 516,
+ "rsids_ge2_sig_pmids": 35,
+ "rsids_ge3_sig_pmids": 12,
+ "rsids_no_sig_study": 12,
+ "top_populations": {
+  "American (Caucasian)": 315,
+  "Danish": 90,
+  "Italian (Southern)": 30,
+  "German": 25,
+  "Italian": 23
+ }
+}

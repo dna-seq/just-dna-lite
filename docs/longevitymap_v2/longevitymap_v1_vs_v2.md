@@ -1,0 +1,33 @@
+# longevitymap: v1.2.0 compared with the v2 design
+
+*2026-11-03. The v1 column is measured on `just-dna-seq/longevitymap@1.2.0`. The v2 column is the design in the requirements document; v2 counts are seed-list figures and are provisional until curation.*
+
+| Aspect | v1.2.0 (published) | v2 (designed) |
+|---|---|---|
+| **Primary source** | HAGR LongevityMap Build 3, frozen 2017-06-24. Cited PMIDs 1993–2015, median 2009 | Genome-wide studies 2014–2026: extreme-percentile meta-analysis, ~1M parental lifespans, multivariate healthspan, East Asian and 2025–26 cohorts. LongevityMap kept as a legacy layer |
+| **What counts as evidence** | Any study reporting "significant", with no threshold or replication rule | Tier A–D rubric: genome-wide p, sample size, independent replication, bias checks. Only A/B are scored or shown by default |
+| **Concentration** | 280 of 516 study-cited rsIDs rest on one 2012 classifier (PMID 22279548), whose 2010 predecessor was retracted (PMID 20595579) | Rows supported only by that paper are tier D, unscored |
+| **Replication** | 35 of 528 rsIDs have ≥2 independent significant studies | Replication is a tier-A requirement |
+| **Loci** | 528 rsIDs, 272 genes, mostly candidate genes (antioxidant, insulin/IGF, sirtuin, DNA repair…) | Seed: 228 rsIDs in 161 loci; lead tiers 11 A, 82 B, 39 C, 1 D. Target ~25–40 scored loci. 12 of the 228 seed rsIDs are in v1 |
+| **Modern loci** | Absent: LPA, CHRNA3/5, 9p21 (CDKN2B-AS1), SH2B3/ATXN2, HLA-DQA1/DRB1, LDLR, FURIN, ZW10. About 7 of ~150 genome-wide longevity rsIDs present (provisional) | All present as tier A/B leads |
+| **One signal, one row** | APOE counted through rs429358, rs7412 and proxies (rs2075650, rs4420638, rs769449…) as separate findings | One lead per locus. APOE scored once as an ε2/ε3/ε4 diplotype; proxies flagged `ld_proxy_of` |
+| **Is the SNP causal?** | Not addressed | Fine-mapping confidence C1–C4 (Open Targets PIP). Wording is "marks a region" unless likely causal |
+| **Which gene?** | Nearest or as-published gene | Effector-gene confidence E1–E4 (L2G, colocalisation). A gene is named only at E1/E2 |
+| **Alleles and effects** | No effect allele, effect size or p-value on any of 671 study rows; no coordinates | Required on every scored row: harmonised lifespan-increasing allele, effect size with unit (years per allele, HR, OR at p90/p99), p, N, ancestry, phenotype class. Coordinates resolved by the enricher, never hand-typed |
+| **Direction balance** | 975 protective / 47 risk / 0 neutral genotype rows | Every genotype of a scored locus has a row. The most common genotype is the neutral reference, the others protective or risk relative to it. Trade-offs use `contested` |
+| **Weights** | Undeclared dose formula (hom = 2 × het on 478 of 482 rsIDs). Spearman ρ with evidence = 0.16. Consumer sums them into "Net weight" | Recommended: no weights (`weighting: scale: none`), ordering by tier `priority`. No summed per-SNP score; polygenic summary via the PGS Catalog pointer (PGS000906) |
+| **Conclusions** | 79 distinct texts for 1,022 rows; one study sentence shared by 548 rows; none addresses the reader | Per-genotype text in second person: result, what it acts through, size in words, frequency, certainty word, main limit. Trade-off text in `negatives` |
+| **Organisation** | 11 pathway categories; 47% of rows `other` | Mediating system first (heart and vessels, brain and memory, smoking and lungs, immune, metabolism, skin and sun, general ageing, ageing markers); hallmark tags secondary; `other` forbidden |
+| **Pleiotropy** | Not represented | Labels: mechanism, broad, trade-off (helps A, harms B), context, antagonistic-pleiotropy strength, drug-target proxy. "May lower / may raise" display; never a good/bad colour |
+| **Age of action** | Not represented | LIFELONG / MIDLIFE / LATE / AGE_INVERTING / EARLY_LIFE / UNKNOWN, with a confidence level. Provisional for 40 loci: 18 mid-life (e.g. LPA, CHRNA3/5, 9p21), 12 lifelong (SH2B3/ATXN2, HLA-DQA1), 4 late (APOE ε4/ε2), 6 unknown (incl. FOXO3) |
+| **Outcome profile** | Not represented | Healthspan / lifespan / exceptional survival (the proxy for maximum lifespan): raises, none, lowers or untested, per locus |
+| **Definition of "pro-longevity"** | Implicit: any reported association | Study phenotype class on every study row. Scoring only from extreme-survival, parental-lifespan, own-survival (and viability, as confirmation) designs; familial, disease-depletion, rare-burden, evolutionary, MR and biomarker definitions annotate only |
+| **Ancestry, sex** | Free-text population on study rows; 47% "American (Caucasian)" | Population on every study row; `eur_only_evidence`, `ancestry_specific`, `sex_specific` flags; mismatch banner; ancestry-specific loci not scored outside their ancestry |
+| **Actionability** | Not represented | `preventable` (a measurable biomarker such as Lp(a) or LDL-C), `modifiable` (a behaviour such as smoking or weight), `descriptive` |
+| **Animal evidence** | Not represented; many candidate genes were chosen because of model organisms (22 of 272 v1 genes have GenAge mouse lifespan entries). The KL, IGF1R and SIRT6 SNPs are not the characterised alleles | Shown as context (GenAge, UM-HET3/DO lifespan QTL, worm RNAi), with a direction-concordance flag (e.g. GHR discordant). Only one human longevity allele (PPARG Pro12Ala) has an in-vivo knock-in lifespan test. Never raises a tier |
+| **Negative evidence** | Recorded in LongevityMap but mostly dropped in the port (2,339 non-significant-only Build 3 rsIDs absent) | Kept as tier D research-view rows with the original PMIDs; contradictions stated |
+| **Context for the reader** | None | Mandatory context card: genetics vs lifestyle (HR 1.21 vs 1.78; <2 pp vs 17 pp mortality variance), heritability range and what each estimate measures, "long-lived people carry risk variants too" |
+| **Audiences** | One table for everyone | Citizen default view; geneticist More-details fold; researcher view with tiers C/D, legacy rows, pleiotropy and animal data |
+| **Receipts** | PMID per study row; 0 located quotes | PMID or DOI, effect statistics and a located `provenance_quote` per anchor study; licence rows for HAGR, GWAS Catalog, Open Targets |
+| **Provenance of the build** | Mechanical port with 30 strand corrections | Spec authored with just-module-creator: scaffold → curate → evidence → enrich → cross-check → compile → lay and scientific reviews → polygon rehearsal → publish |
+| **Report needs** | Hardcoded `LONGEVITY_CATEGORIES` and "Net weight" in just-dna-lite | Category prose from the module (or a `report:` block); Net weight hidden; `negatives` and tier/mechanism chips rendered; research-view toggle; "not screened" state |

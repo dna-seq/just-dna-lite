@@ -1,0 +1,26 @@
+human_gene,model_organism,evidence_type,lifespan_effect,longevity_influence,source,in_v1,in_gwas_seed
+ATM,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 24",True,False
+CDKN1A,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 109",True,False
+ERCC2,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 222",True,False
+GHRHR,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 303",True,False
+IGF1R,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 365",True,False
+IRS2,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 378",True,False
+KL,Mus musculus,GenAge curated gene manipulation,Increase and Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 395",True,False
+LMNA,Mus musculus,GenAge curated gene manipulation,Increase and Decrease,Unclear,"GenAge models build (2023-10), GenAge ID 415",True,False
+SIRT6,Mus musculus,GenAge curated gene manipulation,Increase and Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 610",True,False
+TERT,Mus musculus,GenAge curated gene manipulation,Increase,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 672",False,True
+UCP2,Mus musculus,GenAge curated gene manipulation,Increase,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 696",True,False
+XRCC5,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 735",True,False
+APOE,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 812",True,True
+HTT,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 820",False,True
+PPARG,Mus musculus,GenAge curated gene manipulation,Increase and Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 823",True,False
+SOCS2,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 826",True,False
+SOD2,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 827",True,False
+SIRT1,Mus musculus,GenAge curated gene manipulation,Increase and Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 1011",True,False
+AKT1,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 1810",True,False
+SERPINE1,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 1851",True,False
+NFKB1,Mus musculus,GenAge curated gene manipulation,Decrease,Pro-Longevity,"GenAge models build (2023-10), GenAge ID 1956",True,False
+MSTN,Mus musculus,GenAge curated gene manipulation,Increase,Anti-Longevity,"GenAge models build (2023-10), GenAge ID 2080",True,False
+FGD6,Mus musculus UM-HET3 + C. elegans,unbiased lifespan QTL + RNAi validation,tag-77 RNAi shortened lifespan (~14%),Pro-Longevity (gene activity),Bou Sleiman 2022 Science PMID 36173858,False,True
+(mouse chr12 locus; candidate Susd6/DRAGO),"Mus musculus DO, UM-HET3, BXD",unbiased lifespan QTL replicated across populations,CAST allele +106 days (DRiDO),locus-level,Mullis 2025 Genetics PMID 40326784; Bou Sleiman 2022 PMID 36173858,False,False
+(mouse chr18 locus; candidate Garem1),Mus musculus DO,unbiased lifespan QTL,CAST allele -175 days (DRiDO),locus-level,Mullis 2025 Genetics PMID 40326784,False,False
