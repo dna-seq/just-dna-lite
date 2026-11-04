@@ -1,0 +1,289 @@
+{
+ "paper_rows": 626,
+ "paper_rows_by_batch": {
+  "sebastiani": 281,
+  "batch1": 87,
+  "batch3": 86,
+  "batch2": 86,
+  "batch4": 86
+ },
+ "paper_source_read": {
+  "full_text": 509,
+  "abstract": 116,
+  "none": 1
+ },
+ "paper_verdicts": {
+  "not_significant_but_weighted": 233,
+  "direction_reversed": 132,
+  "ok": 109,
+  "subgroup_generalised": 70,
+  "cannot_verify": 27,
+  "wrong_variant": 25,
+  "model_mismatch": 24,
+  "hagr_misreport": 4,
+  "strand_unresolvable": 2
+ },
+ "register_rows": 605,
+ "by_layer_category": [
+  [
+   "Generation I aggregation",
+   "E1 risk direction inverted (weight sign)",
+   4
+  ],
+  [
+   "Generation I aggregation",
+   "N9 conflicting study-level curations collapsed into one direction without a flag",
+   19
+  ],
+  [
+   "Generation I curation",
+   "E1 risk direction inverted (weight sign)",
+   127
+  ],
+  [
+   "Generation I curation",
+   "E5 genotype not representable (allele not assayed or not at the locus)",
+   53
+  ],
+  [
+   "Generation I curation",
+   "E6 weight inconsistent with the cited evidence",
+   51
+  ],
+  [
+   "Generation I curation",
+   "E7 sex- or subgroup-only effect applied to everyone",
+   63
+  ],
+  [
+   "Generation I curation",
+   "E8 genetic model differs from the cited study",
+   23
+  ],
+  [
+   "Generation I curation",
+   "E9 rsID is not the variant studied",
+   1
+  ],
+  [
+   "Generation I curation",
+   "N6 strand-ambiguous (A/T, C/G) SNP, direction unresolvable",
+   1
+  ],
+  [
+   "Generation I curation",
+   "N7 transcription defect without effect",
+   1
+  ],
+  [
+   "Generation I curation",
+   "N8 record added by Generation I curation (not in HAGR)",
+   4
+  ],
+  [
+   "Generation I curation + v1.2.0 port",
+   "E9 rsID is not the variant studied",
+   1
+  ],
+  [
+   "Generation I import",
+   "E9 rsID is not the variant studied",
+   4
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E10 gene label wrong",
+   6
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E4 citation or transcription error",
+   4
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E6 weight inconsistent with the cited evidence",
+   182
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E7 sex- or subgroup-only effect applied to everyone",
+   7
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E8 genetic model differs from the cited study",
+   1
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "E9 rsID is not the variant studied",
+   1
+  ],
+  [
+   "LongevityMap (HAGR)",
+   "N2 gene symbol not the overlapping gene",
+   1
+  ],
+  [
+   "LongevityMap (HAGR) + Generation I import",
+   "E9 rsID is not the variant studied",
+   2
+  ],
+  [
+   "source paper",
+   "E1 risk direction inverted (weight sign)",
+   1
+  ],
+  [
+   "source paper",
+   "E6 weight inconsistent with the cited evidence",
+   1
+  ],
+  [
+   "source paper",
+   "N6 strand-ambiguous (A/T, C/G) SNP, direction unresolvable",
+   1
+  ],
+  [
+   "v1.2.0 port",
+   "E11 cited evidence lost at port",
+   34
+  ],
+  [
+   "v1.2.0 port",
+   "N5 conclusions are bare labels",
+   12
+  ]
+ ],
+ "by_layer": {
+  "Generation I curation": 324,
+  "LongevityMap (HAGR)": 202,
+  "v1.2.0 port": 46,
+  "Generation I aggregation": 23,
+  "Generation I import": 4,
+  "source paper": 3,
+  "LongevityMap (HAGR) + Generation I import": 2,
+  "Generation I curation + v1.2.0 port": 1
+ },
+ "E1_rows": 132,
+ "E1_rsids": 124,
+ "E1_rows_sebastiani": 82,
+ "E1_layer": {
+  "l2_curation": 127,
+  "l2_aggregation": 4,
+  "l0_paper": 1
+ },
+ "E1_provisional": 33,
+ "v1_rsids": 528,
+ "v1_rsids_with_any_error": 464,
+ "v1_rsids_with_E1": 124,
+ "v1_rsids_E1_and_also_some_OK_study": 3,
+ "v1_rsids_unverified": 18,
+ "v1_rsids_all_studies_ok": 56,
+ "v1_rows_on_E1_rsids": 242,
+ "port_rsids": 22,
+ "gws_longevity_rsids": 145,
+ "gws_in_v1": [
+  "rs2075650",
+  "rs2149954",
+  "rs405509",
+  "rs429358",
+  "rs4420638",
+  "rs7412",
+  "rs769449"
+ ],
+ "E1_by_batch_rows": {
+  "sebastiani": 82,
+  "batch3": 16,
+  "batch2": 15,
+  "batch4": 12,
+  "batch1": 7
+ },
+ "hagr_E4_rows": [
+  [
+   "rs7412",
+   "11640949",
+   "68"
+  ],
+  [
+   "rs1800562",
+   "11857058",
+   "81"
+  ],
+  [
+   "rs2430561",
+   "11857058",
+   "79"
+  ],
+  [
+   "rs28940479",
+   "",
+   ""
+  ]
+ ],
+ "stage_counts": [
+  [
+   "error",
+   "corrected at Generation I import",
+   1
+  ],
+  [
+   "error",
+   "corrected at port (v1.2.0)",
+   15
+  ],
+  [
+   "error",
+   "not in v1.2.0 (skipped or dropped)",
+   2
+  ],
+  [
+   "error",
+   "still in v1.2.0",
+   529
+  ],
+  [
+   "error",
+   "still in v1.2.0 (inert rows)",
+   19
+  ],
+  [
+   "note",
+   "removed at port (weight 0)",
+   1
+  ],
+  [
+   "note",
+   "still in v1.2.0",
+   38
+  ]
+ ],
+ "seb_verdicts": {
+  "NOT_SIGNIFICANT_BUT_WEIGHTED": 181,
+  "DIRECTION_REVERSED": 82,
+  "WRONG_VARIANT": 16,
+  "OK": 2
+ },
+ "nonseb_verdicts": {
+  "OK": 107,
+  "SUBGROUP_GENERALISED": 70,
+  "NOT_SIGNIFICANT_BUT_WEIGHTED": 52,
+  "DIRECTION_REVERSED": 50,
+  "CANNOT_VERIFY": 27,
+  "MODEL_MISMATCH": 24,
+  "WRONG_VARIANT": 9,
+  "HAGR_MISREPORT": 4,
+  "STRAND_UNRESOLVABLE": 2
+ },
+ "nonseb_source_read": {
+  "full_text": 228,
+  "abstract": 116,
+  "none": 1
+ },
+ "nonseb_pmids": 128,
+ "v1_rsids_E1_nonseb": 42,
+ "v1_rsids_E1_seb": 82,
+ "E1_rows_firm": 99,
+ "E1_rsids_firm": 99
+}
