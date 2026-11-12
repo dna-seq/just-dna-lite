@@ -54,14 +54,6 @@ members = ["just-dna-pipelines", "webui"]
 
 [tool.uv]
 reinstall-package = ["just-dna-lite", "just-dna-pipelines", "webui"]
-# TEMPORARY, the workspace's only override. just-dna-enricher 0.8.4 floors `tenacity>=9.2.1`
-# (upstream RM371: 9.2.1 is the first release with `multiplier`), and every google-genai release
-# through 3.2.0 caps `tenacity<9.2.0`, so the trio cannot resolve beside agno's Gemini model.
-# google-genai uses only `stop_after_attempt`, `retry_if_exception`, `wait_exponential_jitter`,
-# `before_sleep_log` and `(Async)Retrying`, all unchanged in 9.2.1. Filed upstream as
-# just-dna-compiler S149 -> RM436 (a shim on main, due in 0.8.5); remove this block once the
-# enricher accepts a tenacity google-genai allows, or google-genai lifts its cap.
-override-dependencies = ["tenacity>=9.2.1"]
 
 [build-system]
 requires = ["uv-build"]

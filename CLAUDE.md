@@ -31,11 +31,11 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 
 - The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.11.0` in
   `webui/pyproject.toml`. Everything else floats on `>=`. No `constraint-dependencies` exist.
-- **One temporary override**, in the root `pyproject.toml` `[tool.uv]` (not a `uv.toml`: uv ignores a
-  `uv.toml` override for a workspace): `tenacity>=9.2.1`. Enricher 0.8.4 floors it (RM371) and every
-  google-genai release through 3.2.0 caps `tenacity<9.2.0`. Filed upstream as just-dna-compiler **S149** → **RM436**
-  (a shim built on main, blocking 0.8.5); remove the override once 0.8.5 is out. A plain `uv lock --upgrade` without it kept enricher 0.7.3 beside
-  format 0.8.4, silently.
+- **No overrides.** Enricher 0.8.1–0.8.4 floored `tenacity>=9.2.1` while every google-genai caps it
+  below 9.2.0, so the 0.8 trio needed a temporary `override-dependencies`; 0.8.5 (RM436, our S149) accepts
+  `tenacity>=9.0` again and the override is gone. A plain `uv lock --upgrade` under the conflict silently
+  kept enricher 0.7.3 beside format 0.8.4: after a relock, check the three format libs share one version.
+  An override for a workspace goes in the root `pyproject.toml` `[tool.uv]`; uv ignores it in a `uv.toml`.
 - Deliberate ceilings: `google-genai<2.0`; `requires-python >=3.13,<3.14`; `granian<2.8.6` (webui): on
   2.8.6 to 2.8.8 a Granian worker deadlocks in its own signal handler (`granian/_signals.py`
   `signal_event.set()` while the Rust `serve` runs), so `uv run serve` ignores SIGINT and SIGTERM until the
@@ -52,7 +52,7 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   The report sorts with a total order (`report_logic._display_tiebreak`): rows tied on |weight| once
   listed in a different order on every run (rs429358 / rs7412 swapped between two runs on one sample). Our polars now
   matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
-- Format libs: `just-dna-format/compiler/enricher>=0.8.4` (the 0.8 line, cut 2026-11-05; upstream
+- Format libs: `just-dna-format/compiler/enricher>=0.8.5` (the 0.8 line, cut 2026-11-05; upstream
   `docs/INTEGRATION_0_8.md` is the adoption guide). `just-dna-registry>=0.30.0` **moves with the format
   pin**: `contract_compatible` treats a `0.x` format minor as breaking on either side, so a mismatched
   pair refuses to publish with no obvious cause; both registries serve format 0.8.4. Registry client

@@ -19,17 +19,17 @@ dependencies = [
     "fsspec>=2026.7.0",
     "google-genai>=1.75.0,<2.0",
     "huggingface-hub>=1.27.0",
-    # The 0.8 line (adopted 2026-11-12, cut 0.8.0 on 2026-11-05, current patch 0.8.4): all three
-    # floor at 0.8.4 and move together with the registry floor at the workspace root
+    # The 0.8 line (adopted 2026-11-12, cut 0.8.0 on 2026-11-05, current patch 0.8.5): all three
+    # floor at 0.8.5 and move together with the registry floor at the workspace root
     # (`contract_compatible` treats a 0.x format minor as breaking; both registries serve 0.8.4).
     # What 0.8 changed for us: upstream docs/INTEGRATION_0_8.md (just-dna-compiler) § 3, and
     # CLAUDE.md § "Shared format libraries". A 0.7 reader refuses every 0.8-written verification
     # block, so this pin is what lets us read modules the registry now publishes. The enricher's
     # `ensembl` lane (`just-dna-seq/ensembl_variations_split`) is the only Ensembl downloader here.
     # The bare `just-dna-enricher` (no `[atlas]` extra) still pulls no protobuf floor.
-    "just-dna-compiler>=0.8.4",
-    "just-dna-enricher>=0.8.4",
-    "just-dna-format>=0.8.4",
+    "just-dna-compiler>=0.8.5",
+    "just-dna-enricher>=0.8.5",
+    "just-dna-format>=0.8.5",
     # agno 3.x imports the mcp 2.x names (`MCPError`, `streamable_http_client`) and `fastmcp`,
     # all declared only under its `[mcp]` extra. Depend on the extra rather than re-listing its
     # members: the 2026-09 relock floated agno to 3.0.10 against a bare `mcp<2.0` cap here, and

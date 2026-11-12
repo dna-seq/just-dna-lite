@@ -8,7 +8,6 @@ members = [
     "just-dna-pipelines",
     "webui",
 ]
-overrides = [{ name = "tenacity", specifier = ">=9.2.1" }]
 
 [[package]]
 name = "agno"
@@ -2177,7 +2176,7 @@ wheels = [
 
 [[package]]
 name = "just-dna-compiler"
-version = "0.8.4"
+version = "0.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "just-dna-format" },
@@ -2185,14 +2184,14 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/f2/e4746655e9d094d3c7b3cd2f3b4d6ce5659748aac0392b5937b5af167c1b/just_dna_compiler-0.8.4.tar.gz", hash = "sha256:e43743b6ca87daabafaad0977e71f497b175e23ad474377b8eadce5b7002c8bf", size = 315831, upload-time = "2026-11-11T01:14:07.281Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/b3/414a2373573a3fe94327f326ee143c7c29c637bb44514ae394186ee9f407/just_dna_compiler-0.8.5.tar.gz", hash = "sha256:4ec9c58aa28f36e5fe1e4f360731e978b804f82b5b51c75b1ad97c9033911908", size = 315833, upload-time = "2026-11-12T22:06:38.049Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/ec/6c4c7672d08aa7cd5979953aea9a0d092903025d6526a01378d42d0018d5/just_dna_compiler-0.8.4-py3-none-any.whl", hash = "sha256:27159915fba14577b1b370fb297ede5dbc7515eeb5f4c1719a8c4cf40d632fd7", size = 342696, upload-time = "2026-11-11T01:14:02.914Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/5b/fae5902163ea3191f154ec81883b1c45f3b5b3fd0a28e012e82182fc47e3/just_dna_compiler-0.8.5-py3-none-any.whl", hash = "sha256:1abfe6f5a935c3faa7e5ed79277d5020300e9afe84301e4bbf0a8ac3b05e86bd", size = 342695, upload-time = "2026-11-12T22:06:33.904Z" },
 ]
 
 [[package]]
 name = "just-dna-enricher"
-version = "0.8.4"
+version = "0.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "duckdb" },
@@ -2206,22 +2205,22 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/19/04ba7a0609d46500d5194091fd24a5924b469bc0f30ca2f6275cc2ca1619/just_dna_enricher-0.8.4.tar.gz", hash = "sha256:0f26947da0692647b0f3ef67248d759a51300b94ef25e0dbade04fe02a71dad3", size = 1034242, upload-time = "2026-11-11T01:14:08.245Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/76/9001776927431a915c265d95b637ec59efc9c27cadd0dd87cd51228287dd/just_dna_enricher-0.8.5.tar.gz", hash = "sha256:1bc9ddd750c5fd2b69ff809de7969cba5a9bedbec8b691a7c8485b68cd631827", size = 1037610, upload-time = "2026-11-12T22:06:39.212Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/c0/73495a1951fa2365da9b16591e006dd0539dab776fe9edc9c8cb6e7ab8ee/just_dna_enricher-0.8.4-py3-none-any.whl", hash = "sha256:3b4c00e5366358b98fac3e7631d7d5093f9043f745344353558156b70a8b5724", size = 1137628, upload-time = "2026-11-11T01:14:04.595Z" },
+    { url = "https://files.pythonhosted.org/packages/23/f8/cecf72d8b4eebed04e48d743ff3dd5c2de2e0e5e822ee4ed9c42ea323cb7/just_dna_enricher-0.8.5-py3-none-any.whl", hash = "sha256:e592315bcac60d448cb014ed0a21efc5f676b40b5e97f7332baab4c5226067f1", size = 1141008, upload-time = "2026-11-12T22:06:35.435Z" },
 ]
 
 [[package]]
 name = "just-dna-format"
-version = "0.8.4"
+version = "0.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/cd/f332e08286561b176ec182a72c37b987367ef1753c602729e464281e4a51/just_dna_format-0.8.4.tar.gz", hash = "sha256:2d5743d524aeeeba263afb9546df6631d1597121f0fd6f79ac4b38cb125d3118", size = 354923, upload-time = "2026-11-11T01:14:09.642Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/ae/c9b9f643199ccf49f855b5f24f31f91467edb08c4b71ab21de7e5efab073/just_dna_format-0.8.5.tar.gz", hash = "sha256:0566b8c2f3c3d941f9c3ea7750615456902353e7385131b0d8d44d5535137849", size = 355368, upload-time = "2026-11-12T22:06:40.498Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/73/108a0ace7984916240654404e6db7a2ff4d6fb5c33aa76acbb1bdc2340eb/just_dna_format-0.8.4-py3-none-any.whl", hash = "sha256:b10642debfec3b9e4ddd143bf65c6ff9d0b4825a2774dabeef30d25b36421604", size = 389086, upload-time = "2026-11-11T01:14:05.94Z" },
+    { url = "https://files.pythonhosted.org/packages/56/d9/598bf3b1794b9ceb2a413c0ea620bf8b82aac29a969b9620ef4de20c1a7b/just_dna_format-0.8.5-py3-none-any.whl", hash = "sha256:868cf3fe4430069768f96548b65179ecdcb7d5fa59d1eeaf9ad0b8c7021fb62f", size = 389520, upload-time = "2026-11-12T22:06:36.866Z" },
 ]
 
 [[package]]
@@ -2332,9 +2331,9 @@ requires-dist = [
     { name = "fsspec", specifier = ">=2026.7.0" },
     { name = "google-genai", specifier = ">=1.75.0,<2.0" },
     { name = "huggingface-hub", specifier = ">=1.27.0" },
-    { name = "just-dna-compiler", specifier = ">=0.8.4" },
-    { name = "just-dna-enricher", specifier = ">=0.8.4" },
-    { name = "just-dna-format", specifier = ">=0.8.4" },
+    { name = "just-dna-compiler", specifier = ">=0.8.5" },
+    { name = "just-dna-enricher", specifier = ">=0.8.5" },
+    { name = "just-dna-format", specifier = ">=0.8.5" },
     { name = "numpy", specifier = ">=2.5.2" },
     { name = "openai", specifier = ">=3.0.0" },
     { name = "pillow", specifier = ">=12.3.0" },
@@ -4352,11 +4351,11 @@ wheels = [
 
 [[package]]
 name = "tenacity"
-version = "9.2.1"
+version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/9e/497c1c8ebe5a5b5d1d4a7511aea22c0bb1a97e3170d98abdef0e1b34265a/tenacity-9.2.1.tar.gz", hash = "sha256:a606b5c808d0cded4a359d5b9932d867ff2a6a6b64d37350260fd01bbdf83839", size = 58261, upload-time = "2026-10-07T12:13:01.633Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl", hash = "sha256:9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e", size = 32310, upload-time = "2026-10-07T12:13:00.102Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
 ]
 
 [[package]]
