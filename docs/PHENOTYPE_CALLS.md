@@ -220,10 +220,11 @@ Found while building the pilots, meant for the `just-dna-compiler` consumer inbo
 (`docs/CONSUMER_SUGGESTIONS.md`, id from `.claude/triage-state.py --next`). Measure before filing, and
 file each as a report with a reproducer.
 
-1. **Filed as S117** (with S120 and S121; build-side fix in `v1_port/reanchor.py`, see CLAUDE.md). The
-   enricher places the rs8176719 insertion at `9:133257520 G>GC`, where dbSNP, gnomAD and DRAGEN use
-   `133257521 T>TC`: the same Ensembl insertion-anchor defect measured on `superhuman`. The caller's
-   indel window tolerates it; the re-anchor fixes it at build time.
+1. **Filed as S117** (with S120 and S121). Fixed upstream in 0.8 (RM267: the split Ensembl snapshot
+   places these insertions on dbSNP's event, and `enrich` withholds a placement two authorities disagree
+   on), so the build-side `v1_port/reanchor.py` was retired. Before 0.8 the enricher placed the
+   rs8176719 insertion at `9:133257520 G>GC`, where dbSNP, gnomAD and DRAGEN use `133257521 T>TC`; the
+   caller's indel window tolerated it either way.
 
 Not yet filed as of 2026-09-27:
 
