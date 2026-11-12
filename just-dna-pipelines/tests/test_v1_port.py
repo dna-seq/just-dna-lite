@@ -32,6 +32,7 @@ from just_dna_pipelines.v1_port.pmid import normalize_pmids
 from just_dna_pipelines.v1_port.publish import plan_publish, resolve_module_dir
 from just_dna_pipelines.v1_port.runner import DEFAULT_ENSEMBL_CACHE
 from just_dna_pipelines.v1_port.sources import REGISTRY, fetch_data_file
+from just_dna_format.snapshot import SnapshotRelease
 
 _DIGITS = re.compile(r"^\d+$")
 
@@ -478,7 +479,7 @@ def test_publish_still_catches_a_partial_weights_compile(tmp_path):
 
 @pytest.mark.parametrize("label, render", [
     ("cardio", lambda: clinvar_panel._module_spec_yaml("cardio", ["MYH7"], {"clinvar_file_date": "x"}, 1)),
-    ("pharmacogenomics", lambda: pharmgkb._module_spec_yaml({"dataset": "x"}, 1)),
+    ("pharmacogenomics", lambda: pharmgkb._module_spec_yaml(SnapshotRelease(dataset="x"), 1)),
 ])
 def test_database_derived_ports_credit_their_gen_i_authors_and_state_their_curator(label, render):
     """The four database-derived Gen-I modules were designed by Olga Borysova and coded by Alex Karmazin and

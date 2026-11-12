@@ -167,6 +167,8 @@ class TestModuleTableUrl:
             diplotypes_url=f"hf://{base}/diplotypes.parquet",
             allele_function_url=f"hf://{base}/allele_function.parquet",
             activity_phenotype_url=f"hf://{base}/activity_phenotype.parquet",
+            meta_url=f"hf://{base}/meta.parquet",
+            meta_resolved_url=f"hf://{base}/meta_resolved.parquet",
         )
         for table in ModuleTable:
             url = get_module_table_url(module_name, table, module_info=info)

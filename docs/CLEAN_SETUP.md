@@ -87,7 +87,7 @@ The initialization is called by:
 The optional Ensembl step (`annotate --ensembl`, `annotate_all_job`) and module compilation read the
 Ensembl variation snapshot `just-dna-seq/ensembl_variations_split` (dbSNP 157, VEP 116). It is
 just-dna-enricher's `ensembl` lane, so the enricher downloads and checks it. The commands read
-`JUST_DNA_PIPELINES_CACHE_DIR` from `.env`:
+`JUST_DNA_PIPELINES_CACHE_DIR` from `.env` automatically:
 
 ```bash
 # Download the snapshot (~14.5 GB) and build the DuckDB view over it
