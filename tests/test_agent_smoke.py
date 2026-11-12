@@ -43,6 +43,11 @@ def test_agent_creates_valid_module(agent_output_dir: Path) -> None:
 
     response = agent.run(message)
     assert response is not None
+    # A provider that refuses for billing (Gemini's 402 RESOURCE_EXHAUSTED when prepaid credits run
+    # out) means this check could not run; that is a skip with the reason, never a pass, and not a
+    # defect in the code under test either.
+    if "RESOURCE_EXHAUSTED" in str(response.content) or "credits are depleted" in str(response.content):
+        pytest.skip(f"Gemini refused the request for billing: {str(response.content)[:200]}")
     assert response.content, "Agent returned empty response"
 
     print(f"\n{'='*60}")

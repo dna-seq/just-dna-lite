@@ -36,6 +36,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     validate_modules,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
+from just_dna_pipelines.annotation.resources import get_cache_dir
 from just_dna_pipelines.annotation.hf_logic import (
     UnsupportedLeadTable,
     annotate_vcf_with_module_weights,
@@ -60,8 +61,9 @@ def real_vcf_path(tmp_path_factory) -> Path:
     """
     import requests
     
-    # Simple caching in ~/.cache/just-dna-pipelines/test_data/
-    cache_dir = Path.home() / ".cache" / "just-dna-pipelines" / "test_data"
+    # Cached under the configured cache root (JUST_DNA_PIPELINES_CACHE_DIR, loaded from .env when the
+    # resources module imports), never a hardcoded ~/.cache: large data belongs on the data disk.
+    cache_dir = get_cache_dir() / "test_data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     vcf_path = cache_dir / "antonkulaga.vcf"
     

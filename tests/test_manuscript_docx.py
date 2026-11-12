@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import struct
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 import zlib
@@ -219,7 +220,17 @@ class FontMetrics:
         pytest.skip(f"neither {TABLE_FONT} nor Liberation Sans is installed to measure table text with")
 
     def advance(self, character: str, bold: bool) -> float:
-        glyph = self._fonts[bold].load_char(ord(character), flags=LoadFlags.NO_HINTING)
+        """The character's advance; a character the font has no glyph for is measured as its
+        compatibility form (NFKC: the paper's superscript minus `⁻` is `−`), which is what a
+        renderer's fallback draws at about that width. Liberation Sans has no U+207B, and asking
+        FreeType for it raised, so the whole test errored on one exponent."""
+        font = self._fonts[bold]
+        if ord(character) not in font.get_charmap():
+            stand_in = unicodedata.normalize("NFKC", character)
+            if stand_in != character and all(ord(c) in font.get_charmap() for c in stand_in):
+                return sum(self.advance(c, bold) for c in stand_in)
+            character = "0"  # a digit's width: the narrowest honest guess for an unknown symbol
+        glyph = font.load_char(ord(character), flags=LoadFlags.NO_HINTING)
         return glyph.linearHoriAdvance / 65536
 
 
