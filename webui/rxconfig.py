@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
-import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -10,74 +8,14 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_IS_WINDOWS = sys.platform == "win32"
-
-
-def _bun_available() -> bool:
-    """Whether reflex can find a bun binary to run its frontend scripts.
-
-    We mirror the locations reflex searches without importing reflex (which must
-    not happen before REFLEX_SSR is set, or the setting would miss the process
-    fork).
-    """
-    exe = "bun.exe" if _IS_WINDOWS else "bun"
-    if shutil.which(exe):
-        return True
-    roots: list[Path] = []
-    bun_install = os.environ.get("BUN_INSTALL")
-    if bun_install:
-        roots.append(Path(bun_install))
-    reflex_dir = os.environ.get("REFLEX_DIR")
-    if reflex_dir:
-        roots.append(Path(reflex_dir) / "bun")
-    try:
-        from platformdirs import user_data_dir
-
-        roots.append(Path(user_data_dir("reflex")) / "bun")
-    except ImportError:
-        pass
-    return any((root / "bin" / exe).exists() for root in roots)
-
-
-def _ssr_build_runs_under_bun() -> bool:
-    """Whether the Vite SSR pass would execute in bun rather than Node.
-
-    @mui/x-data-grid's ``esm/DataGrid/index.js`` does ``import '../index.css'``.
-    Vite leaves node_modules external in the SSR bundle, so prerendering imports
-    that file at runtime: bun resolves it, Node's ESM loader raises
-    ``Unknown file extension ".css"`` and every route prerenders as a 500.
-
-    Bun being present is not enough. Reflex runs ``bun run export``, whose
-    ``react-router`` binary starts with ``#!/usr/bin/env node``; bun honours that
-    shebang whenever ``node`` is on PATH and only stands in for Node when it is
-    not. So a machine with both (a clean clone on a dev box) ran the prerender in
-    Node and crashed, while the container, which installs no Node, worked.
-    """
-    node = "node.exe" if _IS_WINDOWS else "node"
-    return _bun_available() and shutil.which(node) is None
-
-
-# Resolve REFLEX_SSR *before* importing reflex, so the value is in place before
-# reflex forks its frontend/backend processes. SSR runs only where the prerender
-# would run under bun (see above). Under Node it cannot succeed: every route
-# prerenders as a 500 and the build stops ("Prerender: Request failed for /"), so
-# a REFLEX_SSR=true from .env (or from `reflex export`, which sets it before this
-# file loads) is overridden there, loudly, rather than taking the app down.
-# Upstream fix needed in reflex-mui-datagrid / reflex.
-if not _ssr_build_runs_under_bun():
-    if os.environ.get("REFLEX_SSR", "").strip().lower() in {"1", "true", "yes", "on"}:
-        print(
-            "REFLEX_SSR=true ignored: Node is on PATH, so the prerender would run in Node and "
-            "fail on @mui/x-data-grid's CSS import (every route 500s). SSR needs bun with no "
-            "`node` on PATH. Set REFLEX_SSR=false to silence this.",
-            file=sys.stderr,
-            flush=True,
-        )
-    os.environ["REFLEX_SSR"] = "false"
+# Prerendering (REFLEX_SSR) follows Reflex's default: on in production. It used to be gated off
+# wherever Node would run it, because @mui/x-data-grid's CSS import failed every route under Node;
+# webui.vite_ssr bundles @mui/* into the SSR build instead, so Node and bun both prerender.
 os.environ.setdefault("REFLEX_SOCKET_MAX_HTTP_BUFFER_SIZE", "50000000")
 
 import reflex as rx  # noqa: E402
 from reflex.plugins.sitemap import SitemapPlugin  # noqa: E402
+from webui.vite_ssr import SsrBundleMuiPlugin  # noqa: E402
 
 _IN_CONTAINER = os.path.exists("/.dockerenv") or os.environ.get("container") == "podman"
 
@@ -117,6 +55,8 @@ config = rx.Config(
         rx.plugins.RadixThemesPlugin(
             theme=rx.theme(appearance="light", accent_color="blue"),
         ),
+        # Lets Node prerender: @mui/x-data-grid imports its own CSS (see webui.vite_ssr).
+        SsrBundleMuiPlugin(),
     ],
     disable_plugins=[SitemapPlugin],
     vite_allowed_hosts=_vite_hosts,

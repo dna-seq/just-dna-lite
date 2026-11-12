@@ -710,13 +710,14 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
   `ui fixed menu` and accordions don't: use flexbox. Checkboxes need the Fomantic
   `div.ui.checkbox > input + label` structure, not `rx.checkbox`.
-- **SSR is on only when the prerender runs in bun** (`rxconfig._ssr_build_runs_under_bun`): bun
-  present **and no `node` on PATH**. `@mui/x-data-grid` imports its own `.css`, which Node's ESM
-  loader rejects, so a Node prerender fails every route with a 500. `react-router`'s shebang is
-  `env node`, so bun runs Node whenever Node exists; "bun installed" is not the test. Where Node would
-  run it, the gate forces `REFLEX_SSR=false` **even over an explicit `true`** (from `.env`, or set by
-  `reflex export` before `rxconfig` loads) and prints why: a prod `.env` with `REFLEX_SSR=true` on a host
-  with Node took lite.just-dna.life down on 2026-11-12 ("Prerender: Request failed for /").
+- **Prerendering must work under Node**: prod runs Node and needs the HTML for crawlers and link
+  previews, so turning SSR off is not a fix. `@mui/x-data-grid` imports its own `.css`; Vite leaves
+  `node_modules` external in the SSR bundle, and Node's ESM loader refuses the import
+  (`ERR_UNKNOWN_FILE_EXTENSION`), so the server bundle fails and every route prerenders as a 500
+  ("Prerender: Request failed for /"). `webui.vite_ssr.SsrBundleMuiPlugin` (in `rxconfig.plugins`) patches
+  the generated `vite.config.js` with `ssr.noExternal: [/^@mui\//]`, so Vite bundles MUI and its CSS
+  import at build time. Reproduce with a user-local Node from the `nodejs-wheel-binaries` wheel on PATH
+  and `REFLEX_SSR=true uv run reflex export --frontend-only --no-zip --ssr`. The old bun-only gate is gone.
 - Custom routes: pass a FastAPI app as `rx.App(api_transformer=api)`. They are served by the **backend**
   only. Never hardcode port 8000: `webui.run` picks a free port into `API_URL` / `REFLEX_BACKEND_PORT`;
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
