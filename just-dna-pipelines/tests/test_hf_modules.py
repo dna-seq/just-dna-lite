@@ -918,8 +918,10 @@ class TestLeadGenotypeNormalization:
             "genotype": ["A/G", "C/C"],
             "drug": ["atorvastatin", "warfarin"],
         })
+        # `maintain_order="left"`: since polars 2 a lazy collect runs the streaming engine, which does
+        # not keep the left row order through a join unless asked (this test flipped between runs).
         joined = vcf.join(
-            _normalize_lead_genotype(module), on=["rsid", "genotype"], how="left"
+            _normalize_lead_genotype(module), on=["rsid", "genotype"], how="left", maintain_order="left"
         ).collect()
         assert joined["drug"].to_list() == ["atorvastatin", "warfarin"]
         assert joined.schema["genotype"] == pl.List(pl.String)
