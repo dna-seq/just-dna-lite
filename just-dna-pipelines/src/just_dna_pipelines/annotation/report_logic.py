@@ -1063,6 +1063,22 @@ def apply_directionality(variants: list[dict], module_directional: Optional[bool
     return directional
 
 
+def _display_tiebreak(variant: dict) -> tuple[str, ...]:
+    """A total order for rows the ranking key ties on (equal |weight|, equal evidence level).
+
+    Without it the tie keeps input order, and since polars 2 a lazy `collect()` runs the streaming
+    engine, which does not keep row order through the joins the report builds on: two runs over one
+    sample listed rs429358 and rs7412 (both |0.5|) in opposite orders.
+    """
+    return (
+        str(variant.get("rsid") or ""),
+        str(variant.get("genotype_str") or ""),
+        str(variant.get("gene") or ""),
+        str(variant.get("drug") or ""),
+        str(variant.get("conclusion") or ""),
+    )
+
+
 def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) -> dict:
     """The view model for one annotated variant, shared by every report shape.
 
@@ -1332,7 +1348,7 @@ def build_longevity_report_data(
             ]
 
             # Sort by absolute weight descending for better readability
-            variants.sort(key=lambda v: abs(v["weight"]), reverse=True)
+            variants.sort(key=lambda v: (-abs(v["weight"]), *_display_tiebreak(v)))
 
             positive = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) > 0)
             negative = sum(1 for v in variants if _variant_sign(v["weight"], v["state"], v.get("direction")) < 0)
@@ -1417,7 +1433,7 @@ def build_module_report_data(
         # scan order. Evidence level is its ranking axis: 1A is a prescribing guideline, 2B the
         # weakest tier we admit.
         variants.sort(
-            key=lambda v: (abs(v["weight"]), _evidence_rank(v["evidence_level"])), reverse=True
+            key=lambda v: (-abs(v["weight"]), -_evidence_rank(v["evidence_level"]), *_display_tiebreak(v))
         )
 
         # Direction counts are weight-aware with a state fallback so weight-less protective
@@ -1483,7 +1499,7 @@ def build_pharmacogenomics_report_data(
 
         for bucket in drugs.values():
             bucket["variants"].sort(
-                key=lambda v: _evidence_rank(v["evidence_level"]), reverse=True
+                key=lambda v: (-_evidence_rank(v["evidence_level"]), *_display_tiebreak(v))
             )
             bucket["best_evidence"] = bucket["variants"][0]["evidence_level"]
             bucket["genes"] = sorted({v["gene"] for v in bucket["variants"] if v["gene"]})
@@ -1491,8 +1507,7 @@ def build_pharmacogenomics_report_data(
 
         ordered = sorted(
             drugs.values(),
-            key=lambda b: (_evidence_rank(b["best_evidence"]), b["total_count"]),
-            reverse=True,
+            key=lambda b: (-_evidence_rank(b["best_evidence"]), -b["total_count"], b["drug"]),
         )
 
         summary = {

@@ -48,7 +48,9 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   `collect()` now runs the streaming engine, which does not keep row order through joins, group-bys or
   unpivots: sort, or pass `maintain_order`, wherever order matters. `explode` defaults to
   `empty_as_null=False` (always pass it), horizontal `concat` requires equal heights, `read_csv` keeps the
-  requested `columns=` order. Upgrade guide: polars `docs/source/releases/upgrade/2.md`. Our polars now
+  requested `columns=` order. Upgrade guide: polars `docs/source/releases/upgrade/2.md`.
+  The report sorts with a total order (`report_logic._display_tiebreak`): rows tied on |weight| once
+  listed in a different order on every run (rs429358 / rs7412 swapped between two runs on one sample). Our polars now
   matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
 - Format libs: `just-dna-format/compiler/enricher>=0.8.4` (the 0.8 line, cut 2026-11-05; upstream
   `docs/INTEGRATION_0_8.md` is the adoption guide). `just-dna-registry>=0.30.0` **moves with the format
