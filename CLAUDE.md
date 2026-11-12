@@ -36,7 +36,10 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   google-genai release through 3.2.0 caps `tenacity<9.2.0`. Filed upstream as just-dna-compiler **S149** → **RM436**
   (a shim built on main, blocking 0.8.5); remove the override once 0.8.5 is out. A plain `uv lock --upgrade` without it kept enricher 0.7.3 beside
   format 0.8.4, silently.
-- Deliberate ceilings: `google-genai<2.0`; `requires-python >=3.13,<3.14`. The old `grpcio<1.82` cap is
+- Deliberate ceilings: `google-genai<2.0`; `requires-python >=3.13,<3.14`; `granian<2.8.6` (webui): on
+  2.8.6 to 2.8.8 a Granian worker deadlocks in its own signal handler (`granian/_signals.py`
+  `signal_event.set()` while the Rust `serve` runs), so `uv run serve` ignores SIGINT and SIGTERM until the
+  worker is killed; on 2.8.5 it stops in 5 s. Measured 2026-11-12 with a faulthandler dump. The old `grpcio<1.82` cap is
   gone: dagster 1.13.28 allows `protobuf<8` (it excludes only grpcio-health-checking 1.82.0), so grpcio
   1.85 and protobuf 7 resolve and dagster imports. Keep the dagster floors at `>=1.13.28` for that.
 - `agno[mcp]>=3.0.10`: agno 3 imports the mcp 2.x names, so depend on its extra; never re-add a bare
