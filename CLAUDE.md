@@ -394,6 +394,17 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   `_genotype_key_expr` reproduces every key the compiler wrote.
 - **Render if present, never a fixed field list.** `_AUTHORED_AXES` flows into the view model, each with
   an `{% if %}` row. `test_a_populated_0_5_axis_reaches_the_html` guards it.
+- **The meta-table (format 0.8, `meta.parquet` + `meta_resolved.parquet`, via `ModuleInfo.meta_url` /
+  `meta_resolved_url`).** `apply_meta_combinations` shows a `replaces` row's finding when **every**
+  member matches the sample (member count from `parse_members(members)`, never from `matches`, which
+  lists only what matched) and drops the member rows it names from the table; the combined result
+  names them in its fold. `_join_meta_resolved` adds `meta_tier`, `meta_age_of_action(_confidence)`,
+  `meta_tradeoff` (true or null) on the `(variant_key, genotype)` key. The report knows neither the
+  sample's sex nor a drug, so it reads the `(sex=null, drug=null)` rows only. Only `variants` members
+  are read: a combination naming a diplotype, a `pharm_variants` row or an allele is skipped
+  (`meta_combination_not_assessed`) and its members show as a 0.7 reader shows them. No published
+  module carries `meta.csv` yet (prod checked 2026-11-12). Tests: `tests/test_meta_table.py` on the
+  vendored upstream `pleiotropy_tradeoff` spec.
 - Routing dispatches on the manifest's `lead_table` (default `"weights"`). `pharm_variants` gets a
   drug-keyed section ranked by ClinPGx evidence.
 - **Modules not read in this run** renders `skipped` (about the module, retry won't help) and `failed`

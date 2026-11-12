@@ -1,0 +1,3 @@
+source,layer,license,license_url,license_sha256,attribution,notice,share_alike,commercial_use,redistribution,declared_use,dataset,fetched_at,draft_digest
+clinvar,resolution,public-domain,https://www.ncbi.nlm.nih.gov/clinvar/docs/maintenance_use/,,"ClinVar, NCBI (https://www.ncbi.nlm.nih.gov/clinvar/)","US-government work, no copyright asserted. NCBI asks that ClinVar be cited and states the records are submitter assertions, not a clinical diagnosis.",false,true,true,unstated,clinvar_2026-06-27,2026-11-05T00:24:18Z,
+ensembl,resolution,Apache-2.0,https://www.ensembl.org/info/about/legal/disclaimer.html,,Ensembl (https://www.ensembl.org),,false,true,true,unstated,ensembl-variation-2026_07_13-vep116.0,2026-11-04T15:05:15Z,

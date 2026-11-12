@@ -1,0 +1,4 @@
+variant_key,rsid,chrom,start,ref,alts,genome_build,locus_index,vrs_id,vrs_spec,caid,source,authority,status,rsid_alternates,rsid_current,rsid_status,placement_witness,placement_verdict,left_aligned,authored_event,judged_coordinate,fetched_at,source_release
+rs10455872,rs10455872,6,160589086,A,G,GRCh38,0,ga4gh:VA.p4HqyaoHIUA38oR8OAHepboYMGGti_mL,2.0,,cache,ensembl,resolved,,,live,clinvar,same_event,true,,,,ensembl-variation-2026_07_13-vep116.0
+rs3184504,rs3184504,12,111446804,T,"A,C,G",GRCh38,0,"ga4gh:VA.IqbXU-k4sSTNgFeHXg-j54GEbQlb0RIk,ga4gh:VA.jfvwPFRrK0116dCim98Mf0BEGFBO1cSc,ga4gh:VA.JMaR5RHjL91kcpgxlDjvd7LTPTTj6nzk",2.0,,cache,ensembl,resolved,,,live,clinvar,unplaced,true,,,,ensembl-variation-2026_07_13-vep116.0
+rs5882,rs5882,16,56982180,G,"A,C",GRCh38,0,"ga4gh:VA.zws8w3H0J3zKMclHqXZcRZ32SCleAH4t,ga4gh:VA.Oh0UGgd7mvjYXCG2t6P3Pkn9I6rdv7JF",2.0,,cache,ensembl,resolved,,,live,clinvar,unplaced,true,,,,ensembl-variation-2026_07_13-vep116.0

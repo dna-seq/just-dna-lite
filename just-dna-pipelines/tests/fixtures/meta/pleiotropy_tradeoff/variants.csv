@@ -1,0 +1,10 @@
+rsid,genotype,state,conclusion,gene,phenotype,trait_efo_id,effect_allele
+rs3184504,C/C,neutral,"No copy of the SH2B3 T allele (262W).",SH2B3,Celiac disease,MONDO:0005130,T
+rs3184504,C/T,risk,"One copy of the SH2B3 T allele: higher celiac disease risk, and a stronger NOD2 response to bacterial components in functional tests. A trade-off, not a net harm.",SH2B3,Celiac disease,MONDO:0005130,T
+rs3184504,T/T,risk,"Two copies of the SH2B3 T allele: higher celiac disease risk, and a stronger NOD2 response to bacterial components in functional tests. A trade-off, not a net harm.",SH2B3,Celiac disease,MONDO:0005130,T
+rs10455872,A/A,neutral,"Two copies of the common LPA version. No Lp(a)-raising allele at this site.",LPA,Coronary artery disease,MONDO:0005010,A
+rs10455872,A/G,risk,"One copy of the LPA version that raises lipoprotein(a) and coronary disease risk.",LPA,Coronary artery disease,MONDO:0005010,A
+rs10455872,G/G,risk,"Two copies of the LPA version that raises lipoprotein(a) and coronary disease risk.",LPA,Coronary artery disease,MONDO:0005010,A
+rs5882,A/A,neutral,"CETP codon 405 isoleucine, two copies. Its link to exceptional longevity is reported, but which allele carries it is not settled across studies.",CETP,Exceptional longevity,OBA:VT0005372,
+rs5882,A/G,neutral,"CETP codon 405, one isoleucine and one valine. Its link to exceptional longevity is reported, but which allele carries it is not settled across studies.",CETP,Exceptional longevity,OBA:VT0005372,
+rs5882,G/G,neutral,"CETP codon 405 valine, two copies. Its link to exceptional longevity is reported, but which allele carries it is not settled across studies.",CETP,Exceptional longevity,OBA:VT0005372,

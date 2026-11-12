@@ -430,6 +430,7 @@ table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
     text-transform: none !important;
 }
 .detail-table td { background: white; }
+.meta-finding { margin: 1rem 0; padding: 0.75rem 1rem; border-left: 4px solid #2185d0; background: #f6f9fc; }
 .nested-table-shell {
     margin: 0.75rem;
     border-color: var(--line);
@@ -646,6 +647,32 @@ window.addEventListener("scroll", function() {
 {% if value %}<tr><th>{{ label }}</th><td>{{ value }}</td></tr>{% endif %}
 {% endmacro %}
 
+{# The meta-table (format 0.8): a finding the module states about a combination of positions this
+   sample carries. It replaces the separate results for those positions, which are named in the fold
+   and not listed again in the table below. #}
+{% macro meta_findings_block(findings) %}
+{% for f in findings %}
+<div class="meta-finding">
+    <p><strong>Combined result</strong></p>
+    {% if f.conclusion %}<p>{{ f.conclusion }}</p>{% endif %}
+    {% if f.negatives %}<p>{{ f.negatives }}</p>{% endif %}
+    <details>
+        <summary>More details</summary>
+        <table class="detail-table">
+            <tr><th>Read together from</th><td>{{ f.replaces | join(", ") }}. These positions are not listed separately below.</td></tr>
+            {{ variant_detail_row("Direction", f.direction) }}
+            {{ variant_detail_row("Evidence tier (module's scale)", f.tier) }}
+            {{ variant_detail_row("Age of action", f.age_of_action) }}
+            {{ variant_detail_row("Trait (EFO)", f.trait_efo_id) }}
+            {% if f.pmid and f.pmid.isdigit() %}<tr><th>Citation</th><td><a href="https://pubmed.ncbi.nlm.nih.gov/{{ f.pmid }}/">PMID {{ f.pmid }}</a></td></tr>{% endif %}
+            {{ variant_detail_row("DOI", f.doi) }}
+            {% if f.withheld %}<tr><th>Not stated</th><td>The module's rules disagree about {{ f.withheld | join(", ") }} here, so it is left out.</td></tr>{% endif %}
+        </table>
+    </details>
+</div>
+{% endfor %}
+{% endmacro %}
+
 {# One <symbol> per assistant is emitted once by `ai_assistant_icon_defs`; every row then
    costs a short <use> reference instead of a repeated path. Inlining the paths per row cost
    about 5 kB a variant - 1 MB of a 206-variant report - for four identical copies of the
@@ -761,6 +788,10 @@ window.addEventListener("scroll", function() {
             {{ variant_detail_row("Possible downsides", v.negatives) }}
             {{ variant_detail_row("Trait (EFO)", v.trait_efo_id) }}
             {{ variant_detail_row("Flags", v.flags) }}
+            {{ variant_detail_row("Evidence tier (module's scale)", v.meta_tier) }}
+            {{ variant_detail_row("Age of action", v.meta_age_of_action) }}
+            {{ variant_detail_row("Age of action, confidence", v.meta_age_of_action_confidence) }}
+            {% if v.meta_tradeoff %}<tr><th>Trade-off</th><td>The module links this variant to a lower risk for one trait and a higher risk for another.</td></tr>{% endif %}
             {{ variant_detail_row("Population", v.population) }}
             {{ variant_detail_row("p-value", v.p_value) }}
             {# One authored row that resolved onto several positions (format 0.6 `locus_count`). At
@@ -923,6 +954,7 @@ window.addEventListener("scroll", function() {
             <div class="stat-box stat-inferred"><div class="number">{{ longevity.summary.total_restored }}</div><div class="label">Inferred</div></div>
             {% endif %}
         </div>
+        {{ meta_findings_block(longevity.meta_findings or []) }}
 
         {% for cat_key, cat in longevity.categories.items() %}
         {% if cat.total_count > 0 %}
@@ -972,7 +1004,10 @@ window.addEventListener("scroll", function() {
             <div class="stat-box stat-inferred"><div class="number">{{ mod.summary.total_restored }}</div><div class="label">Inferred</div></div>
             {% endif %}
         </div>
+        {{ meta_findings_block(mod.meta_findings or []) }}
         {{ variant_table(mod.variants, mod.module_name ~ "TBody", none) }}
+        {% elif mod.meta_findings %}
+        {{ meta_findings_block(mod.meta_findings) }}
         {% else %}
         <p class="no-results">No annotated variants were found for this module.</p>
         {% endif %}

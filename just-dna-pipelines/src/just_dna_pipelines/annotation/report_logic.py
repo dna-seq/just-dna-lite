@@ -17,6 +17,7 @@ from eliot import log_message, start_action
 from just_dna_format.alleles import split_genotype
 from just_dna_format.derive import clin_sig_from_booleans, direction_from_state
 from just_dna_format.manifest import read_manifest
+from just_dna_format.meta import parse_members
 from just_dna_format.vocab import RSID_PATTERN
 
 from just_dna_pipelines.annotation.analytics import umami_script_tag
@@ -131,6 +132,10 @@ def _scan_optional_module_table(
             _log_missing_module_table(
                 module_name, table, "module metadata has no clin_sig_concordance table"
             )
+            return None
+        if table == ModuleTable.META and module_info.meta_url is None:
+            return None  # no meta.csv: every module published before 0.8, not worth a warning
+        if table == ModuleTable.META_RESOLVED and module_info.meta_resolved_url is None:
             return None
 
     try:
@@ -643,6 +648,148 @@ def _join_concordance(
     )
 
 
+#: What `meta_resolved.parquet` (format 0.8) contributes to a matched `variants` row.
+_META_RESOLVED_COLUMNS: dict[str, str] = {
+    "tier": "meta_tier",
+    "age_of_action": "meta_age_of_action",
+    "age_of_action_confidence": "meta_age_of_action_confidence",
+    "tradeoff": "meta_tradeoff",
+}
+
+
+def _unscoped(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """The meta rows that apply to a report that conditions on neither sex nor drug.
+
+    The format keys a scoped row by `(sex, drug)` and tells a consumer to look a target up with its
+    own value on an axis it conditions on and `null` on one it does not (INTEGRATION_0_8 § 1.2.1). The
+    report knows neither the sample's sex nor a drug, so it reads the `(null, null)` rows only: a row
+    scoped to `female` or to one thiopurine says nothing about a reader the report cannot place there.
+    """
+    return lf.filter(pl.col("sex").is_null() & pl.col("drug").is_null())
+
+
+def _join_meta_resolved(
+    weights_lf: pl.LazyFrame, meta_resolved_lf: pl.LazyFrame, module_name: str
+) -> pl.LazyFrame:
+    """Attach the meta-table's per-row facts (format 0.8: `tier`, `age_of_action`, `tradeoff`).
+
+    `meta_resolved.parquet` keys a `variants` target by `[variant_key, genotype]` in `variants.csv`'s
+    spelling, the key `clin_sig_concordance` uses, so the join is the same `_genotype_key_expr`.
+    `tradeoff` is true or null, never false; a column precedence withheld arrives null and renders
+    nothing. Skipped, rows left bare, when the lead table carries nothing to key on (pre-0.6).
+    """
+    schema = weights_lf.collect_schema()
+    names = set(schema.names())
+    if "variant_key" not in names or "phased" not in names or schema.get("genotype") != pl.List(pl.String):
+        log_message(
+            message_type="info",
+            action="meta_resolved_join_skipped",
+            module=module_name,
+            reason="lead table carries no variant_key + list genotype + phased to key on",
+        )
+        return weights_lf
+    right = (
+        _unscoped(meta_resolved_lf)
+        .filter(pl.col("table") == "variants")
+        .select(
+            pl.col("key").list.get(0, null_on_oob=True).alias("variant_key"),
+            pl.col("key").list.get(1, null_on_oob=True).alias(_GENOTYPE_KEY),
+            *(pl.col(source).alias(target) for source, target in _META_RESOLVED_COLUMNS.items()),
+        )
+        .unique(subset=["variant_key", _GENOTYPE_KEY], keep="first", maintain_order=True)
+    )
+    return (
+        weights_lf.with_columns(_genotype_key_expr())
+        .join(right, on=["variant_key", _GENOTYPE_KEY], how="left", maintain_order="left")
+        .drop(_GENOTYPE_KEY)
+    )
+
+
+def apply_meta_combinations(
+    annotated: pl.DataFrame,
+    module_name: str,
+    module_info: Optional[ModuleInfo],
+) -> tuple[pl.DataFrame, list[dict]]:
+    """Replace member findings with the combination that names them (format 0.8, RM28).
+
+    A `meta.parquet` row with `replaces` true states a finding about a combination of members. When
+    **every** member matches this sample, the combination's finding is shown and the findings of the
+    rows in its `matches` that this sample carries are not shown separately (they are named under the
+    combination instead). A 0.7 reader shows the member findings, the accepted cost (§ 1.2.1); this is
+    the reader the format asks for.
+
+    Members are counted from the authored `members` cell (`parse_members`), never from `matches`, so a
+    member that matched no module row (`meta_selector_matches_nothing`) can never be read as met. Only
+    `variants` members are read here: a combination naming a diplotype, a pharm_variants row or an
+    allele is left alone, its members' own findings shown and the skip logged, because this per-row
+    report cannot tell whether the sample carries those (the phenotype caller reads them apart).
+
+    Returns the rows to render and the combination findings for the template.
+    """
+    meta_lf = _scan_optional_module_table(module_name, ModuleTable.META, module_info=module_info)
+    if meta_lf is None or annotated.height == 0:
+        return annotated, []
+    names = set(annotated.columns)
+    if "variant_key" not in names or "phased" not in names or annotated.schema.get("genotype") != pl.List(pl.String):
+        return annotated, []
+    combinations = _unscoped(meta_lf).filter(pl.col("replaces")).collect()
+    if combinations.height == 0:
+        return annotated, []
+
+    keyed = annotated.with_columns(_genotype_key_expr())
+    carried = {
+        (str(variant_key), str(genotype))
+        for variant_key, genotype in keyed.select("variant_key", _GENOTYPE_KEY).iter_rows()
+    }
+    findings: list[dict] = []
+    replaced: set[tuple[str, str]] = set()
+    for row in combinations.iter_rows(named=True):
+        matches = row.get("matches") or []
+        tables = {match["table"] for match in matches}
+        if tables - {"variants"}:
+            log_message(
+                message_type="info",
+                action="meta_combination_not_assessed",
+                module=module_name,
+                members=row.get("members"),
+                reason=f"names {sorted(tables - {'variants'})}, which this report cannot read per row",
+            )
+            continue
+        member_count = len(parse_members(row["members"]))
+        hits = [
+            (int(match["member"]), str(match["key"][0]), str(match["key"][1]))
+            for match in matches
+            if len(match["key"]) >= 2 and (str(match["key"][0]), str(match["key"][1])) in carried
+        ]
+        if len({member for member, _, _ in hits}) < member_count:
+            continue
+        keys = sorted({(variant_key, genotype) for _, variant_key, genotype in hits})
+        replaced.update(keys)
+        findings.append({
+            "members": row["members"],
+            "conclusion": row.get("conclusion") or "",
+            "direction": row.get("direction") or "",
+            "negatives": row.get("negatives") or "",
+            "tier": row.get("tier") or "",
+            "age_of_action": row.get("age_of_action") or "",
+            "trait_efo_id": row.get("trait_efo_id") or "",
+            "pmid": row.get("pmid") or "",
+            "doi": row.get("doi") or "",
+            "withheld": list(row.get("withheld") or []),
+            "replaces": [f"{variant_key} {genotype}" for variant_key, genotype in keys],
+        })
+    if not replaced:
+        return annotated, findings
+    replaced_frame = pl.DataFrame(
+        {"variant_key": [vk for vk, _ in sorted(replaced)], _GENOTYPE_KEY: [gk for _, gk in sorted(replaced)]},
+        schema={"variant_key": keyed.schema["variant_key"], _GENOTYPE_KEY: pl.String},
+    )
+    kept = keyed.join(
+        replaced_frame, on=["variant_key", _GENOTYPE_KEY], how="anti", maintain_order="left"
+    ).drop(_GENOTYPE_KEY)
+    return kept, findings
+
+
 def load_annotated_weights(
     weights_parquet: Path,
     module_name: str,
@@ -698,6 +845,11 @@ def load_annotated_weights(
         )
         if concordance_lf is not None:
             enriched = _join_concordance(enriched, concordance_lf, module_name)
+        meta_resolved_lf = _scan_optional_module_table(
+            module_name, ModuleTable.META_RESOLVED, module_info=module_info
+        )
+        if meta_resolved_lf is not None:
+            enriched = _join_meta_resolved(enriched, meta_resolved_lf, module_name)
         return _ensure_annotation_report_columns(enriched.collect())
 
 
@@ -1001,6 +1153,11 @@ def _build_variant(row: dict, studies_by_rsid: dict[str, list[dict[str, str]]]) 
     for axis in _AUTHORED_AXES:
         value = row.get(axis)
         variant[axis] = "" if value is None else value
+    # The meta-table's per-row facts (format 0.8, `meta_resolved.parquet`), absent on every module
+    # without a `meta.csv`. `tradeoff` is true or null, never false: null renders nothing.
+    for target in _META_RESOLVED_COLUMNS.values():
+        value = row.get(target)
+        variant[target] = "" if value is None else value
     variant["ai_explain_links"] = _build_variant_ai_links(variant)
     return variant
 
@@ -1140,6 +1297,7 @@ def build_longevity_report_data(
 
         # Keep the rows that matched a module entry (weight-agnostic: superhuman etc. have no weight)
         annotated = _annotated_rows(enriched_df)
+        annotated, meta_findings = apply_meta_combinations(annotated, module_name, module_info)
 
         # Get all rsids for study lookup
         rsids = annotated.select("rsid").unique().to_series().to_list()
@@ -1217,6 +1375,7 @@ def build_longevity_report_data(
             "categories": categories,
             "summary": summary,
             "module_name": module_name,
+            "meta_findings": meta_findings,
         }
 
 
@@ -1243,6 +1402,7 @@ def build_module_report_data(
     with start_action(action_type="build_module_report_data", module=module_name, path=str(weights_parquet)):
         enriched_df = load_annotated_weights(weights_parquet, module_name, module_info)
         annotated = _annotated_rows(enriched_df)
+        annotated, meta_findings = apply_meta_combinations(annotated, module_name, module_info)
 
         rsids = annotated.select("rsid").unique().to_series().to_list()
         studies_by_rsid = load_studies_for_variants(
@@ -1278,6 +1438,7 @@ def build_module_report_data(
             "variants": variants,
             "summary": summary,
             "module_name": module_name,
+            "meta_findings": meta_findings,
         }
 
 

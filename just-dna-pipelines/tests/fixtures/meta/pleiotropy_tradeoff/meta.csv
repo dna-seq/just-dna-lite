@@ -1,0 +1,6 @@
+members,trait_efo_id,trait_role,direction,conclusion,negatives,tier,age_of_action,age_of_action_confidence,flags,pmid,doi,sex
+variants[variant_key=rs3184504],MONDO:0005130,,risk,,,,,,,20560212,,
+variants[variant_key=rs3184504],MONDO:0005113,,protective,,,,,,,20560212,,
+variants[variant_key=rs10455872],EFO:0006925,mediator,protective,,,,,,,20032323,,
+variants[variant_key=rs10455872],MONDO:0005010,,protective,,,,,,,20032323,,
+variants[variant_key=rs5882],OBA:VT0005372,,protective,,,,,,,14559957,,

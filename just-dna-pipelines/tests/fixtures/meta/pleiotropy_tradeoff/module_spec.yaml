@@ -1,0 +1,14 @@
+schema_version: '1.0'
+module:
+  title: Pleiotropy — per-trait judgements and the computed trade-off
+  description: One allele judged per trait on the meta-table, with the trade-off computed rather
+    than authored. SH2B3 opposes on two traits, LPA does not, and CETP's allele is not determined.
+  report_title: Pleiotropy and trade-offs
+  icon: balance scale
+  icon_set: fomantic
+  color: '#00b5ad'
+  name: pleiotropy_tradeoff
+defaults:
+  curator: ai-module-creator
+  method: literature-review
+genome_build: GRCh38

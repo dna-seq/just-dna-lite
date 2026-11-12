@@ -76,6 +76,13 @@ class ModuleInfo(BaseModel):
     diplotypes_url: Optional[str] = None
     allele_function_url: Optional[str] = None
     activity_phenotype_url: Optional[str] = None
+    # The meta-table (format 0.8, RM28/RM323/RM324/RM327): `meta.parquet` holds one row per authored
+    # `meta.csv` row (a combination of members, with what it states and whether a matching combination
+    # replaces its members' findings); `meta_resolved.parquet` holds the per-target facts after
+    # precedence (`tier`, `age_of_action`, `tradeoff`, ...). Attested like the other side parquets;
+    # `None` on a module with no `meta.csv`, which is every module published before 0.8.
+    meta_url: Optional[str] = None
+    meta_resolved_url: Optional[str] = None
     logo_url: Optional[str] = None
     metadata_url: Optional[str] = None
     # What the source's own `manifest.json` states about these bytes, when it publishes one.
@@ -345,6 +352,8 @@ def _probe_module_at_path(
     diplotypes_path = f"{base_path}/diplotypes.parquet"
     allele_function_path = f"{base_path}/allele_function.parquet"
     activity_phenotype_path = f"{base_path}/activity_phenotype.parquet"
+    meta_path = f"{base_path}/meta.parquet"
+    meta_resolved_path = f"{base_path}/meta_resolved.parquet"
     metadata_json_path = f"{base_path}/metadata.json"
     metadata_yaml_path = f"{base_path}/metadata.yaml"
 
@@ -389,6 +398,10 @@ def _probe_module_at_path(
         ),
         activity_phenotype_url=(
             _build_url(protocol, activity_phenotype_path) if _has("activity_phenotype.parquet") else None
+        ),
+        meta_url=_build_url(protocol, meta_path) if _has("meta.parquet") else None,
+        meta_resolved_url=(
+            _build_url(protocol, meta_resolved_path) if _has("meta_resolved.parquet") else None
         ),
         logo_url=logo_url,
         metadata_url=resolved_metadata_url,
@@ -682,6 +695,9 @@ class ModuleTable(str, Enum):
     DIPLOTYPES = "diplotypes"
     ALLELE_FUNCTION = "allele_function"
     ACTIVITY_PHENOTYPE = "activity_phenotype"
+    # The meta-table (format 0.8); read by the report, never by the engine.
+    META = "meta"
+    META_RESOLVED = "meta_resolved"
     # Whichever table family carries this module's rows — weights for most, pharm_variants for a
     # pharmacogenomics module. Ask for this rather than WEIGHTS unless you truly need weights.
     LEAD = "lead"
@@ -788,6 +804,14 @@ def get_module_table_url(module_name: str, table: str | ModuleTable, module_info
         if not info.activity_phenotype_url:
             raise ValueError(f"Module {module_name} does not have an activity_phenotype table")
         return info.activity_phenotype_url
+    elif table_name == "meta":
+        if not info.meta_url:
+            raise ValueError(f"Module {module_name} does not have a meta table")
+        return info.meta_url
+    elif table_name == "meta_resolved":
+        if not info.meta_resolved_url:
+            raise ValueError(f"Module {module_name} does not have a meta_resolved table")
+        return info.meta_resolved_url
 
     # Fallback for unknown tables
     return f"{info.path}/{table_name}.parquet"
