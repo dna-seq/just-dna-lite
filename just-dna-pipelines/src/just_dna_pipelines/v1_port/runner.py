@@ -20,7 +20,7 @@ from typing import Optional
 
 from just_dna_enricher.enrich import enrich
 from just_dna_enricher.literature import enrich_literature
-from just_dna_enricher.locations import resolve_clinvar_reference, resolve_ensembl_reference
+from just_dna_enricher.locations import default_ensembl_cache_dir, resolve_clinvar_reference, resolve_ensembl_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
 from just_dna_pipelines.v1_port.reanchor import reanchor_indels_to_clinvar
 from pydantic import BaseModel, Field
@@ -41,7 +41,7 @@ from just_dna_pipelines.v1_port.writer import write_spec_dir
 # resolve in a process reads platformdirs and returns None even when the env names a full cache.
 # Every later call in that process is fine, which is what makes it easy to miss.
 load_env()
-DEFAULT_ENSEMBL_CACHE = resolve_ensembl_reference() or Path("/data/just-dna-cache/ensembl_variations")
+DEFAULT_ENSEMBL_CACHE = resolve_ensembl_reference() or default_ensembl_cache_dir()
 DEFAULT_OUT_ROOT = Path("data/interim/v1_port")
 DEFAULT_DOWNLOAD_CACHE = Path("data/interim/v1_port/_sources")
 

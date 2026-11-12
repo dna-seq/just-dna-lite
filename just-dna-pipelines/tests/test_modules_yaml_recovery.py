@@ -74,7 +74,7 @@ def test_an_unusable_working_copy_falls_back_to_the_shipped_defaults(
     # Not merely "did not raise": the shipped catalog has to survive intact, or discovery
     # would come back empty and the app would look healthy while annotating nothing.
     assert {source.url for source in config.sources} == expected
-    assert config.ensembl_source.repo_id
+    assert config.registries
 
 
 def test_the_warning_names_the_file_so_an_operator_can_find_it(

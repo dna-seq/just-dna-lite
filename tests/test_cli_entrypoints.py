@@ -24,7 +24,6 @@ import just_dna_lite.process
 import webui.run
 from just_dna_lite.cli import app as pipelines_app
 from just_dna_lite.process import dg_dev_argv, lite_mcp_http_argv, webui_dev_argv
-from just_dna_pipelines import enricher_cli
 from just_dna_pipelines.cli import app as shadowed_pipelines_app
 
 
@@ -41,19 +40,19 @@ def test_the_shadowed_pipelines_entrypoint_still_imports() -> None:
     assert result.exit_code == 0, result.output
 
 
-def test_the_enricher_mount_is_always_a_typer_app_and_says_why_when_it_is_the_stub() -> None:
-    """`enricher_app` is the real app or the stub, never `None`; the stub's `status` exits 1 with
-    the captured reason so the loss is visible rather than a missing command group."""
-    assert isinstance(enricher_cli.enricher_app, typer.Typer)
-    result = CliRunner().invoke(pipelines_app, ["enrich", "--help"])
+@pytest.mark.parametrize("app", [pipelines_app, shadowed_pipelines_app], ids=["installed", "shadowed"])
+def test_the_enricher_app_is_mounted_whole_with_its_cache_commands(app: typer.Typer) -> None:
+    """`pipelines enrich` is just-dna-enricher's own Typer app, imported directly.
+
+    It sat behind a guarded import and a stub while dagster capped protobuf below the Atlas
+    gencode's runtime (S107). That cap is gone (dagster 1.13.28 allows protobuf<8), so the import
+    is plain and the Ensembl snapshot commands (`cache pull --only ensembl`, `cache status`) are
+    reachable here rather than duplicated by our own downloader.
+    """
+    result = CliRunner().invoke(app, ["enrich", "cache", "--help"])
     assert result.exit_code == 0, result.output
-    if enricher_cli.ENRICHER_CLI_UNAVAILABLE is not None:
-        status = CliRunner().invoke(pipelines_app, ["enrich", "status"])
-        assert status.exit_code == 1
-        assert "not available" in status.output
-        assert enricher_cli.ENRICHER_CLI_UNAVAILABLE.split(":")[0] in status.output
-    else:
-        assert "cache" in result.output
+    for command in ("pull", "status", "prepare"):
+        assert command in result.output, command
 
 
 def test_launcher_children_never_start_through_a_console_script_wrapper() -> None:

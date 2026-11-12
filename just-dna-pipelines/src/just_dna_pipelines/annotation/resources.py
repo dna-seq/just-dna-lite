@@ -14,6 +14,7 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 import requests
+from just_dna_enricher.locations import default_ensembl_cache_dir
 from platformdirs import user_cache_dir
 
 from just_dna_pipelines.module_config import DefaultSample, get_immutable_config
@@ -79,22 +80,15 @@ def get_workspace_root() -> Path:
 
 
 def get_default_ensembl_cache_dir() -> Path:
-    """Get the default cache directory for ensembl_variations.
+    """The Ensembl snapshot directory: just-dna-enricher's ``ensembl`` lane, created if absent.
 
-    Layout after downloading via fsspec::
-
-        {cache_dir}/ensembl_variations/data/homo_sapiens-chr1.parquet
-        {cache_dir}/ensembl_variations/data/homo_sapiens-chr2.parquet
-        ...
-
-    The directory is created automatically if it does not exist yet.
+    Since format 0.8 the enricher owns this directory (``just-dna-seq/ensembl_variations_split``,
+    its ``manifest.json`` and pull record), so the path is the enricher's answer rather than our
+    own rebuild of it: ``$JUST_DNA_ENSEMBL_CACHE``, else ``$JUST_DNA_PIPELINES_CACHE_DIR/
+    ensembl_variations``, else the platformdirs default. ``.env`` was loaded at import above, so the
+    enricher's own dotenv walk stays off.
     """
-    env_cache = os.getenv("JUST_DNA_PIPELINES_CACHE_DIR")
-    if env_cache:
-        cache_dir = Path(env_cache) / "ensembl_variations"
-    else:
-        user_cache_path = Path(user_cache_dir(appname="just-dna-pipelines"))
-        cache_dir = user_cache_path / "ensembl_variations"
+    cache_dir = default_ensembl_cache_dir(load_dotenv_file=False)
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

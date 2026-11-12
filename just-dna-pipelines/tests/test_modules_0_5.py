@@ -121,8 +121,8 @@ class TestModulesConfigMerge:
         assert urls == ["just-dna-seq/annotators", "/data/registered_modules"]
 
     def test_other_keys_take_the_working_value(self) -> None:
-        merged = _merge_config({"ensembl_source": {"repo_id": "a"}}, {"ensembl_source": {"repo_id": "b"}})
-        assert merged["ensembl_source"] == {"repo_id": "b"}
+        merged = _merge_config({"quality_filters": {"min_depth": 5}}, {"quality_filters": {"min_depth": 10}})
+        assert merged["quality_filters"] == {"min_depth": 10}
 
 
 class TestProjectRelativeSources:

@@ -10,29 +10,16 @@ dependencies = [
   "webui",
   "pyyaml>=6.0.3",
   "pydantic>=2.13.4",
-  "dagster-dg-cli>=1.13.17",
+  "dagster-dg-cli>=1.13.28",
   "just-prs>=0.11.0",
   # The catalog client. `version.contract_compatible` compares the installed `just-dna-format`
   # on client and server and treats a 0.x minor as breaking, so this floor moves with the format
-  # floor in just-dna-pipelines/pyproject.toml, never alone. 0.25.0 is the format-0.7 cut; 0.27.0
-  # (2026-09-27) adopts upstream v0.7.3 (format 0.7.1, compiler 0.7.2, enricher 0.7.3) — all patch,
-  # not-load-bearing floors, no symbol we import moved. Its one client change is additive:
-  # `RegistryClient.publish` gains an opt-in `pack=` (send a compressed spec archive) that needs a
-  # 0.27 server; we do not pass it, so a 0.27 client against an older server is unaffected. The
-  # format minor is still 0.7, so `contract_compatible` sees no gap: a registry patch behind the
-  # client is not a contract gap, only the format minor is. Every client symbol we use is unchanged
-  # since 0.18 (`RegistryClient`, `RegistryError`, `VersionMismatchError`, `generate_install_id`,
-  # `validate_install_id`, `client_cli.app`). Never point a dependency at a directory outside this
-  # repo. Verify what is deployed before assuming either way:
+  # floor in just-dna-pipelines/pyproject.toml, never alone. 0.28 is the format-0.8 cut; 0.30.0
+  # (2026-11-11) floors format 0.8.4. Client changes since 0.27 are additive (`publish(recover_within=)`,
+  # `list_modules(clin_sig=)`, `rename_namespace`, `lane_rows`); every symbol we import is unchanged.
+  # Never point a dependency at a directory outside this repo. Verify what is deployed:
   #   curl -s $REGISTRY_URL/api/v1/version
-  "just-dna-registry>=0.27.0",
-  # grpcio-health-checking 1.82.0 ships _pb2 gencode built against protobuf 7.35.0,
-  # but dagster still caps protobuf<7 — the resolved protobuf 6.x runtime is then older than
-  # the gencode and dagster fails to import (VersionError in health_pb2). Dagster 1.13.13
-  # added the same <1.82 cap; keep it at the workspace root so uv cannot float grpcio
-  # independently. 1.81.1 is the last release built against protobuf 6.x gencode.
-  "grpcio-health-checking<1.82",
-  "grpcio<1.82",
+  "just-dna-registry>=0.30.0",
 ]
 
 [tool.uv.sources]
@@ -64,6 +51,17 @@ manuscript = "just_dna_lite.manuscript.cli:app"
 
 [tool.uv.workspace]
 members = ["just-dna-pipelines", "webui"]
+
+[tool.uv]
+reinstall-package = ["just-dna-lite", "just-dna-pipelines", "webui"]
+# TEMPORARY, the workspace's only override. just-dna-enricher 0.8.4 floors `tenacity>=9.2.1`
+# (upstream RM371: 9.2.1 is the first release with `multiplier`), and every google-genai release
+# through 3.2.0 caps `tenacity<9.2.0`, so the trio cannot resolve beside agno's Gemini model.
+# google-genai uses only `stop_after_attempt`, `retry_if_exception`, `wait_exponential_jitter`,
+# `before_sleep_log` and `(Async)Retrying`, all unchanged in 9.2.1. Filed upstream as
+# just-dna-compiler S149 -> RM436 (a shim on main, due in 0.8.5); remove this block once the
+# enricher accepts a tenacity google-genai allows, or google-genai lifts its cap.
+override-dependencies = ["tenacity>=9.2.1"]
 
 [build-system]
 requires = ["uv-build"]

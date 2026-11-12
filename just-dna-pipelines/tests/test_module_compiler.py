@@ -420,6 +420,15 @@ class TestResolver:
             assert v.start == gt["start"], f"{v.rsid}: start {v.start} != {gt['start']}"
             assert v.ref == gt["ref"], f"{v.rsid}: ref {v.ref} != {gt['ref']}"
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "upstream S151 -> RM438 (patch due): the enricher's position->rsID back-fill keys on "
+            "(chrom, start, ref) and keeps the first id in string order, so dbSNP 157's insertion "
+            "rs2517910443 at CYP2D6*4 "
+            "(22:42128945 C>CGGG...) takes rs3892097's place; the row's genotype is not consulted"
+        ),
+    )
     def test_position_to_rsid(self, ensembl_db_path: Path) -> None:
         """Known CYP positions must resolve back to their rsids."""
         variants = [

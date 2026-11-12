@@ -38,14 +38,6 @@ from just_dna_lite.process import (
 from just_dna_pipelines.annotation.cli_annotate import annotate as annotate_cmd
 from just_dna_pipelines.annotation.cli_annotate import annotate_main
 from just_dna_pipelines.annotation.hard_regions import HARD_REGIONS_DESCRIPTION, ensure_hard_regions
-from just_dna_pipelines.annotation.ensembl_download import (
-    EnsemblDownloadError,
-    download_ensembl_cache,
-    fetch_ensembl_manifest,
-    file_is_valid,
-    resolve_ensembl_cache_root,
-    sha256_file,
-)
 from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
@@ -53,10 +45,14 @@ from just_dna_pipelines.annotation.module_cache import (
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
-from just_dna_pipelines.enricher_cli import enricher_app
+from just_dna_enricher.cli import app as enricher_app
 from just_dna_pipelines.lite_mcp.server import DEFAULT_HTTP_PORT as DEFAULT_MCP_PORT
 from just_dna_pipelines.lite_mcp.server import serve as mcp_serve
 from just_dna_enricher.caches import CACHE_LANES, prepare_caches
+from just_dna_enricher.download import ensure_snapshot
+from just_dna_enricher.locations import ensembl_release_label
+from just_dna_enricher.resolver import EnsemblReferenceError
+from just_dna_pipelines.annotation.resources import get_default_ensembl_cache_dir
 from just_dna_registry.client_cli import app as registry_client_app
 from just_dna_lite.registry_org_cli import app as registry_org_app
 
@@ -77,8 +73,6 @@ app.add_typer(agent_app, name="agent")
 # consumes with no reference and no network — the replacement for injecting an Ensembl
 # DuckDB, which just-dna-compiler deprecates for removal at 1.0. Mounting the app whole
 # means new enricher commands surface here without further wiring.
-# `enricher_app` is a stub with one `status` command when the enricher CLI cannot be imported
-# here (protobuf gencode/runtime mismatch, S107) — see `just_dna_pipelines.enricher_cli`.
 app.add_typer(enricher_app, name="enrich")
 # Registry reference client (list/download/publish/import-module/find-by-hash/
 # update-module-version). Reads REGISTRY_URL / REGISTRY_TOKEN from flags, env, or .env.
@@ -518,13 +512,11 @@ def start_all(
         raise typer.Exit(exit_code)
 
 
-# Ensembl download logic is centralized in just_dna_pipelines.annotation.ensembl_download
-# (single source of truth, shared with the just_dna_pipelines CLI). These are thin aliases so the
-# other ensembl commands in this file (verify-ensembl, ensembl-setup) keep their call sites.
-_resolve_ensembl_cache = resolve_ensembl_cache_root
-_fetch_ensembl_manifest = fetch_ensembl_manifest
-_sha256_file = sha256_file
-_file_is_valid = file_is_valid
+def _ensembl_lane_dir(cache_dir: Optional[str]) -> Path:
+    """The Ensembl snapshot directory: ``<cache_dir>/ensembl_variations`` when given, else the lane's."""
+    if cache_dir:
+        return Path(cache_dir) / "ensembl_variations"
+    return get_default_ensembl_cache_dir()
 
 
 @app.command("prepare-caches")
@@ -541,15 +533,15 @@ def prepare_caches_cmd(
     ),
 ) -> None:
     """
-    Provision every enricher reference cache this machine can have (enricher 0.7, RM176).
+    Provision every enricher reference cache this machine can have, plus our GIAB mask.
 
-    Pulls the published snapshots and builds the lanes that are unpublished for recorded reasons;
-    a lane that is already present is left alone, so this is safe to run on every deploy. This is
-    `just-dna-enricher cache prepare` through its Python API (`caches.prepare_caches`), offered
-    here because the enricher's own command line cannot be imported beside dagster's protobuf
-    pin (see `pipelines enrich status`). `cache pull` is the wrong command now: it fetches only
-    what is published and stops, so a deployment that only pulled ran with several caches absent
-    and the checks reading them skipping themselves.
+    `just-dna-enricher cache prepare` (`caches.prepare_caches`) with two things it lacks: `.env`
+    is loaded through our bounded `load_env()` before any lane resolves its directory, and the
+    GIAB hard-regions mask restoration reads is provisioned beside the lanes. It pulls the
+    published snapshots, follows a newer published release of a pulled lane (RM420), and builds
+    the lanes that are unpublished for recorded reasons, so it is safe on every deploy. The
+    Ensembl snapshot is the `ensembl` lane (`--lane ensembl`); `pipelines enrich cache status`
+    says which release each lane holds.
 
     Exit 1 if any lane failed. A lane that cannot run unattended (an operator-held workbook, a
     personal key) is reported as such and is not a failure.
@@ -609,136 +601,6 @@ def prepare_caches_cmd(
         raise typer.Exit(1)
 
 
-@app.command("download-ensembl")
-def download_ensembl(
-    repo_id: str = typer.Option(
-        "just-dna-seq/ensembl_variations",
-        "--repo", "-r",
-        help="HuggingFace dataset repo ID.",
-    ),
-    cache_dir: Optional[str] = typer.Option(
-        None,
-        "--cache-dir", "-c",
-        help="Override cache directory. Defaults to JUST_DNA_PIPELINES_CACHE_DIR env var "
-             "or ~/.cache/just-dna-pipelines.",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force", "-f",
-        help="Force re-download even if files pass SHA256 validation.",
-    ),
-) -> None:
-    """
-    Download Ensembl variation annotations from HuggingFace to the local cache.
-
-    Files are saved to:
-      {cache_dir}/ensembl_variations/data/
-
-    Each file is validated by SHA256 (from HF LFS metadata). Already-valid files
-    are skipped.
-
-    The destination is read from JUST_DNA_PIPELINES_CACHE_DIR (or
-    ~/.cache/just-dna-pipelines if not set). Pass --cache-dir to override.
-
-    Examples:
-
-        uv run pipelines download-ensembl
-        uv run pipelines download-ensembl --force
-        uv run pipelines download-ensembl --cache-dir /data/my-cache
-    """
-    try:
-        download_ensembl_cache(repo_id=repo_id, cache_dir=cache_dir, force=force)
-    except EnsemblDownloadError as exc:
-        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-
-
-@app.command("verify-ensembl")
-def verify_ensembl(
-    repo_id: str = typer.Option(
-        "just-dna-seq/ensembl_variations",
-        "--repo", "-r",
-        help="HuggingFace dataset repo ID to check against.",
-    ),
-    cache_dir: Optional[str] = typer.Option(
-        None,
-        "--cache-dir", "-c",
-        help="Override cache directory.",
-    ),
-) -> None:
-    """
-    Verify the local Ensembl cache against the remote SHA256 checksums.
-
-    Reports missing, incomplete, and corrupted files without downloading anything.
-    Exit code 1 if any file fails; 0 if the cache is fully intact.
-
-    Example:
-
-        uv run pipelines verify-ensembl
-    """
-    from huggingface_hub import get_token
-    from rich.console import Console as RichConsole
-    from rich.progress import Progress, SpinnerColumn, TextColumn, MofNCompleteColumn
-
-    rich = RichConsole()
-    resolved_cache = _resolve_ensembl_cache(cache_dir)
-    target_dir = resolved_cache / "ensembl_variations" / "data"
-
-    rich.print(f"\n[bold]Ensembl Cache Verifier[/bold]")
-    rich.print(f"  Path : [cyan]{target_dir}[/cyan]\n")
-
-    token = get_token()
-    rich.print("[dim]Fetching remote manifest…[/dim]")
-    manifest = _fetch_ensembl_manifest(repo_id, token)
-    if not manifest:
-        rich.print(f"[red]Error: no parquet files found in repo {repo_id}[/red]")
-        raise typer.Exit(1)
-
-    missing: list[str] = []
-    wrong_size: list[str] = []
-    bad_sha256: list[str] = []
-    ok: list[str] = []
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        MofNCompleteColumn(),
-        console=rich,
-    ) as progress:
-        task = progress.add_task("Verifying files…", total=len(manifest))
-        for filename, (expected_size, expected_sha256) in manifest.items():
-            path = target_dir / filename
-            progress.update(task, description=f"[dim]{filename}[/dim]", advance=1)
-            if not path.exists():
-                missing.append(filename)
-            elif path.stat().st_size != expected_size:
-                wrong_size.append(f"{filename}  (local {path.stat().st_size} B ≠ remote {expected_size} B)")
-            elif _sha256_file(path) != expected_sha256:
-                bad_sha256.append(filename)
-            else:
-                ok.append(filename)
-
-    rich.print(f"\n[green]✓ OK        : {len(ok)}/{len(manifest)}[/green]")
-    if missing:
-        rich.print(f"[yellow]  Missing   : {len(missing)}[/yellow]")
-        for f in missing:
-            rich.print(f"    • {f}")
-    if wrong_size:
-        rich.print(f"[red]  Wrong size: {len(wrong_size)}[/red]")
-        for f in wrong_size:
-            rich.print(f"    • {f}")
-    if bad_sha256:
-        rich.print(f"[red]  Bad SHA256: {len(bad_sha256)}[/red]")
-        for f in bad_sha256:
-            rich.print(f"    • {f}")
-
-    if missing or wrong_size or bad_sha256:
-        rich.print("\n[dim]Run [bold]uv run pipelines download-ensembl[/bold] to repair.[/dim]\n")
-        raise typer.Exit(1)
-
-    rich.print("\n[bold green]Cache is fully intact.[/bold green]\n")
-
-
 @app.command("build-duckdb")
 def build_duckdb(
     cache_dir: Optional[str] = typer.Option(
@@ -759,8 +621,8 @@ def build_duckdb(
     Creates lightweight VIEWs over the parquet files — no data is copied,
     so the database is tiny and queries stream directly from parquet.
 
-    Requires the Ensembl parquet cache to already be downloaded
-    (run ``uv run pipelines download-ensembl`` first).
+    Requires the Ensembl snapshot to be present
+    (``uv run pipelines prepare-caches --lane ensembl``, or ``ensembl-setup``).
 
     Examples:
 
@@ -777,15 +639,14 @@ def build_duckdb(
     rich = RichConsole()
     logger = logging.getLogger("just_dna_pipelines.cli")
 
-    resolved_cache = _resolve_ensembl_cache(cache_dir)
-    ensembl_dir = resolved_cache / "ensembl_variations"
+    ensembl_dir = _ensembl_lane_dir(cache_dir)
     data_dir = ensembl_dir / "data"
     duckdb_path = ensembl_dir / "ensembl_variations.duckdb"
 
     if not data_dir.exists() or not any(data_dir.glob("*.parquet")):
         rich.print(
             f"[red]Error: Ensembl parquet cache not found at {data_dir}[/red]\n"
-            "[dim]Run [bold]uv run pipelines download-ensembl[/bold] first.[/dim]"
+            "[dim]Run [bold]uv run pipelines prepare-caches --lane ensembl[/bold] first.[/dim]"
         )
         raise typer.Exit(1)
 
@@ -819,11 +680,6 @@ def build_duckdb(
 
 @app.command("ensembl-setup")
 def ensembl_setup(
-    repo_id: str = typer.Option(
-        "just-dna-seq/ensembl_variations",
-        "--repo", "-r",
-        help="HuggingFace dataset repo ID.",
-    ),
     cache_dir: Optional[str] = typer.Option(
         None,
         "--cache-dir", "-c",
@@ -833,20 +689,20 @@ def ensembl_setup(
     force: bool = typer.Option(
         False,
         "--force", "-f",
-        help="Force re-download and rebuild.",
+        help="Rebuild the DuckDB even if one exists.",
     ),
 ) -> None:
     """
-    Full Ensembl setup: download parquet, verify integrity, build DuckDB.
+    Full Ensembl setup: provision the snapshot, then build the DuckDB over it.
 
-    One-stop command for bootstrapping the Ensembl annotation cache from
-    scratch. Runs three steps in sequence:
+      1. the enricher's `ensembl` lane (`download.ensure_snapshot`) pulls
+         just-dna-seq/ensembl_variations_split, keeping a file only where the
+         snapshot's manifest.json attests it, and refetching a truncated one
+      2. build-duckdb creates the DuckDB catalog over the parquet
 
-      1. download-ensembl  — fetch parquet files from HuggingFace
-      2. verify-ensembl    — confirm all files match remote SHA256
-      3. build-duckdb      — create the DuckDB catalog over the parquet
-
-    Already-complete steps are skipped automatically (use --force to redo).
+    The snapshot is the enricher's: `uv run pipelines enrich cache status` says which
+    release it holds, and `uv run pipelines enrich cache pull --only ensembl` follows
+    a newer one. --force rebuilds the DuckDB.
 
     Examples:
 
@@ -862,27 +718,17 @@ def ensembl_setup(
 
     rich = RichConsole()
     logger = logging.getLogger("just_dna_pipelines.cli")
+    ensembl_dir = _ensembl_lane_dir(cache_dir)
 
-    # ── Step 1: Download ──────────────────────────────────────────────────────
-    rich.print("[bold]Step 1/3: Download Ensembl parquet files[/bold]\n")
-    download_ensembl(
-        repo_id=repo_id,
-        cache_dir=cache_dir,
-        force=force,
-    )
+    rich.print("[bold]Step 1/2: Provision the Ensembl snapshot[/bold]\n")
+    try:
+        ensure_snapshot(ensembl_dir)
+    except EnsemblReferenceError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    rich.print(f"  {ensembl_dir}: {ensembl_release_label(ensembl_dir) or 'release not stated'}")
 
-    # ── Step 2: Verify ────────────────────────────────────────────────────────
-    rich.print("\n[bold]Step 2/3: Verify cache integrity[/bold]\n")
-    verify_ensembl(
-        repo_id=repo_id,
-        cache_dir=cache_dir,
-    )
-
-    # ── Step 3: Build DuckDB ──────────────────────────────────────────────────
-    rich.print(f"\n[bold]Step 3/3: Build DuckDB[/bold]\n")
-
-    resolved_cache = _resolve_ensembl_cache(cache_dir)
-    ensembl_dir = resolved_cache / "ensembl_variations"
+    rich.print(f"\n[bold]Step 2/2: Build DuckDB[/bold]\n")
     duckdb_path = ensembl_dir / "ensembl_variations.duckdb"
 
     if duckdb_path.exists() and not force:

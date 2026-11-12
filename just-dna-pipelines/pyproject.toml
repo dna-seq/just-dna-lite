@@ -12,40 +12,24 @@ dependencies = [
     # stat-field fix). The `[mcp]` extra below carries the floor now; see that comment.
     "aiohttp>=3.14.3",
     "anthropic>=0.121.0",
-    "dagster>=1.13.17",
-    "dagster-duckdb>=0.29.17",
-    "dagster-webserver>=1.13.17",
+    "dagster>=1.13.28",
+    "dagster-duckdb>=0.29.28",
+    "dagster-webserver>=1.13.28",
     "eliot>=1.18.0",
     "fsspec>=2026.7.0",
     "google-genai>=1.75.0,<2.0",
     "huggingface-hub>=1.27.0",
-    # The 0.7 line (adopted 2026-09-21): format 0.7.0, compiler and enricher 0.7.1 — a partial cut,
-    # the shape 0.6.3/0.6.4 used. The compiler moves with the enricher because enricher 0.7.1
-    # imports `just_dna_compiler.resolution_findings`, added after v0.7.0 was tagged; a 0.7.0
-    # compiler beside a 0.7.1 enricher is a ModuleNotFoundError in a clean venv. The three floors
-    # move together with the registry floor at the workspace root (`contract_compatible` treats a
-    # 0.x format minor as breaking). See CLAUDE.md § "What 0.7 changed on our side".
-    # v0.7.3 (2026-09-27) moves all three by a patch: format 0.7.1, compiler 0.7.2, enricher 0.7.3.
-    # A derivation-only patch — nothing adds a field, table, parameter, public function or warning
-    # code, and the sweep gate over the 16 reference modules moved nothing on any axis
-    # (content_signature, manifest fields, parquet bytes/schema, warnings), so no compiled module
-    # needs recompiling for the compiler's sake. The enricher corrections (RM268 live-REST indel
-    # anchoring, RM271 non-base alleles, RM273/RM274 indel spelling, RM277 stale literature pins)
-    # reach a module only by re-running `just-dna-enricher enrich <spec> --rederive`; a v1-port
-    # rebuild is the maintainer's call. The intra-workspace floors move together (compiler needs
-    # format >=0.7.1; enricher needs format >=0.7.1 and compiler >=0.7.2).
-    #
-    # The S107 fix from enricher 0.7.2 (2026-09-25, RM254) still holds and still matters: the Atlas
-    # gencode's `protobuf.runtime_version.VersionError` is neither ImportError nor RuntimeError, so
-    # the RM247 guards let it through and every enricher command died at import beside dagster's
-    # `protobuf<7`. 0.7.2 bound `atlas_protos.ATLAS_IMPORT_FAILURES = (ImportError, RuntimeError,
-    # VersionError)` and moved the `protobuf>=7.35.1` floor onto the `[atlas]` extra. 0.7.3 keeps
-    # that split (verified: `uv pip show just-dna-enricher` lists no protobuf floor), so the bare
-    # `just-dna-enricher` we depend on (no extra; the lock pulls no atlas/alphagenome dep) imports
-    # cleanly, and only an install that asks for `[atlas]` fails to resolve rather than crashing.
-    "just-dna-compiler>=0.7.2",
-    "just-dna-enricher>=0.7.3",
-    "just-dna-format>=0.7.1",
+    # The 0.8 line (adopted 2026-11-12, cut 0.8.0 on 2026-11-05, current patch 0.8.4): all three
+    # floor at 0.8.4 and move together with the registry floor at the workspace root
+    # (`contract_compatible` treats a 0.x format minor as breaking; both registries serve 0.8.4).
+    # What 0.8 changed for us: upstream docs/INTEGRATION_0_8.md (just-dna-compiler) § 3, and
+    # CLAUDE.md § "Shared format libraries". A 0.7 reader refuses every 0.8-written verification
+    # block, so this pin is what lets us read modules the registry now publishes. The enricher's
+    # `ensembl` lane (`just-dna-seq/ensembl_variations_split`) is the only Ensembl downloader here.
+    # The bare `just-dna-enricher` (no `[atlas]` extra) still pulls no protobuf floor.
+    "just-dna-compiler>=0.8.4",
+    "just-dna-enricher>=0.8.4",
+    "just-dna-format>=0.8.4",
     # agno 3.x imports the mcp 2.x names (`MCPError`, `streamable_http_client`) and `fastmcp`,
     # all declared only under its `[mcp]` extra. Depend on the extra rather than re-listing its
     # members: the 2026-09 relock floated agno to 3.0.10 against a bare `mcp<2.0` cap here, and
@@ -55,7 +39,8 @@ dependencies = [
     "numpy>=2.5.2",
     "openai>=3.0.0",
     "pillow>=12.3.0",
-    "polars-bio>=0.35.1",
+    "polars>=2.1.0",
+    "polars-bio>=0.37.0",
     "pooch>=1.9.0",
     "psutil>=7.2.2",
     "pycomfort>=0.0.18",

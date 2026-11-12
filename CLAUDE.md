@@ -29,21 +29,29 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 
 ## Dependency pins
 
-- The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.10.0` in
-  `webui/pyproject.toml`. Everything else floats on `>=`. No `constraint-dependencies` or
-  `override-dependencies` exist anywhere.
-- Deliberate ceilings: `grpcio<1.82` and `grpcio-health-checking<1.82` in lockstep (1.82 gencode needs
-  protobuf 7.35, dagster caps `protobuf<7`); `google-genai<2.0`; `requires-python >=3.13,<3.14`.
+- The **only** `==` pin in the workspace (including sibling repos) is `reflex==0.11.0` in
+  `webui/pyproject.toml`. Everything else floats on `>=`. No `constraint-dependencies` exist.
+- **One temporary override**, in the root `pyproject.toml` `[tool.uv]` (not a `uv.toml`: uv ignores a
+  `uv.toml` override for a workspace): `tenacity>=9.2.1`. Enricher 0.8.4 floors it (RM371) and every
+  google-genai release through 3.2.0 caps `tenacity<9.2.0`. Filed upstream as just-dna-compiler **S149** → **RM436**
+  (a shim built on main, blocking 0.8.5); remove the override once 0.8.5 is out. A plain `uv lock --upgrade` without it kept enricher 0.7.3 beside
+  format 0.8.4, silently.
+- Deliberate ceilings: `google-genai<2.0`; `requires-python >=3.13,<3.14`. The old `grpcio<1.82` cap is
+  gone: dagster 1.13.28 allows `protobuf<8` (it excludes only grpcio-health-checking 1.82.0), so grpcio
+  1.85 and protobuf 7 resolve and dagster imports. Keep the dagster floors at `>=1.13.28` for that.
 - `agno[mcp]>=3.0.10`: agno 3 imports the mcp 2.x names, so depend on its extra; never re-add a bare
   `mcp<2.0` cap.
-- Format libs: `just-dna-format>=0.7.1`, `just-dna-compiler>=0.7.2`, `just-dna-enricher>=0.7.3` (the
-  `v0.7.3` cut, 2026-09-27; a derivation-only patch, no field/table/parameter/warning code moved, no
-  compiled module needs recompiling — corrections reach a module only via `enrich --rederive`).
-  `just-dna-registry>=0.27.0` **moves with the format pin**: `contract_compatible` treats a `0.x`
-  format minor as breaking on either side, so a mismatched pair refuses to publish with no obvious
-  cause. The format minor is still `0.7`, so this bump is not contract-forced; 0.27.0's only client
-  change is an opt-in `RegistryClient.publish(pack=…)` needing a 0.27 server, which we do not pass.
-  Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
+- **Polars 2** (`polars>=2.1.0`, `polars-bio>=0.37.0`, which lifted polars-bio's `<2` cap). Lazy
+  `collect()` now runs the streaming engine, which does not keep row order through joins, group-bys or
+  unpivots: sort, or pass `maintain_order`, wherever order matters. `explode` defaults to
+  `empty_as_null=False` (always pass it), horizontal `concat` requires equal heights, `read_csv` keeps the
+  requested `columns=` order. Upgrade guide: polars `docs/source/releases/upgrade/2.md`. Our polars now
+  matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
+- Format libs: `just-dna-format/compiler/enricher>=0.8.4` (the 0.8 line, cut 2026-11-05; upstream
+  `docs/INTEGRATION_0_8.md` is the adoption guide). `just-dna-registry>=0.30.0` **moves with the format
+  pin**: `contract_compatible` treats a `0.x` format minor as breaking on either side, so a mismatched
+  pair refuses to publish with no obvious cause; both registries serve format 0.8.4. Registry client
+  changes since 0.27 are additive. Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
 - **Upgrading reflex does not upgrade `reflex-components-*`.** Upgrade them explicitly, then compare
   `uv pip list | grep reflex` with the release notes:
   `uv lock --upgrade-package reflex-components-core --upgrade-package reflex-components-radix && uv sync`.
@@ -77,9 +85,8 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
 ## Module configuration (`modules.yaml`)
 
 `modules.yaml` lists module **sources** (any fsspec URL), optional **display metadata** (`title`,
-`description`, `icon`, `color`, `report_title`), the **Ensembl reference** (`ensembl_source.repo_id`),
-`quality_filters`, `registries` and `immutable_mode`. Modules are always auto-discovered; unlisted ones
-get generated defaults.
+`description`, `icon`, `color`, `report_title`), `quality_filters`, `registries` and `immutable_mode`.
+Modules are always auto-discovered; unlisted ones get generated defaults.
 
 - **Layering**: the git-tracked repo-root file holds defaults (bundled fallback:
   `just-dna-pipelines/src/just_dna_pipelines/modules.yaml`). Runtime writes go to the gitignored working
@@ -99,7 +106,9 @@ get generated defaults.
   the repo-local sources whenever `JUST_DNA_PIPELINES_OUTPUT_DIR` is set, and any test module's
   `load_env()` sets it session-wide.
 - Never hardcode module lists, metadata, HF repo URLs or the Ensembl repo id: use `get_module_meta()`,
-  `build_module_metadata_dict()`, `MODULES_CONFIG.sources`, `MODULES_CONFIG.ensembl_source.repo_id`.
+  `build_module_metadata_dict()`, `MODULES_CONFIG.sources`, and for Ensembl the enricher's
+  `locations.SNAPSHOT_REPO_IDS["ensembl"]` (`annotation.assets.ENSEMBL_REPO_ID`). `ensembl_source:` is gone
+  from `modules.yaml` (a working copy that still has it loads; the key is ignored).
 - Source URL forms: `org/repo` or `hf://datasets/org/repo`, `github://org/repo`, `https://…`, `s3://…`,
   `gcs://…`. A lead table at the root means a single module; subfolders with one mean a collection;
   override with `kind: module|collection`.
@@ -166,9 +175,11 @@ does not call it.
 - `just_dna_compiler`: import from **`just_dna_compiler.compiler`** (`validate_spec`, `compile_module`,
   `reverse_module`); the package root exports nothing. `resolution` is table-injected only.
 - `just_dna_enricher`: enrichment and the DuckDB Ensembl `resolver` (`resolve_variants`,
-  `EnsemblReferenceError`). Inject-only: it never downloads a reference.
+  `EnsemblReferenceError`), inject-only, and its snapshot lanes (`download.ensure_snapshot`,
+  `caches.prepare_caches`), which own the cache directories. The Ensembl cache is its `ensembl` lane.
 - `just_dna_pipelines.module_compiler` is a re-export shim; import from the libs in new code. The one
-  local piece is `module_compiler/resolver.py::ensure_resolver_db` (HF download + DuckDB build), which
+  local piece is `module_compiler/resolver.py::ensure_resolver_db` (the lane's `ensure_snapshot`, then our
+  DuckDB view), which
   `register_custom_module` and the pipelines `resolve_variants` wrapper use to auto-provision.
 - **Filing upstream**: never edit or commit the
   [just-dna-compiler](https://github.com/dna-seq/just-dna-compiler) repo (renamed from `just-dna-format`;
@@ -183,9 +194,9 @@ does not call it.
 - **Versioning**: a new optional column is a minor. `artifact.digest` moves on every recompile across a
   version boundary; `content_signature` (authored identity) does not. Re-pin anything that caches a
   digest; keying on `content_signature` needs nothing. We cache neither. 1.0 will remove `state`.
-- **Three artifact generations are live**: 0.3 on HuggingFace, 0.5 (backup at
-  `data/interim/v1_port_0_5/`, gitignored) and 0.7 (the rebuilt `data/interim/v1_port/`). Every read path
-  must handle all three; classify by the columns and values present, never by family name or era.
+- **Four artifact generations are live**: 0.3 on HuggingFace, 0.5 (backup at
+  `data/interim/v1_port_0_5/`, gitignored), 0.7 (the rebuilt `data/interim/v1_port/`) and 0.8 (whatever the
+  0.8 compiler writes, which both registries now run). Every read path must handle all four; classify by the columns and values present, never by family name or era.
 - `variant_key` is the authored identity: the rsid for rsid-authored rows, a `ga4gh:VA.…` id for a
   coordinate-authored SNV, else `chrom:start:ref[:alts]`. Per-ALT VRS ids for rsid modules are in
   `resolution.csv`. `ModuleInfo.version` is a SemVer **string**.
@@ -234,11 +245,20 @@ does not call it.
   `compile_module(spec, out, resolve_with_ensembl=True, ensembl_cache=None)`.
 - **`load_env()` before the first `resolve_*_reference()` in a process**, or the first default cache dir
   resolves from platformdirs and returns `None`.
-- **Provision caches with `uv run pipelines prepare-caches`** (`caches.prepare_caches`), never
-  `just-dna-enricher cache pull` (removed upstream; pulled only published lanes, to the wrong dir).
-- `just_dna_pipelines.enricher_cli` mounts `just_dna_enricher.cli` behind a guarded import (it failed
-  beside dagster's protobuf before enricher 0.7.2). Do not import `just_dna_enricher.cli` anywhere else.
-  `just_dna_lite.cli` owns the installed script.
+- **Provision caches with `uv run pipelines prepare-caches`** (`caches.prepare_caches` after our bounded
+  `load_env()`, plus the GIAB mask). The enricher's own commands are mounted whole as `pipelines enrich`
+  (`enrich cache status`, `enrich cache pull --only ensembl`); run them through `pipelines`, not the bare
+  `just-dna-enricher` script, so `.env` is ours.
+- `pipelines enrich` imports `just_dna_enricher.cli` directly. The guarded import and its stub
+  (`enricher_cli.py`, S107) are gone: they existed because dagster capped `protobuf<7` below the Atlas
+  gencode, and protobuf 7 now resolves. `just_dna_lite.cli` owns the installed script.
+- **Our own Ensembl downloader is gone** (`annotation/ensembl_download.py`, `download-ensembl`,
+  `verify-ensembl`). It wrote `just-dna-seq/ensembl_variations` into the directory the enricher's lane owns;
+  after the enricher pulled the split repo, that leaves a cache it reads as mixing releases and resolves
+  nothing (INTEGRATION_0_8 § 1.29). `ensembl_annotations`, `ensure_resolver_db` and `ensembl-setup` all
+  call `ensure_snapshot`. The split core carries `chrom, start, ref, alt, id, row_idx`, one row per ALT;
+  its `groups/` sidecars (consequence, ClinVar, frequencies) are not pulled (upstream **S150** → **RM437**, 0.9), so
+  the Ensembl join adds rsIDs only. Do not describe its output as annotation until that lands.
 - `draft_gene_panel` aborts on ClinVar's malformed 9-digit PMIDs; `v1_port/clinvar_panel.py` passes
   `max_citations=0` and drafts its own filtered `studies.csv`.
 - Since format 0.6 the compiler places `pharm_variants` / `haplotypes` / `heteroplasmy` from
@@ -556,11 +576,11 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 - Validation via `@asset_check`, selected with `AssetSelection.checks_for_assets(...)`.
 - Dynamic partitions: discovery asset calls `context.instance.add_dynamic_partitions(PARTS.name, keys)`;
   partitioned assets read `context.partition_key`.
-- **Ensembl cache**: flat `ensembl_variations/data/homo_sapiens-chr*.parquet`, downloaded by
-  `annotation/ensembl_download.py`. `ensembl_annotations` verifies each file against HF size + SHA256
-  and re-downloads only mismatches (`.part` then replace; `<file>.sha256` stamps skip rehashing). Never
-  revert to "any parquet present, skip" (a damaged file caused `Out of buffer`). Readers glob
-  `*.parquet`, never the bare directory. `verify-ensembl` ignores the stamps and rehashes everything.
+- **Ensembl cache**: the enricher's `ensembl` lane, `ensembl_variations/data/homo_sapiens-chr*.parquet`
+  beside its `manifest.json` and pull record. `ensembl_annotations` calls `download.ensure_snapshot`, which
+  attests each file against the manifest and refetches a truncated one; never put a second downloader in
+  front of it (see "Our own Ensembl downloader is gone"). Readers glob `*.parquet`, never the bare
+  directory.
 - **polars-bio**: `scan_vcf` (0.23+) has no `thread_num`; `just_dna_pipelines.io.read_vcf_file` maps it
   to `concurrent_fetches`. Don't read PGEN with it (a hardcoded 512 MB `max_companion_bytes` cap refuses
   the PGS Catalog `.pvar.zst`, polars-bio#453); just-prs stays on `pgenlib`. `pb.write_vcf` writes
@@ -674,6 +694,14 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   use `State.__fields__["x"].set_default(…)`. `backend_vars` and
   `reflex_base.utils.types.is_backend_base_variable` are gone: `get_fields()` lists every var,
   `base_vars` only the ones that reach the client.
+- **Reflex 0.11**: `deploy_url` defaults to `None`, and in prod mode the backend then sends no CORS
+  headers and Socket.IO accepts only its own origin. `serve` exports `REFLEX_DEPLOY_URL` from
+  `DEPLOY_URL`/`PUBLIC_APP_URL` (an explicit one wins), because behind a TLS-terminating proxy the backend
+  sees `http://` while the browser sends `https://`. Read `config.frontend_url`, never `deploy_url`.
+  `@rx.event` returns an `EventHandler`: stack other decorators *below* it. A `set[T]` state var is a
+  `SetVar` (call `.to_array()` to index it). In dev, a handler blocking the loop over 0.2 s is named in a
+  warning; treat it as the "anything over ~1 s is background" rule firing early. `rx.foreach` warns on an
+  index-keyed item with `on_mount`/hooks: give it `key=`.
 - Fomantic: segments, buttons, labels, dividers, messages and `top attached tabular menu` +
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
   `ui fixed menu` and accordions don't: use flexbox. Checkboxes need the Fomantic

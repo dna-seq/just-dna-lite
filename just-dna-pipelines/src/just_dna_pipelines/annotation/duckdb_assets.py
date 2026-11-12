@@ -26,7 +26,7 @@ from just_dna_pipelines.annotation.resources import (
     get_ensembl_parquet_dir,
     ensure_vcf_in_user_input_dir,
 )
-from just_dna_pipelines.annotation.assets import user_vcf_partitions
+from just_dna_pipelines.annotation.assets import ENSEMBL_REPO_ID, user_vcf_partitions
 
 
 def configure_duckdb_for_memory_efficiency(con, config: Optional[DuckDBConfig] = None, logger=None):
@@ -203,7 +203,7 @@ def ensure_ensembl_duckdb_exists(logger = None) -> Path:
     },
     auto_materialize_policy=AutoMaterializePolicy.eager(),
     metadata={
-        "dataset": "just-dna-seq/ensembl_variations",
+        "dataset": ENSEMBL_REPO_ID,
         "storage": "cache",
         "format": "duckdb",
     }

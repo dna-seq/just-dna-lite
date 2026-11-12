@@ -314,21 +314,24 @@ export HF_TOKEN="your_token_here"
 
 ### Ensembl Reference Dataset
 
-The Ensembl variation reference is configured in `modules.yaml` under `ensembl_source:`:
+The Ensembl variation reference is just-dna-enricher's `ensembl` lane:
+`just-dna-seq/ensembl_variations_split` (dbSNP 157, VEP 116), named in code by
+`just_dna_enricher.locations.SNAPSHOT_REPO_IDS["ensembl"]` (`annotation.assets.ENSEMBL_REPO_ID`). It is
+not configurable in `modules.yaml`: since format 0.8 the enricher owns the directory, and a second
+downloader writing another repo's files into it leaves a cache the enricher reads as mixing releases and
+resolves nothing.
 
-```yaml
-ensembl_source:
-  repo_id: just-dna-seq/ensembl_variations
-```
+The `ensembl_annotations` asset calls `just_dna_enricher.download.ensure_snapshot`. That pull writes a
+pull record before the first download, keeps a file only where the snapshot's `manifest.json` attests it
+by size and SHA256, removes and refetches a truncated parquet, and re-pulls a cache whose record names
+the old `just-dna-seq/ensembl_variations` repo. A cache its pull record calls whole is trusted without the
+network. The asset records the repo and the snapshot's release (`ensembl_release_label`) as metadata.
+`uv run pipelines enrich cache status` shows the release on disk; `uv run pipelines enrich cache pull
+--only ensembl` follows a newer published one.
 
-The `ensembl_annotations` asset reads this config and downloads the parquet files directly into our local cache (no duplicate HuggingFace blob storage), through the same downloader as `uv run pipelines download-ensembl`. Change `repo_id` to use a different Ensembl dataset without touching any Python code.
-
-Every run checks each local file against the size and SHA256 HuggingFace publishes, re-downloads any that do not match (to a `.part` file, renamed only once it validates), and writes a `<file>.sha256` stamp so an unchanged file is hashed once, not on every run. The asset used to skip the download as soon as *any* parquet was present and wrote straight to the final name, so a partial or damaged file stayed in the cache and every Ensembl join then failed inside DuckDB (a Windows user saw `_duckdb.Error: Out of buffer`). When HuggingFace cannot be reached and a cache exists, the asset warns and uses it unchecked. `uv run pipelines verify-ensembl` always re-hashes, ignoring stamps.
-
-*   **Default Location**: `~/.cache/just-dna-pipelines/ensembl_variations/data/homo_sapiens-chr*.parquet`
-*   **Override**: Set `JUST_DNA_PIPELINES_CACHE_DIR`.
-*   **Layout**: Flat chromosome-split parquets under `data/`. No SNV/INDEL subdirs.
-*   **DuckDB catalog**: A single `ensembl_variations` VIEW is created over all parquet files.
+*   **Default Location**: `$JUST_DNA_ENSEMBL_CACHE`, else `$JUST_DNA_PIPELINES_CACHE_DIR/ensembl_variations/`, else the platform cache dir.
+*   **Layout**: the core, one row per ALT, in `data/homo_sapiens-chr*.parquet` (`chrom, start, ref, alt, id, row_idx`), beside `manifest.json` and `pull-record.json`. The snapshot's `groups/` sidecars (consequence, ClinVar, frequencies, predictors) are not pulled (upstream S150, RM437), so the Ensembl join adds rsIDs only.
+*   **DuckDB catalog**: A single `ensembl_variations` VIEW is created over the core parquet files.
 
 ---
 

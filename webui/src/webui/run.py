@@ -226,13 +226,20 @@ def serve() -> None:
         shutil.rmtree(web_dir)
         print("Removed stale .web build directory before production serve.", flush=True)
 
-    from webui.crawler_assets import generate_crawler_assets
     from webui.deployment_urls import persist_local_backend_api_url, resolve_configured_public_app_url
 
     app_url = resolve_configured_public_app_url()
     if app_url:
         os.environ["API_URL"] = app_url
+        # Reflex 0.11: in prod mode, with `deploy_url` unset, the backend sends no CORS headers and
+        # Socket.IO accepts only its own origin. Behind a proxy that terminates TLS the backend
+        # sees `http://<host>` while the browser sends `https://<host>`, so the event socket would
+        # be refused. Naming the public origin allows it; an explicit REFLEX_DEPLOY_URL wins.
+        os.environ.setdefault("REFLEX_DEPLOY_URL", app_url)
         print(f"Using fullstack public app URL for Reflex API: {app_url}", flush=True)
+
+    from webui.crawler_assets import generate_crawler_assets
+
     dagster_process = _start_dagster_for_serve()
     dagster_home = Path(os.environ["DAGSTER_HOME"]) if os.getenv("DAGSTER_HOME") else None
     atexit.register(

@@ -11,7 +11,7 @@ The file is searched in three locations (first found wins):
 
 All writes (register/unregister custom modules) go to the working copy.
 On first write the repo default is copied as the seed so settings like
-quality_filters and ensembl_source carry over.
+quality_filters and registries carry over.
 
 Modules are always auto-discovered from sources. This config only controls
 which sources to scan and how modules are displayed in the UI, CLI, and
@@ -235,15 +235,6 @@ class Source(BaseModel):
         return "file"
 
 
-class EnsemblSource(BaseModel):
-    """Ensembl variation reference dataset configuration.
-
-    Loaded from ``ensembl_source:`` in modules.yaml.
-    The ``repo_id`` must be a HuggingFace dataset (``org/repo``).
-    """
-    repo_id: str = "just-dna-seq/ensembl_variations"
-
-
 #: Where the public registry lives. The client, the CLI and ``scripts/registry_precheck.py`` all
 #: read ``$REGISTRY_URL``; this is only the fallback when nothing configures a store list.
 DEFAULT_REGISTRY_URL: str = "https://module-registry.just-dna.life"
@@ -318,7 +309,6 @@ class ModulesConfig(BaseModel):
     sources: list[Source] = [Source(url="just-dna-seq/annotators")]
     module_metadata: dict[str, ModuleMetadata] = {}
     quality_filters: QualityFilters = QualityFilters()
-    ensembl_source: EnsemblSource = EnsemblSource()
     immutable_mode: ImmutableModeConfig = ImmutableModeConfig()
     registries: list[RegistryStore] = [
         RegistryStore(
@@ -697,7 +687,7 @@ def save_config(config: ModulesConfig, path: Optional[Path] = None) -> None:
     """Persist a ModulesConfig to the working copy using a merge strategy.
 
     On first write the repo default is copied as the seed so that
-    quality_filters, ensembl_source, etc. are preserved.  Only the
+    quality_filters, registries, etc. are preserved.  Only the
     ``sources`` and ``module_metadata`` keys are patched.
 
     An existing working copy we cannot parse is **moved aside, not overwritten**, and the write

@@ -3,8 +3,8 @@ Ensembl rsid <-> position resolution for just-dna-pipelines.
 
 The rsid/position *lookup* logic lives in ``just-dna-enricher`` (``just_dna_enricher.resolver``),
 which is deliberately inject-only — it never downloads a reference. This module keeps the
-pipelines-specific *provisioning* the library omits: ``ensure_resolver_db`` builds the Ensembl
-DuckDB from the local parquet cache, downloading it from HuggingFace Hub if absent. ``resolve_variants``
+pipelines-specific step: ``ensure_resolver_db`` has the enricher's ``ensembl`` lane provision the
+parquet (``download.ensure_snapshot``) and builds our DuckDB view over it. ``resolve_variants``
 here provisions that DuckDB on demand and then delegates the actual lookup to the library, so direct
 callers keep the pre-extraction behavior. See just-dna-format/docs/{CHANGELOG,ROADMAP}.md.
 
@@ -17,6 +17,8 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from just_dna_enricher.download import ensure_snapshot
+from just_dna_enricher.locations import parquet_footer_ok
 from just_dna_enricher.resolver import EnsemblReferenceError
 from just_dna_enricher.resolver import resolve_variants as _lib_resolve_variants
 
@@ -25,24 +27,6 @@ from just_dna_pipelines.module_compiler.models import VariantRow
 logger = logging.getLogger(__name__)
 
 __all__ = ["EnsemblReferenceError", "ensure_resolver_db", "resolve_variants"]
-
-_PARQUET_MAGIC = b"PAR1"
-
-
-def _parquet_footer_ok(path: Path) -> bool:
-    """Cheap integrity check: a complete parquet begins and ends with the ``PAR1`` magic.
-
-    A truncated/interrupted download (the common cache-corruption mode) is missing its footer
-    magic, which is exactly what makes DuckDB's ``read_parquet`` blow up with "No magic bytes
-    found at end of file". Reads only 4 bytes from each end — no full scan.
-    """
-    if not path.is_file() or path.stat().st_size < 8:
-        return False
-    with path.open("rb") as fh:
-        if fh.read(4) != _PARQUET_MAGIC:
-            return False
-        fh.seek(-4, 2)
-        return fh.read(4) == _PARQUET_MAGIC
 
 
 def ensure_resolver_db(ensembl_cache: Optional[Path] = None) -> Path:
@@ -70,54 +54,14 @@ def ensure_resolver_db(ensembl_cache: Optional[Path] = None) -> Path:
 
     cache_dir = get_default_ensembl_cache_dir()
     data_dir = cache_dir / "data"
+    had_corrupt = any(not parquet_footer_ok(p) for p in data_dir.glob("*.parquet")) if data_dir.exists() else False
 
-    existing = list(data_dir.glob("*.parquet")) if data_dir.exists() else []
-    corrupt = [p for p in existing if not _parquet_footer_ok(p)]
-
-    # Fast path: a non-empty cache with no truncated files is trusted without hitting the network.
-    # We (re)provision only when the cache is empty or something is corrupt — a corrupt file left
-    # by an interrupted download would otherwise be skipped forever (the old `if exists: continue`)
-    # and crash DuckDB later with "No magic bytes found at end of file".
-    if existing and not corrupt:
-        return ensure_ensembl_duckdb_exists(logger=logger)
-
-    for p in corrupt:
-        logger.warning("Corrupt/truncated Ensembl parquet %s — removing for re-download", p.name)
-        p.unlink()
-    if corrupt:
-        # The DuckDB view was built over the corrupt parquet; drop it so it rebuilds cleanly.
-        stale_db = cache_dir / "ensembl_variations.duckdb"
-        stale_db.unlink(missing_ok=True)
-
-    logger.info("Provisioning Ensembl parquet cache from HuggingFace Hub ...")
-    from huggingface_hub import HfFileSystem, get_token
-
-    data_dir.mkdir(parents=True, exist_ok=True)
-    fs = HfFileSystem(token=get_token())
-    remote_prefix = "datasets/just-dna-seq/ensembl_variations/data"
-    remote_files = [
-        f for f in fs.ls(remote_prefix, detail=False)
-        if f.endswith(".parquet")
-    ]
-    logger.info("Found %d remote parquet files", len(remote_files))
-    for remote_path in remote_files:
-        filename = remote_path.rsplit("/", 1)[-1]
-        local_path = data_dir / filename
-        if _parquet_footer_ok(local_path):
-            continue
-        # Download to a temp path and rename only after the footer verifies, so an interrupted
-        # download never leaves a truncated file under the real name.
-        tmp_path = local_path.with_suffix(".part")
-        logger.info("  Downloading %s ...", filename)
-        fs.get(remote_path, str(tmp_path))
-        if not _parquet_footer_ok(tmp_path):
-            tmp_path.unlink(missing_ok=True)
-            raise EnsemblReferenceError(
-                f"Downloaded {filename} is incomplete (missing parquet footer magic); "
-                "re-run `uv run pipelines download-ensembl --force`"
-            )
-        tmp_path.replace(local_path)
-    logger.info("Download complete: %s", cache_dir)
+    # The enricher's lane provisions the parquet: it trusts a cache its pull record calls whole,
+    # removes and refetches a truncated file, and re-pulls a cache of another repo (RM372).
+    ensure_snapshot(cache_dir)
+    if had_corrupt:
+        # The DuckDB view was built over a file the pull just replaced; drop it so it rebuilds.
+        (cache_dir / "ensembl_variations.duckdb").unlink(missing_ok=True)
 
     return ensure_ensembl_duckdb_exists(logger=logger)
 

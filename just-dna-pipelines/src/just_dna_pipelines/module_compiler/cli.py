@@ -67,6 +67,17 @@ def module_validate(
         "--authority-key",
         help="Authority key accepted for authored facts (0.5). Repeatable.",
     ),
+    resolve: bool = typer.Option(
+        True,
+        "--resolve/--no-resolve",
+        help="Read resolution.csv as the compile will (0.8: pass the compile's switch, so a green "
+             "`validate --strict` means the strict compile will not refuse).",
+    ),
+    ba1_threshold: float = typer.Option(
+        0.05,
+        "--ba1-threshold",
+        help="Allele-frequency threshold for the ACMG BA1 stand-alone benign rule; pass the compile's.",
+    ),
 ) -> None:
     """
     Validate a module spec without producing output.
@@ -90,7 +101,13 @@ def module_validate(
     if strict:
         console.print("[bold]Mode:      [/bold] strict (warnings are errors)")
     console.print()
-    result = validate_spec(spec_dir, authority_keys=authority_key or None, strict=strict)
+    result = validate_spec(
+        spec_dir,
+        authority_keys=authority_key or None,
+        strict=strict,
+        resolve_with_ensembl=resolve,
+        ba1_threshold=ba1_threshold,
+    )
 
     if result.errors:
         console.print("[bold red]Errors:[/bold red]")
@@ -366,7 +383,9 @@ def module_compile(
     ensembl_reference: Optional[str] = typer.Option(
         None,
         "--ensembl-reference",
-        help="Reference label recorded in the manifest, e.g. 'Ensembl 115 GRCh38' (0.5).",
+        help="Ensembl reference recorded in the manifest, spelled `<repo>@<rev>` from "
+             "just_dna_enricher.locations.SNAPSHOT_REPO_IDS['ensembl'] "
+             "(e.g. 'just-dna-seq/ensembl_variations_split@<rev>').",
     ),
     provenance: Optional[Path] = typer.Option(
         None,

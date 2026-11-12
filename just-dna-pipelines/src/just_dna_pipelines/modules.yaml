@@ -64,12 +64,6 @@ quality_filters:
   # CYP2D6) emit PASS calls with no DP by design; `drop` loses all of them.
   unstated_metrics: keep
 
-# Ensembl variation reference dataset.
-# Downloaded via fsspec (HfFileSystem) into ~/.cache/just-dna-pipelines/ensembl_variations/data/.
-# Change repo_id to point at a different dataset (any HuggingFace org/repo).
-ensembl_source:
-  repo_id: just-dna-seq/ensembl_variations
-
 # Sources to scan for annotation modules.
 # Simple string = URL with auto-detect. Object = URL + overrides.
 sources:

@@ -19,9 +19,8 @@ from dagster import (
 )
 
 import polars as pl
-import requests
-from huggingface_hub import get_token
-from huggingface_hub.utils import HfHubHTTPError
+from just_dna_enricher.download import ensure_snapshot
+from just_dna_enricher.locations import SNAPSHOT_REPO_IDS, ensembl_release_label
 
 from just_dna_pipelines.runtime import resource_tracker
 from just_dna_pipelines.module_config import (
@@ -44,12 +43,9 @@ from just_dna_pipelines.annotation.resources import (
     ensure_vcf_in_user_input_dir,
 )
 from just_dna_pipelines.annotation.logic import annotate_vcf_with_ensembl
-from just_dna_pipelines.annotation.ensembl_download import (
-    EnsemblDownloadError,
-    EnsemblManifest,
-    download_ensembl_cache,
-    fetch_ensembl_manifest,
-)
+
+#: The Ensembl snapshot's repository, as just-dna-enricher pulls it (its `ensembl` lane).
+ENSEMBL_REPO_ID: str = SNAPSHOT_REPO_IDS["ensembl"]
 
 
 # ============================================================================
@@ -60,13 +56,13 @@ from just_dna_pipelines.annotation.ensembl_download import (
 # This establishes the data lineage: HF Repo → Local Cache → User Analysis
 ensembl_hf_dataset = AssetSpec(
     key="ensembl_hf_dataset",
-    description="Remote Ensembl variations dataset on HuggingFace Hub (just-dna-seq/ensembl_variations). "
-                "This is the external source of truth for Ensembl variation data.",
+    description=f"Remote Ensembl variation snapshot on HuggingFace Hub ({ENSEMBL_REPO_ID}), "
+                "the enricher's `ensembl` lane. The external source of truth for Ensembl variation data.",
     metadata={
         "source": "HuggingFace Hub",
-        "repo_id": "just-dna-seq/ensembl_variations",
+        "repo_id": ENSEMBL_REPO_ID,
         "type": "external_dataset",
-        "url": "https://huggingface.co/datasets/just-dna-seq/ensembl_variations",
+        "url": f"https://huggingface.co/datasets/{ENSEMBL_REPO_ID}",
     },
 )
 
@@ -371,83 +367,44 @@ def user_vcf_normalized(
 # REFERENCE DATA ASSETS
 # ============================================================================
 
-def _fetch_manifest_or_reason(
-    repo_id: str, token: str | None
-) -> tuple[EnsemblManifest | None, str]:
-    """The remote manifest, or ``None`` and why it could not be fetched (usually: offline)."""
-    try:
-        return fetch_ensembl_manifest(repo_id, token), ""
-    except (HfHubHTTPError, EnsemblDownloadError, requests.RequestException, OSError) as exc:
-        return None, str(exc)
-
-
 @asset(
-    description="Ensembl variation annotations downloaded from HuggingFace Hub.",
+    description="The Ensembl variation snapshot (just-dna-enricher's `ensembl` lane) in the local cache.",
     compute_kind="huggingface",
     io_manager_key="annotation_cache_io_manager",
     deps=[ensembl_hf_dataset],  # Depends on the HF source asset for staleness tracking
     metadata={
-        "dataset": "just-dna-seq/ensembl_variations",
+        "dataset": ENSEMBL_REPO_ID,
         "source": "Ensembl Variation Database",
         "storage": "cache",
     }
 )
 def ensembl_annotations(context: AssetExecutionContext, config: EnsemblAnnotationsConfig) -> Output[Path]:
     """
-    Download Ensembl variation parquets into our local cache and check them.
+    Provision the Ensembl snapshot through just-dna-enricher (``download.ensure_snapshot``).
 
-    Files land directly in ``~/.cache/just-dna-pipelines/ensembl_variations/data/``
-    (no duplicate HuggingFace blob storage) through the same downloader as
-    ``pipelines download-ensembl``: each file is checked against HF's size and
-    SHA256 and fetched to a ``.part`` file that is renamed only once it matches.
+    The enricher owns this directory since format 0.8: it pulls ``ENSEMBL_REPO_ID``, writes a pull
+    record before the first download, keeps a file only where the snapshot's ``manifest.json``
+    attests it, removes and refetches a truncated parquet, and re-pulls a cache whose record names
+    another repo. Our own downloader wrote the old repo's files into the same directory, which the
+    enricher then reads as a cache that "mixes releases" and resolves nothing (INTEGRATION_0_8
+    § 1.29), so it is gone rather than kept beside this.
     """
     logger = context.log
-
-    if config.cache_dir is not None:
-        cache_dir = Path(config.cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        cache_dir = get_default_ensembl_cache_dir()
-
-    data_dir = cache_dir / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-
+    cache_dir = Path(config.cache_dir) if config.cache_dir is not None else get_default_ensembl_cache_dir()
     logger.info(f"Ensembl cache directory: {cache_dir}")
 
-    with resource_tracker("Download Ensembl Reference") as tracker:
-        manifest, manifest_error = _fetch_manifest_or_reason(config.repo_id, config.token or get_token())
-        existing = list(data_dir.glob("*.parquet"))
-        if manifest is None:
-            if not existing:
-                raise EnsemblDownloadError(
-                    f"Cannot download the Ensembl cache from {config.repo_id}: {manifest_error}"
-                )
-            logger.warning(
-                f"Could not reach {config.repo_id} to check the Ensembl cache ({manifest_error}); "
-                f"using the {len(existing)} local parquet file(s) unchecked."
-            )
-            status = "unchecked (offline)"
-        else:
-            # Every file is checked against HF's size + SHA256, not just "some parquet exists".
-            # This asset used to skip the whole download if any parquet was present and wrote
-            # straight to the final name, so a partial or damaged cache was never repaired and
-            # every later Ensembl join failed inside DuckDB (reported as "Out of buffer").
-            download_ensembl_cache(
-                repo_id=config.repo_id,
-                force=config.force_download,
-                manifest=manifest,
-                target_dir=data_dir,
-            )
-            status = "verified"
+    with resource_tracker("Provision Ensembl Reference", context=context) as tracker:
+        ensure_snapshot(cache_dir)
 
-    parquet_files = list(data_dir.glob("*.parquet"))
+    parquet_files = list((cache_dir / "data").glob("*.parquet"))
     total_size = sum(p.stat().st_size for p in parquet_files) / (1024 ** 3)
 
     metadata_dict: dict = {
         "cache_path": MetadataValue.path(str(cache_dir.absolute())),
         "num_files": MetadataValue.int(len(parquet_files)),
         "total_size_gb": MetadataValue.float(round(total_size, 2)),
-        "status": MetadataValue.text(status),
+        "repo_id": MetadataValue.text(ENSEMBL_REPO_ID),
+        "release": MetadataValue.text(ensembl_release_label(cache_dir) or "not stated"),
     }
     if "report" in tracker:
         report = tracker["report"]

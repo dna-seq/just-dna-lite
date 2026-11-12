@@ -48,8 +48,6 @@ registries:
   mode: test
   token_env: REGISTRY_TOKEN_POLYGON
   description: Testing ground. Publish here to rehearse; nothing here is public or permanent.
-ensembl_source:
-  repo_id: just-dna-seq/ensembl_variations
 sources:
 - url: just-dna-seq/annotators
   kind: collection

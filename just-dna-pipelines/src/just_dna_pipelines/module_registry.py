@@ -147,7 +147,9 @@ def register_custom_module(
     """
     spec_dir = Path(spec_dir)
 
-    validation = validate_spec(spec_dir)
+    # The compile's own switch (format 0.8, RM367): validate and compile reach one verdict only
+    # when both read resolution.csv the same way.
+    validation = validate_spec(spec_dir, resolve_with_ensembl=resolve_with_ensembl)
     if not validation.valid:
         return CompilationResult(
             success=False,

@@ -84,27 +84,31 @@ The initialization is called by:
 
 ## Ensembl Reference Cache
 
-The annotation pipeline requires the Ensembl variation database downloaded locally.
-Use the built-in CLI commands to manage it — they read `JUST_DNA_PIPELINES_CACHE_DIR`
-from `.env` automatically.
+The optional Ensembl step (`annotate --ensembl`, `annotate_all_job`) and module compilation read the
+Ensembl variation snapshot `just-dna-seq/ensembl_variations_split` (dbSNP 157, VEP 116). It is
+just-dna-enricher's `ensembl` lane, so the enricher downloads and checks it. The commands read
+`JUST_DNA_PIPELINES_CACHE_DIR` from `.env`:
 
 ```bash
-# Download all chromosome parquet files (~14 GB) to the configured cache
-uv run pipelines download-ensembl
+# Download the snapshot (~14.5 GB) and build the DuckDB view over it
+uv run pipelines ensembl-setup
 
-# Resume an interrupted download (already-valid files are skipped by SHA256)
-uv run pipelines download-ensembl
+# The same download, as one lane of the full cache set
+uv run pipelines prepare-caches --lane ensembl
 
-# Check integrity of an existing cache without downloading
-uv run pipelines verify-ensembl
-
-# Force a full re-download
-uv run pipelines download-ensembl --force
+# Which release the cache holds, and whether a newer one is published
+uv run pipelines enrich cache status
+uv run pipelines enrich cache pull --only ensembl
 ```
 
-Files land at `{JUST_DNA_PIPELINES_CACHE_DIR}/ensembl_variations/data/`.
-Each file is validated against the SHA256 checksum from the HuggingFace LFS manifest,
-so partial or corrupted downloads are detected and will be re-fetched on the next run.
+Files land at `{JUST_DNA_PIPELINES_CACHE_DIR}/ensembl_variations/data/`, beside the snapshot's
+`manifest.json` and a `pull-record.json`. The enricher keeps a file only where the manifest attests it
+by size and SHA256, refetches a truncated one, and re-pulls a cache that came from the older
+`just-dna-seq/ensembl_variations` repo. An interrupted download resumes where it stopped.
+
+The split snapshot's core holds only alleles and rsIDs. Consequences, ClinVar, frequencies and
+predictor scores sit in its `groups/` files, which nothing downloads yet, so the Ensembl step currently
+adds rsIDs and little else.
 
 ## Environment Variables
 

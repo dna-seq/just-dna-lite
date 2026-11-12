@@ -15,14 +15,10 @@ from just_dna_pipelines.annotation.module_cache import (
     clear_hf_module_cache,
     get_app_version,
 )
-from just_dna_pipelines.annotation.ensembl_download import (
-    EnsemblDownloadError,
-    download_ensembl_cache,
-)
 from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
-from just_dna_pipelines.enricher_cli import enricher_app
+from just_dna_enricher.cli import app as enricher_app
 from just_dna_pipelines.runtime import environ_guard
 
 # just-dna-registry calls a bare load_dotenv() at import, which climbs above this checkout; import it
@@ -41,9 +37,8 @@ app.add_typer(v1_port_app, name="v1-port")
 # The enricher's own Typer app, mounted whole rather than re-declared: it is the
 # authoring tier that produces `resolution.csv` and the 0.5 fact sidecars which
 # `pipelines module compile` then consumes with no reference and no network.
-# Mounting it means new enricher commands appear here without further wiring.
-# `enricher_app` is a stub with one `status` command when the enricher CLI cannot be imported
-# here (protobuf gencode/runtime mismatch, S107) — see `just_dna_pipelines.enricher_cli`.
+# Mounting it means new enricher commands appear here without further wiring; the Ensembl
+# snapshot is its `cache pull --only ensembl` / `cache status`.
 app.add_typer(enricher_app, name="enrich")
 app.add_typer(registry_client_app, name="registry")
 
@@ -64,229 +59,6 @@ def clear_module_cache() -> None:
     else:
         console.print("[yellow]No cached HF module repos found — nothing to clear.[/yellow]")
     console.print(f"[dim]Current app version: {get_app_version()}[/dim]")
-
-
-@app.command()
-def download_ensembl(
-    repo_id: str = typer.Option(
-        "just-dna-seq/ensembl_variations",
-        "--repo", "-r",
-        help="HuggingFace dataset repo ID.",
-    ),
-    cache_dir: Optional[str] = typer.Option(
-        None,
-        "--cache-dir", "-c",
-        help="Override cache directory. Defaults to JUST_DNA_PIPELINES_CACHE_DIR env var "
-             "or ~/.cache/just-dna-pipelines.",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force", "-f",
-        help="Force re-download even if files pass SHA256 validation.",
-    ),
-) -> None:
-    """
-    Download Ensembl variation annotations from HuggingFace to the local cache.
-
-    Files are saved to:
-      {cache_dir}/ensembl_variations/data/
-
-    Each file is validated by SHA256 (from HF LFS metadata). Already-valid files are skipped.
-
-    The destination is read from JUST_DNA_PIPELINES_CACHE_DIR (or ~/.cache/just-dna-pipelines
-    if not set). Pass --cache-dir to override.
-
-    Examples:
-
-        # Download using settings from .env
-        uv run pipelines download-ensembl
-
-        # Force re-download of all files
-        uv run pipelines download-ensembl --force
-
-        # Custom cache directory
-        uv run pipelines download-ensembl --cache-dir /data/my-cache
-    """
-    # Single source of truth lives in just_dna_pipelines.annotation.ensembl_download.
-    try:
-        download_ensembl_cache(repo_id=repo_id, cache_dir=cache_dir, force=force, console=console)
-    except EnsemblDownloadError as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(1)
-
-
-@app.command()
-def build_duckdb(
-    cache_dir: Optional[str] = typer.Option(
-        None,
-        "--cache-dir", "-c",
-        help="Override cache directory. Defaults to JUST_DNA_PIPELINES_CACHE_DIR env var "
-             "or ~/.cache/just-dna-pipelines.",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force", "-f",
-        help="Rebuild even if a DuckDB already exists.",
-    ),
-) -> None:
-    """
-    Build (or rebuild) the Ensembl DuckDB from the local parquet cache.
-
-    Creates lightweight VIEWs over the parquet files — no data is copied,
-    so the database is tiny and queries stream directly from parquet.
-
-    Requires the Ensembl parquet cache to already be downloaded
-    (run ``uv run pipelines download-ensembl`` first).
-
-    Examples:
-
-        uv run pipelines build-duckdb
-        uv run pipelines build-duckdb --force
-        uv run pipelines build-duckdb --cache-dir /data/my-cache
-    """
-    import os
-    import logging
-    from platformdirs import user_cache_dir
-    from just_dna_pipelines.annotation.duckdb_assets import build_duckdb_from_parquet
-
-    logger = logging.getLogger("just_dna_pipelines.cli")
-
-    if cache_dir:
-        resolved_cache = Path(cache_dir)
-    else:
-        env_cache = os.getenv("JUST_DNA_PIPELINES_CACHE_DIR")
-        resolved_cache = Path(env_cache) if env_cache else Path(user_cache_dir(appname="just-dna-pipelines"))
-
-    ensembl_dir = resolved_cache / "ensembl_variations"
-    data_dir = ensembl_dir / "data"
-    duckdb_path = ensembl_dir / "ensembl_variations.duckdb"
-
-    if not data_dir.exists() or not any(data_dir.glob("*.parquet")):
-        console.print(
-            f"[red]Error: Ensembl parquet cache not found at {data_dir}[/red]\n"
-            "[dim]Run [bold]uv run pipelines download-ensembl[/bold] first.[/dim]"
-        )
-        raise typer.Exit(1)
-
-    if duckdb_path.exists() and not force:
-        size_mb = duckdb_path.stat().st_size / (1024 * 1024)
-        console.print(
-            f"[green]DuckDB already exists:[/green] {duckdb_path} ({size_mb:.1f} MB)\n"
-            "[dim]Use --force to rebuild.[/dim]"
-        )
-        return
-
-    if duckdb_path.exists():
-        console.print(f"[yellow]Removing existing DuckDB: {duckdb_path}[/yellow]")
-        duckdb_path.unlink()
-
-    console.print(f"\n[bold]Building Ensembl DuckDB[/bold]")
-    console.print(f"  Source : [cyan]{ensembl_dir}[/cyan]")
-    console.print(f"  Output : [cyan]{duckdb_path}[/cyan]\n")
-
-    _, metadata = build_duckdb_from_parquet(ensembl_dir, duckdb_path, logger=logger)
-
-    console.print(f"[bold green]Done![/bold green]")
-    console.print(f"  Views created    : {metadata['num_views']} ({metadata['view_names']})")
-    console.print(f"  Parquet files    : {metadata['total_parquet_files']}")
-    console.print(f"  Database size    : {metadata['db_size_mb']} MB")
-    if "build_duration_sec" in metadata:
-        console.print(f"  Build time       : {metadata['build_duration_sec']:.1f}s")
-        console.print(f"  Peak memory      : {metadata['peak_memory_mb']:.0f} MB")
-    console.print()
-
-
-@app.command()
-def ensembl_setup(
-    repo_id: str = typer.Option(
-        "just-dna-seq/ensembl_variations",
-        "--repo", "-r",
-        help="HuggingFace dataset repo ID.",
-    ),
-    cache_dir: Optional[str] = typer.Option(
-        None,
-        "--cache-dir", "-c",
-        help="Override cache directory. Defaults to JUST_DNA_PIPELINES_CACHE_DIR env var "
-             "or ~/.cache/just-dna-pipelines.",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force", "-f",
-        help="Force re-download and rebuild.",
-    ),
-) -> None:
-    """
-    Full Ensembl setup pipeline: download parquet, verify, build DuckDB.
-
-    This is the recommended one-stop command for setting up the Ensembl
-    annotation cache from scratch. It runs three steps in sequence:
-
-      1. download-ensembl  — fetch parquet files from HuggingFace
-      2. verify (inline)   — confirm all files are present
-      3. build-duckdb      — create the DuckDB catalog over the parquet
-
-    Already-complete steps are skipped automatically (use --force to redo).
-
-    Examples:
-
-        uv run pipelines ensembl-setup
-        uv run pipelines ensembl-setup --force
-        uv run pipelines ensembl-setup --cache-dir /data/my-cache
-    """
-    import os
-    import logging
-    from platformdirs import user_cache_dir
-    from just_dna_pipelines.annotation.duckdb_assets import build_duckdb_from_parquet
-
-    logger = logging.getLogger("just_dna_pipelines.cli")
-
-    # ── Step 1: Download ──────────────────────────────────────────────────────
-    console.print("[bold]Step 1/3: Download Ensembl parquet files[/bold]\n")
-    download_ensembl(repo_id=repo_id, cache_dir=cache_dir, force=force)
-
-    # ── Step 2: Verify ────────────────────────────────────────────────────────
-    console.print("\n[bold]Step 2/3: Verify cache integrity[/bold]\n")
-
-    if cache_dir:
-        resolved_cache = Path(cache_dir)
-    else:
-        env_cache = os.getenv("JUST_DNA_PIPELINES_CACHE_DIR")
-        resolved_cache = Path(env_cache) if env_cache else Path(user_cache_dir(appname="just-dna-pipelines"))
-
-    ensembl_dir = resolved_cache / "ensembl_variations"
-    data_dir = ensembl_dir / "data"
-    parquet_files = list(data_dir.glob("*.parquet"))
-
-    if not parquet_files:
-        console.print(f"[red]Error: No parquet files found at {data_dir}[/red]")
-        raise typer.Exit(1)
-
-    total_gb = sum(f.stat().st_size for f in parquet_files) / (1024 ** 3)
-    console.print(f"[green]Cache present:[/green] {len(parquet_files)} files, {total_gb:.2f} GB at {data_dir}")
-
-    # ── Step 3: Build DuckDB ──────────────────────────────────────────────────
-    console.print(f"\n[bold]Step 3/3: Build DuckDB[/bold]\n")
-
-    duckdb_path = ensembl_dir / "ensembl_variations.duckdb"
-
-    if duckdb_path.exists() and not force:
-        size_mb = duckdb_path.stat().st_size / (1024 * 1024)
-        console.print(f"[green]DuckDB already exists:[/green] {duckdb_path} ({size_mb:.1f} MB) — skipping.")
-    else:
-        if duckdb_path.exists():
-            duckdb_path.unlink()
-        console.print(f"  Source : [cyan]{ensembl_dir}[/cyan]")
-        console.print(f"  Output : [cyan]{duckdb_path}[/cyan]\n")
-
-        _, metadata = build_duckdb_from_parquet(ensembl_dir, duckdb_path, logger=logger)
-
-        console.print(f"  Views  : {metadata['num_views']} ({metadata['view_names']})")
-        console.print(f"  Files  : {metadata['total_parquet_files']}")
-        console.print(f"  Size   : {metadata['db_size_mb']} MB")
-        if "build_duration_sec" in metadata:
-            console.print(f"  Time   : {metadata['build_duration_sec']:.1f}s")
-
-    console.print(f"\n[bold green]Ensembl setup complete![/bold green]\n")
 
 
 @app.command()

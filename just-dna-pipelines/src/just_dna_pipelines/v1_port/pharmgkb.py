@@ -31,6 +31,7 @@ from typing import Optional
 import polars as pl
 import yaml
 from just_dna_enricher.clinpgx import load_snapshot
+from just_dna_format.snapshot import SnapshotRelease
 from just_dna_enricher.clinpgx_draft import ClinPgxDraftResult, draft_pharm_variants
 from just_dna_enricher.locations import resolve_clinpgx_reference
 from just_dna_format.layout import SOURCES_CSV, sidecar_candidates
@@ -155,7 +156,7 @@ def enrich_drafted_rows(spec_dir: Path, snapshot: Path) -> tuple[int, int, int]:
     return len(rows), filled_conclusions, filled_genes
 
 
-def _module_spec_yaml(release: dict[str, object], row_count: int) -> str:
+def _module_spec_yaml(release: SnapshotRelease, row_count: int) -> str:
     # Display metadata is owned by modules.yaml, never by a Python literal — the app and the module
     # must agree on the title a report is headed with.
     meta = display_meta(MODULE_NAME)
@@ -183,7 +184,7 @@ def _module_spec_yaml(release: dict[str, object], row_count: int) -> str:
     }
     header = (
         f"# Built by `pipelines v1-port pharmgkb` from the ClinPGx snapshot "
-        f"{release.get('dataset', '?')}\n"
+        f"{release.dataset or '?'}\n"
         f"# ({row_count:,} rows, evidence level >= {MIN_EVIDENCE_LEVEL}). ClinPGx is CC BY-SA 4.0 "
         f"and may not be sold — see licensing.csv.\n"
     )
@@ -234,7 +235,7 @@ def build_pharmgkb_module(
         drugs=frame["drug"].n_unique(),
         genes=frame["gene"].drop_nulls().n_unique() if "gene" in frame.columns else 0,
         conclusions_filled=filled_conclusions,
-        release=str(release.get("dataset") or ""),
+        release=release.dataset or "",
         warnings=list(result.warnings),
     )
     _write_log(out_dir, build, release, reference, min_evidence_level, declared_use)
@@ -244,7 +245,7 @@ def build_pharmgkb_module(
 def _write_log(
     out_dir: Path,
     build: PharmGkbBuild,
-    release: dict[str, object],
+    release: SnapshotRelease,
     snapshot: Path,
     min_evidence_level: str,
     declared_use: str,
@@ -254,8 +255,8 @@ def _write_log(
         "route: just-dna-enricher clinpgx_draft.draft_pharm_variants (0.5 snapshot)",
         "supersedes: dna-seq/just_drugs data/annotation_tab.tsv (PharmGKB variant annotations)",
         f"snapshot: {snapshot}",
-        f"clinpgx_release: {release.get('dataset', '?')}",
-        f"clinpgx_source_sha256: sha256:{release.get('source_sha256', '?')}",
+        f"clinpgx_release: {release.dataset or '?'}",
+        f"clinpgx_source_sha256: sha256:{release.source_sha256 or '?'}",
         f"min_evidence_level: {min_evidence_level}",
         f"declared_use: {declared_use}",
         f"rows: {build.rows}",
