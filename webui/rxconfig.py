@@ -58,10 +58,21 @@ def _ssr_build_runs_under_bun() -> bool:
 
 
 # Resolve REFLEX_SSR *before* importing reflex, so the value is in place before
-# reflex forks its frontend/backend processes.  Default SSR off unless the SSR
-# pass would run under bun (see above); an explicit REFLEX_SSR always wins.
+# reflex forks its frontend/backend processes. SSR runs only where the prerender
+# would run under bun (see above). Under Node it cannot succeed: every route
+# prerenders as a 500 and the build stops ("Prerender: Request failed for /"), so
+# a REFLEX_SSR=true from .env (or from `reflex export`, which sets it before this
+# file loads) is overridden there, loudly, rather than taking the app down.
 # Upstream fix needed in reflex-mui-datagrid / reflex.
-if os.environ.get("REFLEX_SSR") is None and not _ssr_build_runs_under_bun():
+if not _ssr_build_runs_under_bun():
+    if os.environ.get("REFLEX_SSR", "").strip().lower() in {"1", "true", "yes", "on"}:
+        print(
+            "REFLEX_SSR=true ignored: Node is on PATH, so the prerender would run in Node and "
+            "fail on @mui/x-data-grid's CSS import (every route 500s). SSR needs bun with no "
+            "`node` on PATH. Set REFLEX_SSR=false to silence this.",
+            file=sys.stderr,
+            flush=True,
+        )
     os.environ["REFLEX_SSR"] = "false"
 os.environ.setdefault("REFLEX_SOCKET_MAX_HTTP_BUFFER_SIZE", "50000000")
 
