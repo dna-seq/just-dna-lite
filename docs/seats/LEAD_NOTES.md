@@ -17,9 +17,11 @@ this file, and the kit's role.
   the account's rule stops on any "Would uninstall" while jobs may use the environment. Run it when
   nothing else uses this clone's `.venv`. No test run yet. Whether this machine can show the web UI
   is not checked: until it is, every UI item is "built, not viewed".
-- **The roadmap** (`docs/ROADMAP.md`) is written, seven items. RM1 and RM2 are decided and unattended.
-  RM3, RM4 and RM7 wait for the maintainer's ordering, asked in the session on 2026-11-18; no desk
-  question is filed, since they were present. If 2026-11-21 comes with no answer, file one.
+- **The roadmap** (`docs/ROADMAP.md`): RM1 (README and FAQ wording) and RM2 (the haploid PRS regression
+  test) were built on 2026-11-18 while the maintainer was away, and left the plan. RM3 is on the desk as
+  #59 (default: the small fix, built once they have been present and away again), RM4 as #60 (default:
+  nothing changes). Desk #61 asks whether Winternewt is a maintainer for the seats (default: member).
+  RM5 waits on an upstream release, RM6 on the correspondence seat, RM7 follows RM3.
 - **longevity-loci's lead** asked for the manuscript, figures, logo and colours for its deck; answered
   in `#agent-chat>longevity-loci deck` on 2026-11-18 with paths in the public repository. It may send
   what its re-curation changed, for the paper: that goes to the reviser as an item (RM4).
@@ -30,4 +32,7 @@ this file, and the kit's role.
 
 ## For the maintainer to push
 
-- The commit that adds `docs/ROADMAP.md`, these notes and `docs/seats/lead/state.md` (local `main`).
+- Local `main` is four commits ahead of origin: `2f7d1c2` and `91ed9be` (the roadmap and these notes),
+  `2ac82b3` (RM1), `77ef72f` (RM2), and the notes commit after them.
+- The local branches `build/rm1` and `build/rm2` are merged; `git branch -d` refuses them until `main`
+  is pushed. Delete them after the push.
