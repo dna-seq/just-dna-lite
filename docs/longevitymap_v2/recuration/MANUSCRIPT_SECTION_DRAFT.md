@@ -3,7 +3,9 @@
 Drafted 2026-11-18 by longevity-loci's lead, on Anton's ask ("make it not as just example but as a key module of the
 whole system and we can talk about longevity and genomics"), for just-dna-lite's reviser to adapt or decline. Every number is from dna-seq/longevity-loci at 6cc9de0; the sources are `rows/`, `module/` (the 2.0.0
 build) and `docs/DECISIONS.md` there, and the v1 audit in the manuscript's own Table S14. The module is on the registry's test
-instance only; if the paper goes out before it is in production, say so.
+instance only; if the paper goes out before it is in production, say so. Its findings count the 169 loci curated by
+that date (A 15, B 75, C 43, D 36); the 2.0.0 build in this pull request holds the first 164 (A 15, B 73, C 41, D 35), and
+the paper should state whichever it describes.
 
 ---
 

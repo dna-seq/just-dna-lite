@@ -59,6 +59,11 @@ scientific reviewer, read the rendered report first. Known points for them and f
   repository's report, if either should change.
 - **No licence is stated** in `module_spec.yaml`; the sources' terms are in `licensing.csv`. The maintainer names
   one, or it ships without and says so.
+- **APOE's ε-pair result is not called.** The module carries APOE as `haplotypes.csv` and `diplotypes.csv` (12 pair
+  results), but the phenotype caller runs only on phenotype-led modules, and this one is weights-led: on the demo genome
+  the report showed no APOE result (its two sites are not variant rows). Owner: this repository's engine (call a
+  weights-led module's diplotypes too), or the module ships APOE as a separate phenotype module. Until one is done,
+  2.0.0 shows less about APOE than 1.2.0, which scored rs429358 and rs7412 as rows.
 - **Not closed.** The module carries no `close_module` stamp; closing marks authoring finished and is done once the
   text is final. Title and weighting are the v2 requirements' recommended defaults (`provenance.json`), not yet
   confirmed by the maintainer.
@@ -77,6 +82,13 @@ uv run pipelines registry publish just-dna-seq longevitymap 2.0.0 data/modules/l
 Every file in the spec directory travels, `quote_sources.csv` (the quotes the studies rest on) included.
 
 ## 5. HuggingFace collection (public)
+
+In the same change, the display text: `module_metadata.longevitymap` in both `modules.yaml` files (the root and
+`just-dna-pipelines/src/just_dna_pipelines/modules.yaml`) overrides the module's own title and description, and still
+says "from LongevityMap database". Once 2.0.0 is the default it should read, for example, "Longevity-associated variants,
+re-curated from the evidence and graded by tier (2.0.0; 1.2.0 is the frozen port of HAGR's LongevityMap)". It is not
+changed by this pull request, because before the publish it would describe a module users cannot get yet.
+
 
 ```bash
 uv run pipelines v1-port publish longevitymap --out data/interim/release --dry-run

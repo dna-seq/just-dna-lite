@@ -20,3 +20,6 @@ so no per-variant sum is formed. Content signature `sha256:aebf5e38…`, the sam
 
 **Not in 2.0.0.** A literature sweep of 2015 to October 2026 has since added five loci in longevity-loci (rows 170
 to 174, not yet through their adversarial review); they come as a later version.
+
+Paths named inside the spec's own files (`module_spec.yaml`'s comment, `provenance.json`) are longevity-loci's, where
+the module was authored.

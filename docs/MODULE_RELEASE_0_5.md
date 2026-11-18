@@ -1,5 +1,7 @@
 # Releasing the annotation modules on 0.5
 
+> **longevitymap is no longer published from the v1 port.** Its 1.2.0 (built by `v1-port port`) is frozen; from 2.0.0 on the name is published from `data/modules/longevitymap_v2/` by [LONGEVITYMAP_V2_RELEASE.md](LONGEVITYMAP_V2_RELEASE.md). The port still builds it locally, for the audit in `docs/longevitymap_v2/audit/`.
+
 > **We are on format 0.6 since 2026-08-18** (format 0.6.1 / compiler 0.6.1 / enricher 0.6.2). The runbook below still applies step for step; two things in it read differently. The licence sidecar is now written as **`licensing.csv`** (`sources.csv` is the deprecated spelling — still read, warned, removed at 1.0), and **every `artifact.digest` moved at the version boundary** while no `content_signature` did, so a digest that differs from a 0.5 record is the compiler version and not a content change. Republishing the ten modules remains the maintainer's call; they are still 0.5 artifacts on purpose. See CLAUDE.md § *What 0.6 changed on our side*.
 
 The build-and-publish runbook for the ten `just-dna-seq` modules, on `just-dna-format` 0.5.0 /
@@ -456,7 +458,7 @@ uv run python -c "from huggingface_hub import whoami; print(whoami()['name'])"
 **Step 1 — dry run, and read the file lists.** Writes nothing and contacts nobody.
 
 ```bash
-MODULES="coronary thrombophilia lipidmetabolism vo2max longevitymap superhuman pharmgkb cardio cancer pathogenic"
+MODULES="coronary thrombophilia lipidmetabolism vo2max superhuman pharmgkb cardio cancer pathogenic"  # longevitymap: from 2.0.0 on, docs/LONGEVITYMAP_V2_RELEASE.md
 for m in $MODULES; do uv run pipelines v1-port publish "$m" --dry-run; done
 ```
 

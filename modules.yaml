@@ -58,7 +58,7 @@ sources:
 module_metadata:
   longevitymap:
     title: Longevity Map
-    description: "Longevity-associated genetic variants: 1.2.0 is the frozen port of HAGR's LongevityMap; 2.0.0 is re-curated from the evidence and graded by tier"
+    description: Longevity-associated genetic variants from LongevityMap database
     report_title: Longevity Variants
     icon: heart-pulse
     color: '#21ba45'
