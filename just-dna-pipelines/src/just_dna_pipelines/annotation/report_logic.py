@@ -1288,6 +1288,33 @@ def load_studies_for_variants(
         return result
 
 
+def are_longevity_pathways(categories: set[str]) -> bool:
+    """Whether a module's row categories are all Generation I's pathway categories.
+
+    `build_longevity_report_data` files each row under one of `LONGEVITY_CATEGORIES` and shows nothing
+    else, so a row whose `category` is outside them vanishes from the section. Longevity Map 2.0.0
+    (the re-curation, `data/modules/longevitymap_v2/`) keeps the name `longevitymap` and fills
+    `category` with the system a locus acts through (`general_ageing`, `heart_vessels`, ...): routed
+    there, all 163 rows it matched on a public genome rendered as "0 Total variants". Null categories
+    count as `other`, which is one of Generation I's.
+    """
+    return categories <= set(LONGEVITY_CATEGORIES)
+
+
+def uses_longevity_pathways(module_name: str, module_info: Optional[ModuleInfo] = None) -> bool:
+    """Whether a module's report belongs in the pathway section, judged by its annotations table.
+
+    A module whose annotations carry no `category` (or that has no annotations table) keeps the pathway
+    section, as before. One with any category outside Generation I's takes the generic module section,
+    which renders its authored axes.
+    """
+    annotations = _scan_optional_module_table(module_name, ModuleTable.ANNOTATIONS, module_info=module_info)
+    if annotations is None or "category" not in annotations.collect_schema().names():
+        return True
+    present = annotations.select(pl.col("category").drop_nulls().unique()).collect().to_series().to_list()
+    return are_longevity_pathways(set(present))
+
+
 def build_longevity_report_data(
     weights_parquet: Path,
     module_name: str = "longevitymap",
@@ -2110,7 +2137,7 @@ def generate_longevity_report(
                 mod_data = build_pharmacogenomics_report_data(parquet_path, mod_name, info)
                 mod_data["display_name"] = display_name
                 pgx_modules_data.append(mod_data)
-            elif mod_name == "longevitymap":
+            elif mod_name == "longevitymap" and uses_longevity_pathways(mod_name, info):
                 longevity_data = build_longevity_report_data(parquet_path, mod_name, info)
             else:
                 mod_data = build_module_report_data(parquet_path, mod_name, info)

@@ -1,0 +1,23 @@
+{
+  "generator": "just-module-creator",
+  "items": [
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Scaffold defaults replaced by the values the requirements' data model names for every row. [jmc field=defaults value_sha256=40e2a0c61e14 source=longevitymap v2 requirements, section 6.2 (curator, method) recorded=2026-11-10T20:25:26Z by=longevity-loci module seat (claude-opus-5-5)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "Scaffold placeholders filled from the requirements' recommended default for D3 (keep the name longevitymap, title Longevity genetics); a default pending the maintainer's decision. [jmc field=module value_sha256=013b3361a686 source=longevitymap v2 requirements, section 11 decision D3 recorded=2026-11-10T20:25:25Z by=longevity-loci module seat (claude-opus-5-5)]",
+      "human_reviewed": false,
+      "outranks": {}
+    },
+    {
+      "variant_key": "module_spec.yaml",
+      "rationale": "The requirements' recommended default for D1 (no weights), copied with its note; a default pending the maintainer's decision. [jmc field=weighting value_sha256=2dbe21c5608a source=longevitymap v2 requirements, section 6.6 decision D1 recorded=2026-11-10T20:25:26Z by=longevity-loci module seat (claude-opus-5-5)]",
+      "human_reviewed": false,
+      "outranks": {}
+    }
+  ]
+}
