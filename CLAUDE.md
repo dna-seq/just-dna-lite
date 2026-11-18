@@ -52,8 +52,11 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   The report sorts with a total order (`report_logic._display_tiebreak`): rows tied on |weight| once
   listed in a different order on every run (rs429358 / rs7412 swapped between two runs on one sample). Our polars now
   matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
-- Format libs: `just-dna-format/compiler/enricher>=0.8.5` (the 0.8 line, cut 2026-11-05; upstream
-  `docs/INTEGRATION_0_8.md` is the adoption guide). `just-dna-registry>=0.30.0` **moves with the format
+- Format libs: `just-dna-format/compiler/enricher>=0.8.9` (the 0.8 line, cut 2026-11-05; upstream
+  `docs/INTEGRATION_0_8.md` is the adoption guide). After an upgrade, read upstream's "After upgrading" steps
+  **before** the next cache pull: 0.8.8 asks to check each lane's `pull-record.json` for a missing
+  `release_sha256` first (on 2026-11-18 only `ensembl_variations` lacked it, and that lane publishes no
+  `release.json`, so nothing was mislabelled). `just-dna-registry>=0.33.1` **moves with the format
   pin**: `contract_compatible` treats a `0.x` format minor as breaking on either side, so a mismatched
   pair refuses to publish with no obvious cause; both registries serve format 0.8.4. Registry client
   changes since 0.27 are additive. Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
@@ -265,7 +268,10 @@ does not call it.
   its `groups/` sidecars (consequence, ClinVar, frequencies) are not pulled (upstream **S150** → **RM437**, 0.9), so
   the Ensembl join adds rsIDs only. Do not describe its output as annotation until that lands.
 - `draft_gene_panel` aborts on ClinVar's malformed 9-digit PMIDs; `v1_port/clinvar_panel.py` passes
-  `max_citations=0` and drafts its own filtered `studies.csv`.
+  `max_citations=0` and drafts its own filtered `studies.csv`. Its genotype fill and study rows key
+  each variant the way the drafted `variants.csv` does (rsID or coordinate), read back from the draft,
+  never restated: enricher 0.8.9 (RM449) moved every indel to a coordinate row, and a restated rule
+  left `<<REPLACE>>` genotypes and ungrounded variants.
 - Since format 0.6 the compiler places `pharm_variants` / `haplotypes` / `heteroplasmy` from
   `resolution.csv` too (`manifest.compilation.positional_rows[_placed]`; `None` = not counted). Older
   artifacts still carry null coordinates, hence value-based routing below.

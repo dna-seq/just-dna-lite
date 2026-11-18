@@ -14,12 +14,13 @@ dependencies = [
   "just-prs>=0.11.0",
   # The catalog client. `version.contract_compatible` compares the installed `just-dna-format`
   # on client and server and treats a 0.x minor as breaking, so this floor moves with the format
-  # floor in just-dna-pipelines/pyproject.toml, never alone. 0.28 is the format-0.8 cut; 0.30.0
-  # (2026-11-11) floors format 0.8.4. Client changes since 0.27 are additive (`publish(recover_within=)`,
-  # `list_modules(clin_sig=)`, `rename_namespace`, `lane_rows`); every symbol we import is unchanged.
+  # floor in just-dna-pipelines/pyproject.toml, never alone. 0.28 is the format-0.8 cut; 0.33.1
+  # (2026-11-17) floors enricher 0.8.8. Client changes since 0.27 are additive (`publish(recover_within=)`,
+  # `list_modules(clin_sig=)`, `rename_namespace`, `lane_rows`, `upgrade_status`); every symbol we
+  # import is unchanged.
   # Never point a dependency at a directory outside this repo. Verify what is deployed:
   #   curl -s $REGISTRY_URL/api/v1/version
-  "just-dna-registry>=0.30.0",
+  "just-dna-registry>=0.33.1",
 ]
 
 [tool.uv.sources]

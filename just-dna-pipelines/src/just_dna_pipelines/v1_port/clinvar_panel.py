@@ -154,9 +154,11 @@ def panel_genes(
 def _allele_index(records: Iterable[dict], ambiguous: set[str]) -> dict[tuple, tuple[str, str]]:
     """Map each drafted row's identity to the ``(ref, alt)`` its genotype is written from.
 
-    The identity is the rsID when the draft kept one, else the full coordinate — mirroring
-    ``clinvar_draft._identity_cells``, which forces the coordinate for an rsID that names several
-    alleles at one locus. Keyed the same way so a filled row is matched to the record it came from.
+    A drafted row is identified by its rsID or by its full coordinate, and which one is the drafter's
+    choice (``clinvar_draft._identity_cells``): the coordinate for an rsID that names several alleles
+    at one locus, and since enricher 0.8.9 (RM449) for every indel record, rsID or not. So every
+    record is indexed under its coordinate, and under its rsID too unless that rsID is ambiguous;
+    the fill then follows whichever identity the drafter wrote, without restating its rule.
     """
     index: dict[tuple, tuple[str, str]] = {}
     for record in records:
@@ -166,9 +168,8 @@ def _allele_index(records: Iterable[dict], ambiguous: set[str]) -> dict[tuple, t
         rsid = (record.get("rsid") or "").strip()
         if rsid and rsid not in ambiguous:
             index.setdefault(("rsid", rsid), (ref, alt))
-        else:
-            key = ("coord", str(record.get("chrom") or ""), str(record.get("start") or ""), ref, alt)
-            index.setdefault(key, (ref, alt))
+        key = ("coord", str(record.get("chrom") or ""), str(record.get("start") or ""), ref, alt)
+        index.setdefault(key, (ref, alt))
     return index
 
 
@@ -303,9 +304,16 @@ def draft_studies(
 
     A variant ClinVar links no usable literature to is grounded on the ClinVar resource paper — the
     honest citation for an aggregate classification, and what Gen-I used for every row.
+
+    Each study row names its variant the way ``variants.csv`` does: by rsID where a drafted row
+    carries that rsID, else by coordinate. The drafter decides which (since enricher 0.8.9, RM449,
+    every indel is drafted by coordinate), so the identity is read back from the drafted file rather
+    than restated here.
     """
     citations_file = reference / "citations" / "citations.parquet"
     ambiguous = multi_allelic_rsids(records)
+    with (spec_dir / "variants.csv").open(newline="", encoding="utf-8") as handle:
+        drafted_rsids = {(row.get("rsid") or "").strip() for row in csv.DictReader(handle)} - {""}
     wanted = {str(r.get("variation_id") or "") for r in records} - {""}
 
     links: dict[str, list[str]] = {}
@@ -336,7 +344,7 @@ def draft_studies(
     grounded_on_resource = 0
     for record in records:
         rsid = (record.get("rsid") or "").strip() or None
-        if rsid in ambiguous:
+        if rsid in ambiguous or rsid not in drafted_rsids:
             rsid = None
         identity = (
             {"rsid": rsid, "chrom": "", "start": "", "ref": ""}
