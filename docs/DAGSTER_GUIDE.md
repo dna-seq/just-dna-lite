@@ -131,6 +131,9 @@ Before HF module annotation, the raw VCF is normalized and persisted as parquet.
 1. Strip `chr` prefix from chromosome column (case-insensitive: `chr1` → `1`, `CHR1` → `1`)
 2. Rename `id` column to `rsid`
 3. Compute genotype column from GT + REF + ALT as `List[String]` sorted alphabetically
+4. Give rows of a VCF split one per ALT (`bcftools norm -m-`) their site's genotype: a split `1/2` reads
+   `1/0` + `0/1`, whose `0` is the other ALT, not REF (`io.resolve_split_multiallelic_genotypes`; counts in
+   the materialization's `split_multiallelic_*` metadata)
 
 **Output path:**
 ```

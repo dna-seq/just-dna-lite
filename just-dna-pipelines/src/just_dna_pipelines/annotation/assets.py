@@ -29,7 +29,7 @@ from just_dna_pipelines.module_config import (
     build_quality_filter_expr,
     unstated_metric_counts,
 )
-from just_dna_pipelines.io import read_vcf_file
+from just_dna_pipelines.io import read_vcf_file, resolve_split_multiallelic_genotypes
 from just_dna_pipelines.annotation.chromosomes import rewrite_chromosome_column_strip_chr_prefix
 from just_dna_pipelines.annotation.configs import (
     EnsemblAnnotationsConfig,
@@ -245,6 +245,9 @@ def user_vcf_normalized(
     2. Rename 'id' column to 'rsid'
     3. Compute genotype column from GT + ref + alt
     4. Apply quality filters from modules.yaml (FILTER, min depth, min qual)
+    5. Give rows of a VCF split one per ALT (`bcftools norm -m-`) their site's genotype: a split
+       `1/2` reads `1/0` + `0/1`, whose `0` is the other ALT, not REF
+       (`io.resolve_split_multiallelic_genotypes`)
 
     If sex="Female" is set, logs a warning when chrY variants are present
     (informational only — never removes chrY).
@@ -329,6 +332,21 @@ def user_vcf_normalized(
             f"{output_path.stem}.{context.run.run_id}.tmp{output_path.suffix}"
         )
         lf.sink_parquet(str(temp_output_path), compression=config.compression)
+        # Resolved from the written parquet, not the VCF: finding the shared positions scans the frame
+        # twice, and a second VCF parse would cost more than this rewrite.
+        resolved_lf, split = resolve_split_multiallelic_genotypes(pl.scan_parquet(str(temp_output_path)))
+        if split.rows_resolved:
+            split_path = temp_output_path.with_name(
+                f"{output_path.stem}.{context.run.run_id}.split.tmp{output_path.suffix}"
+            )
+            resolved_lf.sink_parquet(str(split_path), compression=config.compression)
+            split_path.replace(temp_output_path)
+            logger.info(
+                f"Split multi-allelic sites: {split.rows_resolved} row(s) at {split.groups_resolved} "
+                f"position(s) given their site genotype"
+            )
+        if split.groups_skipped:
+            logger.info(f"Shared positions left as written, by reason: {split.groups_skipped}")
         row_count = pl.scan_parquet(str(temp_output_path)).select(pl.len()).collect().item()
         temp_output_path.replace(output_path)
 
@@ -352,6 +370,8 @@ def user_vcf_normalized(
         metadata_dict["rows_after_filter"] = MetadataValue.int(row_count)
         metadata_dict["rows_removed"] = MetadataValue.int(rows_before_filter - row_count)
     metadata_dict["quality_filters_hash"] = MetadataValue.text(filters.config_hash())
+    metadata_dict["split_multiallelic_rows_resolved"] = MetadataValue.int(split.rows_resolved)
+    metadata_dict["split_multiallelic_groups_skipped"] = MetadataValue.json(split.groups_skipped)
 
     # Records the caller passed that state no depth/QUAL survive by the threshold abstaining
     # (QualityFilters.unstated_metrics). Say how many, so the policy is visible rather than silent.

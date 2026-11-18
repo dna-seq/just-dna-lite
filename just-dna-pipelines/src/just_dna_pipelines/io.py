@@ -1,10 +1,13 @@
+from itertools import groupby
 from pathlib import Path
 from typing import Union, Optional, Literal, Tuple, TypeVar
 import polars as pl
 import polars_bio as pb
 from eliot import start_action
+from pydantic import BaseModel, Field
 import os
 import pooch
+import re
 import tempfile
 
 # Type variable for generic data types
@@ -192,6 +195,114 @@ def _compute_genotype_expr(gt_col: str = "GT", ref_col: str = "ref", alt_col: st
         .list.sort()
         .alias("genotype")
     )
+
+
+
+# VCF's allele for "overlapped by a deletion that starts upstream", here: a haplotype whose allele cannot
+# be written in a split row's shorter REF frame (the deletion runs past that row's REF).
+SPANNING_DELETION_ALLELE = "*"
+
+_GT_TOKEN = re.compile(r"\d+|\.")
+_SPLIT_COLUMNS = ["chrom", "start", "ref", "alt", "GT", "genotype"]
+
+
+class SplitResolution(BaseModel):
+    """What `resolve_split_multiallelic_genotypes` did, for logs and asset metadata."""
+
+    groups_resolved: int = 0
+    rows_resolved: int = 0
+    groups_skipped: dict[str, int] = Field(default_factory=dict)
+
+
+def _resolve_split_group(rows: list[dict]) -> tuple[str, dict[tuple[str, str], list[str]]]:
+    """One position's rows → (`"resolved"` or why not, row (ref, alt) → its genotype in its own frame).
+
+    A split row's GT names its own ALT as `1` and every other allele, REF or another ALT, as `0`,
+    slot by slot. So each haplotype slot is the ALT of the one row that marks it `1`, or REF when no
+    row does. Rows are put on the longest REF first: `bcftools norm -m-` trims each split row, so
+    `AT>A,ATT` arrives as `AT>A` and `A>AT`, whose REFs are prefixes of the site's.
+    """
+    if any(not r["alt"] or "|" in r["alt"] or not r["ref"] for r in rows):
+        return "not_split", {}
+    tokens = [_GT_TOKEN.findall(r["GT"] or "") for r in rows]
+    if any(not t or "." in t for t in tokens):
+        return "missing_call", {}
+    if any(x not in ("0", "1") for t in tokens for x in t):
+        return "not_split", {}
+    if len({len(t) for t in tokens}) != 1:
+        return "ploidy_differs", {}
+    if len({(r["ref"], r["alt"]) for r in rows}) != len(rows):
+        return "duplicate_allele", {}
+    site_ref = max((r["ref"] for r in rows), key=len)
+    if any(not site_ref.startswith(r["ref"]) for r in rows):
+        return "ref_not_prefix", {}
+    slots: list[str] = []
+    for k in range(len(tokens[0])):
+        claims = [r for r, t in zip(rows, tokens) if t[k] == "1"]
+        if len(claims) > 1:
+            return "slot_claimed_twice", {}
+        slots.append(claims[0]["alt"] + site_ref[len(claims[0]["ref"]):] if claims else site_ref)
+    resolved: dict[tuple[str, str], list[str]] = {}
+    for r in rows:
+        suffix = site_ref[len(r["ref"]):]
+        resolved[(r["ref"], r["alt"])] = sorted(
+            a[: len(a) - len(suffix)] if a.endswith(suffix) and len(a) > len(suffix) else SPANNING_DELETION_ALLELE
+            for a in slots
+        )
+    return "resolved", resolved
+
+
+def resolve_split_multiallelic_genotypes(lf: pl.LazyFrame) -> tuple[pl.LazyFrame, SplitResolution]:
+    """Give the rows of a VCF split one per ALT the genotype of the site they came from.
+
+    `bcftools norm -m-` turns `A>G,T 1/2` into `A>G 1/0` and `A>T 0/1`. The `0` there means "another
+    ALT", not REF, so `_compute_genotype_expr` reads `A/G` and `A/T`: a reference copy the sample does
+    not have. The same split turns `1/1` into a `1/1` row plus a false `0/0` one. Every row at a
+    position shared with another row is checked; a group that is a split gets the site genotype on
+    each of its rows, in that row's REF frame (an allele that frame cannot spell is
+    `SPANNING_DELETION_ALLELE`). Anything else at a shared position (independent records, missing
+    calls, an unsplit multi-allelic row) keeps its genotype and is counted by reason. GT stays as the
+    caller wrote it.
+
+    Collects the rows at shared positions (about 1.5% of a WGS callset), so callers should hand it a
+    frame that is cheap to scan twice, such as a parquet.
+    """
+    names = lf.collect_schema().names()
+    if any(c not in names for c in _SPLIT_COLUMNS):
+        return lf, SplitResolution()
+    shared = lf.group_by("chrom", "start").len().filter(pl.col("len") > 1).select("chrom", "start")
+    candidates = (
+        lf.join(shared, on=["chrom", "start"], how="semi")
+        .select(_SPLIT_COLUMNS)
+        .sort("chrom", "start", "ref", "alt")
+        .collect()
+    )
+    stats = SplitResolution()
+    fixed: list[tuple] = []
+    for (chrom, start), group in groupby(candidates.iter_rows(named=True), key=lambda r: (r["chrom"], r["start"])):
+        rows = list(group)
+        reason, genotypes = _resolve_split_group(rows)
+        if reason != "resolved":
+            stats.groups_skipped[reason] = stats.groups_skipped.get(reason, 0) + 1
+            continue
+        stats.groups_resolved += 1
+        stats.rows_resolved += len(rows)
+        fixed.extend((chrom, start, ref, alt, g) for (ref, alt), g in genotypes.items())
+    if not fixed:
+        return lf, stats
+    schema = candidates.schema
+    table = pl.DataFrame(
+        fixed,
+        schema={"chrom": schema["chrom"], "start": schema["start"], "ref": schema["ref"],
+                "alt": schema["alt"], "_split_genotype": schema["genotype"]},
+        orient="row",
+    )
+    resolved = (
+        lf.join(table.lazy(), on=["chrom", "start", "ref", "alt"], how="left", maintain_order="left")
+        .with_columns(pl.coalesce("_split_genotype", "genotype").alias("genotype"))
+        .drop("_split_genotype")
+    )
+    return resolved, stats
 
 
 def read_vcf_file(

@@ -555,6 +555,14 @@ disables; absent section = no filtering) is applied in `user_vcf_normalized`. A 
   (`TargetedConflict` stays dropped). Normalization reports `kept_depth_unstated` /
   `kept_qual_unstated`; the field is in `config_hash`. Tests: `test_quality_filters.py`.
 - `sex="Female"` logs a warning for chrY variants but never removes them.
+- **A VCF split one row per ALT misreads multi-allelic sites**: `bcftools norm -m-` writes `1/2` as `1/0` +
+  `0/1`, whose `0` is the other ALT. `user_vcf_normalized` rewrites `genotype` on such rows from the
+  site (`io.resolve_split_multiallelic_genotypes`, each row in its own trimmed REF frame, `*` where that
+  frame cannot spell an allele); GT stays as written, and the phenotype caller trusts `genotype` over a
+  disagreeing GT (unphased). Verified on a DeepVariant split file: 150,249 rows equal the unsplit file's.
+  Tests: `test_split_multiallelic.py`. **Open:** staleness is the quality-filter hash only, so a parquet
+  normalized before this fix is still reused; re-normalize split-VCF samples by hand until a
+  normalization version joins `normalized_parquet_is_current`.
 
 ## Dagster pipeline
 
