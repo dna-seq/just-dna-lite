@@ -158,10 +158,13 @@ items:
   anchor: DNA-Li
   context_before: SecvADN SRL † These authors contributed equally. * Co-supervising authors. Abstract Just-
   context_after: te is the core of an open-source ecosystem for reading a personal
-  comment: |-
-    so maybe it is a good ideea to mention in the abstract part what i wrote in the draft text above- because you start describing the system- which is accurate but how about beginning with something like this paper presents just dna lite, an open core...that is used to....providing a methodology or workflow to researchers by....
+  comment: 'so maybe it is a good ideea to mention in the abstract part what i wrote in the draft text above- because
+    you start describing the system- which is accurate but how about beginning with something like this paper presents
+    just dna lite, an open core...that is used to....providing a methodology or workflow to researchers by....
+
     it is closely related to paper.... where we present how new features can be added....
-    @antonkulaga@gmail.com
+
+    @antonkulaga@gmail.com'
   where: Abstract
   line: 29
   status: open
@@ -193,10 +196,13 @@ items:
   anchor: differ
   context_before: trait side by side, so users see where the models agree and
   context_after: . AI assistants can also run annotation and scoring through Model Context
-  comment: |-
-    it does need a bit of rephrasing
-    like maybe for every variant there is a risk associated with it according to publicly available databases and studies. It uses a template of a catalog to store them in order according to the findings...or some sort like that
-    @antonkulaga@gmail.com
+  comment: 'it does need a bit of rephrasing
+
+    like maybe for every variant there is a risk associated with it according to publicly available databases and
+    studies. It uses a template of a catalog to store them in order according to the findings...or some sort like
+    that
+
+    @antonkulaga@gmail.com'
   where: Abstract
   line: 33
   status: open
@@ -889,9 +895,10 @@ items:
   replies:
   - author: Livia Zaharia
     date: '2026-11-01T20:42:08Z'
-    text: |-
-      actually agree with georg- these paper crazy people want exactly like in legislation to always mention to what you a re refering even though you did mention them before somewhere
-      @antonkulaga@gmail.com
+    text: 'actually agree with georg- these paper crazy people want exactly like in legislation to always mention
+      to what you a re refering even though you did mention them before somewhere
+
+      @antonkulaga@gmail.com'
 - id: C131
   kind: comment
   author: Livia Zaharia
@@ -901,9 +908,10 @@ items:
   anchor: A web application is the main interface, and typed MCP tools serve AI assistants (Section 3.2.1).
   context_before: the application code, and columnar storage with streaming operations limits memory use.
   context_after: 2.1 Annotation Pipeline The standalone annotation engine uses polars-bio for VCF reading
-  comment: |-
-    could we have some nice schemas? i think in some cases they would be helpful for reviewers- honestly sometimes i do have to read the text multiple times to get the meaning so some graphics may be helpful
-    @antonkulaga@gmail.com
+  comment: 'could we have some nice schemas? i think in some cases they would be helpful for reviewers- honestly
+    sometimes i do have to read the text multiple times to get the meaning so some graphics may be helpful
+
+    @antonkulaga@gmail.com'
   where: '2. System and Methods: Platform Architecture'
   line: 107
   status: open
@@ -932,9 +940,11 @@ items:
   anchor: 2.1 Annotation Pipeline
   context_before: the main interface, and typed MCP tools serve AI assistants (Section 3.2.1).
   context_after: The standalone annotation engine uses polars-bio for VCF reading (a genomics library
-  comment: |-
-    also not 100% related to thi subject but to the general paper- put a page counter on the document- maybe footer?
-    is footer with notes at the base accepted in the format? like not to search for reference somewhere in the back of the text but while you read
+  comment: 'also not 100% related to thi subject but to the general paper- put a page counter on the document- maybe
+    footer?
+
+    is footer with notes at the base accepted in the format? like not to search for reference somewhere in the back
+    of the text but while you read'
   where: 2.1 Annotation Pipeline
   line: 110
   status: open
@@ -1045,9 +1055,10 @@ items:
   replies:
   - author: Livia Zaharia
     date: '2026-11-01T21:19:59Z'
-    text: |-
-      i just think we should have some simple genomics explanation paragraphs.since i don't know if reviewers are specialiezed similar in both informatics and genomics
-      @antonkulaga@gmail.com
+    text: 'i just think we should have some simple genomics explanation paragraphs.since i don''t know if reviewers
+      are specialiezed similar in both informatics and genomics
+
+      @antonkulaga@gmail.com'
 - id: C133
   kind: comment
   author: Livia Zaharia
@@ -1061,9 +1072,9 @@ items:
     so existing Parquet modules need no CSV files.'
   context_before: and studies.parquet when available; other module families have a different lead table.
   context_after: The just-dna-format library defines the authored specification and the manifest, integrity and
-  comment: |-
-    nice schema feeling-please insert
-    each paragraph from this section would be nice and explained with a a schema- tink of it a mini slideshow silde
+  comment: 'nice schema feeling-please insert
+
+    each paragraph from this section would be nice and explained with a a schema- tink of it a mini slideshow silde'
   where: 2.2 Annotation Modules as Data
   line: 141
   status: open
@@ -1517,9 +1528,11 @@ items:
     as Pa
   context_before: be scored” (Table S5). Section 4.3 gives the counts. A prepared catalogue.
   context_after: rquet and downloaded on first use from HuggingFace (datasets just-dna-seq/pgs-catalog and just-dna-seq/prs-percentiles),
-  comment: |-
-    and another general ideea- present first the simple structure then take each component and explain there what particular cases and specific genomic things that can happen there- it feel sthat text has a lot of content but is not structured but hard to follow
-    so restructure and insert graphics
+  comment: 'and another general ideea- present first the simple structure then take each component and explain there what
+    particular cases and specific genomic things that can happen there- it feel sthat text has a lot of content
+    but is not structured but hard to follow
+
+    so restructure and insert graphics'
   where: 3.2 Polygenic Risk Scores
   line: 230
   status: open
@@ -1988,9 +2001,10 @@ items:
   replies:
   - author: Livia Zaharia
     date: '2026-11-01T21:52:25Z'
-    text: |-
-      make a table with was tested and what not or usage-why so much text when i can see tables which are usually easier to read
-      @antonkulaga@gmail.com
+    text: 'make a table with was tested and what not or usage-why so much text when i can see tables which are usually
+      easier to read
+
+      @antonkulaga@gmail.com'
 - id: C140
   kind: comment
   author: Livia Zaharia
@@ -2595,9 +2609,10 @@ items:
     three modes: warm runs reuse the sample’s quality-filtered table, so the VCF is not read again; full runs'
   context_before: public genomes, for Generation I given an OakVar store account (Table S2).
   context_after: start from a fresh instance and read the VCF, as every OakVar
-  comment: |-
-    can we have a technical annex where we describe the experiments and present here only the results?
-    i mean describin what kind of runs is a good ideea but describing how the machine was idle or not feels a bit like reading a log file of the run- which is interesting if debugging but might be too technic
+  comment: 'can we have a technical annex where we describe the experiments and present here only the results?
+
+    i mean describin what kind of runs is a good ideea but describing how the machine was idle or not feels a bit
+    like reading a log file of the run- which is interesting if debugging but might be too technic'
   where: 4.1 Annotation Speed
   line: 312
   status: open
@@ -3215,9 +3230,10 @@ items:
     text: Thanks for this comment, it pushed Livia to actually contribute to the text ;-)
   - author: Livia Zaharia
     date: '2026-11-01T21:49:28Z'
-    text: |-
-      I mean I actually asked about it- and I did put comments which in my opinion are obvious and makeeasier to read through the paper
-      however I am wondering -does publication has  a maximum mandatory length? since I see we already have 27 pages
+    text: 'I mean I actually asked about it- and I did put comments which in my opinion are obvious and makeeasier
+      to read through the paper
+
+      however I am wondering -does publication has  a maximum mandatory length? since I see we already have 27 pages'
 - id: C117
   kind: comment
   author: G Fue
@@ -3266,12 +3282,10 @@ items:
   - deleted: '1'
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
   line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted, with S1. Carry it into v0.8''s master. What remains of Georg''s
-    S1 after its asterisk part was accepted in the Doc: Livia Zaharia''s affiliation from 1 to 4. Decide it with
-    S1.'
+  status: addressed
+  now: '**Authors:** Kulaga Anton^1,2,†^, Usanov Nikolay^3,4,†^, Borysova Olga^4^, Karmazin Alexey^3,4^, Koval Maria^4^,
+    Pushkareva Malvina^4^, Zaharia Livia^4^, Fuellen Georg^1^, Tacutu Robi^2,\*^'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Submission package
   severity: minor
   stage: final
@@ -3298,12 +3312,11 @@ items:
       hum in Rostock
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
   line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved after the asterisk edit (S1, S22) was accepted. Same change
-    as S1: remove the asterisk after ''Fuellen Georg^1,*^'' and decide who the corresponding author is (C64). Georg''s
-    reply names https://www.aging-us.com/article/206431 as the precedent; ask him which role he wants recorded.'
+  status: addressed
+  now: '**Authors:** Kulaga Anton^1,2,†^, Usanov Nikolay^3,4,†^, Borysova Olga^4^, Karmazin Alexey^3,4^, Koval Maria^4^,
+    Pushkareva Malvina^4^, Zaharia Livia^4^, Fuellen Georg^1^, Tacutu Robi^2,\*^'
+  why: The asterisk is off Georg's name (S1, accepted in the Doc); carried into the master on 2026-11-19 (0eb68c5).
+    Who is corresponding author stays open with C64.
   category: Submission package
   severity: minor
   stage: final
@@ -3327,13 +3340,12 @@ items:
   - inserted: ' to the Internet'
   where: Abstract
   line: 29
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: answered in other words: the Abstract now says ''does not have to
-    be uploaded to a third-party server''. Carry it into v0.8''s master. S10 and S19 (Box 1, Section 5.2) are still
-    pending in the Doc. Accept Georg''s edit: ''so the genome does not have to be uploaded to the Internet''. S10
-    and S19 make the same edit in Box 1 and Section 5.2.'
+  status: addressed
+  now: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a whole-genome variant file (VCF) and computes polygenic
+    risk scores locally, so the genome does not have to be uploaded to a third-party server.
+  why: Accepted in the Doc in other words ('uploaded to a third-party server' rather than 'to the Internet'); carried
+    into the master on 2026-11-19 (0eb68c5).
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3354,13 +3366,12 @@ items:
   comment: you can just upload to your computer...
   where: Abstract
   line: 31
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved: the Abstract now says ''uploaded to a third-party server''
-    (S2). Answered by accepting S2 (''uploaded to the Internet''): ''uploaded'' alone can mean copying the file
-    onto one''s own computer. Livia''s reply proposes ''uploaded to a publicly accessible location'' (the Internet,
-    a server and the like); either removes the ambiguity.'
+  status: addressed
+  now: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a whole-genome variant file (VCF) and computes polygenic
+    risk scores locally, so the genome does not have to be uploaded to a third-party server.
+  why: Answered by the Abstract's 'uploaded to a third-party server', accepted in the Doc; carried into the master
+    on 2026-11-19 (0eb68c5).
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3409,16 +3420,13 @@ items:
   - deleted: already uses
   where: Abstract
   line: 31
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''no coding involved'', ''without the need of a software
-    update''). Carry it into v0.8''s master. Accept Georg''s edits (''write with no coding involved'', ''publish
-    new modules'', ''where users browse'', ''without the need of a software update'') except one: ''employing an
-    AI assistant of the researcher''s choice'' says the plugin works in any assistant, while Section 3.2.1 says
-    just-module-creator ''adds module-authoring skills for Claude Code and Codex''. Write ''employing an AI assistant
-    such as Claude Code or Codex'', or keep ''of the researcher''s choice'' only if the plugin is known to run in
-    others.'
+  status: addressed
+  now: What the platform reports comes from modules, versioned tables of variant-trait associations that researchers
+    write with no coding involved. Ready-made modules cover longevity, disease predisposition and drug response.
+    Researchers publish new modules to just-dna-registry, an open registry that works like an app store, where users
+    browse, install and apply them without the need of a software update. The just-module-creator plugin drafts
+    modules from the literature and public databases employing an AI assistant of the researcher's choice.
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3443,12 +3451,12 @@ items:
   - inserted: ' (further called PGS)'
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''Polygenic scores (further called PGS)''). Carry it into
-    v0.8''s master. The PGS Catalog itself is still not explained (C48). Define the abbreviation where the Abstract
-    first uses it, ''polygenic scores (PGS)'', so that ''PGS Catalog'' reads. C126 asks the same for every abbreviation.'
+  status: addressed
+  now: Every matched variant links to its reported effect and its sources. Polygenic scores (further called PGS)
+    come from just-prs, a library that also works on its own. It computes PGS Catalog scores from a cleaned copy
+    of the Catalog, places each within a reference population matched to the genome's inferred ancestry, labels
+    its quality and shows all models for a trait side by side, so users see where the models agree and differ.
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3543,15 +3551,14 @@ items:
   - inserted: 'whole-genome DNA '
   where: 1.1 Background and Significance
   line: 52
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted, ''mostly'' included, against the advice below; the authors''
-    call. Carry it into v0.8''s master. Accept ''raw variant data'' and ''whole-genome DNA sequencing''; decline
-    ''mostly'' and keep ''can'': most consumers'' raw data still come from genotyping arrays (23andMe, AncestryDNA,
-    the consumer formats Sections 3.2 and 5.4 name), and no source in the paragraph says sequencing is now the main
-    source. Result: ''That raw variant data can now come from whole-genome DNA sequencing: ...''. Livia''s S25 adds
-    an ''s'' inside this edit (''mostly comes'').'
+  status: addressed
+  now: 'That raw variant data now mostly come from whole-genome DNA sequencing: several companies offer direct-to-consumer
+    sequencing services (O''Daniel et al., 2025). While the National Human Genome Research Institute (NHGRI) estimates
+    that the first human genome cost US$500 million to US$1 billion (NHGRI, 2021), by 2025, manufacturers advertised
+    the sequencing of a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory
+    studies report higher costs after including labour, computing and analysis, with estimates depending on the
+    workflow and costing scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -3584,17 +3591,14 @@ items:
     inserted: ' b'
   where: 1.1 Background and Significance
   line: 52
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted except its ''s'', which stays pending as S29; the Doc now
-    reads ''While The National Human Genome Research Institute'', so lower-case ''the''. Carry it into v0.8''s master.
-    Two edits in one. Accept the merge of the two cost sentences into one contrast: ''While the National Human Genome
-    Research Institute (NHGRI) estimates that the first human genome cost US$500 million to US$1 billion (NHGRI,
-    2021), by 2025 manufacturers advertised the sequencing of a human genome for US$80 to US$200 (...)''. The ''s''
-    sits inside Georg''s pending S4 (''raw variant data now mostly comes from whole-genome DNA sequencing'') and
-    follows it: S4''s triage keeps ''can now come'' and declines ''mostly'', since most consumers'' raw data still
-    come from genotyping arrays, and with that wording the ''s'' is not needed.'
+  status: addressed
+  now: 'That raw variant data now mostly come from whole-genome DNA sequencing: several companies offer direct-to-consumer
+    sequencing services (O''Daniel et al., 2025). While the National Human Genome Research Institute (NHGRI) estimates
+    that the first human genome cost US$500 million to US$1 billion (NHGRI, 2021), by 2025, manufacturers advertised
+    the sequencing of a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory
+    studies report higher costs after including labour, computing and analysis, with estimates depending on the
+    workflow and costing scope (Mordaunt et al., 2024; Ehman et al., 2025).'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3623,8 +3627,14 @@ items:
   - inserted: -based
   where: 1.2 Overview of Just-DNA-Lite
   line: 73
-  status: open
-  now: ''
+  status: addressed
+  now: Just-DNA-Lite is a local, open-source platform for annotating a personal genome and computing polygenic scores.
+    We developed it as a ground-up rewrite of Just-DNA-Seq (Kulaga et al., 2024), whose first generation (Generation
+    I), built for longevity research, was a set of annotation and report modules for OakVar, a Python variant-analysis
+    framework derived from OpenCRAVAT (Pagel et al., 2020). Just-DNA-Lite (Generation II) removes the OakVar dependency
+    entirely and uses a standalone annotation engine. It also replaces Python-based annotation plugins with declarative
+    modules discoverable from configured sources (Section 2.2). Supplementary S1 describes Generation I, and Figure
+    S1 gives a historical overview of its module domains.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3632,8 +3642,7 @@ items:
     verdict: missed
     miss_reason: wording-preference
     note: '''Local-based'' instead of ''local''.'
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''Python-based'', in Section 1.2), as rounds.py sync confirms.
-    Carry it into v0.8''s master.'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
 - id: S27
   kind: suggestion
   author: G Fue
@@ -3656,12 +3665,14 @@ items:
   - inserted: ' citizen scientists,'
   where: 1.2 Overview of Just-DNA-Lite
   line: 78
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted, with Livia''s ''including'' (S28). Carry it into v0.8''s
-    master. Georg''s S7 as the Doc now holds it, with Livia''s ''including'' (S28); follows the decision on naming
-    the first user group (C58, C130).'
+  status: addressed
+  now: The resulting workflow lets users choose published annotation content, apply it to their own genome and inspect
+    the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Researchers, including citizen scientists, with different
+    needs enter this workflow at different points; Box 1 names the user groups and where each starts.
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3691,11 +3702,14 @@ items:
   - deleted: .
   where: 1.2 Overview of Just-DNA-Lite
   line: 78
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted. Carry it into v0.8''s master. Livia''s edit of Georg''s
-    suggestion S27 (''incl.'' to ''including''); follows the decision on naming the first user group (C58, C130).'
+  status: addressed
+  now: The resulting workflow lets users choose published annotation content, apply it to their own genome and inspect
+    the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Researchers, including citizen scientists, with different
+    needs enter this workflow at different points; Box 1 names the user groups and where each starts.
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: info
   stage: writing
@@ -3750,11 +3764,15 @@ items:
   - deleted: nothing
   where: 1.2 Overview of Just-DNA-Lite
   line: 84
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted (''so users do not need to assemble these''). Carry it into
-    v0.8''s master. Accept Georg''s edit: ''so users do not need to assemble these''.'
+  status: addressed
+  now: '- **Polygenic scores with the context to read them.** The PGS Catalog publishes polygenic score models as
+    scoring files; just-prs computes them for a genome and adds what a reader needs to judge each result. It infers
+    the genome''s ancestry, places each score as a percentile in the matching 1000 Genomes reference population,
+    reports how much of the score the genome covers, labels the result''s quality and groups all models for a trait
+    so that their agreement and disagreement are visible. The scoring files, cleaned metadata and audited reference
+    distributions, for 6,117 scores across 778 traits, are downloaded on first use, so users do not need to assemble
+    these (Sections 3.2 and 4.3).'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3774,11 +3792,24 @@ items:
   comment: (?)
   where: 2.3 Web Interface and Self-Exploration
   line: 165
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved: Figure 1''s title now reads ''The Just-DNA-Lite web interface
-    elements.'' Write ''Figure 1. The Just-DNA-Lite web interface, as served by the public demonstration (https://lite.just-dna.life/).'''
+  status: addressed
+  now: '**Figure 1. The Just-DNA-Lite web interface elements.** (**a**) The Module Catalog, which lists the modules
+    published in just-dna-registry. The panel on the left shows the selected module''s publishing account, version
+    picker, variant and gene counts and the button that installs it; each card gives a module''s publishing account,
+    version, variant count and downloads (here from the accounts `eric-mods`, `just-dna-seq` and `ksuha-dna`). (**b**)
+    The Longevity Variants section of an HTML report for Anton Kulaga''s public genome. It opens with counts of
+    matched variants, of positive and negative associations and of inferred genotypes, and the summed module weight;
+    the counts of matched variants and of associations, and the summed weight, include the inferred genotypes. Each
+    table row gives the genotype, the module''s alleles, zygosity, weight and buttons that open a prepared question
+    in an external AI assistant; the first row is an inferred homozygous-reference genotype (Section 2.1). The FOXO3
+    rs2802292 row is open to the module''s conclusion, curation method, direction and priority, and to the first
+    two of its five linked studies, each with its PubMed ID, population and design; its priority of 0.95 (the SNP
+    weight, *w*_SNP, of Section 3.1), times 0.5 for a heterozygous genotype, gives its weight of 0.475. Both panels
+    were captured at https://lite.just-dna.life/ on 26 October 2026 and are cropped; panel b joins two parts of
+    the section, its summary cards and the table of its insulin-signalling category, and leaves out the part between
+    them.'
+  why: Figure 1's title edited in the Doc to 'The Just-DNA-Lite web interface elements.'; carried into the master
+    on 2026-11-19 (0eb68c5).
   category: Figures and tables
   severity: minor
   stage: writing
@@ -3941,17 +3972,10 @@ items:
   - deleted: ',*'
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
   line: 6
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted (Livia Zaharia''s affiliation is 4, the asterisk is off Georg''s
-    name). Carry it into v0.8''s master. Check that the footnote reads ''* Co-supervising author.'' Decide the author
-    marks and affiliations. Georg''s edit does two things: it changes Livia Zaharia''s affiliation from 1 (Rostock
-    University Medical Center) to 4 (SecvADN SRL), and it removes the co-supervising asterisk from his own name
-    (as he asks in C45). Accepting it leaves Robi Tacutu the only co-supervising author, so the footnote ''* Co-supervising
-    authors.'' becomes singular, and a SecvADN affiliation for Livia Zaharia belongs in Competing Interests (the
-    run''s decision D11 already asks for every author''s competing interests). Confirm both with Georg and Livia.
-    In the Doc the asterisk part was accepted; S22 holds the rest.'
+  status: addressed
+  now: '**Authors:** Kulaga Anton^1,2,†^, Usanov Nikolay^3,4,†^, Borysova Olga^4^, Karmazin Alexey^3,4^, Koval Maria^4^,
+    Pushkareva Malvina^4^, Zaharia Livia^4^, Fuellen Georg^1^, Tacutu Robi^2,\*^'
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Submission package
   severity: minor
   stage: final
@@ -3981,15 +4005,14 @@ items:
     inserted: ', incl. citizen scientists,'
   where: 1.2 Overview of Just-DNA-Lite
   line: 78
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: accepted: Section 1.2 reads ''Researchers, including citizen scientists,
-    with different needs enter this workflow''. Carry it into v0.8''s master. Follows the decision in C58 (naming
-    the first user group researchers, including citizen scientists). If accepted, fix the grammar of the edit, which
-    reads ''Researchers, incl. citizen scientists, with different needs enter this workflow'': write ''Researchers,
-    including citizen scientists, enter this workflow at different points, depending on their needs; Box 1 names...''.
-    If not, keep ''People''. The Doc now holds it as S27, with Livia''s ''including'' (S28).'
+  status: addressed
+  now: The resulting workflow lets users choose published annotation content, apply it to their own genome and inspect
+    the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population
+    comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source
+    registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations
+    as tools instead of writing their own analysis code. Researchers, including citizen scientists, with different
+    needs enter this workflow at different points; Box 1 names the user groups and where each starts.
+  why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
   stage: writing

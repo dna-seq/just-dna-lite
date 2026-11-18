@@ -67,3 +67,11 @@ was shown to that session and will not be shown again: its first work is repeate
   rs9536314, rs2149954 (nine counting APOE proxies). Sent to longevity-loci/lead in #agent-chat > longevity-loci deck.
 - **Waits on:** longevity-loci's PR into this repo (Anton, 2026-11-19: v2 supersedes the v1 port; supplements under
   `docs/longevitymap_v2/`, no S-number yet). The paper quotes the module that PR ships, read at its commit.
+- **2026-11-19, later:** Anton: round v0.7 is worked in place. The Doc is read through the Google Docs connector
+  (`read_doc` with comments; Drive connector also available); rclone is not needed. Nine Doc edits carried (0eb68c5),
+  16 ledger items addressed. The Doc holds 71 open suggestions by "Winter Newt", all posted 2026-11-02 23:55 in one
+  burst (an agent run's, it seems): Anton's to accept or reject, not signed by this seat.
+- **To file with the tooling seat (manuscript-skills), unattended:** (1) `comments.py import-gdoc` on a ledger first
+  pulled from a .docx export does not know its items again: it doubled 132 items to 329 and wrote four people into
+  `rev-marks.toml` unasked (reverted). (2) `comments.py status --strict` in a round worked in place flags every
+  carried item "addressed, but its paragraph reads the same", since old and new round are one file.
