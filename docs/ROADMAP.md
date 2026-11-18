@@ -18,7 +18,7 @@ The paper's input-format claims depend on which.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** waits until 2026-11-21: longevity-loci's pull request, to review · **Owner:** lead
+**State:** waits until 2026-11-21: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
@@ -64,3 +64,15 @@ or a close; nothing is posted without the maintainer's word on that text.
 The report prints each module's `artifact.digest` as the module's own claim; nothing calls
 `verify_manifest` (`CLAUDE.md`, "Report"). Wiring it with `require_marketplace=True` rejects every
 local compile, so the design question is what a local or sandbox module shows instead.
+
+## RM8 — A weights-led module's haplotype pairs are never called
+
+**State:** unattended · **Owner:** lead
+
+Longevity Map 2.0.0 is led by `variants` and also carries `haplotypes` and `diplotypes`, so that APOE
+is read once, as its ε pair. The engine sends a module to the phenotype caller only when it is
+phenotype-led, so on the public demo genome the 2.0.0 report shows no APOE result (found by
+longevity-loci's lead while checking pull request 37, 2026-11-19; not reproduced here yet). Reproduce
+it on the compiled spec in `data/modules/longevitymap_v2/` once the pull request is merged, then make
+the engine call the pairs of a module that has both, with the result in the report's combined
+section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the merge.
