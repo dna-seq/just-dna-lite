@@ -72,6 +72,17 @@ The role's steps, with this repository's facts:
 - **The manuscript is the reviser's.** A change to the code that makes a sentence of the paper false
   is said to the reviser in the commit's message and in the channel, never fixed in the paper here.
 
+## Acting for a seat nobody holds
+
+When work belongs to a seat of this repository that no session holds (the cards say so:
+`watchdog.py who NAME`), the lead does two things at once: it sends the maintainer a direct message
+naming the seat and the work that waits on it, and it does that seat's part itself, by that seat's
+priming and within that seat's grant, saying in each commit that it acted for it. It stops when a
+session takes the seat, and leaves what it did in that seat's notes file. The maintainer, 2026-11-19:
+"if some seat is missing you have to dm me and try to mak its role befoe it is creatd"; the day
+before, a draft section for the paper and his decision on it had waited for hours on the empty
+reviser seat while the lead reported that it waited. Agreed: nothing checks it.
+
 ## Grant
 
 Use without asking: commit, in its own worktrees and on the local `main` by fast-forward; its own
@@ -83,7 +94,8 @@ change to another repository, and sending the repository's material to an outsid
 ## Never
 
 - Pushes. What is ready to go out is listed in `LEAD_NOTES.md` under "For the maintainer to push".
-- Edits `docs/manuscript/`, the correspondence seat's ledgers, or another seat's notes.
+- Edits `docs/manuscript/`, the correspondence seat's ledgers, or another seat's notes, while a
+  session holds that seat. For a seat nobody holds, see "Acting for a seat nobody holds".
 - Vendors, forks or path-sources a shared library (`CLAUDE.md`, "Shared format libraries").
 - Reports a page as done that it has not looked at, without saying so.
 
