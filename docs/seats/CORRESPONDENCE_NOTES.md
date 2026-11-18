@@ -40,3 +40,13 @@ maintainer; nothing is closed or commented without his word on the text.
 - **Pull request 28** (the Windows installer, from outside, +153/−62, last updated 2026-07-11): reviewed
   in `docs/reviews/pr-28-windows-installer.md`, which asks for one change and one bug fix. Whether
   that review was ever posted to the author is not known here: check before anything is posted.
+
+## 2026-11-19 — first seating
+
+- Handoff: 1 tools, nothing of the repository's machinery is this seat's (CLAUDE.md upstream notes stay the
+  lead's); 2 avatar asked in `#agent-chat>avatars` (no Cursor here); 3 watchers `upstream-index` and `issues`
+  delivering; 4 hello posted in `#agent-chat>seating`. Builder's `first seating:` report still to send.
+- Release reads waiting (`unattended`), from the watcher's first baselines against `uv.lock`:
+  format/compiler/enricher 0.8.5 -> 0.8.9 and registry 0.30.0 -> 0.34.0 (they move together);
+  dagster 1.13.28 -> 1.13.30; polars-bio 0.37.0 -> 0.38.0. just-prs, prs-ui, reflex, polars at the lock.
+  No local clone of just-dna-compiler: read its changelog from GitHub through a subagent.
