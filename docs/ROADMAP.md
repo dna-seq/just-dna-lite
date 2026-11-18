@@ -18,7 +18,7 @@ The paper's input-format claims depend on which.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** blocked: desk #60 (if nobody answers, nothing changes in the app, and the reviser raises a short passage for the paper) · **Owner:** lead
+**State:** waits until 2026-11-21: the reviser seat taken, which writes the paper's part · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
@@ -26,6 +26,13 @@ maintainer, 2026-11-18). Here, `docs/longevitymap_v2/` holds the earlier researc
 and the paper's section 3.1 and Table S14 describe the module before the re-curation. Open, and the
 maintainer's: whether the app's default module list and the registry take the new module, under which
 name, and whether the paper's round v0.7 describes it (the reviser's work once decided).
+
+Decided on 2026-11-18 (the maintainer, in `#agent-chat > general chat`, relayed to desk #60): the paper
+takes the re-curated module in as "a key module of the whole system", with a section on its curation
+and what the new longevity analysis taught, not only as an example. That is the reviser's to write
+with him, from the item handed to it that day (counts, method and source commit from
+longevity-loci's lead). Not decided: when the app's default switches; it stays on the old module
+until the new one is in production on the registry.
 
 ## RM5 — The Ensembl join adds rsIDs only
 
