@@ -46,3 +46,24 @@ was shown to that session and will not be shown again: its first work is repeate
 - Not read yet: `changes-from-v0.6.md`, `comments.yaml`, the record, the marks report.
 - Not done: the picture (no drawing agent on this machine; ask in `#agent-chat>avatars`), the
   first-seating report to `@agents-kit/builder`. The hello to the secretary was sent.
+
+## 2026-11-19 — seated in a session of its own; the draft checked
+
+- **Preflight:** the marks lint clean (153 segments, 2 blind spots); the docx builds (`--no-pdf`); the master is
+  unchanged since the co-authors got it (`d85c7f9`). No: tectonic (no PDF build here), rclone's `gdrive` remote
+  (only `pulsewatch` configured, so no pull or push from this machine). `edits: apply` raised with Anton; the seat
+  works as `propose` meanwhile.
+- **Open with Anton (asked 2026-11-19 in session):** the longevity section and the answers to the 126 open comments
+  (96 Georg Fuellen, 30 Livia Zaharia) go into a new `v0.8/` (default) or into v0.7 in place.
+- **The draft, checked at longevity-loci `6cc9de0`** (a read-only clone beside this one).
+  Confirmed: tiers 15/75/43/36 of 169; six axes; 111 general ageing, 17 heart, 9 metabolism; 157 age unknown;
+  163 rsIDs, 489 genotype rows, 113/99/277 by `state`, 679 study rows, 51 PMIDs, no weight column; APOE once as
+  ε pairs; ZW10/TTC12 A→B on heterogeneity; CHRNA3/5 A→B; FOXO3 tier B (multivariate only); v1 975/47 by `state`
+  (`v1_audit_profile.json`); 127 of 132 inverted directions at Generation I curation (S14).
+  Wrong or unsupported: build is 164 rows, findings 169; 6,765 quotes (nothing produces it); 19 markers are inside
+  the 169 (6 tier A); "except APOE" uncounted, CDKN2B-AS1 contradicts it; "all present" false (11 of 145 leads
+  have no v2 variant within 500 kb); CELSR2 seed tier is B; tier A rule drops "≥3k cases"; 22,759 is PubMed only;
+  "18 rows" is queued papers; "about 7 of ~150" is 7 of 145; the five v1 rsIDs are rs429358, rs7412, rs2802292,
+  rs9536314, rs2149954 (nine counting APOE proxies). Sent to longevity-loci/lead in #agent-chat > longevity-loci deck.
+- **Waits on:** longevity-loci's PR into this repo (Anton, 2026-11-19: v2 supersedes the v1 port; supplements under
+  `docs/longevitymap_v2/`, no S-number yet). The paper quotes the module that PR ships, read at its commit.
