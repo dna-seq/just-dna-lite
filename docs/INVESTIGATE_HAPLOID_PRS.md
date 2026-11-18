@@ -54,3 +54,10 @@ is adding sex inference so a male's diploid-written X/Y calls score one copy.
 
 0.10.3 is on PyPI and is now the floor in the root `pyproject.toml`. The regression test (step 3) is
 still open, so this note stays open.
+
+## Update 2026-11-18: the regression test is in; this note is closed
+
+`tests/test_prs_haploid.py` scores a haploid alt and a haploid ref call on chrX and a haploid alt on
+chrM through both engines, on the just-prs locked now (0.11.0): each one-allele genotype counts as one
+copy at most, and the two engines agree. It was not run against just-prs 0.10.1, so it is not claimed
+to fail there; the crash on that version is the code reading above. Roadmap RM2 left the plan with it.

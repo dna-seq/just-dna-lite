@@ -5,16 +5,6 @@ owner. A done item leaves this file in the commit that lands it. Written on 2026
 `docs/INVESTIGATE_*.md`, `plans/handoffs/`, the open issues and the code as it was that day; nothing
 before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.md`).
 
-## RM2 — Reproduce the haploid-genotype crash in single-score PRS
-
-**State:** unattended · **Owner:** lead
-
-`docs/INVESTIGATE_HAPLOID_PRS.md` (2026-10-13) found by code reading that the Polars scoring engine
-raises on a haploid GT such as `"1"` (male chrX, chrM), on just-prs 0.10.1. The lock has moved to
-just-prs 0.11 since. Read-only: run its "To check" list on a VCF with haploid calls against the
-version locked now, and write what happens. A crash that is the library's goes to the correspondence
-seat as an upstream report; one that is ours becomes its own item.
-
 ## RM3 — The web UI treats every sample as GRCh38
 
 **State:** blocked: desk #59, yes after a present (if nobody answers, the small fix is built: a clear refusal of a file whose header is not GRCh38) · **Owner:** lead
