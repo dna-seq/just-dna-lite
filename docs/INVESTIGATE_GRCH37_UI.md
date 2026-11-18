@@ -19,6 +19,7 @@ reproduced in a running app).
   are silently wrong or empty.
 - **Docs disagree:** `README.md:122` and `docs/FAQ.md:33` say GRCh37 "can be lifted" or is "handled
   through liftover"; no VCF liftover exists (CLAUDE.md, "Writing preferences").
+  Reworded on 2026-11-18 (roadmap RM1): both now say there is no liftover and what a GRCh37 file gives.
 - **T2T:** `REFERENCE_GENOMES` lists `T2T-CHM13v2.0` (`state.py:149`); it is handled as GRCh38, with
   no T2T-specific processing.
 

@@ -5,15 +5,6 @@ owner. A done item leaves this file in the commit that lands it. Written on 2026
 `docs/INVESTIGATE_*.md`, `plans/handoffs/`, the open issues and the code as it was that day; nothing
 before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.md`).
 
-## RM1 — The README and the FAQ promise what the code does not do
-
-**State:** unattended · **Owner:** lead
-
-`README.md` (line 122) says the app takes 23andMe, AncestryDNA and MyHeritage files, and `docs/FAQ.md`
-(line 33) says GRCh37 is handled through liftover. `CLAUDE.md`, "Writing preferences", says both are
-planned and not done, and that no VCF liftover exists. Decided by that rule: reword both to what the
-code does today, checked against the upload path, and say the limits where a reader meets them.
-
 ## RM2 — Reproduce the haploid-genotype crash in single-score PRS
 
 **State:** unattended · **Owner:** lead

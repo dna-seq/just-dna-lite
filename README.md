@@ -119,7 +119,7 @@ There is no prebuilt image to pull yet. Compose builds it from this repository.
 <details>
 <summary><strong>Chip files from consumer tests, and the command line</strong></summary>
 
-23andMe, AncestryDNA, and MyHeritage read a few hundred thousand chosen positions. The app can take those files, and the report will be much thinner than one from a whole genome. Whole-genome and whole-exome files on the GRCh38 reference are the path this was built for. Older GRCh37 files can be lifted. A T2T reference is still planned.
+23andMe, AncestryDNA, and MyHeritage read a few hundred thousand chosen positions. The app reads VCF files only, so a raw chip download from one of those services is not accepted yet; support for chip files is planned. Whole-genome and whole-exome VCF files on the GRCh38 reference are the path this was built for. Older GRCh37 files are not converted: the app has no liftover, and a GRCh37 file is read as if it were GRCh38, which gives wrong or empty results. GRCh37 and T2T support are planned.
 
 ```bash
 uv run pipelines list-modules
