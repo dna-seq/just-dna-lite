@@ -89,6 +89,14 @@ says "from LongevityMap database". Once 2.0.0 is the default it should read, for
 re-curated from the evidence and graded by tier (2.0.0; 1.2.0 is the frozen port of HAGR's LongevityMap)". It is not
 changed by this pull request, because before the publish it would describe a module users cannot get yet.
 
+Which title a user sees: `module_metadata` wins over the module's own `module_spec.yaml`, so the catalog and report
+show "Longevity Map" / "Longevity Variants" from `modules.yaml`, not the spec's "Longevity genetics", until that block
+is changed. Decide which name ships and make the two agree.
+
+The HuggingFace publisher uploads and never deletes. Files of 1.2.0 that 2.0.0 does not carry (its `logo.png`, if
+present) stay in `data/longevitymap/`; discovery reads what the new `manifest.json` attests, so a leftover file is
+not read as part of 2.0.0, but delete it by hand if the folder should hold 2.0.0 alone.
+
 
 ```bash
 uv run pipelines v1-port publish longevitymap --out data/interim/release --dry-run
