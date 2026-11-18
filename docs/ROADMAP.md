@@ -26,7 +26,7 @@ seat as an upstream report; one that is ours becomes its own item.
 
 ## RM3 — The web UI treats every sample as GRCh38
 
-**State:** waits until 2026-11-21: the maintainer's ordering of this first roadmap, asked in the lead's session on 2026-11-18 · **Owner:** lead
+**State:** blocked: desk #59, yes after a present (if nobody answers, the small fix is built: a clear refusal of a file whose header is not GRCh38) · **Owner:** lead
 
 `docs/INVESTIGATE_GRCH37_UI.md` (2026-10-10, code reading only): the UI sets `genome_build = "GRCh38"` on
 every file load, so a GRCh37 or T2T sample is scored, ancestry-called and position-joined as GRCh38
@@ -37,7 +37,7 @@ The paper's input-format claims depend on which.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** waits until 2026-11-21: the maintainer's ordering of this first roadmap, asked in the lead's session on 2026-11-18 · **Owner:** lead
+**State:** blocked: desk #60 (if nobody answers, nothing changes in the app, and the reviser raises a short passage for the paper) · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
@@ -68,7 +68,7 @@ or a close; nothing is posted without the maintainer's word on that text.
 
 ## RM7 — A module's digest is shown, never verified
 
-**State:** waits until 2026-11-21: the maintainer's ordering of this first roadmap, asked in the lead's session on 2026-11-18 · **Owner:** lead
+**State:** after RM3 · **Owner:** lead
 
 The report prints each module's `artifact.digest` as the module's own claim; nothing calls
 `verify_manifest` (`CLAUDE.md`, "Report"). Wiring it with `require_marketplace=True` rejects every
