@@ -870,3 +870,9 @@ not a VCF liftover and cannot be reused for annotation.
 - Container: no GHCR image yet; `compose.yaml` builds locally. The `Containerfile` needs
   `chmod -R 777 .venv` (rootless Podman) and `UV_FROZEN=1`. Workshops live in `docs/workshops/`. Keep
   pytest in root dev dependencies. There is no `uv bundle`.
+
+## Seats
+
+Standing roles for agent sessions (a lead, a correspondence seat, a reviser) are described under
+`docs/seats/`; the seats kit (agent-seat-blueprints) runs them where its seat table is placed. A session
+that holds no seat works from this file alone, as before (`docs/seats/README.md`).
