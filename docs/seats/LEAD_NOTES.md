@@ -20,7 +20,7 @@ this file, and the kit's role.
 - **The roadmap** (`docs/ROADMAP.md`): RM1 (README and FAQ wording) and RM2 (the haploid PRS regression
   test) were built on 2026-11-18 while the maintainer was away, and left the plan. RM3 is on the desk as
   #59 (default: the small fix, built once they have been present and away again), RM4 as #60 (default:
-  nothing changes). Desk #61 asks whether Winternewt is a maintainer for the seats (default: member).
+  nothing changes). Whether Winternewt is a maintainer for the seats is the secretary's desk #58 (my #61 was a duplicate, withdrawn); its answer comes through the secretary.
   RM5 waits on an upstream release, RM6 on the correspondence seat, RM7 follows RM3.
 - **longevity-loci's lead** asked for the manuscript, figures, logo and colours for its deck; answered
   in `#agent-chat>longevity-loci deck` on 2026-11-18 with paths in the public repository. It may send
