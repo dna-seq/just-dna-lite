@@ -30,9 +30,7 @@ this file, and the kit's role.
 - **Another session without a seat** works in this clone, and other people's sessions push to the
   trunk: pull before each item, build only in own worktrees.
 
-## For the maintainer to push
+## Pushes
 
-- Local `main` is four commits ahead of origin: `2f7d1c2` and `91ed9be` (the roadmap and these notes),
-  `2ac82b3` (RM1), `77ef72f` (RM2), and the notes commit after them.
-- The local branches `build/rm1` and `build/rm2` are merged; `git branch -d` refuses them until `main`
-  is pushed. Delete them after the push.
+From 2026-11-19 the lead pushes `main` itself (D2). Pushed that day at 18a7619, nothing left ahead of
+origin.

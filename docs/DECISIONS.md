@@ -19,3 +19,11 @@ The maintainer adopted the seats kit (agent-seat-blueprints) for this repository
   track` turns one into the other by a pull request.
 - **What a seat may do with git:** commit only, the default offered and not changed; the maintainer
   pushes. Rejected for now: the lead pushing its own branches.
+
+## D2 — The lead pushes `main` (2026-11-19), amends D1
+
+D1 left every seat commit-only, the maintainer pushing. After 40 commits had waited unpushed for a
+day, the maintainer: "why do not you push to origin, wtf?". The lead now pushes `main` to `origin` as
+a fast-forward once its changes pass their tests, its own and the other seats' commits on it. Still
+the maintainer's: force pushes, other branches, merging pull requests, tags and releases.
+

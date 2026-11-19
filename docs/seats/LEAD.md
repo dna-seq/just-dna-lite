@@ -85,15 +85,19 @@ reviser seat while the lead reported that it waited. Agreed: nothing checks it.
 
 ## Grant
 
-Use without asking: commit, in its own worktrees and on the local `main` by fast-forward; its own
-`build/` branches deleted with `git branch -d` once merged; its own worktrees removed after the
-merge. Not covered, so the maintainer's: any push, a tag or a release, a package published, a module
-republished to the registry or to HuggingFace, a new runtime dependency or a changed pin ceiling, a
-change to another repository, and sending the repository's material to an outside service.
+Use without asking: commit, in its own worktrees and on the local `main`; merge `origin/main` into
+it and push `main` to `origin` as a fast-forward, once each change on it passed its tests, so the
+trunk never sits ahead of origin for long (the maintainer, 2026-11-19, after 40 commits had waited
+unpushed: "why do not you push to origin, wtf?"); its own `build/` branches deleted with `git branch
+-d` once merged; its own worktrees removed after the merge. Not covered, so the maintainer's: a force
+push or rewriting pushed history, a push of another branch or to another remote, merging a pull
+request, a tag or a release, a package published, a module republished to the registry or to
+HuggingFace, a new runtime dependency or a changed pin ceiling, a change to another repository, and
+sending the repository's material to an outside service.
 
 ## Never
 
-- Pushes. What is ready to go out is listed in `LEAD_NOTES.md` under "For the maintainer to push".
+- Force-pushes, or pushes anything but `main` as a fast-forward.
 - Edits `docs/manuscript/`, the correspondence seat's ledgers, or another seat's notes, while a
   session holds that seat. For a seat nobody holds, see "Acting for a seat nobody holds".
 - Vendors, forks or path-sources a shared library (`CLAUDE.md`, "Shared format libraries").
