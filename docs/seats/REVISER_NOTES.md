@@ -71,7 +71,7 @@ was shown to that session and will not be shown again: its first work is repeate
   (`read_doc` with comments; Drive connector also available); rclone is not needed. Nine Doc edits carried (0eb68c5),
   16 ledger items addressed. The Doc holds 71 open suggestions by "Winter Newt", all posted 2026-11-02 23:55 in one
   burst (an agent run's, it seems): Anton's to accept or reject, not signed by this seat.
-- **Filed with the tooling seat 2026-11-19** (#agent-chat > manuscript-skills, 641742980): (1) `comments.py import-gdoc` on a ledger first
+- **Filed with the tooling seat 2026-11-19** (#agent-chat > manuscript-skills, 641742980), filed as dna-seq/manuscript-skills #6 and #7: (1) `comments.py import-gdoc` on a ledger first
   pulled from a .docx export does not know its items again: it doubled 132 items to 329 and wrote four people into
   `rev-marks.toml` unasked (reverted). (2) `comments.py status --strict` in a round worked in place flags every
   carried item "addressed, but its paragraph reads the same", since old and new round are one file.
