@@ -84,3 +84,7 @@ was shown to that session and will not be shown again: its first work is repeate
   lead (checks hold at bcd2f7b); the section is drafted once it merges.
   Both fixed in manuscript-skills 0.69.1 (this machine still has 0.67.0 until the plugin syncs). `import-gdoc` still
   writes commenters into `rev-marks.toml` by default (put to Anton as desk #64): always pass `--no-people`.
+- **Anton, 2026-11-19, forwarded by the lead (641950013):** "manuscript skills is super token consuming, please
+  fininsh this run but do not initialize run withou asking me or getting explicit instruciton on it". The run in
+  progress (`reviews/20261118T233751Z-7c381cd5`) is finished; no new manuscript-skills run, skill or subagent panel
+  (claim checkers included) starts unless he asks for it in his own words or says yes when asked.
