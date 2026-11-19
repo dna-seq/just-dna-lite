@@ -2225,6 +2225,7 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/71/ce884b09f5cd30d32a0bbdee5aa06327ab2b867debb1cf30fc87cdd8acf4/just_dna_enricher-0.8.9.tar.gz", hash = "sha256:f470d81e8e20e0f775da664f90024af69ec88e26625934ddee641a0aad40732b", size = 1047186, upload-time = "2026-11-18T22:45:51.399Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dd/f5/2f211672e6c33d465a4b9791a656bfee3226d5ab35d422d1a53e1f0b427f/just_dna_enricher-0.8.9-py3-none-any.whl", hash = "sha256:b39a07317497f1ac3db015e9b33b035d54bf52e407a3a53e0a48c61190493518", size = 1150480, upload-time = "2026-11-18T22:45:47.331Z" },
 ]
@@ -2237,6 +2238,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "pydantic" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/ea/ef/9c8ba03f8c899aa1502c5cb3f99753b7c45bcd75497df72f5c20e679c928/just_dna_format-0.8.9.tar.gz", hash = "sha256:cd425bbcf5371892146e01f404acfa2aebe6e48b0a03f3d4a092baa06a163c7c", size = 357497, upload-time = "2026-11-18T22:45:52.874Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/49/38e60c3da27fb57b1e9be63c1a2973bafaa486ff0f510dcfc072523e0edf/just_dna_format-0.8.9-py3-none-any.whl", hash = "sha256:1ee621fddb39e37525bce65422ce2c3fde5c5e3b66c8c3bee79b6a3f5bebac65", size = 391705, upload-time = "2026-11-18T22:45:48.736Z" },
 ]
@@ -2383,7 +2385,7 @@ dev = [
 
 [[package]]
 name = "just-dna-registry"
-version = "0.33.1"
+version = "0.34.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2391,9 +2393,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/f4/68f2cfcd937b483b322d0fab76be471314d60da4ca919b6d733089530466/just_dna_registry-0.33.1.tar.gz", hash = "sha256:edf8bf5176293750286310b2ca7151fe17333ebc7d8b037720b7891f4071f31b", size = 498592, upload-time = "2026-11-18T20:04:28.079Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/b2/ba92b09210e60365dc282220b35f41f767e9c7750bb1992481878d58d4cf/just_dna_registry-0.34.1.tar.gz", hash = "sha256:0a7b242ad44bb94bb0a963b1c7c2c20820404ec080afb142a28fc87778d120b3", size = 512869, upload-time = "2026-11-19T01:13:14.617Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/89/7d1bdccc913b384f160a8f41b5f1e6f0913596020bceb20cc94a245ef9e8/just_dna_registry-0.33.1-py3-none-any.whl", hash = "sha256:2370cb7ff61ce1e5fc8fcff855643ca5dca1721cc8b6d843f600137ba727d76c", size = 533895, upload-time = "2026-11-18T20:04:25.034Z" },
+    { url = "https://files.pythonhosted.org/packages/92/56/7e9923a4a9788b7b08140d66e5c0bb4d385cc848b9f3f47ea7125caeeba1/just_dna_registry-0.34.1-py3-none-any.whl", hash = "sha256:b59b9ca503e0ba094d973a5ca2ee5cf6a09a04f11603bc29f9bad79c4c831d5a", size = 549104, upload-time = "2026-11-19T01:13:12.969Z" },
 ]
 
 [[package]]
