@@ -15,8 +15,8 @@ How a row was made, the tier rules and every call with the alternative it reject
 
 **At a glance (2.0.0).** 164 loci, 163 rsIDs, 489 genotype rows (113 protective, 99 risk, 277 neutral reference),
 679 study rows citing 51 papers. Tiers: A 15, B 73, C 41, D 35. No weights are authored (`weighting: scale: none`),
-so no per-variant sum is formed. Content signature `sha256:c76726fd…` under just-dna-compiler 0.8.5 (this repository's lock): the polygon rehearsal's
-content (aebf5e38) with the study notes worded for a reader, the rows' citation ids taken out (longevity-loci 4c5d4ba).
+so no per-variant sum is formed. Content signature `sha256:2b3f2e01…` under just-dna-compiler 0.8.5 (this repository's lock): the polygon rehearsal's
+content (aebf5e38) with the study notes worded for a reader, the rows' citation ids and row numbers taken out (longevity-loci 4c357a2).
 
 **Not in 2.0.0.** A literature sweep of 2015 to October 2026 has since added five loci in longevity-loci (rows 170
 to 174, not yet through their adversarial review); they come as a later version.

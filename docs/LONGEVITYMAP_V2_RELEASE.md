@@ -27,8 +27,8 @@ uv run pipelines module compile data/modules/longevitymap_v2 -o data/interim/rel
 ```
 
 Expected: success; 489 weights rows, 679 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
-`sha256:c76726fd3843aafd8c64819979c731b74053a84b3f5ff3ef082b89224c8115f0` (the polygon rehearsal's content, aebf5e38, with
-the study notes reworded for a reader on 2026-11-19; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
+`sha256:2b3f2e01fe809bcf68862abaf7acab4fc598e02db91510caace380e4a02b23bd` (the polygon rehearsal's content, aebf5e38, with
+the study notes worded for a reader on 2026-11-19: no citation ids or row numbers; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
 sequence, and `module_not_closed` (see "Before publishing").
 
 ## 2. Read it in the app (local, safe)
