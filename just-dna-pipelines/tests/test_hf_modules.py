@@ -1302,3 +1302,33 @@ class TestPositionJoinRequiresRefAgreement:
             # a confident contradiction, never the "unknown" residual a reference would settle
             assert vcf_profile is not None and mod_profile is not None
             assert vcf_profile != mod_profile
+
+
+def test_pharm_rows_for_one_call_come_out_in_their_identity_order(tmp_path):
+    """Rows that tie on position, genotype, variant and evidence level differ by drug, category and
+    annotation id: the format's `pharm_variants` row key. The pre-sink sort must reach it, or the
+    streaming engine writes them in a different order on every run (seen on pharmgkb)."""
+    from just_dna_pipelines.annotation.hf_logic import annotate_vcf_with_module_weights
+
+    drugs = ["warfarin", "simvastatin", "clopidogrel", "atorvastatin"]
+    categories = ["Toxicity", "Efficacy", "Dosage", "Efficacy"]
+    lead = tmp_path / "pharm_variants.parquet"
+    # Authored in reverse of the identity order, so an unordered tie shows up as authored order.
+    pl.DataFrame({
+        "rsid": ["rs1"] * 4, "chrom": ["1"] * 4, "start": [100] * 4, "ref": ["A"] * 4,
+        "alts": ["G"] * 4, "genotype": ["A/G"] * 4, "variant_key": ["rs1"] * 4,
+        "drug": drugs, "phenotype_category": categories,
+        "annotation_id": ["4", "3", "2", "1"], "evidence_level": ["1A"] * 4,
+    }, schema_overrides={"start": pl.UInt32}).write_parquet(lead)
+    info = ModuleInfo(name="pgxtest", repo_id="local", path=str(tmp_path),
+                      lead_table="pharm_variants", lead_url=str(lead))
+    vcf = pl.DataFrame({
+        "chrom": ["1"], "start": [100], "ref": ["A"], "alt": ["G"], "rsid": ["rs1"],
+        "genotype": [["A", "G"]],
+    }, schema_overrides={"start": pl.UInt32}).lazy()
+
+    out, matched, _ = annotate_vcf_with_module_weights(vcf, "pgxtest", tmp_path / "out.parquet", module_info=info)
+    rows = pl.read_parquet(out).filter(pl.col("drug").is_not_null())
+    assert matched == 4
+    expected = sorted(zip(drugs, categories, ["4", "3", "2", "1"]))
+    assert list(zip(rows["drug"], rows["phenotype_category"], rows["annotation_id"])) == expected

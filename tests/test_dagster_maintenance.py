@@ -33,6 +33,7 @@ from dagster import (
 from just_dna_pipelines.annotation.annotation_runner import (
     normalized_parquet_is_current,
 )
+from just_dna_pipelines.annotation.assets import NORMALIZATION_VERSION
 from just_dna_pipelines.module_config import _load_config
 from webui.state import (
     _prs_partition_key,
@@ -325,7 +326,10 @@ _SAMPLE = "public/sampleA"
 def _normalized() -> Output[None]:
     return Output(
         None,
-        metadata={"quality_filters_hash": MetadataValue.text(_load_config().quality_filters.config_hash())},
+        metadata={
+            "quality_filters_hash": MetadataValue.text(_load_config().quality_filters.config_hash()),
+            "normalization_version": MetadataValue.int(NORMALIZATION_VERSION),
+        },
     )
 
 

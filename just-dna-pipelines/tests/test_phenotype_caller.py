@@ -29,6 +29,7 @@ from just_dna_pipelines.annotation.phenotype_caller import (
     gather_site_evidence,
     load_phenotype_definition,
 )
+from just_dna_pipelines.io import resolve_split_multiallelic_genotypes
 from just_dna_pipelines.annotation.restoration import (
     CallsetScope,
     RestorationContext,
@@ -314,6 +315,21 @@ class TestPhaseSets:
         no_ps = gather_site_evidence(frame(["0|1", "1|0"], [None, None]), hfe_def, base)
         assert all(s.phased_alleles is None for s in no_ps)
         assert call_gene("hfe_compound_het", hfe_def, no_ps).status == "ambiguous"
+
+    def test_a_split_multiallelic_site_reads_the_site_genotype_not_its_gt(self, hfe_def: GeneDefinition) -> None:
+        """`G>A,C 1|2` split one row per ALT: the C282Y row's GT `1|0` names G for its `0`, which is C."""
+        base = build_restoration_context(pl.LazyFrame(schema={"chrom": pl.String, "start": pl.UInt32}), 10_000)
+        split = pl.DataFrame(
+            {"chrom": ["6", "6"], "start": [26092913, 26092913], "rsid": [None, None], "ref": ["G", "G"],
+             "alt": ["A", "C"], "filter": ["PASS", "PASS"], "GT": ["1|0", "0|1"], "PS": [26092913, 26092913],
+             "genotype": [["A", "G"], ["C", "G"]]},
+            schema_overrides={"start": pl.UInt32, "PS": pl.Int32, "genotype": pl.List(pl.String)},
+        ).lazy()
+        resolved, _ = resolve_split_multiallelic_genotypes(split)
+        site = next(s for s in gather_site_evidence(resolved, hfe_def, base) if s.start == 26092913)
+        assert site.observed == ["A", "C"]
+        # GT cannot say which homolog carries C, so the row is read unphased.
+        assert site.phased_alleles is None
 
 
 @pytest.fixture(scope="module")

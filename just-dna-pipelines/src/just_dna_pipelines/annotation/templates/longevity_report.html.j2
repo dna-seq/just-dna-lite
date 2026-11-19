@@ -948,7 +948,7 @@ window.addEventListener("scroll", function() {
             {% if longevity.summary.directional %}
             <div class="stat-box stat-positive"><div class="number">{{ longevity.summary.total_positive }}</div><div class="label">Positive</div></div>
             <div class="stat-box stat-negative"><div class="number">{{ longevity.summary.total_negative }}</div><div class="label">Negative</div></div>
-            <div class="stat-box stat-weight"><div class="number">{{ longevity.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% if longevity.summary.weighted %}<div class="stat-box stat-weight"><div class="number">{{ longevity.summary.total_weight }}</div><div class="label">Net weight</div></div>{% endif %}
             {% endif %}
             {% if longevity.summary.total_restored %}
             <div class="stat-box stat-inferred"><div class="number">{{ longevity.summary.total_restored }}</div><div class="label">Inferred</div></div>
@@ -998,7 +998,7 @@ window.addEventListener("scroll", function() {
             {% if mod.summary.directional %}
             <div class="stat-box stat-positive"><div class="number">{{ mod.summary.total_positive }}</div><div class="label">Positive</div></div>
             <div class="stat-box stat-negative"><div class="number">{{ mod.summary.total_negative }}</div><div class="label">Negative</div></div>
-            <div class="stat-box stat-weight"><div class="number">{{ mod.summary.total_weight }}</div><div class="label">Net weight</div></div>
+            {% if mod.summary.weighted %}<div class="stat-box stat-weight"><div class="number">{{ mod.summary.total_weight }}</div><div class="label">Net weight</div></div>{% endif %}
             {% endif %}
             {% if mod.summary.total_restored %}
             <div class="stat-box stat-inferred"><div class="number">{{ mod.summary.total_restored }}</div><div class="label">Inferred</div></div>

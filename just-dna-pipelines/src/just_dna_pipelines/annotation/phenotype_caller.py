@@ -488,9 +488,15 @@ def gather_site_evidence(
         if key in matched:
             record = matched[key]["record"]
             ordered = _record_alleles(record.get("GT"), record["ref"], record.get("alt"))
-            if ordered is None:
-                # No GT to read (a callset without FORMAT) — fall back to the stored genotype list.
-                ordered = list(record["genotype"] or [])
+            stored = list(record["genotype"] or [])
+            if ordered is None or sorted(ordered) != sorted(stored):
+                # No GT to read (a callset without FORMAT), or a row of a VCF split one per ALT, whose
+                # GT `0` is another ALT: normalization wrote the site's genotype, which GT cannot say.
+                # Its homolog order is not kept, so such a row reads unphased.
+                ordered = stored
+                read_from_stored = True
+            else:
+                read_from_stored = False
             if matched[key]["matched_by"] == "indel_window":
                 ordered = _translate(
                     ordered, record["ref"], (record.get("alt") or "").split(","), meta
@@ -500,7 +506,7 @@ def gather_site_evidence(
                                              matched_by=None, restored_flank_bp=None))
                 continue
             phase_set = record.get("PS")
-            phased = "|" in (record.get("GT") or "") and phase_set is not None
+            phased = "|" in (record.get("GT") or "") and phase_set is not None and not read_from_stored
             evidence.append(
                 SiteEvidence(
                     **base,

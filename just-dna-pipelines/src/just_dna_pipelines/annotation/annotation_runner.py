@@ -18,7 +18,7 @@ import polars as pl
 from dagster import AssetKey, AssetRecordsFilter, DagsterInstance, Definitions
 from pydantic import BaseModel, Field
 
-from just_dna_pipelines.annotation.assets import user_vcf_partitions
+from just_dna_pipelines.annotation.assets import NORMALIZATION_VERSION, user_vcf_partitions
 from just_dna_pipelines.annotation.hf_modules import AnnotationManifest
 from just_dna_pipelines.annotation.resources import get_user_output_dir, get_workspace_root
 from just_dna_pipelines.module_config import _load_config
@@ -68,8 +68,9 @@ def normalized_parquet_is_current(
 ) -> bool:
     """Whether ``user_vcf_normalized.parquet`` can be reused for this partition as it is.
 
-    Current means: the latest materialization recorded the quality-filter hash now in force, the
-    file is on disk, and it is not empty. An empty normalized genome is never legitimate — it is
+    Current means: the latest materialization recorded the quality-filter hash now in force and
+    this code's `NORMALIZATION_VERSION` (none recorded reads as 1, written before the version existed),
+    the file is on disk, and it is not empty. An empty normalized genome is never legitimate — it is
     the signature of an earlier broken run whose config hash did not change, so it is treated as
     stale and the run self-heals.
     """
@@ -88,7 +89,9 @@ def normalized_parquet_is_current(
         return False
     stored = materialization.metadata.get("quality_filters_hash")
     stored_hash = str(stored.value) if stored is not None and hasattr(stored, "value") else ""
-    if stored_hash != current_hash or not normalized_path.exists():
+    version = materialization.metadata.get("normalization_version")
+    stored_version = int(version.value) if version is not None and hasattr(version, "value") else 1
+    if stored_hash != current_hash or stored_version != NORMALIZATION_VERSION or not normalized_path.exists():
         return False
     return not parquet_is_empty(normalized_path)
 

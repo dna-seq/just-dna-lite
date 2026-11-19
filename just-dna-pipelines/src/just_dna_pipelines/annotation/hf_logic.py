@@ -534,8 +534,15 @@ def annotate_vcf_with_module_weights(
         # into memory the way `collect()` would (the point of streaming for a large module). `genotype`
         # is a List, so it is stringified into a throwaway key for the sort; every other key is used
         # only where the column is present (the rsid- and position-join paths carry different columns).
+        # The keys must reach the lead family's row identity or ties stay unordered: a `pharm_variants`
+        # row is one `(variant_key, drug, genotype, phenotype_category, annotation_id)` (the format's
+        # `PharmVariantRow` key), and without the last three, pharmgkb's rows for one call differing
+        # only by drug came out in a different order on every run.
         sort_keys = ["chrom", "start", "_genotype_sort_key"]
-        for optional in ("variant_key", "weight", "conclusion", "priority", EVIDENCE_COLUMN):
+        for optional in (
+            "variant_key", "weight", "conclusion", "priority", EVIDENCE_COLUMN,
+            "drug", "phenotype_category", "annotation_id",
+        ):
             if optional in annotated_lf.collect_schema().names():
                 sort_keys.append(optional)
         annotated_lf = (
