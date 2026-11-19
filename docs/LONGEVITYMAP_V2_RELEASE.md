@@ -27,8 +27,8 @@ uv run pipelines module compile data/modules/longevitymap_v2 -o data/interim/rel
 ```
 
 Expected: success; 489 weights rows, 679 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
-`sha256:aebf5e38c20414a8bd766e1c92950c4a838092bdeeda6b9d3526789c2d9a44d1` (the same as the polygon rehearsal,
-compiled there with 0.8.6). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
+`sha256:c76726fd3843aafd8c64819979c731b74053a84b3f5ff3ef082b89224c8115f0` (the polygon rehearsal's content, aebf5e38, with
+the study notes reworded for a reader on 2026-11-19; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
 sequence, and `module_not_closed` (see "Before publishing").
 
 ## 2. Read it in the app (local, safe)
@@ -51,9 +51,6 @@ pathways, and in the pathway section every row dropped out ("0 Total variants").
 The report-voice rule applies (`CLAUDE.md`, "Report voice"): two independent reviewer agents, a lay reader and a
 scientific reviewer, read the rendered report first. Known points for them and for the maintainer:
 
-- **Study notes carry curation shorthand.** The `studies.csv` analysis and conclusion fields cite longevity-loci's
-  decision and quote ids (`D26.13`, `q33`) that a report reader cannot resolve. Owner: longevity-loci (a reworded
-  export, then a new compile).
 - **Flags render as a raw list** (`['tier:B', 'mech:cancer', ...]`) in the generic section, and **"Net weight 0.0"**
   shows because the module is directional though it authors no weights (`weighting: scale: none`). Owner: this
   repository's report, if either should change.
@@ -72,7 +69,7 @@ scientific reviewer, read the rendered report first. Known points for them and f
 
 A token that owns `just-dna-seq` is needed (`REGISTRY_TOKEN` and `REGISTRY_TOKEN_SANDBOX` do not). The rehearsal is
 the same command against the polygon (`--url` of the `polygon` store, a test namespace and its token); it was run as
-`test-longevity-loci/longevitymap@2.0.0` on 2026-11-16, signature as in step 1.
+`test-longevity-loci/longevitymap@2.0.0` on 2026-11-16 (signature aebf5e38, before the study notes were reworded).
 
 ```bash
 uv run pipelines registry publish just-dna-seq longevitymap 2.0.0 data/modules/longevitymap_v2 \
