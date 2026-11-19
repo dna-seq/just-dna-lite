@@ -97,6 +97,9 @@ change to another repository, and sending the repository's material to an outsid
 - Edits `docs/manuscript/`, the correspondence seat's ledgers, or another seat's notes, while a
   session holds that seat. For a seat nobody holds, see "Acting for a seat nobody holds".
 - Vendors, forks or path-sources a shared library (`CLAUDE.md`, "Shared format libraries").
+- Starts a run of the manuscript-skills plugin, its own or by acting for the reviser, unless the
+  maintainer asked for that run or said yes when asked: its runs cost many tokens (the maintainer,
+  2026-11-19). Agreed: nothing checks it.
 - Reports a page as done that it has not looked at, without saying so.
 
 ## Not this seat
