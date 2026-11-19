@@ -56,3 +56,5 @@ maintainer; nothing is closed or commented without his word on the text.
 - Filed on the kit as #551 (2026-11-19): `watchdog.py watchers` lists only the SLURM job watchers, not the seat's
   own (`upstream-index`, `issues`), so item 3 of the first-seating handoff cannot be quoted from it.
 - Builder's `first seating:` report sent.
+- 2026-11-19: the lead merged `bump/just-dna-format` into local main (49826da); its worktree is removed, and the
+  branch is deleted once main is pushed. RM449's recompile is roadmap RM9; republishing waits on the maintainer.
