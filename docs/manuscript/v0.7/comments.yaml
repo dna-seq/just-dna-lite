@@ -561,11 +561,13 @@ items:
   - inserted: 'both '
   where: 1.1 Background and Significance
   line: 64
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept ''risks that both individuals and regulations ... seek to avoid'': the smallest answer to Georg''s
-    C55 about the same ''and''.'
+  status: addressed
+  now: Such a platform has to be easy to use, transparent in its methods and extensible without code. It also has
+    to protect privacy. Genomic data are among the most sensitive personal information, and uploading them to third-party
+    servers carries risks that both individuals and regulations such as the General Data Protection Regulation (GDPR)
+    seek to avoid.
+  why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
+    for his veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -743,10 +745,12 @@ items:
   - inserted: ' to the Internet'
   where: 1.2 Overview of Just-DNA-Lite
   line: 97
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''without uploading the genome to the Internet''.'
+  status: addressed
+  now: Read their own VCF (on the GRCh38 human reference genome) against longevity, disease-predisposition, drug-response
+    and other modules, and see where they fall for thousands of polygenic scores, with the studies and models behind
+    each result, without uploading the genome to the Internet
+  why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
+    for his veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2180,10 +2184,16 @@ items:
   - inserted: 'and then '
   where: 3.3 Additional Trait Annotation Modules
   line: 281
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''and then adding annotation columns''.'
+  status: addressed
+  now: 'The platform includes several additional modules curated by hand from the published literature: coronary
+    artery disease (SNPs selected on meta-study p-values and the number of studies across populations), lipid metabolism
+    (selected by the same criteria), VO2 max (published studies of the oxygen-uptake response to exercise training,
+    mostly candidate-gene and cohort studies) and Superhuman (rare protective alleles from the Church laboratory''s
+    Protective and Enhancing Alleles list, checked against the primary literature). Table S4 gives each module''s
+    curation and every source it cites. These modules work by joining the user''s VCF against curated variant-trait
+    databases and then adding annotation columns (weight, state, gene, conclusion) to matching variants.'
+  why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
+    for his veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2244,10 +2254,17 @@ items:
   - deleted: use
   where: 3.4 Growing the Module Ecosystem
   line: 286
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''the AI assistants users already employ''.'
+  status: addressed
+  now: Because modules are data, new content reaches users through configured repositories or `just-dna-registry`
+    without changes to the annotation engine or a new application release, while evidence review and scientific
+    curation stay with module contributors. Rather than embedding its own assistant, the platform exposes its operations
+    to the AI assistants users already employ. Modules can be drafted in such an assistant through the just-module-creator
+    plugin (github.com/dna-seq/just-module-creator); the result is the same kind of artifact, validated and compiled
+    the same way. Its manifest can mark it as AI-generated through its authorship entries, which tag each contributor
+    as human or AI. Through the platform's MCP server, the assistant can then install the draft, annotate a genome
+    with it and inspect the result (Section 3.2.1).
+  why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
+    for his veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2972,10 +2989,20 @@ items:
   - inserted: ' to the Internet'
   where: 5.2 Local Processing and Data Privacy
   line: 423
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept Georg''s edit: ''does not require uploading the user''s genome to the Internet''.'
+  status: addressed
+  now: Core annotation and PRS computation use local genome files, cached reference datasets and local result storage.
+    Downloading reference data does not require uploading the user's genome to the Internet. This architecture reduces
+    the need to disclose genomic data to a hosted analysis service. However, local execution is not a guarantee
+    against disclosure through other parts of the workflow, and the optional AI explanations and MCP clients need
+    a privacy assessment of their own. In an annotation report, each variant row with an rsID has buttons that open
+    a prepared question about it in ChatGPT, Claude, Perplexity or Grok. Following one sends that variant's genotype,
+    gene and stored interpretation to that provider. A polygenic-score trait report has the same buttons (Figure
+    3), and following one sends that trait's results, model by model, to the provider. When an assistant uses an
+    external model provider, prompts and tool outputs may transmit sensitive results even if the raw VCF remains
+    local. Privacy therefore depends on the deployment, the selected services and the information shared with them.
+    The platform's local architecture alone does not establish regulatory compliance.
+  why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
+    for his veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3125,12 +3152,22 @@ items:
   - inserted: 'is '
   where: 5.6 Conclusion
   line: 451
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept the two grammar edits (''show that annotation is 128 to 181 times faster''). Deleting ''people and''
-    follows C58: with the reframing write ''gives researchers, including citizen scientists, a local way...''; without
-    it keep ''people and researchers''.'
+  status: partly
+  now: Just-DNA-Lite gives people and researchers a local way to read a genome against published evidence. It offers
+    polygenic scoring of the PGS Catalog with the context to read each result (ancestry-matched percentiles for
+    6,117 scores, coverage, quality labels and every model for a trait side by side), a registry of installable
+    annotation modules that grows as researchers publish them, whole-genome annotation in about a minute, and the
+    same operations from a web interface, AI assistants and Python libraries. The reported benchmarks show that
+    annotation is 128 to 181 times faster than the configured workflow of the OakVar-based Generation I system run
+    on the same machine, on the two call sets Generation I ran on, and close numerical agreement between scoring
+    engines on one genome; Generation II annotation was timed on three call sets from three people. Evaluation across
+    individuals, reference populations and matched-variant sets remains necessary to establish the broader reliability
+    of these workflows. The platform provides infrastructure for research and education, without establishing clinical
+    validity for the findings it reports. Its public demonstration runs on public genomes, and a local installation
+    analyses a user's own genome on their own computer.
+  why: Georg Fuellen's two grammar edits applied by the reviser on 2026-11-19, while the maintainer was away, open
+    for his veto.
+  next: 'Deleting ''people and'' follows C58 (whether Box 1''s first group is called researchers): decide with C58.'
   category: Writing and clarity
   severity: minor
   stage: writing

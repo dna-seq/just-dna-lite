@@ -75,3 +75,10 @@ was shown to that session and will not be shown again: its first work is repeate
   pulled from a .docx export does not know its items again: it doubled 132 items to 329 and wrote four people into
   `rev-marks.toml` unasked (reverted). (2) `comments.py status --strict` in a round worked in place flags every
   carried item "addressed, but its paragraph reads the same", since old and new round are one file.
+- **2026-11-19, unattended (watchdog: maintainer away 2 h).** Desk #62 (who is corresponding author: the co-authors
+  already took Georg's co-supervising asterisk off; default Anton) and #63 (Winter Newt an agent or Anton; default an
+  agent's proposals; G Fue and Livia added as people in both options). Applied under the standing "do not block"
+  word, signed `claude`, open for veto: S10, S14, S15, S19, S26 addressed, S21 partly (its "people and" waits on
+  C58). Ledger: 105 open, 20 addressed, 1 partly, 6 not-on-point. The Google Docs connector was not connected at
+  this turn, so the supplementary, S4 and S5 Docs are still not read. Longevity-loci's PR is #37, reviewed by the
+  lead (checks hold at bcd2f7b); the section is drafted once it merges.
