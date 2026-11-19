@@ -528,7 +528,9 @@ The Catalog talks to one server at a time, chosen in the store selector.
   ClinVar counters count genotype rows. Word them only through `state._catalog_counts` (gene count
   where `variant_count` is 0, a numberless ClinVar label). Upstream: just-dna-compiler S72, S123/RM300,
   S125. Tests: `tests/test_registry_catalog_ui.py`.
-- Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`.
+- Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`. Behind an
+  HTTP proxy three of the error-message tests fail (the proxy answers where DNS should fail): run them with
+  `http_proxy`/`https_proxy` and their uppercase twins unset.
 
 ## Immutable (public demo) mode
 

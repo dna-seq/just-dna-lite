@@ -76,3 +76,14 @@ longevity-loci's lead while checking pull request 37, 2026-11-19; not reproduced
 it on the compiled spec in `data/modules/longevitymap_v2/` once the pull request is merged, then make
 the engine call the pairs of a module that has both, with the result in the report's combined
 section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the merge.
+
+## RM9 — superhuman and thrombophilia carry a wrong indel claim
+
+**State:** blocked: the maintainer's word on republishing, asked in the lead's session on 2026-11-19 · **Owner:** lead
+
+Upstream RM449 (read by the correspondence seat, `docs/upstreams/just-dna-compiler.md`): the published
+`superhuman@2.4.1` and `thrombophilia@2.0.1` were compiled before the compiler's indel fix and carry a
+wrong claim about mirrored indel sites; until 0.8.10 (RM453) such sites are re-derived online. A local
+recompile on the 0.8.9 now locked is safe and decided; republishing is the maintainer's call
+(`CLAUDE.md`, "Building and releasing modules").
+
