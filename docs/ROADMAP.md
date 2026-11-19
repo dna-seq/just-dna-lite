@@ -66,13 +66,15 @@ it on the compiled spec in `data/modules/longevitymap_v2/` once the pull request
 the engine call the pairs of a module that has both, with the result in the report's combined
 section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the merge.
 
-## RM9 — superhuman and thrombophilia carry a wrong indel claim
+## RM9 — Republish superhuman with the 0.8.9 compiler's indel fix
 
-**State:** building: the local recompile, by the lead (2026-11-19); republishing is desk #65, and on silence nothing is republished · **Owner:** lead
+**State:** blocked: desk #65 (if nobody answers, nothing is republished) · **Owner:** lead
 
-Upstream RM449 (read by the correspondence seat, `docs/upstreams/just-dna-compiler.md`): the published
-`superhuman@2.4.1` and `thrombophilia@2.0.1` were compiled before the compiler's indel fix and carry a
-wrong claim about mirrored indel sites; until 0.8.10 (RM453) such sites are re-derived online. A local
-recompile on the 0.8.9 now locked is safe and decided; republishing is the maintainer's call
-(`CLAUDE.md`, "Building and releasing modules").
+Upstream RM449: the published `superhuman@2.4.1` was compiled before an rsID row's indel genotype went
+on one event. Rebuilt locally on 2026-11-19 with compiler 0.8.9 (gitignored, `data/interim/v1_port/`):
+spec version 2.5.0, all 118 positions resolved, `rs766212849` on one event (2:166278198, a 5-base
+deletion). Republishing is the maintainer's. Not ours: the published `thrombophilia@2.0.1` that
+RM449 also names; this repository builds thrombophilia as the 1.1.0 port of 9 positions, which lacks
+the named row. The local Ensembl cache was an unfinished pull (chromosomes 9, MT, X, Y missing) and
+completed during the rebuild; it sits in the home directory (14 GB).
 
