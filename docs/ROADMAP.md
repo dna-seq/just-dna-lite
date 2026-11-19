@@ -79,7 +79,7 @@ section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the
 
 ## RM9 — superhuman and thrombophilia carry a wrong indel claim
 
-**State:** blocked: the maintainer's word on republishing, asked in the lead's session on 2026-11-19 · **Owner:** lead
+**State:** unattended: the local recompile; republishing is asked in the lead's session on 2026-11-19, and on silence nothing is republished · **Owner:** lead
 
 Upstream RM449 (read by the correspondence seat, `docs/upstreams/just-dna-compiler.md`): the published
 `superhuman@2.4.1` and `thrombophilia@2.0.1` were compiled before the compiler's indel fix and carry a
