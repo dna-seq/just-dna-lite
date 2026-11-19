@@ -26,7 +26,7 @@ and 5 write in public.
 uv run pipelines module compile data/modules/longevitymap_v2 -o data/interim/release/longevitymap --strict
 ```
 
-Expected: success; 489 weights rows, 679 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
+Expected (just-dna-compiler 0.8.5 and 0.8.9 alike): success; 489 weights rows, 679 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
 `sha256:2b3f2e01fe809bcf68862abaf7acab4fc598e02db91510caace380e4a02b23bd` (the polygon rehearsal's content, aebf5e38, with
 the study notes worded for a reader on 2026-11-19: no citation ids or row numbers; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
 sequence, and `module_not_closed` (see "Before publishing").
@@ -51,9 +51,9 @@ pathways, and in the pathway section every row dropped out ("0 Total variants").
 The report-voice rule applies (`CLAUDE.md`, "Report voice"): two independent reviewer agents, a lay reader and a
 scientific reviewer, read the rendered report first. Known points for them and for the maintainer:
 
-- **Flags render as a raw list** (`['tier:B', 'mech:cancer', ...]`) in the generic section, and **"Net weight 0.0"**
-  shows because the module is directional though it authors no weights (`weighting: scale: none`). Owner: this
-  repository's report, if either should change.
+- **Flags render as a raw list** (`['tier:B', 'mech:cancer', ...]`) in the generic section. Owner: this repository's
+  report, if it should change. **"Net weight 0.0"** came from the weight boxes not reading `manifest.weighting`; it is
+  a report bug being fixed on main (review of 2026-11-19), not the module's.
 - **No licence is stated** in `module_spec.yaml`; the sources' terms are in `licensing.csv`. The maintainer names
   one, or it ships without and says so.
 - **APOE's ε-pair result is not called.** The module carries APOE as `haplotypes.csv` and `diplotypes.csv` (12 pair
@@ -99,6 +99,10 @@ not read as part of 2.0.0, but delete it by hand if the folder should hold 2.0.0
 uv run pipelines v1-port publish longevitymap --out data/interim/release --dry-run
 uv run pipelines v1-port publish longevitymap --out data/interim/release
 ```
+
+**This is the step that supersedes 1.2.0 for everyone.** It replaces 1.2.0 in place under the same name, so default
+discovery hands every user 2.0.0 from then on; that is the intended effect of this release, and it is a decision,
+not a side effect.
 
 The dry run (2026-11-19) lists weights, annotations, studies, haplotypes, diplotypes, sources and manifest for
 `just-dna-seq/annotators` at `data/longevitymap/`. After it, CI's annotate step (`.github/workflows/nix.yml`) and

@@ -1,7 +1,7 @@
 schema_version: '1.0'
 # longevitymap 2.0.0, the re-curation (docs/longevitymap_v2/longevitymap_v2_requirements.md, §6 and §9).
 # Title (D3), weighting (D1) and the defaults (§6.2) are the requirements' recommended defaults, not yet the
-# person's decisions (§11); dna-seq/longevity-loci's docs/seats/MODULE_NOTES.md tracks which are settled.
+# person's decisions (§11); docs/seats/MODULE_NOTES.md tracks which are settled.
 module:
   title: Longevity genetics
   description: Variants linked to lifespan and healthy ageing, graded by evidence tier.
