@@ -48,10 +48,10 @@ maintainer; nothing is closed or commented without his word on the text.
   delivering; 4 hello posted in `#agent-chat>seating`. Builder's `first seating:` report still to send.
 - Release reads (2026-11-19, unattended): the format trio, registry and polars-bio are read into the ledgers (995d6f5).
   The lead had already adopted 0.8.9 and polars-bio 0.38 on `main` (da6311b). Handed to the lead in
-  `#just-dna-lite>upstreams`: branch `bump/just-dna-format` (4d71343, registry lock 0.34.0, not pushed,
+  `#just-dna-lite>upstreams`: branch `bump/just-dna-format` (now registry lock 0.34.1, not pushed,
   `.worktrees/bump-just-dna-format`), the RM449 recompile of superhuman/thrombophilia, and a proposed
   CLAUDE.md line on the proxy in `test_registry_error_messages`.
-- Open, `unattended`: dagster 1.13.28 -> 1.13.30 release read. registry 0.34.1 is merged upstream, not yet on PyPI.
+- Open, `unattended`: dagster 1.13.28 -> 1.13.30 release read.
 - To file at the next idle turn (kit): `watchdog.py watchers` lists only the SLURM job watchers, not the seat's
   own (`upstream-index`, `issues`), so item 3 of the first-seating handoff cannot be quoted from it.
 - Builder's `first seating:` report sent.

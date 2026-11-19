@@ -4,7 +4,7 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI
 - **What we use:** the Catalog's client; it moves with the format pin, since a mismatched pair refuses to publish
-- **Read mark:** 0.34.0, read 2026-11-19.
+- **Read mark:** 0.34.1, read 2026-11-19.
 - **Last checked:** 2026-11-19 (release watcher baseline)
 
 ## Entries
