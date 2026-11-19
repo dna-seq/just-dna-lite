@@ -72,5 +72,10 @@ coauthors:
       circulated:
       - date: '2026-10-28'
         commit: d85c7f9
+      synced:
+      - date: '2026-11-19'
+        into: '0.7'
+        edits: 9
+        conflicts: 0
 other_models:
 - codex/gpt-6.1-sol

@@ -15,4 +15,5 @@ sessions work as `CLAUDE.md` says.
 | `correspondence` | `correspondence` (triage and liaison) | `docs/upstreams/`, the issues and outside pull requests, dependency bumps | [CORRESPONDENCE.md](CORRESPONDENCE.md) | [CORRESPONDENCE_NOTES.md](CORRESPONDENCE_NOTES.md) |
 | `reviser` | `reviser` | `docs/manuscript/`, the open round | [REVISER.md](REVISER.md) | [REVISER_NOTES.md](REVISER_NOTES.md) |
 
-All three run on one always-on server. None pushes: each commits, and the maintainer pushes.
+All three run on one always-on server. The lead pushes `main` (a fast-forward); the other two commit
+and the lead pushes what they committed.

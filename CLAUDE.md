@@ -528,7 +528,9 @@ The Catalog talks to one server at a time, chosen in the store selector.
   ClinVar counters count genotype rows. Word them only through `state._catalog_counts` (gene count
   where `variant_count` is 0, a numberless ClinVar label). Upstream: just-dna-compiler S72, S123/RM300,
   S125. Tests: `tests/test_registry_catalog_ui.py`.
-- Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`.
+- Tests (network-free): `tests/test_registry_stores.py`, `tests/test_registry_error_messages.py`. Behind an
+  HTTP proxy three of the error-message tests fail (the proxy answers where DNS should fail): run them with
+  `http_proxy`/`https_proxy` and their uppercase twins unset.
 
 ## Immutable (public demo) mode
 
@@ -756,9 +758,12 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 mixin; a substate would clash in the MRO) and defines `genome_build`, `cache_dir`, `status_message`
 itself. Genome build: `GRCh38`/`T2T-CHM13v2.0` → `GRCh38`; `GRCh37`/`hg19` → `GRCh37`. Only GRCh38 is
 fully supported. The **library** scores a GRCh37 sample against the PGS Catalog's **harmonized** scoring
-files for that build; the VCF itself is never lifted over. **The web UI does not reach that path yet**:
-it sets `genome_build = "GRCh38"` on every file load, so GRCh37 samples are scored, annotated and
-ancestry-called as GRCh38 with no warning (`docs/INVESTIGATE_GRCH37_UI.md`). `just_prs.liftover` is
+files for that build; the VCF itself is never lifted over. **The web UI does not reach that path**: it
+analyses human samples on GRCh38 only. A sample whose reference genome (from the VCF header, else the
+upload form) is anything else is stored but refused, with the reason on the page and in a toast:
+`state.unsupported_build_reason` gates Start Analysis, both run handlers and the PRS set-up (desk #59,
+2026-11-19; before it, such a sample was scored and annotated as GRCh38 with no warning,
+`docs/INVESTIGATE_GRCH37_UI.md`). Tests: `tests/test_reference_build_refusal.py`. `just_prs.liftover` is
 not a VCF liftover and cannot be reused for annotation.
 
 - **Genotypes**: `initialize_prs_for_file(parquet_path, genome_build)` calls

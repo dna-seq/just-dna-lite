@@ -145,6 +145,32 @@ SPECIES_OPTIONS: List[str] = [
     "Other",
 ]
 
+# The one human reference genome the app reads. Every module and every polygenic score is placed on
+# GRCh38 positions, and no VCF liftover exists, so a file on another human build is refused rather than
+# read as if it were GRCh38, which gave wrong or empty results with no warning
+# (docs/INVESTIGATE_GRCH37_UI.md; desk #59, its default: refuse with a clear message).
+SUPPORTED_HUMAN_BUILD = "GRCh38"
+
+
+def unsupported_build_reason(species: Optional[str], reference_genome: Optional[str]) -> str:
+    """Why a sample cannot be analysed on its reference genome, or ``""`` when it can.
+
+    Only human samples are judged: the modules are human. A missing build reads as GRCh38, the
+    upload's default, as everywhere else in this file.
+    """
+    if (species or "Homo sapiens") != "Homo sapiens":
+        return ""
+    build = reference_genome or SUPPORTED_HUMAN_BUILD
+    if build == SUPPORTED_HUMAN_BUILD:
+        return ""
+    return (
+        f"This genome is on the {build} reference. The app reads {SUPPORTED_HUMAN_BUILD} files only: "
+        f"its modules and polygenic scores are placed on {SUPPORTED_HUMAN_BUILD} positions, so a {build} "
+        f"file would give wrong or empty results. There is no conversion between references yet, so "
+        f"analysis of this file is switched off."
+    )
+
+
 # Reference genome options by species (Latin names)
 # For humans: GRCh38 and T2T-CHM13 are the main modern assemblies
 REFERENCE_GENOMES: Dict[str, List[str]] = {
@@ -1066,6 +1092,11 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             filename = self.selected_file
         if not filename:
             return
+        meta = self.file_metadata.get(filename, {})
+        refused = unsupported_build_reason(meta.get("species"), meta.get("reference_genome"))
+        if refused:
+            yield rx.toast.error(refused)
+            return
 
         if not self.safe_user_id:
             auth_state = await self.get_state(AuthState)
@@ -1694,6 +1725,8 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         normalized_parquet = self._get_normalized_parquet_path()
         parquet_str = str(normalized_parquet) if normalized_parquet is not None else ""
         ref_genome = self.file_metadata.get(self.selected_file, {}).get("reference_genome", "GRCh38")
+        if self.selected_build_unsupported:
+            return []
         # Grid/sample reset already ran in select_file before remount.
         # Resetting again here would replace the remount-replay fingerprint
         # with an empty model and let the previous filter write itself back.
@@ -2304,8 +2337,9 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             self.progress_status = ""
             normalized_parquet = self._get_normalized_parquet_path()
             ref_genome = self.file_metadata.get(selected_file, {}).get("reference_genome", "GRCh38")
+            build_refused = bool(self.selected_build_unsupported)
 
-        if prs_init_after_normalize and normalized_parquet is not None:
+        if prs_init_after_normalize and normalized_parquet is not None and not build_refused:
             return [PRSState.initialize_prs_for_file(str(normalized_parquet), ref_genome)]
         return None
 
@@ -2724,13 +2758,23 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         return len(self.selected_modules) > 0
 
     @rx.var
+    def selected_build_unsupported(self) -> str:
+        """Why the selected sample's reference genome cannot be analysed, or "" (``unsupported_build_reason``)."""
+        if not self.selected_file:
+            return ""
+        meta = self.file_metadata.get(self.selected_file, {})
+        return unsupported_build_reason(meta.get("species"), meta.get("reference_genome"))
+
+    @rx.var
     def can_run_annotation(self) -> bool:
         """Check if annotation can be run.
         
-        Requires: file selected AND (HF modules selected OR Ensembl enabled).
-        Also blocks if the selected file already has a running job.
+        Requires: file selected AND (HF modules selected OR Ensembl enabled), on a reference
+        genome the app reads. Also blocks if the selected file already has a running job.
         """
         if not self.selected_file:
+            return False
+        if self.selected_build_unsupported:
             return False
         if not self.selected_modules and not self.include_ensembl:
             return False
@@ -2922,6 +2966,9 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             return
         if not self.selected_modules and not self.include_ensembl:
             yield rx.toast.error("Please select at least one module or enable Ensembl annotations")
+            return
+        if self.selected_build_unsupported:
+            yield rx.toast.error(self.selected_build_unsupported)
             return
 
         self.last_run_success = False

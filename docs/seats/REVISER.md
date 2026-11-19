@@ -77,6 +77,15 @@ push to the forge; `rounds.py push ... --go`, which uploads a round to the co-au
 suggestion written into a shared Doc; a submission to a server or a journal; a new round's folder;
 sending the paper to an outside model or service beyond what the round's settings already name.
 
+## Runs of the manuscript-skills plugin
+
+Each run of the plugin (a skill, a simulated referee or reader panel, an improve or a dashboard run)
+starts only when the maintainer asked for that run in his own words, or the seat asked him and he
+said yes; one already in progress is finished. The maintainer, 2026-11-19: "manuscript skills is
+super token consuming, please fininsh this run but do not initialize run withou asking me or getting
+explicit instruciton on it". The repository's own commands (`uv run manuscript build`, `ledger
+lint`) are not runs of the plugin. Agreed: nothing checks it.
+
 ## Never
 
 - Rewrites more than the item asks, or writes a claim, a count, an author list or a citation from
