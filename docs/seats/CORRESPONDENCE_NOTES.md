@@ -53,6 +53,6 @@ maintainer; nothing is closed or commented without his word on the text.
   CLAUDE.md line on the proxy in `test_registry_error_messages`.
 - dagster 1.13.30 read; the bump is blocked by `dagster-dg-cli`'s `typer<0.26` against our `typer>=0.27.1`.
   Waits for the next dagster release (the watcher says it). Told the lead.
-- To file at the next idle turn (kit): `watchdog.py watchers` lists only the SLURM job watchers, not the seat's
+- Filed on the kit as #551 (2026-11-19): `watchdog.py watchers` lists only the SLURM job watchers, not the seat's
   own (`upstream-index`, `issues`), so item 3 of the first-seating handoff cannot be quoted from it.
 - Builder's `first seating:` report sent.
