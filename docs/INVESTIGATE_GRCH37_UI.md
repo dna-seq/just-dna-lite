@@ -31,3 +31,13 @@ reproduced in a running app).
 3. Refuse or prominently warn when annotation runs on a non-GRCh38 sample, rather than joining
    silently.
 4. Fix README.md and docs/FAQ.md, which say "lifted". Paper 1 states the GRCh38-only status (N1, N2).
+
+## Update 2026-11-19: refused instead of misread (roadmap RM3, desk #59)
+
+The maintainer's default on desk #59 was the small fix, and it is built: a human sample whose reference
+genome is not GRCh38 is stored but not analysed. Start Analysis is disabled with a warning naming the
+build, both run handlers refuse with the same text, and PRS is not set up for it
+(`webui.state.unsupported_build_reason`, tests in `tests/test_reference_build_refusal.py`). T2T is
+refused too. The larger fix, passing the real build to just-prs so PRS scores a GRCh37 sample through
+the Catalog's harmonized files, is not built; annotation would stay GRCh38-only either way. Built, not
+viewed: the warning was not looked at in a running app.

@@ -5,17 +5,6 @@ owner. A done item leaves this file in the commit that lands it. Written on 2026
 `docs/INVESTIGATE_*.md`, `plans/handoffs/`, the open issues and the code as it was that day; nothing
 before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.md`).
 
-## RM3 — The web UI treats every sample as GRCh38
-
-**State:** blocked: desk #59, yes after a present (if nobody answers, the small fix is built: a clear refusal of a file whose header is not GRCh38) · **Owner:** lead
-
-`docs/INVESTIGATE_GRCH37_UI.md` (2026-10-10, code reading only): the UI sets `genome_build = "GRCh38"` on
-every file load, so a GRCh37 or T2T sample is scored, ancestry-called and position-joined as GRCh38
-with no warning; results are silently wrong or empty. Two sizes of answer, the maintainer's to pick:
-refuse or warn on a build the header says is not GRCh38 (small), or pass the real build to just-prs so
-PRS uses the Catalog's harmonized files while annotation stays GRCh38-only with a banner (larger).
-The paper's input-format claims depend on which.
-
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
 **State:** waits until 2026-11-21: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b · **Owner:** lead
@@ -59,7 +48,7 @@ or a close; nothing is posted without the maintainer's word on that text.
 
 ## RM7 — A module's digest is shown, never verified
 
-**State:** after RM3 · **Owner:** lead
+**State:** waits until 2026-11-26: put the design question (what a local or sandbox module shows) to the maintainer · **Owner:** lead
 
 The report prints each module's `artifact.digest` as the module's own claim; nothing calls
 `verify_manifest` (`CLAUDE.md`, "Report"). Wiring it with `require_marketplace=True` rejects every
@@ -67,7 +56,7 @@ local compile, so the design question is what a local or sandbox module shows in
 
 ## RM8 — A weights-led module's haplotype pairs are never called
 
-**State:** unattended · **Owner:** lead
+**State:** waits until 2026-11-21: pull request 37 merged, so the spec is on the trunk · **Owner:** lead
 
 Longevity Map 2.0.0 is led by `variants` and also carries `haplotypes` and `diplotypes`, so that APOE
 is read once, as its ε pair. The engine sends a module to the phenotype caller only when it is

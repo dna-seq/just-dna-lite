@@ -2462,6 +2462,15 @@ def new_analysis_section() -> rx.Component:
                     "flexWrap": "wrap",
                 },
             ),
+            rx.cond(
+                UploadState.selected_build_unsupported != "",
+                rx.el.div(
+                    rx.el.div("Reference genome not supported", class_name="header"),
+                    rx.el.p(UploadState.selected_build_unsupported),
+                    class_name="ui warning message",
+                    style={"maxWidth": "760px"},
+                ),
+            ),
             rx.el.button(
                 UploadState.analysis_button_text,
                 rx.el.i(
@@ -2607,7 +2616,7 @@ def no_file_selected_message() -> rx.Component:
             rx.el.div(
                 rx.el.strong("Reference genome. "),
                 "The standard map of human DNA that labs write positions against. "
-                "Most current files use GRCh38; choose that unless your provider used GRCh37/hg19.",
+                "The app reads GRCh38 files only; a file on GRCh37/hg19 or T2T is stored but not analysed.",
             ),
             rx.el.div(
                 rx.el.strong("This tool annotates a VCF. "),
