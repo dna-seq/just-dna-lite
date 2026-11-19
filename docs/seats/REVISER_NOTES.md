@@ -82,3 +82,5 @@ was shown to that session and will not be shown again: its first work is repeate
   C58). Ledger: 105 open, 20 addressed, 1 partly, 6 not-on-point. The Google Docs connector was not connected at
   this turn, so the supplementary, S4 and S5 Docs are still not read. Longevity-loci's PR is #37, reviewed by the
   lead (checks hold at bcd2f7b); the section is drafted once it merges.
+  Both fixed in manuscript-skills 0.69.1 (this machine still has 0.67.0 until the plugin syncs). `import-gdoc` still
+  writes commenters into `rev-marks.toml` by default (put to Anton as desk #64): always pass `--no-people`.
