@@ -52,8 +52,11 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   The report sorts with a total order (`report_logic._display_tiebreak`): rows tied on |weight| once
   listed in a different order on every run (rs429358 / rs7412 swapped between two runs on one sample). Our polars now
   matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
-- Format libs: `just-dna-format/compiler/enricher>=0.8.5` (the 0.8 line, cut 2026-11-05; upstream
-  `docs/INTEGRATION_0_8.md` is the adoption guide). `just-dna-registry>=0.30.0` **moves with the format
+- Format libs: `just-dna-format/compiler/enricher>=0.8.9` (the 0.8 line, cut 2026-11-05; upstream
+  `docs/INTEGRATION_0_8.md` is the adoption guide). After an upgrade, read upstream's "After upgrading" steps
+  **before** the next cache pull: 0.8.8 asks to check each lane's `pull-record.json` for a missing
+  `release_sha256` first (on 2026-11-18 only `ensembl_variations` lacked it, and that lane publishes no
+  `release.json`, so nothing was mislabelled). `just-dna-registry>=0.33.1` **moves with the format
   pin**: `contract_compatible` treats a `0.x` format minor as breaking on either side, so a mismatched
   pair refuses to publish with no obvious cause; both registries serve format 0.8.4. Registry client
   changes since 0.27 are additive. Check a server with `curl -s $REGISTRY_URL/api/v1/version`.
@@ -265,7 +268,10 @@ does not call it.
   its `groups/` sidecars (consequence, ClinVar, frequencies) are not pulled (upstream **S150** → **RM437**, 0.9), so
   the Ensembl join adds rsIDs only. Do not describe its output as annotation until that lands.
 - `draft_gene_panel` aborts on ClinVar's malformed 9-digit PMIDs; `v1_port/clinvar_panel.py` passes
-  `max_citations=0` and drafts its own filtered `studies.csv`.
+  `max_citations=0` and drafts its own filtered `studies.csv`. Its genotype fill and study rows key
+  each variant the way the drafted `variants.csv` does (rsID or coordinate), read back from the draft,
+  never restated: enricher 0.8.9 (RM449) moved every indel to a coordinate row, and a restated rule
+  left `<<REPLACE>>` genotypes and ungrounded variants.
 - Since format 0.6 the compiler places `pharm_variants` / `haplotypes` / `heteroplasmy` from
   `resolution.csv` too (`manifest.compilation.positional_rows[_placed]`; `None` = not counted). Older
   artifacts still carry null coordinates, hence value-based routing below.
@@ -441,7 +447,11 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   direction** (`module_is_directional`: some row of its lead table, not just the rows this person
   matched, has an effective direction of `protective` or `risk`). A trait module (personality, taste)
   signs its weights by "more of the trait" and marks directions `unknown`/`neutral`; it renders plain
-  weights and one sentence saying so (`apply_directionality`).
+  weights and one sentence saying so (`apply_directionality`). **Net weight** shows only when some row
+  of the module authors a non-zero weight (`module_authors_weights`): a tier-ranked module with no
+  weights (Longevity Map 2.0.0, `weighting.scale: none`) otherwise read as "Net weight 0.0". Its
+  Positive / Negative counts stay, since they fall back to direction. `weighting` is free text and is
+  never parsed for this.
 - **Phenotype modules share one *Combined results* section after the per-position modules**, with one
   introduction; each module is a subsection that ends with a table of every position it reads
   (`phenotype_members`: gene, rsID, what the file showed, how it was read, which versions it marks).
@@ -549,6 +559,18 @@ disables; absent section = no filtering) is applied in `user_vcf_normalized`. A 
   (`TargetedConflict` stays dropped). Normalization reports `kept_depth_unstated` /
   `kept_qual_unstated`; the field is in `config_hash`. Tests: `test_quality_filters.py`.
 - `sex="Female"` logs a warning for chrY variants but never removes them.
+- **A VCF split one row per ALT misreads multi-allelic sites**: `bcftools norm -m-` writes `1/2` as `1/0` +
+  `0/1`, whose `0` is the other ALT. `user_vcf_normalized` rewrites `genotype` on such rows from the
+  site (`io.resolve_split_multiallelic_genotypes`, each row in its own trimmed REF frame, `*` where that
+  frame cannot spell an allele); GT stays as written, and the phenotype caller trusts `genotype` over a
+  disagreeing GT (unphased). Verified on a DeepVariant split file: 150,249 rows equal the unsplit file's.
+  Tests: `test_split_multiallelic.py`.
+- **`assets.NORMALIZATION_VERSION`** is recorded on every `user_vcf_normalized` materialization, and
+  `normalized_parquet_is_current` reuses a parquet only when it equals the code's (none recorded reads as
+  1). Bump it whenever the same VCF and filters would now be written differently: the quality-filter hash
+  alone cannot see a code change, so a fix to normalization otherwise never reaches parquets already on
+  disk. Version 2 is the split multi-allelic genotype. Test:
+  `test_a_parquet_from_older_normalization_code_is_normalized_again`.
 
 ## Dagster pipeline
 
