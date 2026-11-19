@@ -2385,7 +2385,7 @@ dev = [
 
 [[package]]
 name = "just-dna-registry"
-version = "0.34.0"
+version = "0.34.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2393,9 +2393,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/5a/2d68731e6464a31df72b387c9379382b6676a4ca1d73e0694c86a57a06dc/just_dna_registry-0.34.0.tar.gz", hash = "sha256:5dbf07cdbfff27b91a01d5180e29e13d722deccea2156230bf44bdf42dda5b92", size = 509984, upload-time = "2026-11-18T22:46:51.316Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/b2/ba92b09210e60365dc282220b35f41f767e9c7750bb1992481878d58d4cf/just_dna_registry-0.34.1.tar.gz", hash = "sha256:0a7b242ad44bb94bb0a963b1c7c2c20820404ec080afb142a28fc87778d120b3", size = 512869, upload-time = "2026-11-19T01:13:14.617Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/62/24b22c7bca5d04b04f5e687e21d1ef38e25618233008fdaea5252a609a99/just_dna_registry-0.34.0-py3-none-any.whl", hash = "sha256:4e00895c9fdd42de128c29d4558cb3ea09df7fb86559d238cd29c47e2ff5b3d7", size = 546719, upload-time = "2026-11-18T22:46:49.141Z" },
+    { url = "https://files.pythonhosted.org/packages/92/56/7e9923a4a9788b7b08140d66e5c0bb4d385cc848b9f3f47ea7125caeeba1/just_dna_registry-0.34.1-py3-none-any.whl", hash = "sha256:b59b9ca503e0ba094d973a5ca2ee5cf6a09a04f11603bc29f9bad79c4c831d5a", size = 549104, upload-time = "2026-11-19T01:13:12.969Z" },
 ]
 
 [[package]]
