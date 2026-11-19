@@ -373,6 +373,7 @@ from just_dna_pipelines.annotation.report_logic import (
     build_module_report_data,
     apply_directionality,
     build_pharmacogenomics_report_data,
+    module_authors_weights,
     module_is_directional,
     report_environment,
     report_filename_stem,
@@ -402,6 +403,7 @@ def _module_data(variants: list[dict]) -> dict:
         "module_name": "synthetic", "display_name": "Synthetic",
         "variants": variants,
         "summary": {"total_variants": len(variants), "directional": apply_directionality(variants),
+                    "weighted": any(v["weight"] for v in variants),
                     "total_positive": 0, "total_negative": 0, "total_weight": 0.0},
     }
 
@@ -918,6 +920,7 @@ def test_weightless_lead_family_does_not_raise_on_the_weight_sum(tmp_path):
     data = build_longevity_report_data(tmp_path / "m_weights.parquet", "m", info)
     assert data["summary"]["total_variants"] == 1
     assert data["summary"]["total_weight"] == 0.0
+    assert data["summary"]["weighted"] is False
 
 
 # =============================================== end to end, against a real sample when present
@@ -1183,6 +1186,36 @@ def test_direction_is_a_property_of_the_whole_module(tmp_path, directions, state
     assert module_is_directional("m", info) is expected
     matched_only_neutral = [_build_variant(_trait_row("rs2", 0.3, "neutral"), {})]
     assert apply_directionality(matched_only_neutral, module_is_directional("m", info)) is expected
+
+
+@pytest.mark.parametrize("weights,expected", [
+    ([None, None], False),   # Longevity Map 2.0.0: `weighting.scale: none`, ranked by tier, no weight authored
+    ([0.0, 0.0], False),     # zeros are no weight either
+    ([0.0, 0.5], True),      # one authored weight anywhere in the module
+])
+def test_weighting_is_a_property_of_the_whole_module(tmp_path, weights, expected) -> None:
+    lead = tmp_path / "weights.parquet"
+    pl.DataFrame({"rsid": ["rs1", "rs2"], "weight": weights, "direction": ["protective", "risk"]},
+                 schema_overrides={"weight": pl.Float64}).write_parquet(lead)
+    info = ModuleInfo(name="m", repo_id="r", path=str(tmp_path), lead_url=str(lead))
+    assert module_authors_weights("m", info) is expected
+
+
+def test_a_lead_table_without_a_weight_column_authors_no_weights(tmp_path) -> None:
+    lead = tmp_path / "weights.parquet"
+    pl.DataFrame({"rsid": ["rs1"], "direction": ["risk"]}).write_parquet(lead)
+    assert module_authors_weights("m", ModuleInfo(name="m", repo_id="r", path=str(tmp_path), lead_url=str(lead))) is False
+
+
+def test_a_directional_module_without_weights_renders_no_net_weight() -> None:
+    """Protective and risk rows are still counted; a sum of weights the module never authored is not shown."""
+    unweighted = _module_data([_build_variant(_trait_row("rs1", 0.0, "protective"), {}),
+                               _build_variant(_trait_row("rs2", 0.0, "risk"), {})])
+    html = _render(other_modules=[unweighted])
+    assert '<div class="label">Positive</div>' in html and '<div class="label">Negative</div>' in html
+    assert '<div class="label">Net weight</div>' not in html
+    weighted = _module_data([_build_variant(_trait_row("rs1", 0.4, "risk"), {})])
+    assert '<div class="label">Net weight</div>' in _render(other_modules=[weighted])
 
 
 def test_a_manifest_that_fails_validation_still_reports_its_stated_version(tmp_path) -> None:

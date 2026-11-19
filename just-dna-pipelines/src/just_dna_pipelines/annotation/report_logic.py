@@ -1041,6 +1041,29 @@ def module_is_directional(module_name: str, module_info: Optional[ModuleInfo]) -
     )
 
 
+def module_authors_weights(module_name: str, module_info: Optional[ModuleInfo]) -> Optional[bool]:
+    """Whether any row of a module's lead table authors a non-zero weight; None when it cannot be read.
+
+    A module property, like `module_is_directional`. A module that authors no weights (Longevity Map
+    2.0.0: `weighting.scale: none`, ranked by evidence tier instead) has no Net weight to report, and a
+    "Net weight 0.0" box reads as a measured balance. `manifest.weighting` says so in free text that is
+    never parsed, so the rows are asked instead.
+    """
+    if module_info is None:
+        return None
+    lf = scan_module_table(module_name, ModuleTable.LEAD, module_info=module_info)
+    if "weight" not in lf.collect_schema().names():
+        return False
+    return lf.filter(pl.col("weight").is_not_null() & (pl.col("weight") != 0)).limit(1).collect().height > 0
+
+
+def _authors_weights(variants: list[dict], module_weighted: Optional[bool]) -> bool:
+    """`module_authors_weights` when the module could be read, else the rows at hand."""
+    if module_weighted is not None:
+        return module_weighted
+    return any(v.get("weight") for v in variants)
+
+
 def apply_directionality(variants: list[dict], module_directional: Optional[bool] = None) -> bool:
     """Whether a module's results have a good/bad direction; strips the colouring when they do not.
 
@@ -1378,6 +1401,9 @@ def build_longevity_report_data(
             "directional": apply_directionality(
                 [v for c in categories.values() for v in c["variants"]], module_is_directional(module_name, module_info)
             ),
+            "weighted": _authors_weights(
+                [v for c in categories.values() for v in c["variants"]], module_authors_weights(module_name, module_info)
+            ),
             "total_positive": total_positive,
             "total_negative": total_negative,
             "total_weight": round(total_weight, 2) if total_weight else 0.0,
@@ -1444,6 +1470,7 @@ def build_module_report_data(
         summary = {
             "total_variants": len(variants),
             "directional": apply_directionality(variants, module_is_directional(module_name, module_info)),
+            "weighted": _authors_weights(variants, module_authors_weights(module_name, module_info)),
             "total_positive": positive,
             "total_negative": negative,
             "total_weight": round(sum(v["weight"] for v in variants), 2),

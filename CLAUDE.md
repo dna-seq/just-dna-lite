@@ -447,7 +447,11 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   direction** (`module_is_directional`: some row of its lead table, not just the rows this person
   matched, has an effective direction of `protective` or `risk`). A trait module (personality, taste)
   signs its weights by "more of the trait" and marks directions `unknown`/`neutral`; it renders plain
-  weights and one sentence saying so (`apply_directionality`).
+  weights and one sentence saying so (`apply_directionality`). **Net weight** shows only when some row
+  of the module authors a non-zero weight (`module_authors_weights`): a tier-ranked module with no
+  weights (Longevity Map 2.0.0, `weighting.scale: none`) otherwise read as "Net weight 0.0". Its
+  Positive / Negative counts stay, since they fall back to direction. `weighting` is free text and is
+  never parsed for this.
 - **Phenotype modules share one *Combined results* section after the per-position modules**, with one
   introduction; each module is a subsection that ends with a table of every position it reads
   (`phenotype_members`: gene, rsID, what the file showed, how it was read, which versions it marks).
