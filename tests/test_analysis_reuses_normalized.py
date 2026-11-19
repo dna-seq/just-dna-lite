@@ -9,9 +9,11 @@ import shutil
 from pathlib import Path
 
 import pytest
-from dagster import DagsterInstance
+from dagster import AssetMaterialization, DagsterInstance, MetadataValue
 
 from just_dna_pipelines.annotation.annotation_runner import FULL_JOB, REUSE_NORMALIZED_JOB
+from just_dna_pipelines.annotation.assets import NORMALIZATION_VERSION
+from just_dna_pipelines.module_config import _load_config
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.runtime import load_env
 from webui import state as webui_state
@@ -71,6 +73,23 @@ def test_a_damaged_parquet_is_normalized_again(
 ) -> None:
     normalized = _normalize(instance, tmp_path)
     normalized.write_bytes(damage)
+    assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
+    assert webui_state._normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
+
+
+@pytest.mark.parametrize("recorded", [None, NORMALIZATION_VERSION - 1], ids=["unrecorded", "older"])
+def test_a_parquet_from_older_normalization_code_is_normalized_again(
+    instance: DagsterInstance, tmp_path: Path, recorded: int | None
+) -> None:
+    """Same filters, older code: a split-VCF parquet from before version 2 holds wrong genotypes."""
+    _normalize(instance, tmp_path)
+    assert webui_state._analysis_job_name(PARTITION, True, False) == REUSE_NORMALIZED_JOB
+    metadata = {"quality_filters_hash": MetadataValue.text(_load_config().quality_filters.config_hash())}
+    if recorded is not None:
+        metadata["normalization_version"] = MetadataValue.int(recorded)
+    instance.report_runless_asset_event(
+        AssetMaterialization(asset_key="user_vcf_normalized", partition=PARTITION, metadata=metadata)
+    )
     assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
     assert webui_state._normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
 

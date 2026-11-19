@@ -214,6 +214,13 @@ def quality_filters_config(context: AssetExecutionContext) -> Output[dict]:
 # NORMALIZED VCF ASSET
 # ============================================================================
 
+# What `user_vcf_normalized` derives from a VCF beyond the quality filters. Bump it whenever the same
+# VCF and the same filters would now be written differently, so `normalized_parquet_is_current` stops
+# reusing parquets written by the older code. 2: rows of a VCF split one per ALT carry their site's
+# genotype (resolve_split_multiallelic_genotypes). A materialization that records none is version 1.
+NORMALIZATION_VERSION = 2
+
+
 @asset(
     description="Normalized VCF as parquet: chromosomes stripped of 'chr' prefix, "
                 "'id' renamed to 'rsid', genotype computed from GT+ref+alt, "
@@ -370,6 +377,7 @@ def user_vcf_normalized(
         metadata_dict["rows_after_filter"] = MetadataValue.int(row_count)
         metadata_dict["rows_removed"] = MetadataValue.int(rows_before_filter - row_count)
     metadata_dict["quality_filters_hash"] = MetadataValue.text(filters.config_hash())
+    metadata_dict["normalization_version"] = MetadataValue.int(NORMALIZATION_VERSION)
     metadata_dict["split_multiallelic_rows_resolved"] = MetadataValue.int(split.rows_resolved)
     metadata_dict["split_multiallelic_groups_skipped"] = MetadataValue.json(split.groups_skipped)
 

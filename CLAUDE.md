@@ -560,9 +560,13 @@ disables; absent section = no filtering) is applied in `user_vcf_normalized`. A 
   site (`io.resolve_split_multiallelic_genotypes`, each row in its own trimmed REF frame, `*` where that
   frame cannot spell an allele); GT stays as written, and the phenotype caller trusts `genotype` over a
   disagreeing GT (unphased). Verified on a DeepVariant split file: 150,249 rows equal the unsplit file's.
-  Tests: `test_split_multiallelic.py`. **Open:** staleness is the quality-filter hash only, so a parquet
-  normalized before this fix is still reused; re-normalize split-VCF samples by hand until a
-  normalization version joins `normalized_parquet_is_current`.
+  Tests: `test_split_multiallelic.py`.
+- **`assets.NORMALIZATION_VERSION`** is recorded on every `user_vcf_normalized` materialization, and
+  `normalized_parquet_is_current` reuses a parquet only when it equals the code's (none recorded reads as
+  1). Bump it whenever the same VCF and filters would now be written differently: the quality-filter hash
+  alone cannot see a code change, so a fix to normalization otherwise never reaches parquets already on
+  disk. Version 2 is the split multi-allelic genotype. Test:
+  `test_a_parquet_from_older_normalization_code_is_normalized_again`.
 
 ## Dagster pipeline
 
