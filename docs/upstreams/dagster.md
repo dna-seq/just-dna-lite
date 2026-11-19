@@ -9,6 +9,12 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 ## Entries
 
-### 1.13.30 published 2026-11-12, not yet read
+### 1.13.29 and 1.13.30 (read 2026-11-19)
 
-The lock is at 1.13.28. 1.13.30 still allows `protobuf<8` and excludes grpcio-health-checking 1.82.0 only. Next: read the release notes, then decide on a lock bump. Verdict: **open, unattended**.
+Nothing in them reaches this repository: UI fixes, `dg --help` under typer 0.26+, Python 3.10 dropped
+(we run 3.13), Dagster+ only items. **The bump does not resolve.** `dagster-dg-cli` 1.13.29 and 1.13.30
+require `typer<0.26`, against our `typer>=0.27.1` (`just-dna-pipelines`, since bcf6ff8), and the dagster
+family pins each other `==`, so the whole family stays at 1.13.28. The cap reads as a stopgap: the same
+release says it fixed `dg --help` on typer 0.26. Per `CLAUDE.md` a pin that won't resolve is waited for:
+the watcher says the next dagster release, and it is tried then. Lowering our typer floor is the lead's
+call, not a bump. Verdict: **blocked: upstream typer cap in dagster-dg-cli**.
