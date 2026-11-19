@@ -348,7 +348,10 @@ was lost in the report, not here.
   `annotate_vcf_with_module_weights` returns `(path, num_matched, restoration_stats)`.
 - **Sort immediately before `sink_parquet`.** The streaming left join emits a non-deterministic
   multiset; the sort is a barrier that fixes it without `collect()`. Never remove it or turn it into a
-  `collect()`. `restoration._with_flanking_distance` sorts its `join_asof` inputs for the same reason.
+  `collect()`. Its keys must reach each lead family's row identity, or ties stay unordered: pharmgkb's
+  rows for one call differing only by `drug` came out in a new order every run until `drug`,
+  `phenotype_category` and `annotation_id` (the format's `PharmVariantRow` key) joined them. A new lead
+  family on this path needs its key columns added there. `restoration._with_flanking_distance` sorts its `join_asof` inputs for the same reason.
   After touching the engine, report or restoration, run `scripts/regression_snapshot.py`
   (`snapshot` / `compare`; baseline in `data/interim/regression_baseline/`).
 - `AnnotationManifest` records `output_dir`, per-module `lead_table`, `skipped_modules` and
