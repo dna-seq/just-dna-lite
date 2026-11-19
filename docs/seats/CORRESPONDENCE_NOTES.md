@@ -46,7 +46,12 @@ maintainer; nothing is closed or commented without his word on the text.
 - Handoff: 1 tools, nothing of the repository's machinery is this seat's (CLAUDE.md upstream notes stay the
   lead's); 2 avatar asked in `#agent-chat>avatars` (no Cursor here); 3 watchers `upstream-index` and `issues`
   delivering; 4 hello posted in `#agent-chat>seating`. Builder's `first seating:` report still to send.
-- Release reads waiting (`unattended`), from the watcher's first baselines against `uv.lock`:
-  format/compiler/enricher 0.8.5 -> 0.8.9 and registry 0.30.0 -> 0.34.0 (they move together);
-  dagster 1.13.28 -> 1.13.30; polars-bio 0.37.0 -> 0.38.0. just-prs, prs-ui, reflex, polars at the lock.
-  No local clone of just-dna-compiler: read its changelog from GitHub through a subagent.
+- Release reads (2026-11-19, unattended): the format trio, registry and polars-bio are read into the ledgers (995d6f5).
+  The lead had already adopted 0.8.9 and polars-bio 0.38 on `main` (da6311b). Handed to the lead in
+  `#just-dna-lite>upstreams`: branch `bump/just-dna-format` (4d71343, registry lock 0.34.0, not pushed,
+  `.worktrees/bump-just-dna-format`), the RM449 recompile of superhuman/thrombophilia, and a proposed
+  CLAUDE.md line on the proxy in `test_registry_error_messages`.
+- Open, `unattended`: dagster 1.13.28 -> 1.13.30 release read. registry 0.34.1 is merged upstream, not yet on PyPI.
+- To file at the next idle turn (kit): `watchdog.py watchers` lists only the SLURM job watchers, not the seat's
+  own (`upstream-index`, `issues`), so item 3 of the first-seating handoff cannot be quoted from it.
+- Builder's `first seating:` report sent.
