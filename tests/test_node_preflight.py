@@ -3,7 +3,8 @@
 Below Reflex's minimum Node, Reflex falls back to `bun --bun run dev`, and react-router 8's
 dev command then loops on a restart Bun cannot honour (it ignores `--conditions` passed through
 NODE_OPTIONS) and dies with "restartWithMergedOptions() was called, but the process has already
-been restarted". A Windows user on Node 22.15 hit exactly that.
+been restarted". A Windows user on Node 22.15 hit exactly that. With no Node at all Reflex runs
+plain `bun run dev`, which works, so only an outdated Node is refused.
 """
 
 import pytest
@@ -47,9 +48,10 @@ def test_outdated_node_names_both_versions_and_both_ways_out(monkeypatch: pytest
     assert "nodejs.org" in message
 
 
-def test_missing_node_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_node_passes_because_reflex_runs_its_own_bun(monkeypatch: pytest.MonkeyPatch) -> None:
+    # With no Node, Reflex runs `bun run dev` (no `--bun`); that path serves the app.
     monkeypatch.setattr(js_runtimes, "get_node_version", lambda: None)
-    assert "No Node.js was found" in node_too_old_for_dev_server()
+    assert node_too_old_for_dev_server() == ""
 
 
 def test_start_refuses_before_spawning_anything(monkeypatch: pytest.MonkeyPatch) -> None:
