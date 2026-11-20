@@ -302,12 +302,10 @@ items:
   - inserted: 'Thereof there is a lack of interpretation both in scientific circles but also consumer wise. '
   where: 1.1 Background and Significance
   line: 45
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept the link Livia adds between the researchers'' and the consumers'' sentences (C129; Georg''s C50
-    asks for the same link), in plainer words: ''Interpretation is therefore lacking for researchers and consumers
-    alike.'''
+  status: addressed
+  now: Interpretation is therefore lacking for researchers and consumers alike.
+  why: Livia's link between the researchers' and the consumers' sentences, in plainer words; Georg's C50 asks for
+    the same.
   category: Story and structure
   severity: minor
   stage: writing
@@ -380,11 +378,9 @@ items:
   - inserted: s
   where: 1.1 Background and Significance
   line: 52
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: The 's' left from S25 ('data ... comes'). The paper treats 'data' as plural ('Genomic data are'), so keep
-    'come'.
+  why: 'Not taken: the paper treats ''data'' as plural (''Genomic data are''), so ''come'' stays.'
   category: Writing and clarity
   severity: info
   stage: writing
@@ -416,13 +412,12 @@ items:
   - inserted: '(e.g., xxx, yyy) '
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'Keep the place Georg marked but fill ''(e.g., xxx, yyy)'' from Table S7, one tool per part of the task
-    the sentence lists: OpenCRAVAT (Pagel et al., 2020) for local annotation with installable modules, pgsc_calc
-    (Lambert et al., 2024) or GenoPred (Pain et al., 2024) for ancestry-normalized PGS Catalog scoring, and GeneChat
-    MCP (Costello, 2026) for access from an AI assistant. This also answers C51 and C52.'
+  status: addressed
+  now: Open-source projects between these extremes each cover part of the task, such as local annotation with installable
+    modules (OpenCRAVAT; Pagel et al., 2020), ancestry-normalized scoring of models from the PGS Catalog, the open
+    database of published polygenic scores (pgsc_calc, Lambert et al.
+  why: Filled with one tool per part of the task, from Table S7, with Table S7's citations; Lambert et al. 2024,
+    Pain et al. 2024 and Costello 2026 added to the bibliography.
   category: References
   severity: minor
   stage: writing
@@ -861,13 +856,15 @@ items:
   - deleted: its
   where: 1.2 Overview of Just-DNA-Lite
   line: 100
-  status: open
-  now: ''
-  why: ''
-  next: 'Reword instead: with ''their'', the row says the researcher does not write code, while the paper''s point
-    (Section 1.2: MCP servers ''let AI assistants call the annotation and scoring operations as tools instead of
-    writing their own analysis code'') is that the assistant does not write its own. Write ''instead of the assistant
-    writing its own analysis code''.'
+  status: addressed
+  now: '| Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through
+    typed tools and reads the results, instead of the assistant writing its own analysis code | The two MCP servers
+    and the plugin skills |
+
+    | Educators and students | Show how variant annotation and polygenic scores work, and where models disagree,
+    on real public genomes | The hosted demonstration (https://lite.'
+  why: 'Taken in other words: the row means that the assistant, not the researcher, does not write its own code
+    (Section 1.2).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2095,11 +2092,10 @@ items:
   - inserted: 'that '
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: Accept Georg's edit ('Model sites that a variant-only VCF does not list'), as part of the rewrite C92 to
-    C94 ask for.
+  status: addressed
+  now: Model sites that a variant-only VCF does not list are assumed to be homozygous reference, so for exome or
+    array input, where most of them are not read, the call rests largely on assumed genotypes.
+  why: Accepted as suggested.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2389,11 +2385,9 @@ items:
   - inserted: )
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept the intent, not the brackets: ''(with Ensembl annotation) on took'' leaves ''on'' stranded. Write
-    ''Generation II with Ensembl annotation turned on took a median of 103.1 s''.'
+  status: addressed
+  now: Generation II with Ensembl annotation turned on took a median of 103.
+  why: 'Taken in plainer words (''turned on''): the brackets would have left ''on'' stranded.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2491,12 +2485,11 @@ items:
   - inserted: 'for '
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: 'Decline as written: with ''for'', the clause loses its verb (''and the repository''s generated tables (...)
-    for the warm and cold runs.''). The original leaves ''gives'' implied; write it out instead: ''and the repository''s
-    generated tables (docs/manuscript/benchmarks/a3/tables.md) give the warm and cold runs.'''
+  status: addressed
+  now: Table S10 gives the full runs, and the repository's generated tables (`docs/manuscript/benchmarks/a3/tables.md`)
+    give the warm and cold runs.
+  why: 'Taken in other words: ''for'' would have left the clause without a verb, so ''give'' is written out. The
+    paragraph is now in Supplementary S10 (C100).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3070,13 +3063,11 @@ items:
   - inserted: 'assuming a role as citizen scientists, '
   where: '5.3 Platform Philosophy: Transparency and the Right to Read Your Own Genome'
   line: 429
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: 'Decline in this place: inserted here, ''assuming a role as citizen scientists'' makes the right to read
-    one''s own genome sound conditional, while the paragraph grounds it in a right everyone has (GDPR Article 15
-    applies to any data subject). If C58''s reframing is accepted, add it as its own sentence, for example after
-    the first one: ''Many who do so act as citizen scientists.'''
+  why: 'Not inserted here: ''assuming a role as citizen scientists'' would make the right to read one''s own genome
+    sound conditional, while the paragraph grounds it in a right every data subject has (GDPR Article 15). How the
+    paper names its users is desk #69.'
   category: Ethics, privacy and scope
   severity: minor
   stage: writing

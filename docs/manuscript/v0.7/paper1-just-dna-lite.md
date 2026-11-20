@@ -44,15 +44,15 @@ AI assistants can run the same steps through Model Context Protocol servers. On 
 <!-- @rev P1 rounds=3 by=claude:2026-10-19,codex:2026-10-19,claude:2026-10-28 -->
 Researchers who receive raw variant files (VCFs) containing millions of variants
 <!-- @/rev P1 -->
-<!-- @rev C4 rounds=5 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19,claude:2026-10-27,claude:2026-10-27 -->
-can find it hard to annotate them against published databases without bioinformatics and programming expertise (Chen et al., 2023), and acquiring that expertise takes time away from the questions they set out to answer. Many consumers who download their raw data from a testing company take it to third-party interpretation tools (Nelson et al., 2019; O'Daniel et al., 2025).
+<!-- @rev C4 rounds=6 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-19,claude:2026-10-27,claude:2026-10-27,claude:2026-11-20 -->
+can find it hard to annotate them against published databases without bioinformatics and programming expertise (Chen et al., 2023), and acquiring that expertise takes time away from the questions they set out to answer. Many consumers who download their raw data from a testing company take it to third-party interpretation tools (Nelson et al., 2019; O'Daniel et al., 2025). Interpretation is therefore lacking for researchers and consumers alike.
 <!-- @/rev C4 -->
 
 <!-- @rev C3 rounds=10 by=robi:2026-09-25,claude:2026-10-10,codex:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,co-authors:2026-11-19,claude:2026-11-19 -->
 That raw variant data now mostly come from whole-genome DNA sequencing: several companies offer direct-to-consumer sequencing services (O'Daniel et al., 2025). While the National Human Genome Research Institute (NHGRI) estimates that the first human genome cost US$500 million to US$1 billion (NHGRI, 2021), by 2025, manufacturers advertised the sequencing of a human genome for US$80 to US$200 (Illumina, 2023; Ultima Genomics, 2025). Clinical laboratory studies report higher costs after including labour, computing and analysis, with estimates depending on the workflow and costing scope (Mordaunt et al., 2024; Ehman et al., 2025).<!-- @/rev C3 -->
 
 <!-- @rev R3 rounds=6 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28 -->
-Existing solutions for reading a personal genome generally belong to two extremes. Commercial platforms such as DNA Complete (formerly Nebula Genomics) and Dante Labs provide curated reports, but the curation is opaque: users cannot verify which polymorphisms contributed to a score, whether the methodology is appropriate for their ancestry, or how findings were weighted. At the other end, research-grade tools like PLINK (Chang et al., 2015), ANNOVAR (Wang et al., 2010) and VEP (McLaren et al., 2016) are powerful but demand command-line proficiency and a lengthy setup. <!-- @rev C36a rounds=5 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28 -->Open-source projects between these extremes each cover part of the task, such as local annotation with installable modules, ancestry-normalized scoring of models from the PGS Catalog (the open database of published polygenic scores) or access to a genome from an AI assistant. Table S7 compares the documented features of 23 tools for personal-genome annotation, polygenic scoring and AI-assisted interpretation; none of them documents a graphical interface, annotation sets added without code, PGS Catalog scoring and ancestry-matched percentiles together.<!-- @/rev C36a -->
+Existing solutions for reading a personal genome generally belong to two extremes. Commercial platforms such as DNA Complete (formerly Nebula Genomics) and Dante Labs provide curated reports, but the curation is opaque: users cannot verify which polymorphisms contributed to a score, whether the methodology is appropriate for their ancestry, or how findings were weighted. At the other end, research-grade tools like PLINK (Chang et al., 2015), ANNOVAR (Wang et al., 2010) and VEP (McLaren et al., 2016) are powerful but demand command-line proficiency and a lengthy setup. <!-- @rev C36a rounds=6 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28,claude:2026-11-20 -->Open-source projects between these extremes each cover part of the task, such as local annotation with installable modules (OpenCRAVAT; Pagel et al., 2020), ancestry-normalized scoring of models from the PGS Catalog, the open database of published polygenic scores (pgsc_calc, Lambert et al., 2024; GenoPred, Pain et al., 2024), or access to a genome from an AI assistant (GeneChat MCP; Costello, 2026). Table S7 compares the documented features of 23 tools for personal-genome annotation, polygenic scoring and AI-assisted interpretation; none of them documents a graphical interface, annotation sets added without code, PGS Catalog scoring and ancestry-matched percentiles together.<!-- @/rev C36a -->
 <!-- @/rev R3 -->
 
 <!-- @rev R4 rounds=12 by=robi:2026-09-25,claude:2026-10-13,claude:2026-10-19,codex:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28 -->
@@ -89,7 +89,7 @@ The resulting workflow lets users choose published annotation content, apply it 
 - **Local.** Annotation and scoring run on the user's computer. Reference data are downloaded; the genome is not uploaded (Section 5.2).
 <!-- @/rev F1 -->
 
-<!-- @rev F2 rounds=5 by=claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-11-19 -->
+<!-- @rev F2 rounds=6 by=claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-11-19,claude:2026-11-20 -->
 **Box 1.** Who Just-DNA-Lite is for, and where each user starts.
 
 | User | What they can do | Where to start |
@@ -97,7 +97,7 @@ The resulting workflow lets users choose published annotation content, apply it 
 | People with a genome from a sequencing provider | Read their own VCF (on the GRCh38 human reference genome) against longevity, disease-predisposition, drug-response and other modules, and see where they fall for thousands of polygenic scores, with the studies and models behind each result, without uploading the genome to the Internet | The web interface installed on their own computer from a terminal (Code Availability), after trying the public demonstration |
 | Researchers in ageing, genetics or a trait domain | Turn a curated variant list or a literature review into a versioned module that others can install; apply published modules to study genomes; compare all available models for a trait side by side | The module format (CSV and YAML) or the just-module-creator plugin in their AI assistant; the registry |
 | Bioinformaticians and software developers | Use scoring, percentiles, ancestry inference and the module format inside their own pipelines; read every result as Parquet in Python, R or DuckDB | The PyPI libraries and command-line tools; the MCP servers |
-| Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through typed tools and reads the results, instead of writing its own analysis code | The two MCP servers and the plugin skills |
+| Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through typed tools and reads the results, instead of the assistant writing its own analysis code | The two MCP servers and the plugin skills |
 | Educators and students | Show how variant annotation and polygenic scores work, and where models disagree, on real public genomes | The hosted demonstration (https://lite.just-dna.life/), which uses public genomes only |
 <!-- @/rev F2 -->
 
@@ -281,8 +281,8 @@ All these interfaces call one scoring implementation, so equivalent inputs, refe
 
 ### **3.2.2 Ancestry Inference**
 
-<!-- @rev V14 rounds=8 by=claude:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,claude:2026-11-20 -->
-The reference superpopulation is chosen by a k-nearest-neighbour classifier, built once from the unrelated individuals (Manichaikul et al., 2010) of the 1000 Genomes high-coverage panel (Byrska-Bishop et al., 2022) and downloaded as a fixed model. A principal component analysis of common, independent SNVs in the panel (Chang et al., 2015) defines the space; the user's genome is projected into it with the method of FRAPOSA (Zhang et al., 2020) and takes the superpopulation most common among its nearest reference individuals. Model sites a variant-only VCF does not list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the call rests largely on assumed genotypes. When too few of the model's sites can be used, the ancestry is reported as unknown and the user chooses the reference. Supplementary S16 gives the panel, its quality control, the projection and the thresholds; Section 4.4 reports how well the classifier separates the reference superpopulations.
+<!-- @rev V14 rounds=9 by=claude:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,claude:2026-11-20,claude:2026-11-20 -->
+The reference superpopulation is chosen by a k-nearest-neighbour classifier, built once from the unrelated individuals (Manichaikul et al., 2010) of the 1000 Genomes high-coverage panel (Byrska-Bishop et al., 2022) and downloaded as a fixed model. A principal component analysis of common, independent SNVs in the panel (Chang et al., 2015) defines the space; the user's genome is projected into it with the method of FRAPOSA (Zhang et al., 2020) and takes the superpopulation most common among its nearest reference individuals. Model sites that a variant-only VCF does not list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the call rests largely on assumed genotypes. When too few of the model's sites can be used, the ancestry is reported as unknown and the user chooses the reference. Supplementary S16 gives the panel, its quality control, the projection and the thresholds; Section 4.4 reports how well the classifier separates the reference superpopulations.
 <!-- @/rev V14 -->
 
 ### **3.3 Additional Trait Annotation Modules**
@@ -308,8 +308,8 @@ The benchmarks in this section measure how fast the platform annotates a genome 
 
 ### **4.1 Annotation Speed**
 
-<!-- @rev A3a rounds=14 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28,claude:2026-11-20 -->
-On Anton Kulaga's published call set, the median full Generation II run took 33.2 s against 6,005.4 s for Generation I, an approximately 181-fold speedup; across the two call sets Generation I ran on, it was 128- to 181-fold (Table 2). Most Generation I runs on Livia Zaharia's genome were made with the desktop in light use (Supplementary S2). Against a whole-genome reference database the gap narrows. Generation II with Ensembl annotation on took a median of 103.1 s and Generation I with dbSNP alone 3,537.2 s, about 34-fold (two runs each; 24- to 57-fold across pairs of runs). These ratios apply to these configurations and these inputs, rather than to OakVar generally. A warm run took a median of 16.3 s.
+<!-- @rev A3a rounds=15 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-13,claude:2026-10-15,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28,claude:2026-11-20,claude:2026-11-20 -->
+On Anton Kulaga's published call set, the median full Generation II run took 33.2 s against 6,005.4 s for Generation I, an approximately 181-fold speedup; across the two call sets Generation I ran on, it was 128- to 181-fold (Table 2). Most Generation I runs on Livia Zaharia's genome were made with the desktop in light use (Supplementary S2). Against a whole-genome reference database the gap narrows. Generation II with Ensembl annotation turned on took a median of 103.1 s and Generation I with dbSNP alone 3,537.2 s, about 34-fold (two runs each; 24- to 57-fold across pairs of runs). These ratios apply to these configurations and these inputs, rather than to OakVar generally. A warm run took a median of 16.3 s.
 
 Peak memory with Ensembl annotation off was at most 4,525 MB for a Generation II run on any genome, against at most 4,611 MB for Generation I, and at most 5,750 MB with Ensembl on. The benchmark ran on a workstation with SSD storage and 63 GiB RAM (Table S6), so it does not directly establish performance on a laptop or on rotational disks; Supplementary S10 gives memory by run mode and the stage times.
 <!-- @/rev A3a -->
@@ -549,6 +549,8 @@ Caruso, C., et al. (2022). How important are genes to achieve longevity? *Intern
 <!-- @rev V20 rounds=1 by=claude:2026-10-19 -->
 Chang, C. C., et al. (2015). Second-generation PLINK: rising to the challenge of larger and richer datasets. *GigaScience*, 4, 7. https://doi.org/10.1186/s13742-015-0047-8
 
+Costello, N. (2026). GeneChat MCP server [software]. https://github.com/natecostello/genechat-mcp
+
 Dagster Labs (2026). Dagster: an orchestration platform for data assets. https://github.com/dagster-io/dagster
 
 <!-- @/rev V20 -->
@@ -580,6 +582,8 @@ Kulaga, A., et al. (2024). Just-DNA-Seq, open-source personal genomics platform:
 Lambert, S. A., et al. (2021). The Polygenic Score Catalog as an open database for reproducibility and systematic evaluation. *Nature Genetics*, 53(4), 420–425. https://doi.org/10.1038/s41588-021-00783-5
 <!-- @/rev I8 -->
 
+Lambert, S. A., et al. (2024). Enhancing the Polygenic Score Catalog with tools for score calculation and ancestry normalization. *Nature Genetics*, 56(10), 1989–1994. https://doi.org/10.1038/s41588-024-01937-x
+
 <!-- @rev V22 rounds=1 by=claude:2026-10-19 -->
 Landrum, M. J., et al. (2018). ClinVar: improving access to variant interpretations and supporting evidence. *Nucleic Acids Research*, 46(D1), D1062–D1067. https://doi.org/10.1093/nar/gkx1153
 
@@ -598,6 +602,8 @@ McLaren, W., et al. (2016). The Ensembl Variant Effect Predictor. *Genome Biolog
 Oak Bioinformatics (2026). OakVar, version 2.13.1 [software]. https://github.com/rkimoakbioinformatics/oakvar
 
 Pagel, K. A., et al. (2020). Integrated informatics analysis of cancer-related variants. *JCO Clinical Cancer Informatics*, 4, 310–317. https://doi.org/10.1200/CCI.19.00132
+
+Pain, O., Al-Chalabi, A., & Lewis, C. M. (2024). The GenoPred pipeline: a comprehensive and scalable pipeline for polygenic scoring. *Bioinformatics*, 40(10), btae551. https://doi.org/10.1093/bioinformatics/btae551
 
 <!-- @/rev RC5b -->
 <!-- @rev V23 rounds=1 by=claude:2026-10-19 -->
