@@ -9,6 +9,7 @@ import sys
 import atexit
 from pathlib import Path
 
+from just_dna_lite.dagster_sqlite import DagsterDatabaseKeepalive
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
 from just_dna_lite.inotify import CHECKED_ENV as INOTIFY_CHECKED_ENV, inotify_budget, inotify_preflight
 from just_dna_lite.process import (
@@ -251,6 +252,10 @@ def serve() -> None:
 
     dagster_process = _start_dagster_for_serve()
     dagster_home = Path(os.environ["DAGSTER_HOME"]) if os.getenv("DAGSTER_HOME") else None
+    if dagster_home is not None:
+        # Keeps the shared SQLite WAL files from being deleted and rebuilt between queries
+        # ("database is locked"); see just_dna_lite.dagster_sqlite.
+        atexit.register(DagsterDatabaseKeepalive(dagster_home).close)
     atexit.register(
         shutdown_managed_processes,
         [dagster_process] if dagster_process is not None else [],

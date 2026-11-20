@@ -26,6 +26,14 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   (`just_dna_lite.inotify`: refuse below 4 free, warn below 32, naming the holders and the `sysctl` fix).
   Out of instances the stack died in watchfiles with "Too many open files (os error 24)".
   Tests: `tests/test_node_preflight.py`, `tests/test_inotify_preflight.py`.
+- **The launchers hold Dagster's shared SQLite files open** (`just_dna_lite.dagster_sqlite.DagsterDatabaseKeepalive`
+  in `start`, `dagster` and `serve`: one idle read-only connection each to `history/runs.db` and
+  `schedules/schedules.db`). Dagster connects per query (`NullPool`); when the last connection closes, SQLite
+  deletes `-wal`/`-shm` and the next one rebuilds them under an exclusive lock, so daemons, webserver, web UI
+  and workers kept failing with "database is locked", each logged with a full stack. Run and schedule storage
+  use SQLite's 5 s timeout (only the event log gets Dagster's 30 s). Measured: 5 of 36 reads locked without
+  it, 0 of 199 with it. The held connection has no transaction, so writers and checkpoints are never blocked.
+  Tests: `tests/test_dagster_sqlite_keepalive.py`.
 - Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners`,
   **listeners only** (a bare `lsof -ti :port` also matches a browser connected to 3000).
   `JUST_DNA_START_KILL_PORTS` stays off by default: 8000/8001 may belong to unrelated tools.
