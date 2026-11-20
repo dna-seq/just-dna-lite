@@ -97,3 +97,9 @@ was shown to that session and will not be shown again: its first work is repeate
   Generation I audit tables (`supplementary/S14_*`), not yet cited in the master. Ledger: 99 open, 26 addressed,
   1 partly, 6 not-on-point. Next by the hardest-first order: C103 (weight of the speed claim), C108 (AI
   accountability), the Abstract (C46, C125, C49).
+- **2026-11-20, unattended (2 h).** Filed desk #71 (weight of speed, C103), #72 (Abstract, C46/C125/C49), #74 (how
+  co-authors vouch for AI-drafted text, C108). Defaults applied for veto: 6008ec3 (PRS runtimes to S3 as Table S3,
+  concordance table renumbered Table 3; C108's sentence said plainly), 8569a64 (Abstract, 274 words; update on #72).
+  #74's default leaves S11 unchanged. Open on the desk: #62, #63, #64, #69, #71, #72, #74. Ledger: 94 open, 29
+  addressed, 3 partly, 6 not-on-point. Next: schemas and figures (C131, C133, C138), affiliations and names
+  (C118 to C121), C122, C123, then the easy tail.
