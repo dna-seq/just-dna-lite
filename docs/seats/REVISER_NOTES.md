@@ -108,3 +108,5 @@ was shown to that session and will not be shown again: its first work is repeate
   in `figures/*.dot`, old Figures 2 and 3 renumbered 4 and 5; Table S15 lists the catalogue's contents. Desk #76
   (affiliations, Fedorova, behaviour modules): defaults keep the paper as it is. Ledger: 89 open, 32 addressed,
   3 partly, 2 declined, 6 not-on-point. Next: the easy tail (S5, S12, S13, S16, S17, S20, S24, S29), then the rest.
+- **2026-11-20, the easy tail.** 33ceba8: S5, S12, S13, S16, S17, S24 applied; S20, S29 declined with reasons.
+  Ledger: 81 open, 38 addressed, 3 partly, 4 declined, 6 not-on-point.
