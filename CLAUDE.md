@@ -783,6 +783,12 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
   63 s / 86 s, but 5.7 GB peak against 3.3 GB, hence one row per call). About 1.5 minutes per SNV keeps the
   default cap near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model test is
   `slow` and skips without the cached model).
+- **Web UI**: the right-panel **Predictions** tab (`webui/pages/predictions.py`, `webui/predictions_state.py`):
+  model cards from the registry, variant set (analysis matches or a region), cap, Run. The run goes through
+  Start Analysis's path (`_try_submit_to_daemon`, then `execute_job_with_run_discovery`) and `UploadState`'s
+  run list, so `selected_file_is_running` blocks a second run on the file either way. Non-GRCh38 samples are
+  refused (`selected_build_unsupported`); in immutable mode the Run control is hidden (a run holds a CPU for
+  many minutes). Its reports are linked in the tab and listed in the Reports tab.
 - Research model, not a clinical tool: the report says so, and that its scores are predictions.
 
 ## PRS (`just-prs>=0.11.0`, `prs-ui>=0.4.0`)

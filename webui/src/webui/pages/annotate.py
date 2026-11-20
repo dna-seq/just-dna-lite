@@ -16,6 +16,7 @@ from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
 from webui.features import module_creator_available
+from webui.pages.predictions import predictions_tab_content
 from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
 from reflex_mui_datagrid import lazyframe_grid
 from prs_ui import prs_scores_selector
@@ -2915,6 +2916,25 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 data_tab_id="analysis",
             ),
         ),
+        (
+            "predictions",
+            draggable_div(
+                fomantic_icon(
+                    "chart line",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "predictions", "#6435c9", "#888"),
+                ),
+                " Predictions",
+                class_name=rx.cond(UploadState.right_panel_active_tab == "predictions", "active item", "item"),
+                on_click=UploadState.switch_right_panel_tab("predictions"),
+                on_drag_start=UploadState.drag_tab_start("predictions"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("predictions"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="predictions",
+            ),
+        ),
         rx.fragment(),  # default / unknown tab id
     )
 
@@ -3610,6 +3630,7 @@ def right_panel_run_view() -> rx.Component:
                         ("annotated_files", _annotated_files_tab_content()),
                         ("reports", _reports_tab_content()),
                         ("analysis", _analysis_tab_content()),
+                        ("predictions", predictions_tab_content()),
                         _input_tab_content(),
                     ),
                     class_name="ui bottom attached segment",
