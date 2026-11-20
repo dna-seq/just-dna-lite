@@ -21,6 +21,7 @@ from webui.compute.jobs import kill_all_jobs
 from webui.compute.pool import start_pool, stop_pool
 from webui.default_samples import default_samples_future
 from webui.grid import clear_grid_artifacts
+from webui.log_filters import install_log_filters
 from reflex import constants
 from reflex.app import default_frontend_exception_handler
 from reflex_base.config import get_config
@@ -30,6 +31,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 # Load environment variables before importing pages/state modules that resolve
 # data paths at import time.
 load_env()
+# Reflex's dev monitor appends a whole stack to each "blocked the event loop" warning; keep the line.
+install_log_filters()
 
 from webui.features import module_creator_available  # noqa: E402
 from webui.local_llm import (  # noqa: E402

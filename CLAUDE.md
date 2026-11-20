@@ -751,7 +751,9 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   sees `http://` while the browser sends `https://`. Read `config.frontend_url`, never `deploy_url`.
   `@rx.event` returns an `EventHandler`: stack other decorators *below* it. A `set[T]` state var is a
   `SetVar` (call `.to_array()` to index it). In dev, a handler blocking the loop over 0.2 s is named in a
-  warning; treat it as the "anything over ~1 s is background" rule firing early. `rx.foreach` warns on an
+  warning; treat it as the "anything over ~1 s is background" rule firing early. That warning is one line
+  (handler and our `file:line`): `webui.log_filters` cuts the stack Reflex appends, since a warning never
+  prints a traceback (`tests/test_log_filters.py` runs the real monitor). `rx.foreach` warns on an
   index-keyed item with `on_mount`/hooks: give it `key=`.
 - Fomantic: segments, buttons, labels, dividers, messages and `top attached tabular menu` +
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
