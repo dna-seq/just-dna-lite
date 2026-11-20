@@ -327,12 +327,10 @@ items:
   comment: there no real "glue" between these two sentences
   where: 1.1 Background and Significance
   line: 48
-  status: open
-  now: ''
-  why: ''
-  next: 'Join the two sentences of the first paragraph by saying consumers face the same barrier, for example ''The
-    same barrier faces consumers: many who download their raw data from a testing company...''. Livia''s S24 adds
-    such a link (C129).'
+  status: addressed
+  now: 'Consumers face the same barrier: many who download their raw data from a testing company take it to third-party
+    interpretation tools (Nelson et al., 2019; O''Daniel et al., 2025).'
+  why: 'The consumers'' sentence now opens with the link: they face the same barrier. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -530,11 +528,10 @@ items:
   comment: '"glue" missing'
   where: 1.1 Background and Significance
   line: 60
-  status: open
-  now: ''
-  why: ''
-  next: 'Link the heritability sentence to the next, for example ''Specific loci have also been identified: genetic
-    association studies have repeatedly linked...''.'
+  status: addressed
+  now: 'Specific loci have also been identified: genetic association studies have repeatedly linked loci such as
+    APOE and FOXO3 to longevity (Broer et al., 2015; Caruso et al., 2022).'
+  why: The heritability sentence and the loci sentence are now linked. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -587,13 +584,12 @@ items:
   comment: this conjunction doesnt work
   where: 1.1 Background and Significance
   line: 64
-  status: open
-  now: ''
-  why: ''
-  next: 'The ''and'' makes regulations the subject of ''seek to avoid''. Rewrite: ''Genomic data are among the most
-    sensitive personal information, so uploading them to third-party servers carries risks that individuals want
-    to avoid and that regulations such as the General Data Protection Regulation (GDPR) are meant to limit.'' Livia''s
-    S26 (''both individuals and regulations'') is a smaller fix of the same ''and''.'
+  status: addressed
+  now: Genomic data are among the most sensitive personal information, and uploading them to third-party servers
+    carries risks that both individuals and regulations such as the General Data Protection Regulation (GDPR) seek
+    to avoid.
+  why: Livia Zaharia's S26 ('both individuals and regulations'), applied in 880f68d, makes both the subject of 'seek
+    to avoid'.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -770,11 +766,10 @@ items:
   comment: '?'
   where: 1.2 Overview of Just-DNA-Lite
   line: 97
-  status: open
-  now: ''
-  why: ''
-  next: 'Make the cross-reference readable: ''installed on their own computer from a terminal (installation steps
-    under Code Availability)''.'
+  status: addressed
+  now: The web interface installed on their own computer from a terminal (installation steps under Code Availability),
+    after trying the public demonstration (https://lite.just-dna.life/) |
+  why: The cross-reference now says what is under Code Availability. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -798,11 +793,10 @@ items:
   comment: '?'
   where: 1.2 Overview of Just-DNA-Lite
   line: 97
-  status: open
-  now: ''
-  why: ''
-  next: 'Give the demonstration''s address where the row first names it: ''after trying the public demonstration
-    (https://lite.just-dna.life/)''; the paper gives it only in row 5 and Section 2.3.'
+  status: addressed
+  now: The web interface installed on their own computer from a terminal (installation steps under Code Availability),
+    after trying the public demonstration (https://lite.just-dna.life/) |
+  why: The demonstration's address is given where Box 1 first names it. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -884,11 +878,13 @@ items:
   comment: which two??
   where: 1.2 Overview of Just-DNA-Lite
   line: 100
-  status: open
-  now: ''
-  why: ''
-  next: 'Name them where Box 1 and the Key features first mention them: the Just-DNA-Lite MCP server (samples, modules,
-    annotation jobs and results) and just-prs-mcp (polygenic scores), described in Section 3.2.1.'
+  status: addressed
+  now: '- **Three ways in.** The same operations are available from a web interface; from AI assistants (Claude
+    Code, Codex, Cursor and other MCP clients) through two MCP servers (the Just-DNA-Lite server for samples, modules,
+    annotation jobs and results, and just-prs-mcp for polygenic scores; Section 3.2.1) and installable plugin skills;
+    and from Python libraries and command-line tools published on PyPI (just-prs, prs-ui, just-dna-format, just-dna-compiler
+    and the just-dna-registry client).'
+  why: The Key features name the two servers and point to Section 3.2.1. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -982,13 +978,12 @@ items:
   comment: is that a problem?
   where: 2.1 Annotation Pipeline
   line: 124
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what it costs: an indel written differently in the VCF and in the module is not matched, so the report
-    can omit a real carrier (a missed finding, never a false match). Add the mitigation the code has: the project''s
-    own module builds re-anchor single-allele indels to ClinVar''s representation before compiling (just-dna-pipelines,
-    v1_port/reanchor.py), but the annotation engine does not normalize indels when it runs.'
+  status: addressed
+  now: 'A differently written indel is therefore missed rather than mismatched: an empty disease-predisposition
+    section does not show that the genome carries none of the module''s indels, since a real carrier can go unreported.'
+  why: 'The sentence says what it costs: a differently written indel is missed, so a real carrier can go unreported,
+    never a false match. The ledger''s earlier suggestion to cite a re-anchoring step is not taken: that step is
+    retired in the code. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -1015,11 +1010,10 @@ items:
   comment: '?'
   where: 2.1 Annotation Pipeline
   line: 124
-  status: open
-  now: ''
-  why: ''
-  next: 'Spell out the inference: ''Because of this, an empty disease-predisposition section does not show that
-    the genome carries none of the module''s indels: a differently written indel is not matched.'''
+  status: addressed
+  now: 'A differently written indel is therefore missed rather than mismatched: an empty disease-predisposition
+    section does not show that the genome carries none of the module''s indels, since a real carrier can go unreported.'
+  why: The inference is spelled out in the same sentence. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
