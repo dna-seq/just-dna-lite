@@ -7,7 +7,7 @@ before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** waits until 2026-11-21: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b · **Owner:** lead
+**State:** waits until 2026-11-25: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b; on 2026-11-21 its head is 3b27dbd (study notes reworded for readers, the spec re-attested), checks green, not merged · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
@@ -56,7 +56,7 @@ local compile, so the design question is what a local or sandbox module shows in
 
 ## RM8 — A weights-led module's haplotype pairs are never called
 
-**State:** waits until 2026-11-21: pull request 37 merged, so the spec is on the trunk · **Owner:** lead
+**State:** waits until 2026-11-25: pull request 37 merged, so the spec is on the trunk (not merged on 2026-11-21) · **Owner:** lead
 
 Longevity Map 2.0.0 is led by `variants` and also carries `haplotypes` and `diplotypes`, so that APOE
 is read once, as its ε pair. The engine sends a module to the phenotype caller only when it is
