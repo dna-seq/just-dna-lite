@@ -76,14 +76,4 @@ spec version 2.5.0, all 118 positions resolved, `rs766212849` on one event (2:16
 deletion). Republishing is the maintainer's. Not ours: the published `thrombophilia@2.0.1` that
 RM449 also names; this repository builds thrombophilia as the 1.1.0 port of 9 positions, which lacks
 the named row. The local Ensembl cache was an unfinished pull (chromosomes 9, MT, X, Y missing) and
-completed during the rebuild; it sits in the home directory (14 GB).
-
-## RM10 — Sort the per-sample lists (issues #19 and #20)
-
-**State:** unattended · **Owner:** lead
-
-Livia asked in June for the sample's PRS runs to sort by date created (#19), and for its annotation
-files and reports to sort by name, file type or date created (#20). Both are sort controls on the
-right panel's per-sample lists (`output_files`, `report_files` and the PRS results in
-`webui/src/webui/state.py`); the default order stays as it is now. The correspondence seat drafts the
-issue replies once it lands.
+completed during the rebuild (14 GB, moved off the home quota on 2026-11-20).

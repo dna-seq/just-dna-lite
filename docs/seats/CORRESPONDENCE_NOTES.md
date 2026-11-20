@@ -80,3 +80,4 @@ Each claim checked against `main` today. Nothing posted.
 - **#19, #20:** the lead planned them as RM10 (unattended). Draft reply for both, waiting for the maintainer's word:
   "Planned: sorting PRS runs by date created (#19), and annotations and reports by name, file type or date
   created (#20), is on the roadmap as one item. We will update here when it lands." With the Claude line.
+  Moved to the desk as #73 when the maintainer turned away (2026-11-20); default: nothing posted until it ships.

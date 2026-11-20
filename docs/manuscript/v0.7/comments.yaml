@@ -131,14 +131,15 @@ items:
   comment: I'd suggest to add an initial background section / problem statement
   where: Abstract
   line: 29
-  status: open
-  now: ''
-  why: ''
-  next: 'Should the Abstract open with a problem statement? The smallest version is one sentence before ''Just-DNA-Lite
-    is the core...'', taken from Section 1.1: people with a whole-genome VCF cannot annotate it against published
-    evidence without programming, and commercial reports do not show how a result was reached. The Abstract is already
-    about 210 words against about 150 at most ladder venues, so this is the run''s decision D7 on length and the
-    Abstract.'
+  status: addressed
+  now: Researchers with a whole-genome variant file (VCF) can find it hard to annotate it against published databases
+    without programming expertise, and commercial reports do not show how a result was reached. This paper presents
+    Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a VCF and computes polygenic risk scores locally, so
+    the genome does not have to be uploaded to a third-party server.
+  why: 'The Abstract opens with a problem sentence taken from Section 1.1. Under desk #72''s default (option 1),
+    applied by the reviser, open for veto. The Abstract is now about 270 words, over most listed venues'' limit;
+    it is cut at submission to the chosen journal.'
   category: Story and structure
   severity: major
   stage: writing
@@ -167,14 +168,16 @@ items:
     @antonkulaga@gmail.com'
   where: Abstract
   line: 29
-  status: open
-  now: ''
-  why: ''
-  next: Should the Abstract open by saying what the paper presents and for whom ('This paper presents Just-DNA-Lite,
-    an open core ... used to ..., giving researchers a workflow to ...') and name the companion paper on adding
-    new modules? Georg asks for a problem statement first (C46); the two combine as one sentence of problem and
-    one of what the paper presents. Livia asks Anton to weigh in. The Abstract is already longer than most ladder
-    venues allow (the run's decision on length).
+  status: partly
+  now: Researchers with a whole-genome variant file (VCF) can find it hard to annotate it against published databases
+    without programming expertise, and commercial reports do not show how a result was reached. This paper presents
+    Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a VCF and computes polygenic risk scores locally, so
+    the genome does not have to be uploaded to a third-party server.
+  why: 'The Abstract now says ''This paper presents Just-DNA-Lite, ...''. Under desk #72''s default (option 1),
+    applied by the reviser, open for veto. The Abstract is now about 270 words, over most listed venues'' limit;
+    it is cut at submission to the chosen journal.'
+  next: Name the companion paper on adding new modules once it has a citable preprint.
   category: Story and structure
   severity: major
   stage: writing
@@ -236,13 +239,14 @@ items:
   comment: some more on Conclusion, incl the "for research use only" caveat?
   where: Abstract
   line: 35
-  status: open
-  now: ''
-  why: ''
-  next: 'End the Abstract with one conclusion sentence carrying a measured result and the scope: for example, the
-    ten default modules annotate a whole genome in about a minute, 128 to 181 times faster than Generation I, and
-    the platform is for research and education and gives no diagnosis (Sections 4.1 and 5.3). Weigh it against the
-    Abstract''s length (the run''s decision D7).'
+  status: addressed
+  now: AI assistants can run the same steps through Model Context Protocol servers. On one workstation, the ten
+    default modules annotate a whole genome in about a minute. The platform is infrastructure for research and education
+    and does not establish the clinical validity of what it reports.
+  why: 'The Abstract ends with the measured annotation time (Section 4.1) and the research-and-education scope with
+    no clinical validity (Section 5.4). Under desk #72''s default (option 1), applied by the reviser, open for veto.
+    The Abstract is now about 270 words, over most listed venues'' limit; it is cut at submission to the chosen
+    journal.'
   category: Story and structure
   severity: major
   stage: writing
@@ -1808,14 +1812,17 @@ items:
     their review task is/looks.
   where: 3.2 Polygenic Risk Scores
   line: 243
-  status: open
-  now: ''
-  why: ''
-  next: 'Which technical paragraphs of Sections 3.2 and 4 move to the supplement? Georg suggests it here (reviewers
-    are ''the unhappier, the larger their review task is/looks'') and in C100. Candidates: the restoration and LD-proxy
-    paragraphs that start ''For variant-only whole-genome VCFs'', the full quality-label and ranking rules, the
-    engines'' join details, the run modes and memory figures of Section 4.1, and the match-rate paragraph of Section
-    4.2 (C107). This is the run''s decision D7 on length.'
+  status: addressed
+  now: For variant-only whole-genome VCFs, just-prs can count scoring loci absent from the file as homozygous reference,
+    which raises coverage on the assumption that those loci were callable; the web interface does so by default
+    for a whole-genome sample, and the user can turn it off. For consumer arrays, the library can estimate untyped
+    scoring variants from typed ones with linkage disequilibrium (LD) proxy tables, which the web upload does not
+    yet use (Section 5.4). Supplementary S15 gives the rules for both. Coverage, and the assumption used to recover
+    each missing locus, remain part of the result's interpretation.
+  why: 'Moved to the supplement, leaving a plain summary in the main text: Section 2.1''s restoration rules (to
+    S12), Section 3.2''s quality-label and ranking rules and the two ways of recovering absent loci (new S15), Section
+    3.2.2''s classifier detail (new S16), Section 4.1''s memory figures and the machine''s use during runs (S10,
+    S2), Section 4.2''s setup and matching detail (S3). Applied by the reviser under the default, open for veto.'
   category: Misplaced detail
   severity: minor
   stage: writing
@@ -2026,12 +2033,20 @@ items:
     text: '@antonkulaga@gmail.com'
   where: 3.2.2 Ancestry Inference
   line: 272
-  status: open
-  now: ''
-  why: ''
-  next: Should technical detail move to a supplementary note, leaving a plain explanation in the main text? In Section
-    3.2.2, keep two or three sentences on how the reference population is chosen and move the panel, kinship, pruning
-    and FRAPOSA details. The same choice covers Livia's C146 and C147 and Georg's C85 and C100.
+  status: addressed
+  now: The reference superpopulation is chosen by a k-nearest-neighbour classifier, built once from the unrelated
+    individuals (Manichaikul et al., 2010) of the 1000 Genomes high-coverage panel (Byrska-Bishop et al., 2022)
+    and downloaded as a fixed model. A principal component analysis of common, independent SNVs in the panel (Chang
+    et al., 2015) defines the space; the user's genome is projected into it with the method of FRAPOSA (Zhang et
+    al., 2020) and takes the superpopulation most common among its nearest reference individuals. Model sites a
+    variant-only VCF does not list are assumed to be homozygous reference, so for exome or array input, where most
+    of them are not read, the call rests largely on assumed genotypes. When too few of the model's sites can be
+    used, the ancestry is reported as unknown and the user chooses the reference. Supplementary S16 gives the panel,
+    its quality control, the projection and the thresholds; Section 4.4 reports how well the classifier separates
+    the reference superpopulations.
+  why: Section 3.2.2 now explains in plain terms how the reference population is chosen; the panel, kinship filter,
+    pruning thresholds, FRAPOSA projection and neighbour counts moved word for word to the new Supplementary S16.
+    Applied by the reviser under the default, open for veto.
   category: Misplaced detail
   severity: minor
   stage: writing
@@ -2546,11 +2561,13 @@ items:
   comment: I'd move a lot of the technical stuff here into the Suppl
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: 'Part of the question in C85: move Section 4.1''s memory figures, run modes and Ensembl comparison to Supplementary
-    S2 and keep the main speed result with Table 2 (shortened, as the run''s decision D6 suggests)?'
+  status: addressed
+  now: Peak memory with Ensembl annotation off was at most 4,525 MB for a Generation II run on any genome, against
+    at most 4,611 MB for Generation I, and at most 5,750 MB with Ensembl on. The benchmark ran on a workstation
+    with SSD storage and 63 GiB RAM (Table S6), so it does not directly establish performance on a laptop or on
+    rotational disks; Supplementary S10 gives memory by run mode and the stage times.
+  why: Section 4.1 keeps the speed results, Table 2 and the run modes; the memory figures by run mode moved to Supplementary
+    S10 and the machine's use during each series to S2. Applied by the reviser under the default, open for veto.
   category: Misplaced detail
   severity: minor
   stage: writing
@@ -2632,11 +2649,19 @@ items:
     like reading a log file of the run- which is interesting if debugging but might be too technic'
   where: 4.1 Annotation Speed
   line: 312
-  status: open
-  now: ''
-  why: ''
-  next: 'Follows C140: keep the run modes and the results in Section 4.1 and move how the machine was used during
-    the runs (idle, light use, page cache) to the supplementary note on the benchmark.'
+  status: addressed
+  now: 'Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three
+    modes: *warm* runs reuse the sample''s quality-filtered table, so the VCF is not read again; *full* runs start
+    from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run
+    (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating
+    system''s page cache has been dropped. Generation I was OakVar 2.13.1 (Oak Bioinformatics, 2026) with its modules
+    and annotation databases installed from the OakVar store, run on the published call set and on Livia Zaharia''s
+    genome, and with its dbSNP annotator alone against Generation II with Ensembl annotation on. Supplementary S2
+    gives the run order, how the machine was used during each series and the Generation I setup.'
+  why: The run modes stay in Section 4.1; which series ran with the machine idle or in light desktop use moved to
+    Supplementary S2, which the paragraph points to. The one caveat a reader needs for the 128-fold figure (most
+    Generation I runs on Livia Zaharia's genome were in light use) stays in the results paragraph and Table 2's
+    caption. Applied by the reviser under the default, open for veto.
   category: Misplaced detail
   severity: minor
   stage: writing
@@ -2687,12 +2712,13 @@ items:
     please read technical annex section...
   where: 4.2 PRS Computation
   line: 339
-  status: open
-  now: ''
-  why: ''
-  next: Open Section 4.2 with one plain sentence on what is compared and why (the same score computed by just-prs
-    and by PLINK2 on one genome should agree), then the table, then a pointer to Supplementary S3 for the matching
-    details; follows C140.
+  status: addressed
+  now: 'This section asks two questions of one genome: does just-prs compute the same scores as the external tool
+    PLINK2 (Chang et al., 2015), which computes the same weighted sum, and how long does each take? Tables 3 and
+    4 give the answers; Supplementary S3 gives how variants were matched and how the runs were timed.'
+  why: Section 4.2 now opens by saying what is compared and why, then the setup in two sentences, the results and
+    Tables 3 and 4, with the matching and timing detail in Supplementary S3. Applied by the reviser under the default,
+    open for veto.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2714,12 +2740,14 @@ items:
     interested in speed.
   where: 4.2 PRS Computation
   line: 342
-  status: open
-  now: ''
-  why: ''
-  next: 'How much weight should speed carry? It is one of six Key features (''Fast''), most of Section 4 and part
-    of the Conclusion. Options: keep it; or lead Section 4.2 with the agreement results (Table 4), move the PRS
-    runtimes (Table 3) to Supplementary S3 and shorten the speed claims elsewhere.'
+  status: addressed
+  now: This section asks whether just-prs computes the same scores as the external tool PLINK2 (Chang et al., 2015),
+    which computes the same weighted sum, on one genome. Table 3 gives the answer; Supplementary S3 gives how variants
+    were matched, how the runs were timed and how long each tool took.
+  why: 'Under the default of desk #71: Section 4.2 now asks only whether just-prs and PLINK2 give the same scores
+    (Table 3, formerly Table 4); the PRS runtimes and the former Table 3 moved to Supplementary S3 as Table S3,
+    and the Key feature ''Fast'' points there. Annotation speed (Section 4.1, Table 2) stays as the measured result
+    of the redesign. Applied by the reviser, open for veto.'
   category: Story and structure
   severity: major
   stage: writing
@@ -2824,11 +2852,13 @@ items:
   comment: I admit, I didnt understand anything in this paragraph, cannot comment anything more here...
   where: 4.2 PRS Computation
   line: 382
-  status: open
-  now: ''
-  why: ''
-  next: Rewrite the paragraph for a reader outside the field in two or three sentences (what was matched, why the
-    two tools' counts differ, what the timings include) and move the rest to Supplementary S3, with C85.
+  status: addressed
+  now: About half of each score's variants were found in this genome by both tools (median 53% for just-prs and
+    51% for PLINK2), with the counting of absent loci as reference turned off; the two percentages are not quite
+    the same measure. The timings cover scoring from prepared inputs, and Supplementary S3 gives what each includes.
+  why: The paragraph is now two plain sentences (how much of each score was found, what the timings cover); the
+    full matching and timing detail moved word for word to Supplementary S3. Applied by the reviser under the default,
+    open for veto.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2851,15 +2881,17 @@ items:
     hopefully implies more than a plausibility estimation.'
   where: 4.3 PGS Catalog Coverage
   line: 394
-  status: open
-  now: ''
-  why: ''
-  next: 'Two parts. (1) The sentence: say it plainly, e.g. ''for these scores a real genome would land far outside
-    the reference distribution, so its percentile would be meaningless''. (2) Georg asks about accountability: ''Can
-    the authors be trusted that any and all AI slop was weeded out because for each statement reported, at least
-    one co-author can 100% vouch for it?'' Decide how the co-authors vouch for the text, for example by assigning
-    each section to a named author who checks every statement against the code, data or source before submission,
-    and say so in the AI-use statement, which now says only ''The authors reviewed the output''.'
+  status: partly
+  now: 'In the reference-distribution release of 2 September 2026, 6,117 of 6,977 scores passed the audit of Section
+    3.2 and 860 were withheld. For 847 of the withheld scores, at least four of the seven test genomes fell in the
+    outermost 1% of the reference distribution (all seven, for 783) and the scale check failed: a real genome would
+    land far outside the reference distribution, so its percentile would mean nothing; the other 13 were withheld
+    because too few of their variants matched the reference panel (12) or their reference distribution had undefined
+    spread (1). The 6,117 scores that passed map to 778 traits of the Experimental Factor Ontology.'
+  why: 'The opaque sentence now says what the failed check means: a real genome would land far outside the reference
+    distribution, so its percentile would mean nothing.'
+  next: 'How the co-authors vouch for each statement given AI drafting, and what Supplementary S11 says of it: desk
+    #74 (default: S11 unchanged; the reviser drafts a per-section sentence with owners left blank).'
   category: Claims and evidence
   severity: major
   stage: now

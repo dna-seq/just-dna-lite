@@ -83,6 +83,14 @@ from webui.compute.jobs import await_job, forget_job, submit_job
 from webui.dagster_env import get_dagster_instance
 from webui.features import module_creator_available, registry_publication_available
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
+from webui.list_sorting import (
+    OUTPUT_FILE_SORTS,
+    REPORT_FILE_SORTS,
+    computed_at_now,
+    created_fields,
+    sort_files,
+    with_computed_at_column,
+)
 from webui.registry_identity import (
     ensure_install_id, load_store_identity, save_store_identity, derive_handle, set_env_var,
 )
@@ -1464,6 +1472,9 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     # Output files for the selected sample
     output_files: List[Dict[str, Any]] = []
     report_files: List[Dict[str, Any]] = []  # HTML report files
+    # Sort orders of the two lists (issues #19, #20); the first option is the old order.
+    output_files_sort: str = OUTPUT_FILE_SORTS[0][0]
+    report_files_sort: str = REPORT_FILE_SORTS[0][0]
     outputs_loaded_for_file: str = ""
 
     # Data preview state (server-side grid state is managed by LazyFrameGridMixin)
@@ -2453,6 +2464,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "name": f.name,
                     "path": str(f),
                     "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    **created_fields(f.stat().st_mtime),
                     "module": module,
                     "type": file_type,
                     "sample_name": sample_name,
@@ -2472,6 +2484,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "name": f.name,
                     "path": str(f),
                     "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    **created_fields(f.stat().st_mtime),
                     "module": "ensembl",
                     "type": "annotations",
                     "sample_name": sample_name,
@@ -2496,6 +2509,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "name": f.name,
                     "path": str(f),
                     "size_mb": round(f.stat().st_size / (1024 * 1024), 2),
+                    **created_fields(f.stat().st_mtime),
                     "module": module,
                     "type": "vcf_export",
                     "sample_name": sample_name,
@@ -2505,8 +2519,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "run_short": run_id[:8] if run_id else "",
                 })
 
-        files.sort(key=lambda x: (x["module"], x["type"]))
-        self.output_files = files
+        self.output_files = sort_files(files, self.output_files_sort)
         
         # Load HTML report files from reports/ directory
         reports_dir = get_user_output_dir() / self.safe_user_id / sample_name / "reports"
@@ -2521,6 +2534,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "name": f.name,
                     "path": str(f),
                     "size_kb": round(f.stat().st_size / 1024, 1),
+                    **created_fields(mtime),
                     "sample_name": sample_name,
                     "materialized_at": mtime_str,
                     "needs_materialization": False,
@@ -2528,9 +2542,30 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                     "run_short": report_run_id[:8] if report_run_id else "",
                 })
         
-        reports.sort(key=lambda x: x["materialized_at"], reverse=True)
-        self.report_files = reports
+        self.report_files = sort_files(reports, self.report_files_sort)
         self.outputs_loaded_for_file = self.selected_file
+
+    @rx.var
+    def output_files_sort_options(self) -> List[Dict[str, str]]:
+        """The Data Files sort selector's options."""
+        return [{"value": v, "label": label} for v, label in OUTPUT_FILE_SORTS]
+
+    @rx.var
+    def report_files_sort_options(self) -> List[Dict[str, str]]:
+        """The Reports sort selector's options."""
+        return [{"value": v, "label": label} for v, label in REPORT_FILE_SORTS]
+
+    @rx.event
+    def set_output_files_sort(self, order: str) -> None:
+        """Re-sort the loaded data files; the order holds for the session."""
+        self.output_files_sort = order
+        self.output_files = sort_files(self.output_files, order)
+
+    @rx.event
+    def set_report_files_sort(self, order: str) -> None:
+        """Re-sort the loaded reports; the order holds for the session."""
+        self.report_files_sort = order
+        self.report_files = sort_files(self.report_files, order)
 
     def _fetch_output_materialization_info(self, partition_key: str) -> Dict[str, Dict[str, Any]]:
         """Fetch materialization timestamps and staleness for output assets.
@@ -4379,6 +4414,13 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         self._reset_grid_view_state(keep_selection=True)
         self._ignore_empty_selection_replay = True
 
+    def _build_prs_results_grid(self) -> None:
+        """prs-ui's grid, plus a sortable "Computed" column (issue #19)."""
+        super()._build_prs_results_grid()
+        self.prs_results_rows, self.prs_results_columns = with_computed_at_column(
+            list(self.prs_results), list(self.prs_results_rows), list(self.prs_results_columns)
+        )
+
     def reset_for_genome_switch(self, next_parquet_path: str = "") -> None:
         """Clear PRS results/charts when the selected genome changes.
 
@@ -5163,6 +5205,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 if row.pop("_low_match", False):
                     any_low_match = True
                 row["_source_file"] = sample_path
+                row["computed_at"] = computed_at_now()
                 if sample_label:
                     row["sample"] = sample_label
                     row["sample_color"] = color_map.get(sample_label, "")

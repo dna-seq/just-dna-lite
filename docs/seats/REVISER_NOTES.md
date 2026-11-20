@@ -91,3 +91,15 @@ was shown to that session and will not be shown again: its first work is repeate
 - **2026-11-20, unattended again.** Desk #69: Box 1's first user group, Georg's "Researchers, including citizen
   scientists" (default; matches the accepted Section 1.2) or Livia's "users" (C58, C130, S9, S11, S18, S20, S21).
   Open on the desk: #62, #63, #64, #69. Google Docs connector still disconnected (supplement, S4, S5 unread).
+- **2026-11-20, the move to the supplement (C85, C100, C107, C140, C146, C147), under the default "move it, keep a
+  plain summary":** 69e18a9 (2.1 to S12), 660e74b (3.2 to a new S15, 3.2.2 to a new S16, 4.1 to S10 and S2), 7991a73
+  (4.2 to S3). Moved text is word for word; citations stay in the main text. S14 stays reserved for the
+  Generation I audit tables (`supplementary/S14_*`), not yet cited in the master. Ledger: 99 open, 26 addressed,
+  1 partly, 6 not-on-point. Next by the hardest-first order: C103 (weight of the speed claim), C108 (AI
+  accountability), the Abstract (C46, C125, C49).
+- **2026-11-20, unattended (2 h).** Filed desk #71 (weight of speed, C103), #72 (Abstract, C46/C125/C49), #74 (how
+  co-authors vouch for AI-drafted text, C108). Defaults applied for veto: 6008ec3 (PRS runtimes to S3 as Table S3,
+  concordance table renumbered Table 3; C108's sentence said plainly), 8569a64 (Abstract, 274 words; update on #72).
+  #74's default leaves S11 unchanged. Open on the desk: #62, #63, #64, #69, #71, #72, #74. Ledger: 94 open, 29
+  addressed, 3 partly, 6 not-on-point. Next: schemas and figures (C131, C133, C138), affiliations and names
+  (C118 to C121), C122, C123, then the easy tail.
