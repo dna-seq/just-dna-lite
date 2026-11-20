@@ -21,15 +21,17 @@ def node_too_old_for_dev_server() -> str:
     has already been restarted". Reflex prints only an "out of date" warning before that, and
     the crash that follows names neither Node nor Bun. ``uv run serve`` builds the frontend
     once and never takes that path.
+
+    No Node at all is a different path and passes: Reflex then runs plain ``bun run dev`` with the
+    Bun it installs. Checked 2026-11-20 on Linux with Reflex 0.11.0, Bun 1.4.4 and react-router
+    8.4.0: the dev server relaunched itself with ``--conditions=development`` and server-rendered
+    the app. Refusing it blocked ``uv run start`` on a machine that never had Node.
     """
     current = js_runtimes.get_node_version()
     required = version.parse(constants.Node.MIN_VERSION)
-    if current is None:
-        found = "No Node.js was found on PATH"
-    elif current < required:
-        found = f"Node.js {current} is installed"
-    else:
+    if current is None or current >= required:
         return ""
+    found = f"Node.js {current} is installed"
     return (
         f"{found}; the development web UI needs Node.js {required} or newer.\n"
         "  Install the current LTS from https://nodejs.org (Windows: winget install OpenJS.NodeJS.LTS),\n"
