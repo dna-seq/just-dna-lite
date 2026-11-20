@@ -69,6 +69,8 @@ uv python install 3.13
 
 **Node.js 22.22 or newer** is what `uv run start` uses for the web interface when Node is installed. Check with `node --version`. With no Node at all, Reflex uses its own Bun instead and `uv run start` works as is. If an older Node is installed, install the current LTS from [nodejs.org](https://nodejs.org) (on Windows: `winget install OpenJS.NodeJS.LTS`) and open a new terminal. If you cannot upgrade Node, `uv run serve` runs the app without that development server.
 
+On Linux, `uv run start` also checks that your user has free inotify instances, the file watchers hot reload uses (`fs.inotify.max_user_instances`, often 128). A busy desktop can use them up, and the start then fails with "Too many open files (os error 24)". The check prints how many are in use, which programs hold them and the `sysctl` command that raises the limit.
+
 **A work laptop that blocks `start.exe`.** Some managed Windows machines refuse the small helper `uv` writes. Run the same command through Python:
 
 ```bash

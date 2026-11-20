@@ -19,8 +19,10 @@ load_env()  # this checkout's .env (or .env.template), never one above it
 with environ_guard():
     import just_dna_registry.client_cli  # noqa: F401
 
+from just_dna_lite.dagster_sqlite import DagsterDatabaseKeepalive
 from just_dna_lite.dagster_maintenance import human_bytes, prune_history, resolve_dagster_home
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
+from just_dna_lite.inotify import CHECKED_ENV as INOTIFY_CHECKED_ENV, inotify_budget, inotify_preflight
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
@@ -298,11 +300,12 @@ def start_dagster(
         )
     
     # cwd=root, as in start_all: definitions.py resolves some paths against the working directory.
-    exit_code = _run_managed_foreground(
-        dg_dev_argv(dagster_file, dagster_port, dagster_host),
-        dagster_home=dagster_home_path,
-        cwd=root,
-    )
+    with DagsterDatabaseKeepalive(dagster_home_path):
+        exit_code = _run_managed_foreground(
+            dg_dev_argv(dagster_file, dagster_port, dagster_host),
+            dagster_home=dagster_home_path,
+            cwd=root,
+        )
     if exit_code != 0:
         raise typer.Exit(exit_code)
 
@@ -389,6 +392,14 @@ def start_all(
         typer.secho(node_problem, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
+    inotify_refusal, inotify_warning = inotify_preflight(inotify_budget())
+    if inotify_refusal:
+        typer.secho(inotify_refusal, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if inotify_warning:
+        typer.secho(inotify_warning, fg=typer.colors.YELLOW, err=True)
+    os.environ[INOTIFY_CHECKED_ENV] = "1"
+
     typer.secho("🏗️  Starting full Just DNA Pipelines stack...", fg=typer.colors.BRIGHT_MAGENTA, bold=True)
 
     leftover = reap_dagster_instance(dagster_home_path)
@@ -425,6 +436,9 @@ def start_all(
     typer.secho("🚀 Starting Reflex Web UI...", fg=typer.colors.BRIGHT_CYAN)
     child_processes: list[subprocess.Popen] = []
     exit_code = 0
+    # Holds Dagster's shared SQLite files open so their WAL files are not deleted and rebuilt
+    # between queries, which made every process on them fail with "database is locked".
+    keepalive = DagsterDatabaseKeepalive(dagster_home_path)
 
     def _force(_signum: int, _frame: object) -> None:
         shutdown_managed_processes(
@@ -510,6 +524,7 @@ def start_all(
             workspace_root=root,
             force=True,
         )
+        keepalive.close()
 
     if exit_code != 0:
         raise typer.Exit(exit_code)

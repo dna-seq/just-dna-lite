@@ -16,6 +16,7 @@ from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
 from webui.features import module_creator_available
+from webui.components.local_explain import local_explain_panel
 from webui.pages.predictions import predictions_tab_content
 from webui.state import LocalModelState, UploadState, OutputPreviewState, PRSState, PRSTraitState
 from reflex_mui_datagrid import lazyframe_grid
@@ -757,7 +758,7 @@ def file_metadata_section() -> rx.Component:
                 rx.el.button(
                     fomantic_icon("save", size=16),
                     " Save Metadata",
-                    on_click=UploadState.save_metadata_to_dagster,
+                    on_click=UploadState.save_metadata_to_dagster(True),
                     class_name="ui green button",
                     type="button",
                 ),
@@ -3561,6 +3562,14 @@ def _prs_tab_content() -> rx.Component:
         rx.theme(
             rx.vstack(
                 _prs_current_sample_source(),
+                rx.cond(
+                    PRSState.prs_results.length() > 0,  # type: ignore[operator]
+                    local_explain_panel(
+                        PRSState,
+                        PRSState.local_explain_target,
+                        "this result's question (the score, your percentile and the model's details)",
+                    ),
+                ),
                 rx.tabs.root(
                     rx.tabs.list(
                         _prs_workbench_tab_trigger(

@@ -35,7 +35,7 @@ from just_dna_pipelines.annotation.annotation_runner import (
 )
 from just_dna_pipelines.annotation.assets import NORMALIZATION_VERSION
 from just_dna_pipelines.module_config import _load_config
-from webui.state import (
+from webui.prs_checkpoint import (
     _prs_partition_key,
     checkpoint_prs_results,
     restore_prs_checkpoint,

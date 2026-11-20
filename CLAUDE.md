@@ -21,6 +21,19 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   `CREATE_NEW_PROCESS_GROUP` on Windows); `just_dna_lite.process` sends SIGINT then SIGKILL (POSIX) or
   `CTRL_BREAK_EVENT` then `TerminateProcess` (Windows). Startup reaps stale Reflex processes holding
   port 3000. A second `uv run start` is last-writer-wins. See `tests/test_process_shutdown.py`.
+- **Preflight before anything spawns** (`start_all`, and `webui.run` unless `JUST_DNA_INOTIFY_CHECKED` says the
+  launcher already did): an outdated Node (`frontend_runtime`) and, on Linux, too few free inotify instances
+  (`just_dna_lite.inotify`: refuse below 4 free, warn below 32, naming the holders and the `sysctl` fix).
+  Out of instances the stack died in watchfiles with "Too many open files (os error 24)".
+  Tests: `tests/test_node_preflight.py`, `tests/test_inotify_preflight.py`.
+- **The launchers hold Dagster's shared SQLite files open** (`just_dna_lite.dagster_sqlite.DagsterDatabaseKeepalive`
+  in `start`, `dagster` and `serve`: one idle read-only connection each to `history/runs.db` and
+  `schedules/schedules.db`). Dagster connects per query (`NullPool`); when the last connection closes, SQLite
+  deletes `-wal`/`-shm` and the next one rebuilds them under an exclusive lock, so daemons, webserver, web UI
+  and workers kept failing with "database is locked", each logged with a full stack. Run and schedule storage
+  use SQLite's 5 s timeout (only the event log gets Dagster's 30 s). Measured: 5 of 36 reads locked without
+  it, 0 of 199 with it. The held connection has no transaction, so writers and checkpoints are never blocked.
+  Tests: `tests/test_dagster_sqlite_keepalive.py`.
 - Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners`,
   **listeners only** (a bare `lsof -ti :port` also matches a browser connected to 3000).
   `JUST_DNA_START_KILL_PORTS` stays off by default: 8000/8001 may belong to unrelated tools.
@@ -457,6 +470,14 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   hidden in immutable mode) saves through `set_env_var`; its Test connection is a background event
   (`local_llm.check_connection`). Tests: `tests/test_local_model_explain.py` (a real fake upstream
   under uvicorn).
+- **Results in the web UI use the same local model through `webui.local_explain.LocalModelExplainMixin`**: a
+  state mixes it in and overrides `_local_explain_request` (subject + prompt); the answer streams into
+  state (`stream_explanation`, pushed every 0.25 s) and `webui.components.local_explain.local_explain_panel`
+  shows it as plain text, never Markdown/HTML. `PRSState` asks prs-ui's own prompt for the selected (or
+  first) score or trait: the copy-only entry of the row's `ai_ask` payload, the uncut one
+  (`_prs_local_explain_request`). Same rules as the report button: config only, nothing in immutable mode,
+  `MAX_PROMPT_CHARS`, a token drops a stale answer, a genome switch clears it. Tests:
+  `tests/test_prs_local_explain.py`; the fake OpenAI server is `tests/fake_openai.py`.
 - **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
   never read as one. A result is an open block (plain headline, the
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
@@ -656,13 +677,15 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 
 ### Running jobs from the web UI
 
-1. Create the run, then try `instance.submit_run(run_id, workspace=None)` (`_try_submit_to_daemon`
-   returns `(ok, error)`; keep logic out of the `except`).
+1. Create the run, then try the daemon, both in a compute worker: `await run_in_compute(create_webui_run, …)`
+   then `submit_or_discard_run(run_id)` (`webui.dagster_runs`), which returns `(ok, error)` and deletes the
+   placeholder run when the daemon refuses.
 2. On failure (usually "External pipeline origin must be set"), run the job in a **spawned child** via
    `webui.compute.jobs` (`submit_job` / `await_job`, see `execute_job_with_run_discovery`). Never run
    `execute_in_process` in the ASGI process or its threads.
-3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; startup
-   cancels orphaned `NOT_STARTED` runs. Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
+3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; server start
+   deletes orphaned `NOT_STARTED` runs once, in a compute worker (`app._delete_orphaned_runs`; it used to run
+   on every page load, where it could delete a run another tab had just created). Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
    [--dry-run]`. Fallback runs cannot be re-executed from the Dagster UI.
    **Event-log size is bounded by `uv run pipelines prune-dagster-history`, not by `cleanup-runs`.**
    `report_runless_asset_event` writes rows with an empty `run_id`, so `delete_run` never reaches them
@@ -725,6 +748,18 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 - **Anything over ~1 s is `@rx.event(background=True)`** with brief `async with self:` blocks and the
   work in a pure function off the state lock; snapshot the inputs into locals in the first block. A
   `yield` generator holds the lock for its whole run and freezes the UI. `@rx.background` does not exist.
+  **`background=True` releases the state lock, not the event loop:** a blocking call written between its
+  awaits still freezes every client. `compute_selected_prs` was background yet held the loop 9.4 s on
+  just-prs downloads, because steps added after the per-score executor ran inline; its setup now goes
+  through `_prepare_prs_compute` in the executor and its checkpoint through the compute pool. **No
+  Dagster call runs in the ASGI process**: reads are `webui.dagster_reads` (page load, sample state,
+  output staleness, run polls and logs, which job an analysis needs), writes `webui.dagster_runs`
+  (register a sample, create a run, submit or discard it) and `webui.prs_checkpoint.*_in_worker`, all
+  through `await run_in_compute(...)` with plain values in and out. A non-background handler may await
+  it too: the loop is free while only its own session waits. A sync handler that needs Dagster returns
+  an event that does (`refresh_output_files`, `save_metadata_to_dagster(False)`). Tests:
+  `tests/test_dagster_off_loop.py`, `tests/test_dagster_runs_off_loop.py` (a loop ticker must not stall
+  0.2 s while the worker runs).
 - **Upload / select-file handlers return `list[EventSpec]`, never `yield` them.** Reflex 0.9 marks the
   generator's `EventFuture` done when it exhausts, and a yielded EventSpec re-dispatched after that
   raises `Cannot add a child to an EventFuture that is already done`. Same rule as `poll_run_status`.
@@ -751,7 +786,9 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   sees `http://` while the browser sends `https://`. Read `config.frontend_url`, never `deploy_url`.
   `@rx.event` returns an `EventHandler`: stack other decorators *below* it. A `set[T]` state var is a
   `SetVar` (call `.to_array()` to index it). In dev, a handler blocking the loop over 0.2 s is named in a
-  warning; treat it as the "anything over ~1 s is background" rule firing early. `rx.foreach` warns on an
+  warning; treat it as the "anything over ~1 s is background" rule firing early. That warning is one line
+  (handler and our `file:line`): `webui.log_filters` cuts the stack Reflex appends, since a warning never
+  prints a traceback (`tests/test_log_filters.py` runs the real monitor). `rx.foreach` warns on an
   index-keyed item with `on_mount`/hooks: give it `key=`.
 - Fomantic: segments, buttons, labels, dividers, messages and `top attached tabular menu` +
   `bottom attached segment` tabs (state-toggled `active item`, content via `rx.match`) work. `ui grid`,
@@ -802,7 +839,7 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
   `slow` and skips without the cached model).
 - **Web UI**: the right-panel **Predictions** tab (`webui/pages/predictions.py`, `webui/predictions_state.py`):
   model cards from the registry, variant set (analysis matches or a region), cap, Run. The run goes through
-  Start Analysis's path (`_try_submit_to_daemon`, then `execute_job_with_run_discovery`) and `UploadState`'s
+  Start Analysis's path (`create_webui_run` and `submit_or_discard_run` in a worker, then `execute_job_with_run_discovery`) and `UploadState`'s
   run list, so `selected_file_is_running` blocks a second run on the file either way. Non-GRCh38 samples are
   refused (`selected_build_unsupported`); in immutable mode the Run control is hidden (a run holds a CPU for
   many minutes). Its reports are linked in the tab and listed in the Reports tab.
@@ -832,7 +869,8 @@ not a VCF liftover and cannot be reused for annotation.
   `prs_results`, the chart spec and `prs_results_source_file`; compute snapshots `prs_compute_token` and
   discards stale writes. After updating `prs_results`, rebuild `prs_results_rows` / `_columns` /
   `_column_groups`. Switching the file also clears the comparison.
-- **The PRS checkpoint is a file, the Dagster event is its index** (#35). `checkpoint_prs_results`
+- **The PRS checkpoint is a file, the Dagster event is its index** (#35). `webui.prs_checkpoint` holds it
+  (no Reflex import, so a compute worker loads it); `checkpoint_prs_results`
   writes `prs_results.json` beside the sample (temp name + `os.replace`) and reports a runless
   `prs_results` materialization carrying only `path` and small fields; `restore_prs_checkpoint` reads
   the newest one, gated on `format_version` (`_prs_results_version`: the prs-ui **and** just-prs

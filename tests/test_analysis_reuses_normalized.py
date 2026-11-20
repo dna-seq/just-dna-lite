@@ -16,7 +16,7 @@ from just_dna_pipelines.annotation.assets import NORMALIZATION_VERSION
 from just_dna_pipelines.module_config import _load_config
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.runtime import load_env
-from webui import state as webui_state
+from webui import dagster_reads
 
 SMALL_VCF = Path(__file__).resolve().parents[1] / "data" / "input" / "tests" / "antku_small.vcf"
 USER = "reusetest"
@@ -30,7 +30,7 @@ def instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DagsterInstance
     monkeypatch.setenv("JUST_DNA_PIPELINES_OUTPUT_DIR", str(tmp_path / "output"))
     monkeypatch.setenv("JUST_DNA_PIPELINES_INPUT_DIR", str(tmp_path / "input"))
     ephemeral = DagsterInstance.ephemeral()
-    monkeypatch.setattr(webui_state, "get_dagster_instance", lambda: ephemeral)
+    monkeypatch.setattr(dagster_reads, "get_dagster_instance", lambda: ephemeral)
     return ephemeral
 
 
@@ -56,13 +56,13 @@ def _normalize(instance: DagsterInstance, tmp_path: Path) -> Path:
 
 
 def test_a_sample_never_normalized_runs_the_full_job(instance: DagsterInstance) -> None:
-    assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == FULL_JOB
 
 
 def test_a_current_parquet_is_reused(instance: DagsterInstance, tmp_path: Path) -> None:
     normalized = _normalize(instance, tmp_path)
-    assert webui_state._normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is None
-    assert webui_state._analysis_job_name(PARTITION, True, False) == REUSE_NORMALIZED_JOB
+    assert dagster_reads.normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is None
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == REUSE_NORMALIZED_JOB
     # The select-time check and the analysis agree, because they are the same test.
     assert normalized.exists()
 
@@ -73,8 +73,8 @@ def test_a_damaged_parquet_is_normalized_again(
 ) -> None:
     normalized = _normalize(instance, tmp_path)
     normalized.write_bytes(damage)
-    assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
-    assert webui_state._normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == FULL_JOB
+    assert dagster_reads.normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
 
 
 @pytest.mark.parametrize("recorded", [None, NORMALIZATION_VERSION - 1], ids=["unrecorded", "older"])
@@ -83,20 +83,20 @@ def test_a_parquet_from_older_normalization_code_is_normalized_again(
 ) -> None:
     """Same filters, older code: a split-VCF parquet from before version 2 holds wrong genotypes."""
     _normalize(instance, tmp_path)
-    assert webui_state._analysis_job_name(PARTITION, True, False) == REUSE_NORMALIZED_JOB
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == REUSE_NORMALIZED_JOB
     metadata = {"quality_filters_hash": MetadataValue.text(_load_config().quality_filters.config_hash())}
     if recorded is not None:
         metadata["normalization_version"] = MetadataValue.int(recorded)
     instance.report_runless_asset_event(
         AssetMaterialization(asset_key="user_vcf_normalized", partition=PARTITION, metadata=metadata)
     )
-    assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
-    assert webui_state._normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == FULL_JOB
+    assert dagster_reads.normalize_run_config_if_stale(USER, SMALL_VCF.name, PARTITION) is not None
 
 
 def test_a_deleted_parquet_is_normalized_again(instance: DagsterInstance, tmp_path: Path) -> None:
     _normalize(instance, tmp_path).unlink()
-    assert webui_state._analysis_job_name(PARTITION, True, False) == FULL_JOB
+    assert dagster_reads.analysis_job_name(PARTITION, True, False) == FULL_JOB
 
 
 @pytest.mark.parametrize(
@@ -107,12 +107,12 @@ def test_ensembl_runs_keep_their_own_jobs(
     instance: DagsterInstance, tmp_path: Path, has_hf_modules: bool, expected: str
 ) -> None:
     _normalize(instance, tmp_path)
-    assert webui_state._analysis_job_name(PARTITION, has_hf_modules, True) == expected
+    assert dagster_reads.analysis_job_name(PARTITION, has_hf_modules, True) == expected
 
 
 def test_no_modules_never_picks_the_reuse_job(instance: DagsterInstance, tmp_path: Path) -> None:
     _normalize(instance, tmp_path)
-    assert webui_state._analysis_job_name(PARTITION, False, False) == FULL_JOB
+    assert dagster_reads.analysis_job_name(PARTITION, False, False) == FULL_JOB
 
 
 def test_the_reuse_job_selects_no_normalization() -> None:

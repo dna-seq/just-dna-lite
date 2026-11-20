@@ -9,7 +9,9 @@ import sys
 import atexit
 from pathlib import Path
 
+from just_dna_lite.dagster_sqlite import DagsterDatabaseKeepalive
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
+from just_dna_lite.inotify import CHECKED_ENV as INOTIFY_CHECKED_ENV, inotify_budget, inotify_preflight
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
@@ -176,6 +178,14 @@ def main() -> None:
         print(node_problem, file=sys.stderr, flush=True)
         raise SystemExit(1)
 
+    already_checked = os.environ.get(INOTIFY_CHECKED_ENV) == "1"
+    inotify_refusal, inotify_warning = ("", "") if already_checked else inotify_preflight(inotify_budget())
+    if inotify_refusal:
+        print(inotify_refusal, file=sys.stderr, flush=True)
+        raise SystemExit(1)
+    if inotify_warning:
+        print(inotify_warning, file=sys.stderr, flush=True)
+
     from reflex import constants
     from reflex.utils import processes
     from reflex_base.config import environment
@@ -242,6 +252,10 @@ def serve() -> None:
 
     dagster_process = _start_dagster_for_serve()
     dagster_home = Path(os.environ["DAGSTER_HOME"]) if os.getenv("DAGSTER_HOME") else None
+    if dagster_home is not None:
+        # Keeps the shared SQLite WAL files from being deleted and rebuilt between queries
+        # ("database is locked"); see just_dna_lite.dagster_sqlite.
+        atexit.register(DagsterDatabaseKeepalive(dagster_home).close)
     atexit.register(
         shutdown_managed_processes,
         [dagster_process] if dagster_process is not None else [],
