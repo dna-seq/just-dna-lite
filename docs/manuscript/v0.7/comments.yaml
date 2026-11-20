@@ -1215,15 +1215,12 @@ items:
     much richer than CAD (or lipid/CVD) papers for some specific reason? Please explain/discuss.'
   where: '3. Algorithm and Implementation: Annotation Modules and Polygenic Scoring'
   line: 188
-  status: open
-  now: ''
-  why: ''
-  next: 'Say in Table 1 or Section 3.3 why the module is small: it is a selection ported unchanged from Generation
-    I (variants chosen on meta-analysis p-values and the number of studies across populations), kept as a worked
-    example, not a catalogue of coronary artery disease genetics, while Longevity Map starts from a curated database
-    of 3,144 variants (Tacutu et al., 2018). Do not suggest that the coronary literature is poorer: large GWAS of
-    coronary artery disease report hundreds of loci (cite one if this is said); the difference is how each module
-    was built.'
+  status: addressed
+  now: These modules are small because they are selections ported from Generation I, kept as worked examples of
+    the module format rather than catalogues of each trait's genetics; Longevity Map is larger because it starts
+    from a dedicated database.
+  why: 'Section 3.3 now says why: the hand-curated modules are selections ported from Generation I, kept as worked
+    examples, while Longevity Map starts from a dedicated database.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -1245,13 +1242,11 @@ items:
   comment: 'how many variants (ETC: same issue for the other ClinVar stuff)'
   where: '3. Algorithm and Implementation: Annotation Modules and Polygenic Scoring'
   line: 193
-  status: open
-  now: ''
-  why: ''
-  next: 'Add counts to the three ClinVar rows of Table 1, from Table S4''s lead rows: Cardio 115,382, Cancer 141,616
-    and Pathogenic 618,629, built from 57,696, 70,658 and 308,990 ClinVar records. Name the unit: lead rows are
-    genotype rows, not variants (Longevity Map''s 1,022 lead rows are the 1,022 genotype rows of Section 3.1). The
-    run''s decision D6 asks for count columns in Table 1.'
+  status: addressed
+  now: 'Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, review status of at least one
+    star): 57,696 variants in 297 cardiac-disease genes (sources in Table S4) |'
+  why: 'The three ClinVar rows of Table 1 now give their size in variants, as the other rows do, from Table S4''s
+    variant_count: Cardio 57,696, Cancer 70,658, Pathogenic 308,990.'
   category: Figures and tables
   severity: minor
   stage: writing

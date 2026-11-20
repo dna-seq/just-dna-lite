@@ -193,7 +193,7 @@ The default modules originate in Generation I, the OakVar-based Just-DNA-Seq (Ku
 The default collection brings together longevity-associated variants, disease-predisposing variants and drug-response associations (Table 1).
 <!-- @/rev T2 -->
 
-<!-- @rev C13b rounds=3 by=robi:2026-09-25,claude:2026-10-10,claude:2026-11-20 -->
+<!-- @rev C13b rounds=4 by=robi:2026-09-25,claude:2026-10-10,claude:2026-11-20,claude:2026-11-20 -->
 **Table 1.** Annotation modules published by the Just-DNA-Lite project in the module registry (namespace `just-dna-seq`), as of 2026-10-10 18:00 UTC. Later versions may differ; versions, digests and every source are listed in Supplementary Table S4, a separate table file.
 
 | Module | Description | Curator |
@@ -204,9 +204,9 @@ The default collection brings together longevity-associated variants, disease-pr
 | VO2 Max | Published studies of the oxygen-uptake response to exercise training: 13 variants in 12 genes, citing 7 papers (sources in Table S4) | <!-- @rev C12c rounds=2 by=robi:2026-09-24,claude:2026-10-13 -->Expert (Olga Borysova)<!-- @/rev C12c --> |
 | Superhuman (protective alleles) | Rare protective and enhancing alleles from the Church laboratory's list, checked against the primary literature: 74 variants in 28 genes, citing 29 papers (sources in Table S4) | <!-- @rev C12d rounds=2 by=robi:2026-09-24,claude:2026-10-13 -->Expert (Olga Borysova)<!-- @/rev C12d --> |
 | Thrombophilia | Inherited blood-clotting risk variants (Factor V Leiden, prothrombin and related loci) from published studies: 8 variants in 8 genes, citing 24 papers (sources in Table S4) | <!-- @rev C12e rounds=2 by=robi:2026-09-24,claude:2026-10-13 -->Expert (Olga Borysova)<!-- @/rev C12e --> |
-| Cardio | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, review status of at least one star) in 297 cardiac-disease genes (sources in Table S4) | Database-derived (ClinVar) |
-| Cancer | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, at least one star) in 298 cancer-predisposition genes (sources in Table S4) | Database-derived (ClinVar) |
-| Pathogenic | Genome-wide flag for ClinVar pathogenic and likely pathogenic variants (release 2026-06-27, at least one star) across 4,793 genes (sources in Table S4) | Database-derived (ClinVar) |
+| Cardio | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, review status of at least one star): 57,696 variants in 297 cardiac-disease genes (sources in Table S4) | Database-derived (ClinVar) |
+| Cancer | Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, at least one star): 70,658 variants in 298 cancer-predisposition genes (sources in Table S4) | Database-derived (ClinVar) |
+| Pathogenic | Genome-wide flag for ClinVar pathogenic and likely pathogenic variants (release 2026-06-27, at least one star): 308,990 variants across 4,793 genes (sources in Table S4) | Database-derived (ClinVar) |
 | Pharmacogenomics | Drug response by genotype from the ClinPGx (PharmGKB) clinical annotations at evidence levels 1A to 2B (release 2025-07-05): 240 annotations, 65 drugs, 35 genes (sources in Table S4) | Database-derived (ClinPGx) |
 <!-- @/rev C13b -->
 
@@ -294,7 +294,7 @@ The reference superpopulation is chosen by a k-nearest-neighbour classifier, bui
 ### **3.3 Additional Trait Annotation Modules**
 
 <!-- @rev C18 rounds=6 by=robi:2026-09-25,claude:2026-10-10,validator:2026-10-10,claude:2026-10-13,claude:2026-10-19,claude:2026-10-28 -->
-The platform includes several additional modules curated by hand from the published literature: coronary artery disease (SNPs selected on meta-study p-values and the number of studies across populations), lipid metabolism (selected by the same criteria), VO2 max (published studies of the oxygen-uptake response to exercise training, mostly candidate-gene and cohort studies) and Superhuman (rare protective alleles from the Church laboratory's Protective and Enhancing Alleles list, checked against the primary literature).<!-- @/rev C18 --> <!-- @rev DS1 rounds=3 by=claude:2026-10-27,claude:2026-10-28,claude:2026-11-19 -->Table S4 gives each module's curation and every source it cites. These modules work by joining the user's VCF against curated variant-trait databases and then adding annotation columns (weight, state, gene, conclusion) to matching variants.<!-- @/rev DS1 -->
+The platform includes several additional modules curated by hand from the published literature: coronary artery disease (SNPs selected on meta-study p-values and the number of studies across populations), lipid metabolism (selected by the same criteria), VO2 max (published studies of the oxygen-uptake response to exercise training, mostly candidate-gene and cohort studies) and Superhuman (rare protective alleles from the Church laboratory's Protective and Enhancing Alleles list, checked against the primary literature).<!-- @/rev C18 --> <!-- @rev DS1 rounds=4 by=claude:2026-10-27,claude:2026-10-28,claude:2026-11-19,claude:2026-11-20 -->These modules are small because they are selections ported from Generation I, kept as worked examples of the module format rather than catalogues of each trait's genetics; Longevity Map is larger because it starts from a dedicated database. Table S4 gives each module's curation and every source it cites. These modules work by joining the user's VCF against curated variant-trait databases and then adding annotation columns (weight, state, gene, conclusion) to matching variants.<!-- @/rev DS1 -->
 
 ### **3.4 Growing the Module Ecosystem**
 
