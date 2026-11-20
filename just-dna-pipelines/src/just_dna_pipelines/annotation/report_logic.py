@@ -62,6 +62,11 @@ AI_EXPLAIN_ASSISTANTS: tuple[tuple[str, str], ...] = (
     ("Grok", "https://grok.com/?q="),
 )
 
+# The web UI's "Local model" button, inserted into a report only while the backend serves it
+# (webui.local_llm). It reads the question from a sibling link's `q` parameter, so every base URL
+# above must end in `?q=`; just-dna-pipelines/tests/test_report_logic.py holds that.
+LOCAL_MODEL_EXPLAIN_SNIPPET: Path = Path(__file__).parent / "templates" / "local_model_explain.html"
+
 
 def report_title_for_modules(module_names: list[str]) -> str:
     """Return a report-level title that does not imply an unrelated module.

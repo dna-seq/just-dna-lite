@@ -1,0 +1,282 @@
+<!-- Local model button. Not part of the generated report: the web UI's backend inserts this before
+     </head> when it serves a report and a local model is configured (webui.local_llm), right after a
+     script that sets window.JUST_DNA_LOCAL_LLM. A downloaded report never contains it.
+     The question sent is the one the four assistant links already carry in their `q` parameter
+     (report_logic.AI_EXPLAIN_ASSISTANTS), so a row holds no second copy of it. The answer goes into
+     one fixed panel, never into the table: the table's script needs each detail row to be the
+     summary row's next sibling. -->
+<style>
+.ai-explain-link.local {
+    background: #6435c9;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+}
+.ai-explain-link.local:disabled { opacity: 0.55; cursor: progress; transform: none; }
+.ai-explain-link.local.busy { opacity: 1; animation: local-llm-pulse 1.2s ease-in-out infinite; }
+@keyframes local-llm-pulse { 50% { box-shadow: 0 0 0 4px rgba(100, 53, 201, 0.28); } }
+#local-llm-panel {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    width: min(480px, calc(100vw - 32px));
+    max-height: min(70vh, 680px);
+    background: white;
+    border: 1px solid var(--line, #d9e2ec);
+    border-top: 4px solid #6435c9;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(16, 42, 67, 0.22);
+}
+#local-llm-panel[hidden] { display: none; }
+.local-llm-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.8rem 0.9rem 0.6rem;
+    border-bottom: 1px solid var(--line, #d9e2ec);
+}
+.local-llm-titles { flex: 1; min-width: 0; }
+.local-llm-title { margin: 0; font-size: 1rem; font-weight: 700; color: #102a43; overflow-wrap: anywhere; }
+.local-llm-model { margin-top: 0.2rem; color: var(--muted, #5d6b7a); font-size: 0.8rem; overflow-wrap: anywhere; }
+.local-llm-close {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line, #d9e2ec);
+    border-radius: 7px;
+    background: white;
+    color: #102a43;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.local-llm-close:hover { background: #f3effc; }
+.local-llm-status { padding: 0.55rem 0.9rem 0; color: var(--muted, #5d6b7a); font-size: 0.85rem; }
+.local-llm-status.error { color: #9f3a38; font-weight: 600; white-space: pre-wrap; }
+.local-llm-status:empty { display: none; }
+.local-llm-body {
+    padding: 0.6rem 0.9rem 0.9rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+.local-llm-body:empty { display: none; }
+@media print {
+    .ai-explain-link.local, #local-llm-panel { display: none !important; }
+}
+</style>
+<script>
+(function () {
+    "use strict";
+    var settings = window.JUST_DNA_LOCAL_LLM;
+    if (!settings || !settings.endpoint) return;
+
+    var SVG_NS = "http://www.w3.org/2000/svg";
+    // A chip: "runs on hardware you chose", distinct from the four assistants' logos.
+    var CHIP_PATH = "M9 2h2v2h2V2h2v2h2a3 3 0 0 1 3 3v2h2v2h-2v2h2v2h-2v2a3 3 0 0 1-3 3h-2v2h-2v-2h-2v2H9v-2H7a3 3 0 0 1-3-3v-2H2v-2h2v-2H2V9h2V7a3 3 0 0 1 3-3h2V2zm-2 4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H7zm2 3h6v6H9V9z";
+
+    var panel = null;
+    var parts = {};
+    var controller = null;
+
+    function chipIcon() {
+        var svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        var path = document.createElementNS(SVG_NS, "path");
+        path.setAttribute("d", CHIP_PATH);
+        svg.appendChild(path);
+        return svg;
+    }
+
+    // The question is the one every assistant link carries; their base URLs all end in `?q=`.
+    function promptFor(container) {
+        var links = container.querySelectorAll("a.ai-explain-link[href]");
+        for (var i = 0; i < links.length; i++) {
+            var question = null;
+            try {
+                question = new URL(links[i].href, document.baseURI).searchParams.get("q");
+            } catch (err) {
+                question = null;
+            }
+            if (question) return question;
+        }
+        return null;
+    }
+
+    function subjectFor(container, question) {
+        var result = container.closest("article.trait-result");
+        var headline = result ? result.querySelector("h4") : null;
+        if (headline && headline.textContent.trim()) return headline.textContent.trim();
+        // A variant's question lists "- RSID: rs…" and "- Gene: …" (report_logic._build_variant_ai_prompt).
+        var rsid = /^(?:- )?RSID: (.+)$/m.exec(question);
+        var gene = /^(?:- )?Gene: (.+)$/m.exec(question);
+        if (rsid) return rsid[1] + (gene ? " (" + gene[1] + ")" : "");
+        return gene ? gene[1] : "this result";
+    }
+
+    function setStatus(text, isError) {
+        parts.status.textContent = text;
+        parts.status.classList.toggle("error", Boolean(isError));
+    }
+
+    function setBusy(busy, button) {
+        document.querySelectorAll(".ai-explain-link.local").forEach(function (b) {
+            b.disabled = busy;
+            b.classList.toggle("busy", busy && b === button);
+        });
+        parts.body.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+
+    function closePanel() {
+        if (controller) controller.abort();
+        if (panel) panel.hidden = true;
+    }
+
+    function ensurePanel() {
+        if (panel) return panel;
+        panel = document.createElement("aside");
+        panel.id = "local-llm-panel";
+        panel.setAttribute("aria-label", "Answer from your local model");
+        panel.hidden = true;
+
+        var head = document.createElement("div");
+        head.className = "local-llm-head";
+        var titles = document.createElement("div");
+        titles.className = "local-llm-titles";
+        parts.title = document.createElement("p");
+        parts.title.className = "local-llm-title";
+        parts.model = document.createElement("div");
+        parts.model.className = "local-llm-model";
+        titles.appendChild(parts.title);
+        titles.appendChild(parts.model);
+        var close = document.createElement("button");
+        close.type = "button";
+        close.className = "local-llm-close";
+        close.textContent = "×";
+        close.setAttribute("aria-label", "Close the answer and stop the model");
+        close.title = "Close";
+        close.addEventListener("click", closePanel);
+        head.appendChild(titles);
+        head.appendChild(close);
+
+        parts.status = document.createElement("div");
+        parts.status.className = "local-llm-status";
+        parts.status.setAttribute("role", "status");
+        parts.body = document.createElement("div");
+        parts.body.className = "local-llm-body";
+
+        panel.appendChild(head);
+        panel.appendChild(parts.status);
+        panel.appendChild(parts.body);
+        document.body.appendChild(panel);
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && panel && !panel.hidden) closePanel();
+        });
+        return panel;
+    }
+
+    function modelLine(model) {
+        return "Model: " + model + " at " + settings.baseUrl;
+    }
+
+    async function errorMessage(response) {
+        var text = await response.text();
+        try {
+            var parsed = JSON.parse(text);
+            if (parsed && typeof parsed.detail === "string") return parsed.detail;
+        } catch (err) {
+            // Not JSON: the route's own errors are plain text.
+        }
+        return text || ("The app answered HTTP " + response.status + ".");
+    }
+
+    async function explain(button, container) {
+        if (controller) return;
+        var question = promptFor(container);
+        ensurePanel();
+        parts.title.textContent = "Explaining " + subjectFor(container, question || "");
+        parts.model.textContent = modelLine(settings.modelLabel);
+        parts.body.textContent = "";
+        panel.hidden = false;
+        if (!question) {
+            setStatus("This result has no question to send.", true);
+            return;
+        }
+        setStatus("Waiting for the model. A model that is not loaded yet can take a minute.", false);
+        var current = new AbortController();
+        controller = current;
+        setBusy(true, button);
+        try {
+            var response = await fetch(settings.endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: question }),
+                signal: current.signal,
+            });
+            if (!response.ok) {
+                setStatus(await errorMessage(response), true);
+                return;
+            }
+            var model = response.headers.get("X-Local-Model");
+            if (model) parts.model.textContent = modelLine(model);
+            setStatus("Answering…", false);
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            while (true) {
+                var step = await reader.read();
+                if (step.done) break;
+                var follow = parts.body.scrollHeight - parts.body.scrollTop - parts.body.clientHeight < 40;
+                parts.body.appendChild(document.createTextNode(decoder.decode(step.value, { stream: true })));
+                if (follow) parts.body.scrollTop = parts.body.scrollHeight;
+            }
+            parts.body.appendChild(document.createTextNode(decoder.decode()));
+            setStatus(parts.body.textContent.trim() ? "" : "The model returned an empty answer.", !parts.body.textContent.trim());
+        } catch (err) {
+            if (err && err.name === "AbortError") {
+                setStatus("Stopped.", false);
+            } else {
+                setStatus("Could not reach this app's server: " + (err && err.message ? err.message : err), true);
+            }
+        } finally {
+            controller = null;
+            setBusy(false, button);
+        }
+    }
+
+    function addButtons() {
+        var label = "Explain with your local model (" + settings.modelLabel + "). Sends a question "
+            + "containing your DNA letters at these positions to " + settings.baseUrl
+            + ", the model server set up in this app, not to a third-party assistant. "
+            + "Nothing is sent until you click.";
+        document.querySelectorAll(".ai-explain-links").forEach(function (container) {
+            if (container.querySelector(".ai-explain-link.local") || !promptFor(container)) return;
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "ai-explain-link local";
+            button.setAttribute("aria-label", label);
+            button.title = label;
+            button.appendChild(chipIcon());
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                explain(button, container);
+            });
+            container.appendChild(button);
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", addButtons);
+    } else {
+        addButtons();
+    }
+})();
+</script>

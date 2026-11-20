@@ -169,6 +169,24 @@ Or use a small script that calls `job_def.execute_in_process()` with the correct
 - `annotate_and_report_job`: Full pipeline — normalize + HF annotate + report
 - `annotate_all_job`: Full pipeline — normalize + HF annotate + Ensembl DuckDB + report
 
+### 5. Genome prediction models (user_variant_effect_predictions)
+
+`predict_variant_effects_job` selects only `user_variant_effect_predictions`
+(`just_dna_pipelines/predictions/`), which reads the existing `user_vcf_normalized.parquet` through the
+IO manager and scores a sample's variants with a sequence model (today one entry, KronGenome F, ONNX
+on ONNX Runtime). Run config names only that asset (`predictions.run_config.prediction_run_config`).
+It needs a normalized sample; the default variant set also needs a finished annotation run.
+
+**Output:**
+```
+data/output/users/{user}/{sample}/krongenome_variant_effects.parquet   # one row per variant and allele
+data/output/users/{user}/{sample}/krongenome_variant_effects.json      # what the run did
+data/output/users/{user}/{sample}/reports/krongenome_variant_effects_{timestamp}.html
+```
+
+**CLI:** `uv run pipelines predict run --user U --sample S [--region chrom:start-end] [--max-variants N]`,
+plus `predict models`, `predict fetch-model` and `predict fetch-reference`.
+
 ### How the Web UI executes jobs (compute children, not in-process)
 
 The Web UI **never** calls `job_def.execute_in_process()` in its own process. Every run is
@@ -404,6 +422,8 @@ Modules are discovered via the registry in `registry.py`. A module typically pro
 *   `JUST_DNA_PIPELINES_CACHE_DIR`: base directory for reference caches.
 *   `JUST_DNA_PIPELINES_OUTPUT_DIR`: base directory for user outputs.
 *   `JUST_DNA_PIPELINES_INPUT_DIR`: base directory for user inputs.
+*   `JUST_DNA_REFERENCE_FASTA`: an uncompressed GRCh38 FASTA for the prediction models (optional; see
+    `predictions/reference.py` for where else it is looked for).
 *   `HF_TOKEN`: Hugging Face token (needed for private datasets).
 
 ---

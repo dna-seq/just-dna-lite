@@ -440,6 +440,23 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   third party, never automatically. They are ~half the file size. Keep icons as one `<symbol>` set with
   `<use>`. Phenotype results get the same four (`_build_phenotype_ai_links`); the privacy note lives in
   each button's tooltip and `aria-label`, and in full under *How to read this report*.
+- **The fifth button, "Local model", is added while the backend serves a report, never by the
+  generator.** `GET /api/report/...` inserts `window.JUST_DNA_LOCAL_LLM` (endpoint path, model,
+  base URL) and `templates/local_model_explain.html` before `</head>` when `LOCAL_LLM_BASE_URL` is set
+  and the app is not in immutable mode (`webui.local_llm.inject_local_model_button`), so reports written
+  earlier gain it and `/api/download-report/...` stays byte-identical (a downloaded copy has no backend).
+  The button reads its question from a sibling link's `q` parameter, so every `AI_EXPLAIN_ASSISTANTS`
+  base URL must end in `?q=` (`test_every_assistant_link_carries_the_whole_question_in_q`); do not add
+  a per-row copy of the prompt. It POSTs to `/api/explain-local`, which streams plain text from the
+  configured OpenAI-compatible endpoint (`openai.AsyncOpenAI`, `LOCAL_LLM_MODEL` or else the first id
+  under `/models`, `LOCAL_LLM_API_KEY` optional). The endpoint comes from config only, never the request.
+  Refusals: 403 in immutable mode, 503 unconfigured, 413 over `MAX_PROMPT_CHARS`; a failure to start is a
+  502 whose text names the endpoint, a failure halfway ends the text with the reason. The answer shows
+  in one fixed panel as `textContent`, never in the table (the detail-row sibling rule). Prompts are
+  never logged, only their length. Settings: the Reports tab's *Local model* form (`LocalModelState`,
+  hidden in immutable mode) saves through `set_env_var`; its Test connection is a background event
+  (`local_llm.check_connection`). Tests: `tests/test_local_model_explain.py` (a real fake upstream
+  under uvicorn).
 - **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
   never read as one. A result is an open block (plain headline, the
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
@@ -583,7 +600,8 @@ Architecture and troubleshooting: [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)
 [docs/CLEAN_SETUP.md](docs/CLEAN_SETUP.md).
 
 Jobs: `normalize_vcf_job` (auto on upload), `annotate_and_report_job` (default: normalize → HF modules
-→ report), `annotate_all_job` (adds Ensembl DuckDB), `annotate_ensembl_only_job`. Ensembl assets
+→ report), `annotate_all_job` (adds Ensembl DuckDB), `annotate_ensembl_only_job`,
+`predict_variant_effects_job` (prediction models, see "Predictions"). Ensembl assets
 (`user_annotated_vcf`, `user_annotated_vcf_duckdb`) **must** depend on `user_vcf_normalized` and take
 `normalized_parquet=`; never re-read the raw VCF.
 
@@ -751,6 +769,44 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   only. Never hardcode port 8000: `webui.run` picks a free port into `API_URL` / `REFLEX_BACKEND_PORT`;
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
   `backend_api_url` never returns `""`.
+
+## Predictions (`just_dna_pipelines.predictions`)
+
+Genome prediction models score a sample's variants and write a **separate** report (never merged into the
+annotation report). `predictions/models.py` is the list of models, one `PredictionModel` entry each
+(HF repo pinned to a commit, files, window, licence); a second model is a second entry. Today: KronGenome F
+(`just-dna-seq/KronGenome-F-1Mb`, CC BY-NC 4.0, Anton Kulaga, intermediate checkpoint at step 96,000).
+
+- **How**: `predict_variant_effects_job` → `user_variant_effect_predictions` reads `user_vcf_normalized`,
+  takes the variants the latest annotation run matched (called rows only, never `restored_hom_ref`), or every
+  variant in a region of at most 1 Mb, capped (`DEFAULT_MAX_VARIANTS` = 5), and runs the ONNX graph on
+  ONNX Runtime (CUDA when the install offers it, else CPU; the provider is recorded). Each SNV is two calls of
+  one row: reference and alternate windows of a **fixed 131,072 bases**, variant at index 65,536. Scores:
+  splice delta (max |Δp| of 4 splice channels within ±50 bp), DNase delta and top NTv3 tracks (log1p of the
+  128-bp mean, alt minus ref; NTv3 restricted to human-sample tracks, the rest are other species).
+- **SNV only.** Indels, mitochondrial sites (the graph fixes nuclear context), alleles the sample does not
+  carry, a REF that differs from the FASTA, a window off the contig and rows past the cap stay in the output
+  as `not_assessed` with a reason.
+- **Files**: model files in `<JUST_DNA_PIPELINES_CACHE_DIR>/models/<repo>/<revision>/` (`HfFileSystem.get`
+  file by file; `uv run pipelines predict fetch-model`), plus the session's optimized graph beside it
+  (`model.optimized.ort<version>-<provider>.onnx`: building the session took ~6 minutes on a busy CPU, the
+  saved graph loads in ~12 s). Outputs: `<sample>/krongenome_variant_effects.parquet` and `.json`, and
+  `<sample>/reports/krongenome_variant_effects_<timestamp>.html`, which the Reports tab lists.
+- **Reference FASTA**: `$JUST_DNA_REFERENCE_FASTA`, else `<cache>/reference/grch38/Homo_sapiens.GRCh38.dna.
+  primary_assembly.fa`, else just-prs's lane (`just_prs.reference.reference_fasta_path`, filled by
+  `pipelines predict fetch-reference`, which needs pysam). Read with pyfaidx; contigs meet through
+  `normalize_chrom`. The parquet's polars-bio `start` is the 1-based VCF POS (tested against GRCh38).
+- **Cost**: on the 16-core desktop at nice 19 one row took 34 s quiet and 48 s under load (a batch of two:
+  63 s / 86 s, but 5.7 GB peak against 3.3 GB, hence one row per call). About 1.5 minutes per SNV keeps the
+  default cap near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model test is
+  `slow` and skips without the cached model).
+- **Web UI**: the right-panel **Predictions** tab (`webui/pages/predictions.py`, `webui/predictions_state.py`):
+  model cards from the registry, variant set (analysis matches or a region), cap, Run. The run goes through
+  Start Analysis's path (`_try_submit_to_daemon`, then `execute_job_with_run_discovery`) and `UploadState`'s
+  run list, so `selected_file_is_running` blocks a second run on the file either way. Non-GRCh38 samples are
+  refused (`selected_build_unsupported`); in immutable mode the Run control is hidden (a run holds a CPU for
+  many minutes). Its reports are linked in the tab and listed in the Reports tab.
+- Research model, not a clinical tool: the report says so, and that its scores are predictions.
 
 ## PRS (`just-prs>=0.11.0`, `prs-ui>=0.4.0`)
 

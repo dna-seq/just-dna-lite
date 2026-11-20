@@ -79,6 +79,10 @@ class TestPhenotypeSection:
         # Per-position evidence lives in the module's positions table, one row per defining site.
         assert _members(html, "hfe_compound_het").count("phase set 26090951") == 2
         assert "C282Y, C282Y-H63D, H63D, wt." in card and "Gene versions this module knows for" in card
+        # The served report's "Local model" button attaches to this container and sends the
+        # question its links carry in `q` (webui.local_llm).
+        links = card[card.index('<span class="ai-explain-links">'):]
+        assert re.search(r'<a class="ai-explain-link [a-z]+" href="[^"]+\?q=[^"]*HFE', links)
 
     def test_an_unphased_double_het_is_ambiguous_and_says_phase_would_decide(self, tmp_path, monkeypatch) -> None:
         html = _run(tmp_path, monkeypatch, ["hfe_compound_het"], [

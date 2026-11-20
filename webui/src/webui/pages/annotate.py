@@ -16,7 +16,8 @@ from webui.components.layout import template, two_column_layout, fomantic_icon
 from webui.components.draggable import draggable_div
 from webui.crawler_assets import page_image_url, page_meta
 from webui.features import module_creator_available
-from webui.state import UploadState, OutputPreviewState, PRSState, PRSTraitState
+from webui.pages.predictions import predictions_tab_content
+from webui.state import LocalModelState, UploadState, OutputPreviewState, PRSState, PRSTraitState
 from reflex_mui_datagrid import lazyframe_grid
 from prs_ui import prs_scores_selector
 from prs_ui.components.prs_section import prs_workbench_mode_panel
@@ -1886,6 +1887,120 @@ def _reports_content() -> rx.Component:
     )
 
 
+_LOCAL_MODEL_ACCENT = "#6435c9"
+
+
+def _local_model_field(label: str, control: rx.Component, hint: str) -> rx.Component:
+    return rx.el.div(
+        rx.el.label(label),
+        control,
+        rx.el.div(hint, style={"color": "#888", "fontSize": "0.8rem", "marginTop": "4px"}),
+        class_name="field",
+    )
+
+
+def _local_model_settings() -> rx.Component:
+    """Collapsible *Local model* form under the report list (hidden in immutable mode).
+
+    Sets where a report's fifth button, "Local model", sends its question (``webui.local_llm``).
+    """
+    status_badge = rx.cond(
+        LocalModelState.local_model_configured,
+        rx.el.span("On", class_name="ui small violet label"),
+        rx.el.span("Off", class_name="ui small basic label"),
+    )
+    form = rx.el.div(
+        rx.el.p(
+            "Reports opened from here get a fifth button that sends a result's question to a model "
+            "you run yourself, such as Ollama, vLLM, LM Studio or a llama.cpp server. The question "
+            "contains your DNA letters at those positions and goes only to this address.",
+            style={"color": "#555", "fontSize": "0.92rem", "lineHeight": "1.5", "marginTop": "0"},
+        ),
+        _local_model_field(
+            "Server address",
+            rx.el.div(
+                rx.el.input(
+                    type="url",
+                    value=LocalModelState.local_model_base_url,
+                    on_change=LocalModelState.set_local_model_base_url,
+                    placeholder="http://127.0.0.1:11434/v1",
+                ),
+                class_name="ui fluid input",
+            ),
+            "An OpenAI-compatible address, usually ending in /v1. Leave empty and save to turn the button off.",
+        ),
+        _local_model_field(
+            "Model",
+            rx.el.div(
+                rx.el.input(
+                    type="text",
+                    value=LocalModelState.local_model_name,
+                    on_change=LocalModelState.set_local_model_name,
+                    placeholder="Leave empty to use the first model the server lists",
+                ),
+                class_name="ui fluid input",
+            ),
+            "The model id as the server names it, for example llama3.2 or qwen2.5:7b.",
+        ),
+        _local_model_field(
+            "API key",
+            rx.el.div(
+                rx.el.input(
+                    type="password",
+                    key=LocalModelState.local_model_form_key,
+                    on_blur=LocalModelState.set_local_model_key,
+                    placeholder=LocalModelState.local_model_key_placeholder,
+                    auto_complete="off",
+                ),
+                class_name="ui fluid input",
+            ),
+            "Saved to .env on this machine.",
+        ),
+        rx.el.div(
+            rx.el.button(
+                fomantic_icon("save", size=16),
+                " Save",
+                on_click=LocalModelState.save_local_model,
+                class_name="ui violet button",
+                type="button",
+            ),
+            rx.el.button(
+                fomantic_icon("plug", size=16),
+                " Test connection",
+                on_click=LocalModelState.test_local_model_connection,
+                class_name=rx.cond(
+                    LocalModelState.local_model_testing,
+                    "ui basic violet loading button",
+                    "ui basic violet button",
+                ),
+                type="button",
+                title="Ask the server which models it has, using the values in this form",
+            ),
+            style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+        ),
+        class_name="ui form",
+        style={"padding": "0 4px 8px"},
+    )
+    return rx.cond(
+        UploadState.is_immutable_mode,
+        rx.fragment(),
+        rx.el.div(
+            _collapsible_header(
+                LocalModelState.local_model_expanded,
+                "microchip",
+                "Local model",
+                status_badge,
+                LocalModelState.toggle_local_model,
+                accent_color=_LOCAL_MODEL_ACCENT,
+            ),
+            rx.cond(LocalModelState.local_model_expanded, form, rx.fragment()),
+            on_mount=LocalModelState.load_local_model_settings,
+            id="local-model-settings",
+            style={"padding": "12px", "borderTop": "1px solid #eee"},
+        ),
+    )
+
+
 def _output_preview_grid() -> rx.Component:
     """Inline output preview grid inside the Outputs section.
 
@@ -2462,29 +2577,32 @@ def new_analysis_section() -> rx.Component:
                     "flexWrap": "wrap",
                 },
             ),
-            rx.cond(
-                UploadState.selected_build_unsupported != "",
-                rx.el.div(
-                    rx.el.div("Reference genome not supported", class_name="header"),
-                    rx.el.p(UploadState.selected_build_unsupported),
-                    class_name="ui warning message",
-                    style={"maxWidth": "760px"},
-                ),
-            ),
-            rx.el.button(
-                UploadState.analysis_button_text,
-                rx.el.i(
-                    "",
-                    class_name=rx.cond(
-                        UploadState.selected_file_is_running,
-                        "spinner loading icon",
-                        "play icon",
+            # The else branch is one element: rx.cond takes at most a true and a false child.
+            rx.el.div(
+                rx.cond(
+                    UploadState.selected_build_unsupported != "",
+                    rx.el.div(
+                        rx.el.div("Reference genome not supported", class_name="header"),
+                        rx.el.p(UploadState.selected_build_unsupported),
+                        class_name="ui warning message",
+                        style={"maxWidth": "760px"},
                     ),
                 ),
-                on_click=UploadState.start_annotation_run,
-                disabled=~UploadState.can_run_annotation,
-                class_name=UploadState.analysis_button_color,
-                style={"maxWidth": "400px"},
+                rx.el.button(
+                    UploadState.analysis_button_text,
+                    rx.el.i(
+                        "",
+                        class_name=rx.cond(
+                            UploadState.selected_file_is_running,
+                            "spinner loading icon",
+                            "play icon",
+                        ),
+                    ),
+                    on_click=UploadState.start_annotation_run,
+                    disabled=~UploadState.can_run_annotation,
+                    class_name=UploadState.analysis_button_color,
+                    style={"maxWidth": "400px"},
+                ),
             ),
         ),
         style={"padding": "0"},
@@ -2913,6 +3031,25 @@ def _tab_item(tab_id: rx.Var[str]) -> rx.Component:
                 draggable=True,
                 style=drag_style,
                 data_tab_id="analysis",
+            ),
+        ),
+        (
+            "predictions",
+            draggable_div(
+                fomantic_icon(
+                    "chart line",
+                    size=16,
+                    color=rx.cond(UploadState.right_panel_active_tab == "predictions", "#6435c9", "#888"),
+                ),
+                " Predictions",
+                class_name=rx.cond(UploadState.right_panel_active_tab == "predictions", "active item", "item"),
+                on_click=UploadState.switch_right_panel_tab("predictions"),
+                on_drag_start=UploadState.drag_tab_start("predictions"),
+                on_drag_over=rx.prevent_default,
+                on_drop=UploadState.drop_tab_onto("predictions"),
+                draggable=True,
+                style=drag_style,
+                data_tab_id="predictions",
             ),
         ),
         rx.fragment(),  # default / unknown tab id
@@ -3459,6 +3596,7 @@ def _reports_tab_content() -> rx.Component:
             "Reports turn the output tables into a browser-friendly view so you can explore the main matches without opening parquet files.",
         ),
         _reports_content(),
+        _local_model_settings(),
         id="segment-reports",
     )
 
@@ -3610,6 +3748,7 @@ def right_panel_run_view() -> rx.Component:
                         ("annotated_files", _annotated_files_tab_content()),
                         ("reports", _reports_tab_content()),
                         ("analysis", _analysis_tab_content()),
+                        ("predictions", predictions_tab_content()),
                         _input_tab_content(),
                     ),
                     class_name="ui bottom attached segment",

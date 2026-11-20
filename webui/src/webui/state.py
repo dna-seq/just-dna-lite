@@ -86,6 +86,15 @@ from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_vi
 from webui.registry_identity import (
     ensure_install_id, load_store_identity, save_store_identity, derive_handle, set_env_var,
 )
+from webui.local_llm import (
+    API_KEY_ENV as _LOCAL_LLM_API_KEY_ENV,
+    BASE_URL_ENV as _LOCAL_LLM_BASE_URL_ENV,
+    MODEL_ENV as _LOCAL_LLM_MODEL_ENV,
+    LocalLlmConfig,
+    check_connection as _check_local_llm_connection,
+    is_valid_base_url,
+    local_llm_config,
+)
 
 # Display name → safe token (latin letters/digits/underscore); injection-safe, drives the handle.
 _DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,32}$")
@@ -452,7 +461,7 @@ def _analysis_job_name(
 
 # Canonical tab order — single source of truth used both as the default for the
 # tab_order state var and as the validation set in move_tab.
-DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis"]
+DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis", "predictions"]
 
 
 class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
@@ -1474,7 +1483,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     outputs_expanded: bool = True  # Whether the outputs section is expanded
     run_history_expanded: bool = True  # Whether the run history section is expanded
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
-    right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis"
+    right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis", "predictions"
     tab_order: list[str] = DEFAULT_TAB_ORDER  # drag-reorderable tab list
     _drag_tab_id: str = ""  # internal: id of the tab being dragged (cleared after drop)
     show_input_tab_info: bool = True
@@ -5751,6 +5760,111 @@ class PRSTraitState(SafeGridMixin, LazyFrameGridMixin, rx.State):
 # ============================================================================
 # AGENT STATE — Module Creator AI agent
 # ============================================================================
+
+class LocalModelState(rx.State):
+    """The Reports tab's *Local model* form: where a report's fifth button sends its question.
+
+    The values live in ``os.environ`` and ``.env`` (``set_env_var``), which ``webui.local_llm`` reads
+    on every request, so a save reaches the next report opened without a restart. The API key never
+    reaches the client: its input is uncontrolled and lands in a backend-only var on blur.
+    """
+
+    local_model_expanded: bool = False
+    local_model_base_url: str = ""
+    local_model_name: str = ""
+    local_model_key_set: bool = False
+    local_model_configured: bool = False
+    local_model_testing: bool = False
+    # Public remount token for the uncontrolled key input, so a save clears what was typed.
+    local_model_form_key: int = 0
+    _local_model_key_input: str = ""
+
+    def _load_local_model_from_env(self) -> None:
+        self.local_model_base_url = os.getenv(_LOCAL_LLM_BASE_URL_ENV, "").strip()
+        self.local_model_name = os.getenv(_LOCAL_LLM_MODEL_ENV, "").strip()
+        self.local_model_key_set = bool(os.getenv(_LOCAL_LLM_API_KEY_ENV, "").strip())
+        self.local_model_configured = local_llm_config() is not None
+        self._local_model_key_input = ""
+
+    @rx.event
+    def load_local_model_settings(self) -> None:
+        self._load_local_model_from_env()
+
+    @rx.event
+    def toggle_local_model(self) -> None:
+        self.local_model_expanded = not self.local_model_expanded
+        if self.local_model_expanded:
+            self._load_local_model_from_env()
+
+    @rx.event
+    def set_local_model_base_url(self, value: str) -> None:
+        self.local_model_base_url = value
+
+    @rx.event
+    def set_local_model_name(self, value: str) -> None:
+        self.local_model_name = value
+
+    @rx.event
+    def set_local_model_key(self, value: str) -> None:
+        self._local_model_key_input = value.strip()
+
+    @rx.var
+    def local_model_key_placeholder(self) -> str:
+        if self.local_model_key_set:
+            return "Already set, type to replace"
+        return "Optional, most local servers need none"
+
+    def _form_config(self) -> LocalLlmConfig | None:
+        """The form's current values as a config, or ``None`` when the address is not a URL."""
+        base_url = self.local_model_base_url.strip()
+        if not is_valid_base_url(base_url):
+            return None
+        return LocalLlmConfig(
+            base_url=base_url,
+            model=self.local_model_name.strip(),
+            api_key=self._local_model_key_input or os.getenv(_LOCAL_LLM_API_KEY_ENV, "").strip(),
+        )
+
+    @rx.event
+    def save_local_model(self) -> list[EventSpec]:
+        """Write the form to ``os.environ`` and ``.env``; an empty address turns the button off."""
+        if _is_immutable_mode():
+            return [rx.toast.error("A local model cannot be set up on this public demo.")]
+        base_url = self.local_model_base_url.strip()
+        if base_url and not is_valid_base_url(base_url):
+            return [rx.toast.error(f"'{base_url}' is not an http:// or https:// address.")]
+        set_env_var(_LOCAL_LLM_BASE_URL_ENV, base_url.rstrip("/"))
+        set_env_var(_LOCAL_LLM_MODEL_ENV, self.local_model_name.strip())
+        if self._local_model_key_input:
+            set_env_var(_LOCAL_LLM_API_KEY_ENV, self._local_model_key_input)
+        self._load_local_model_from_env()
+        self.local_model_form_key += 1
+        if not base_url:
+            return [rx.toast.info("Local model turned off. Reports no longer show its button.")]
+        return [rx.toast.success(
+            f"Saved to .env. Reports opened from now on send questions to {base_url.rstrip('/')}; "
+            "reload a report that is already open."
+        )]
+
+    @rx.event(background=True)
+    async def test_local_model_connection(self) -> list[EventSpec]:
+        """List the models at the address in the form (saved or not) and say what came back."""
+        async with self:
+            if self.local_model_testing:
+                return []
+            if _is_immutable_mode():
+                return [rx.toast.error("A local model cannot be set up on this public demo.")]
+            config = self._form_config()
+            if config is None:
+                return [rx.toast.error(
+                    f"'{self.local_model_base_url.strip()}' is not an http:// or https:// address."
+                )]
+            self.local_model_testing = True
+        ok, message = await _check_local_llm_connection(config)
+        async with self:
+            self.local_model_testing = False
+        return [rx.toast.success(message) if ok else rx.toast.error(message)]
+
 
 _AGENT_UPLOADS_DIR = Path("data/agent_uploads")
 _MAX_AGENT_ATTACHMENTS = 5
