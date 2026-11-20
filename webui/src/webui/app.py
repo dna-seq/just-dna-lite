@@ -386,7 +386,10 @@ async def explain_with_local_model(body: ExplainRequest) -> Response:
     if config is None:
         raise HTTPException(
             status_code=503,
-            detail="No local model is set up. Set LOCAL_LLM_BASE_URL in .env.",
+            detail=(
+                "No local model is set up. Add its address on the Reports tab under Local model, "
+                "or set LOCAL_LLM_BASE_URL in .env."
+            ),
         )
     prompt = body.prompt.strip()
     if not prompt:

@@ -314,6 +314,20 @@ def inject_local_model_button(html_text: str, endpoint_path: str) -> str:
     return f"{html_text[:match.start()]}{block}\n{html_text[match.start():]}"
 
 
+async def check_connection(config: LocalLlmConfig) -> tuple[bool, str]:
+    """The settings form's Test connection: whether explanations would work, and one line why.
+
+    True only when the endpoint answers and lists the configured model (or, with none configured,
+    any model at all).
+    """
+    try:
+        ids = await list_model_ids(config)
+    except OpenAIError as exc:
+        return False, describe_local_llm_failure(config, exc)
+    usable = bool(ids) and (not config.model or config.model in ids)
+    return usable, connection_summary(config, ids)
+
+
 def connection_summary(config: LocalLlmConfig, ids: list[str]) -> str:
     """One line for the settings form's Test connection toast."""
     if not ids:

@@ -23,7 +23,9 @@ from fastapi.testclient import TestClient
 
 from webui import local_llm
 from webui.app import api
-from webui.local_llm import MAX_PROMPT_CHARS, LocalLlmConfig, connection_summary, report_injection
+from webui.local_llm import MAX_PROMPT_CHARS, LocalLlmConfig, report_injection
+from webui.pages.annotate import _local_model_settings
+from webui.state import LocalModelState
 
 REPORT_HTML = (
     "<!DOCTYPE html><html><head><title>Genomic Annotation Report</title>\n</head>"
@@ -357,19 +359,111 @@ def test_a_prompt_at_the_limit_is_accepted(
     assert response.text == FakeUpstream.answer_for(upstream.models[0], prompt)
 
 
-# --------------------------------------------------------------------------- the settings form's test
-
-@pytest.mark.anyio
-async def test_test_connection_lists_the_models(upstream: FakeUpstream, env: pytest.MonkeyPatch) -> None:
-    config = LocalLlmConfig(base_url=upstream.base_url)
-    ids = await local_llm.list_model_ids(config)
-    assert ids == upstream.models
-    summary = connection_summary(config, ids)
-    assert upstream.base_url in summary and upstream.models[0] in summary
-    missing = connection_summary(LocalLlmConfig(base_url=upstream.base_url, model="nope"), ids)
-    assert "does not list 'nope'" in missing
-
+# --------------------------------------------------------------------------- the settings form
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model,usable,needle",
+    [
+        ("", True, "Explanations will use fake-small"),
+        ("fake-large", True, "Explanations will use fake-large"),
+        ("nope", False, "does not list 'nope'"),
+    ],
+)
+async def test_test_connection_reports_what_the_server_lists(
+    upstream: FakeUpstream, env: pytest.MonkeyPatch, model: str, usable: bool, needle: str
+) -> None:
+    config = LocalLlmConfig(base_url=upstream.base_url, model=model)
+    assert await local_llm.list_model_ids(config) == upstream.models
+    ok, message = await local_llm.check_connection(config)
+    assert ok is usable
+    assert needle in message and upstream.base_url in message
+
+
+@pytest.mark.anyio
+async def test_test_connection_names_a_dead_server(env: pytest.MonkeyPatch) -> None:
+    dead = f"http://127.0.0.1:{_free_port()}/v1"
+    ok, message = await local_llm.check_connection(LocalLlmConfig(base_url=dead))
+    assert ok is False
+    assert dead in message and "Could not connect" in message
+
+
+@pytest.fixture
+def saved_env(env: pytest.MonkeyPatch) -> dict[str, str]:
+    """`set_env_var` without touching the checkout's `.env`: records the write, sets os.environ."""
+    written: dict[str, str] = {}
+
+    def record(name: str, value: str) -> None:
+        written[name] = value
+        env.setenv(name, value)
+
+    env.setattr("webui.state.set_env_var", record)
+    return written
+
+
+def test_saving_the_form_configures_the_report_button(saved_env: dict[str, str]) -> None:
+    state = LocalModelState()
+    state.local_model_base_url = " http://127.0.0.1:11434/v1/ "
+    state.local_model_name = "llama3.2"
+    state.set_local_model_key("  secret  ")
+    previous_key = state.local_model_form_key
+
+    state.save_local_model()
+
+    assert saved_env == {
+        local_llm.BASE_URL_ENV: "http://127.0.0.1:11434/v1",
+        local_llm.MODEL_ENV: "llama3.2",
+        local_llm.API_KEY_ENV: "secret",
+    }
+    assert local_llm.local_llm_config() == LocalLlmConfig(
+        base_url="http://127.0.0.1:11434/v1", model="llama3.2", api_key="secret"
+    )
+    assert state.local_model_configured and state.local_model_key_set
+    assert state.local_model_form_key == previous_key + 1
+    assert state.local_model_key_placeholder == "Already set, type to replace"
+
+
+def test_an_empty_key_keeps_the_saved_one_and_an_empty_address_turns_it_off(
+    saved_env: dict[str, str], env: pytest.MonkeyPatch
+) -> None:
+    env.setenv(local_llm.BASE_URL_ENV, "http://127.0.0.1:11434/v1")
+    env.setenv(local_llm.API_KEY_ENV, "kept")
+    state = LocalModelState()
+    state.load_local_model_settings()
+    assert state.local_model_configured
+    state.local_model_base_url = ""
+
+    state.save_local_model()
+
+    assert local_llm.API_KEY_ENV not in saved_env
+    assert saved_env[local_llm.BASE_URL_ENV] == ""
+    assert local_llm.local_llm_config() is None
+    assert state.local_model_configured is False
+
+
+@pytest.mark.parametrize("immutable,address", [("false", "127.0.0.1:11434"), ("true", "http://127.0.0.1:11434/v1")])
+def test_the_form_refuses_a_non_url_and_the_public_demo(
+    saved_env: dict[str, str], env: pytest.MonkeyPatch, immutable: str, address: str
+) -> None:
+    env.setenv("JUST_DNA_IMMUTABLE_MODE", immutable)
+    state = LocalModelState()
+    state.local_model_base_url = address
+    state.save_local_model()
+    assert saved_env == {}
+
+
+def test_the_api_key_never_reaches_the_client() -> None:
+    assert "_local_model_key_input" not in LocalModelState.base_vars
+    assert "local_model_form_key" in LocalModelState.base_vars
+
+
+def test_the_settings_form_builds_and_hides_in_immutable_mode() -> None:
+    rendered = str(_local_model_settings().render())
+    assert "local-model-settings" in rendered
+    assert "is_immutable_mode" in rendered
+    assert "toggle_local_model" in rendered

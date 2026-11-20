@@ -453,7 +453,9 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   Refusals: 403 in immutable mode, 503 unconfigured, 413 over `MAX_PROMPT_CHARS`; a failure to start is a
   502 whose text names the endpoint, a failure halfway ends the text with the reason. The answer shows
   in one fixed panel as `textContent`, never in the table (the detail-row sibling rule). Prompts are
-  never logged, only their length. Tests: `tests/test_local_model_explain.py` (a real fake upstream
+  never logged, only their length. Settings: the Reports tab's *Local model* form (`LocalModelState`,
+  hidden in immutable mode) saves through `set_env_var`; its Test connection is a background event
+  (`local_llm.check_connection`). Tests: `tests/test_local_model_explain.py` (a real fake upstream
   under uvicorn).
 - **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
   never read as one. A result is an open block (plain headline, the
