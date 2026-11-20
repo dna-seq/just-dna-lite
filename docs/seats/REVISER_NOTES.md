@@ -88,3 +88,6 @@ was shown to that session and will not be shown again: its first work is repeate
   fininsh this run but do not initialize run withou asking me or getting explicit instruciton on it". The run in
   progress (`reviews/20261118T233751Z-7c381cd5`) is finished; no new manuscript-skills run, skill or subagent panel
   (claim checkers included) starts unless he asks for it in his own words or says yes when asked.
+- **2026-11-20, unattended again.** Desk #69: Box 1's first user group, Georg's "Researchers, including citizen
+  scientists" (default; matches the accepted Section 1.2) or Livia's "users" (C58, C130, S9, S11, S18, S20, S21).
+  Open on the desk: #62, #63, #64, #69. Google Docs connector still disconnected (supplement, S4, S5 unread).

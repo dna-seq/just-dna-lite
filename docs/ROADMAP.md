@@ -38,7 +38,7 @@ the groups, join them, and only then call the step's output annotation.
 
 ## RM6 — The open issues, sorted into plan or answered
 
-**State:** waits until 2026-11-21: the correspondence seat's first reading of the issues · **Owner:** correspondence
+**State:** blocked: desk #68 (draft replies to issues 7, 10, 11 and 17; if nobody answers, nothing is posted) · **Owner:** correspondence
 
 Twelve issues are open, most of them feature suggestions from June 2026 (#7 to #20), with one outside
 pull request (#28, the Windows installer, reviewed in `docs/reviews/`). Several are overtaken by what
@@ -78,3 +78,12 @@ RM449 also names; this repository builds thrombophilia as the 1.1.0 port of 9 po
 the named row. The local Ensembl cache was an unfinished pull (chromosomes 9, MT, X, Y missing) and
 completed during the rebuild; it sits in the home directory (14 GB).
 
+## RM10 — Sort the per-sample lists (issues #19 and #20)
+
+**State:** unattended · **Owner:** lead
+
+Livia asked in June for the sample's PRS runs to sort by date created (#19), and for its annotation
+files and reports to sort by name, file type or date created (#20). Both are sort controls on the
+right panel's per-sample lists (`output_files`, `report_files` and the PRS results in
+`webui/src/webui/state.py`); the default order stays as it is now. The correspondence seat drafts the
+issue replies once it lands.

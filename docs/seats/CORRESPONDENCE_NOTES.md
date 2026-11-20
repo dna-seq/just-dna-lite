@@ -58,3 +58,19 @@ maintainer; nothing is closed or commented without his word on the text.
 - Builder's `first seating:` report sent.
 - 2026-11-19: the lead merged `bump/just-dna-format` into local main (49826da); its worktree is removed, and the
   branch is deleted once main is pushed. RM449's recompile is roadmap RM9; republishing waits on the maintainer.
+
+### Drafts waiting for the maintainer's word (2026-11-20): blocked: desk #68, default nothing posted
+
+Each claim checked against `main` today. Nothing posted.
+
+- **#7, close:** "Done. Annotation now has an MCP server: `uv run pipelines mcp` (stdio) or `--transport http`, and `uv run start` serves it on port 3006. It lists samples and modules, runs annotation in the background, returns results and validates modules. Reference: docs/MCP_SERVER.md. The PRS side is in just-prs-mcp, as noted above."
+- **#10, close:** "Done. Each variant row in a report has four links that open the variant in an AI assistant, and phenotype results have the same four. Nothing is sent until you click; the tooltip says which service it goes to."
+- **#11, close:** "Done. Module authoring no longer needs API keys: the just-module-creator plugin (https://github.com/dna-seq/just-module-creator) runs in your own assistant (Claude Code, Cursor and others) and uses this app's MCP server to test a module on a real genome. The compiler from just-dna-compiler is integrated (format 0.8.9)."
+- **#17, answer, keep open:** "Thanks for the sample header. Not yet: the app reads VCF files only, and your file is on build 37, while annotation works on GRCh38 only. Two pieces are missing: a reader for MyHeritage (and 23andMe/Ancestry) text files, tracked in #8, and a build-37 to build-38 conversion. Both are planned, not scheduled. We will update this issue when either lands."
+
+### 2026-11-20 — inbox follow-up
+
+- **Pull request 28:** the review in `docs/reviews/pr-28-windows-installer.md` was posted on the PR by winternewt on
+  2026-07-11 (the binaries out of the history, then rebase). No push since: it waits on its author. Nothing to post.
+- **#19, #20 (sorting PRS runs, annotations and reports by date or name):** proposed to the lead as one roadmap
+  item, in `#just-dna-lite>issues` (2026-11-20).
