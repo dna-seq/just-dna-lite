@@ -103,3 +103,8 @@ was shown to that session and will not be shown again: its first work is repeate
   #74's default leaves S11 unchanged. Open on the desk: #62, #63, #64, #69, #71, #72, #74. Ledger: 94 open, 29
   addressed, 3 partly, 6 not-on-point. Next: schemas and figures (C131, C133, C138), affiliations and names
   (C118 to C121), C122, C123, then the easy tail.
+- **2026-11-20, later.** C121 (778 traits) and C122 (AI caveat kept) settled on the data, declined with reasons.
+  Desk #75 (diagrams) default applied: c84c7e3, new Figures 2 (overview) and 3 (module lifecycle), Graphviz sources
+  in `figures/*.dot`, old Figures 2 and 3 renumbered 4 and 5; Table S15 lists the catalogue's contents. Desk #76
+  (affiliations, Fedorova, behaviour modules): defaults keep the paper as it is. Ledger: 89 open, 32 addressed,
+  3 partly, 2 declined, 6 not-on-point. Next: the easy tail (S5, S12, S13, S16, S17, S20, S24, S29), then the rest.
