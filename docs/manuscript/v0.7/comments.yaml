@@ -131,14 +131,15 @@ items:
   comment: I'd suggest to add an initial background section / problem statement
   where: Abstract
   line: 29
-  status: open
-  now: ''
-  why: ''
-  next: 'Should the Abstract open with a problem statement? The smallest version is one sentence before ''Just-DNA-Lite
-    is the core...'', taken from Section 1.1: people with a whole-genome VCF cannot annotate it against published
-    evidence without programming, and commercial reports do not show how a result was reached. The Abstract is already
-    about 210 words against about 150 at most ladder venues, so this is the run''s decision D7 on length and the
-    Abstract.'
+  status: addressed
+  now: Researchers with a whole-genome variant file (VCF) can find it hard to annotate it against published databases
+    without programming expertise, and commercial reports do not show how a result was reached. This paper presents
+    Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a VCF and computes polygenic risk scores locally, so
+    the genome does not have to be uploaded to a third-party server.
+  why: 'The Abstract opens with a problem sentence taken from Section 1.1. Under desk #72''s default (option 1),
+    applied by the reviser, open for veto. The Abstract is now about 270 words, over most listed venues'' limit;
+    it is cut at submission to the chosen journal.'
   category: Story and structure
   severity: major
   stage: writing
@@ -167,14 +168,16 @@ items:
     @antonkulaga@gmail.com'
   where: Abstract
   line: 29
-  status: open
-  now: ''
-  why: ''
-  next: Should the Abstract open by saying what the paper presents and for whom ('This paper presents Just-DNA-Lite,
-    an open core ... used to ..., giving researchers a workflow to ...') and name the companion paper on adding
-    new modules? Georg asks for a problem statement first (C46); the two combine as one sentence of problem and
-    one of what the paper presents. Livia asks Anton to weigh in. The Abstract is already longer than most ladder
-    venues allow (the run's decision on length).
+  status: partly
+  now: Researchers with a whole-genome variant file (VCF) can find it hard to annotate it against published databases
+    without programming expertise, and commercial reports do not show how a result was reached. This paper presents
+    Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against published evidence
+    on the user's own computer. Its web platform annotates a VCF and computes polygenic risk scores locally, so
+    the genome does not have to be uploaded to a third-party server.
+  why: 'The Abstract now says ''This paper presents Just-DNA-Lite, ...''. Under desk #72''s default (option 1),
+    applied by the reviser, open for veto. The Abstract is now about 270 words, over most listed venues'' limit;
+    it is cut at submission to the chosen journal.'
+  next: Name the companion paper on adding new modules once it has a citable preprint.
   category: Story and structure
   severity: major
   stage: writing
@@ -236,13 +239,14 @@ items:
   comment: some more on Conclusion, incl the "for research use only" caveat?
   where: Abstract
   line: 35
-  status: open
-  now: ''
-  why: ''
-  next: 'End the Abstract with one conclusion sentence carrying a measured result and the scope: for example, the
-    ten default modules annotate a whole genome in about a minute, 128 to 181 times faster than Generation I, and
-    the platform is for research and education and gives no diagnosis (Sections 4.1 and 5.3). Weigh it against the
-    Abstract''s length (the run''s decision D7).'
+  status: addressed
+  now: AI assistants can run the same steps through Model Context Protocol servers. On one workstation, the ten
+    default modules annotate a whole genome in about a minute. The platform is infrastructure for research and education
+    and does not establish the clinical validity of what it reports.
+  why: 'The Abstract ends with the measured annotation time (Section 4.1) and the research-and-education scope with
+    no clinical validity (Section 5.4). Under desk #72''s default (option 1), applied by the reviser, open for veto.
+    The Abstract is now about 270 words, over most listed venues'' limit; it is cut at submission to the chosen
+    journal.'
   category: Story and structure
   severity: major
   stage: writing

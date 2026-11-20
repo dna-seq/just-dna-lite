@@ -25,14 +25,14 @@
 
 ## **Abstract**
 
-<!-- @rev C2a rounds=16 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-13,codex:2026-10-19,codex:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28,co-authors:2026-11-19 -->
-Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published evidence on the user's own computer. Its web platform annotates a whole-genome variant file (VCF) and computes polygenic risk scores locally, so the genome does not have to be uploaded to a third-party server.
+<!-- @rev C2a rounds=17 by=robi:2026-09-25,claude:2026-10-10,claude:2026-10-13,codex:2026-10-19,codex:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28,co-authors:2026-11-19,claude:2026-11-20 -->
+Researchers with a whole-genome variant file (VCF) can find it hard to annotate it against published databases without programming expertise, and commercial reports do not show how a result was reached. This paper presents Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against published evidence on the user's own computer. Its web platform annotates a VCF and computes polygenic risk scores locally, so the genome does not have to be uploaded to a third-party server.
 
 What the platform reports comes from modules, versioned tables of variant-trait associations that researchers write with no coding involved. Ready-made modules cover longevity, disease predisposition and drug response. Researchers publish new modules to just-dna-registry, an open registry that works like an app store, where users browse, install and apply them without the need of a software update. The just-module-creator plugin drafts modules from the literature and public databases employing an AI assistant of the researcher's choice.
 
 Every matched variant links to its reported effect and its sources. Polygenic scores (further called PGS) come from just-prs, a library that also works on its own. It computes PGS Catalog scores from a cleaned copy of the Catalog, places each within a reference population matched to the genome's inferred ancestry, labels its quality and shows all models for a trait side by side, so users see where the models agree and differ.
 
-AI assistants can also run annotation and scoring through Model Context Protocol servers, and a public demonstration lets anyone try the platform on public genomes.
+AI assistants can run the same steps through Model Context Protocol servers. On one workstation, the ten default modules annotate a whole genome in about a minute. The platform is infrastructure for research and education and does not establish the clinical validity of what it reports.
 <!-- @/rev C2a -->
 
 ## **1. Introduction**
