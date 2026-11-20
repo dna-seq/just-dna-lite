@@ -677,8 +677,9 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 
 ### Running jobs from the web UI
 
-1. Create the run, then try `instance.submit_run(run_id, workspace=None)` (`_try_submit_to_daemon`
-   returns `(ok, error)`; keep logic out of the `except`).
+1. Create the run, then try the daemon, both in a compute worker: `await run_in_compute(create_webui_run, …)`
+   then `submit_or_discard_run(run_id)` (`webui.dagster_runs`), which returns `(ok, error)` and deletes the
+   placeholder run when the daemon refuses.
 2. On failure (usually "External pipeline origin must be set"), run the job in a **spawned child** via
    `webui.compute.jobs` (`submit_job` / `await_job`, see `execute_job_with_run_discovery`). Never run
    `execute_in_process` in the ASGI process or its threads.
@@ -750,11 +751,15 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   **`background=True` releases the state lock, not the event loop:** a blocking call written between its
   awaits still freezes every client. `compute_selected_prs` was background yet held the loop 9.4 s on
   just-prs downloads, because steps added after the per-score executor ran inline; its setup now goes
-  through `_prepare_prs_compute` in the executor and its checkpoint through the compute pool. Dagster
-  reads go to a `webui.compute` worker as plain data (`webui.dagster_reads.dashboard_snapshot` for
-  `on_load`, `webui.prs_checkpoint.*_in_worker` for PRS); a non-background handler may `await
-  run_in_compute(...)` too, which frees the loop while its own session waits. Tests:
-  `tests/test_dagster_off_loop.py` (a loop ticker must not stall 0.2 s while the worker runs).
+  through `_prepare_prs_compute` in the executor and its checkpoint through the compute pool. **No
+  Dagster call runs in the ASGI process**: reads are `webui.dagster_reads` (page load, sample state,
+  output staleness, run polls and logs, which job an analysis needs), writes `webui.dagster_runs`
+  (register a sample, create a run, submit or discard it) and `webui.prs_checkpoint.*_in_worker`, all
+  through `await run_in_compute(...)` with plain values in and out. A non-background handler may await
+  it too: the loop is free while only its own session waits. A sync handler that needs Dagster returns
+  an event that does (`refresh_output_files`, `save_metadata_to_dagster(False)`). Tests:
+  `tests/test_dagster_off_loop.py`, `tests/test_dagster_runs_off_loop.py` (a loop ticker must not stall
+  0.2 s while the worker runs).
 - **Upload / select-file handlers return `list[EventSpec]`, never `yield` them.** Reflex 0.9 marks the
   generator's `EventFuture` done when it exhausts, and a yielded EventSpec re-dispatched after that
   raises `Cannot add a child to an EventFuture that is already done`. Same rule as `poll_run_status`.
@@ -834,7 +839,7 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
   `slow` and skips without the cached model).
 - **Web UI**: the right-panel **Predictions** tab (`webui/pages/predictions.py`, `webui/predictions_state.py`):
   model cards from the registry, variant set (analysis matches or a region), cap, Run. The run goes through
-  Start Analysis's path (`_try_submit_to_daemon`, then `execute_job_with_run_discovery`) and `UploadState`'s
+  Start Analysis's path (`create_webui_run` and `submit_or_discard_run` in a worker, then `execute_job_with_run_discovery`) and `UploadState`'s
   run list, so `selected_file_is_running` blocks a second run on the file either way. Non-GRCh38 samples are
   refused (`selected_build_unsupported`); in immutable mode the Run control is hidden (a run holds a CPU for
   many minutes). Its reports are linked in the tab and listed in the Reports tab.

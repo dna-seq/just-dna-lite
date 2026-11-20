@@ -29,8 +29,9 @@ from just_dna_pipelines.predictions.run_config import (
     prediction_run_config,
 )
 
-from webui.dagster_env import get_dagster_instance
-from webui.state import AuthState, UploadState, defs, get_dagster_web_url
+from webui.compute.pool import run_in_compute
+from webui.dagster_runs import create_webui_run, submit_or_discard_run
+from webui.state import AuthState, UploadState, get_dagster_web_url
 
 # A run is scored variant by variant at about 1.5 minutes each on a CPU; 200 is already hours.
 MAX_VARIANTS_LIMIT = 200
@@ -175,13 +176,7 @@ class PredictionState(rx.State):
             region=self.region.strip() if self.variant_set == VARIANT_SET_REGION else None,
             max_variants=self.max_variants,
         )
-        instance = get_dagster_instance()
-        run = instance.create_run_for_job(
-            job_def=defs.resolve_job_def(PREDICTION_JOB),
-            run_config=run_config,
-            tags={"dagster/partition": partition_key, "source": "webui"},
-        )
-        run_id = run.run_id
+        run_id = await run_in_compute(create_webui_run, PREDICTION_JOB, run_config, partition_key)
         run_info: dict[str, Any] = {
             "run_id": run_id,
             "filename": upload.selected_file,
@@ -202,12 +197,11 @@ class PredictionState(rx.State):
         upload._add_log(f"Prediction run {run_id} with {model.title} ({self.variant_set})")
         yield
 
-        submitted, error = upload._try_submit_to_daemon(instance, run_id)
+        submitted, error = await run_in_compute(submit_or_discard_run, run_id)
         if submitted:
             yield rx.toast.info(f"Prediction started for {sample_name}")
             return
         upload._add_log(f"Daemon submission failed: {error}")
-        instance.delete_run(run_id)
         upload._inproc_discover_partition = partition_key
         upload._inproc_discover_since = time.time()
         upload._inproc_original_run_id = run_id

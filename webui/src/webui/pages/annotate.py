@@ -758,7 +758,7 @@ def file_metadata_section() -> rx.Component:
                 rx.el.button(
                     fomantic_icon("save", size=16),
                     " Save Metadata",
-                    on_click=UploadState.save_metadata_to_dagster,
+                    on_click=UploadState.save_metadata_to_dagster(True),
                     class_name="ui green button",
                     type="button",
                 ),
