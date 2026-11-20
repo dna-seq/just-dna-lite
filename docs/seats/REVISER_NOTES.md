@@ -110,3 +110,9 @@ was shown to that session and will not be shown again: its first work is repeate
   3 partly, 2 declined, 6 not-on-point. Next: the easy tail (S5, S12, S13, S16, S17, S20, S24, S29), then the rest.
 - **2026-11-20, the easy tail.** 33ceba8: S5, S12, S13, S16, S17, S24 applied; S20, S29 declined with reasons.
   Ledger: 81 open, 38 addressed, 3 partly, 4 declined, 6 not-on-point.
+- **2026-11-20, clarity batches** (the ledger's own `next`, no fork): cee136c (Sections 1 and 2), 94c5e68 (3.1, 3.2:
+  the PRS definition now opens 3.2), bbb672a (Section 4 setup before results, Figure 5 caption, ancestry sites,
+  5.4). 5.4 now says the web interface refuses a sample naming another build (5e31431, desk #59). Ledger: 44 open,
+  75 addressed. Still open: Box 1's user group and its followers (desk #69: C58, S9, S11, S18, C110, C114, C130),
+  authorship (#62: C64, C115, C116), carried facts (#76), and C51 to C53, C57, C66, C68 to C70, C72, C90, C91,
+  C95, C117, C124, C126 to C128, C132, C134 to C137, C139, C141, C144, C145, C48, C56.
