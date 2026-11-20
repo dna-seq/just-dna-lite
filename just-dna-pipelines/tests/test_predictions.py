@@ -465,6 +465,7 @@ def test_report_ranks_scored_rows_and_lists_not_assessed_with_reasons(tmp_path: 
     assert html.index("rs123") < html.index("not-an-rsid") < html.index(REASON_INDEL)
     assert html.index("Your results") < html.index("How to read this") < html.index("Technical details")
     assert "acceptor site, + strand" in html
+    assert "/x/" not in html and "krongenome_variant_effects.parquet" in html  # file names, never server paths
     # Rows past the cap are one sentence and a fold, not a reason repeated on every row.
     assert [r["rsid"] for r in context["over_cap"]] == ["rs920", "rs930"]
     assert [r["reason"] for r in context["not_assessed"]] == [REASON_INDEL]

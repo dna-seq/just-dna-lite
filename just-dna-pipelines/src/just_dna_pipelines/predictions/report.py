@@ -111,7 +111,9 @@ def build_report_context(results: pl.DataFrame, run: PredictionRun, model: Predi
         "scored": scored,
         "not_assessed": not_assessed,
         "over_cap": over_cap,
+        # File names only: a report is shared and served, and the server's directories are nobody's business.
         "reference_fasta_name": Path(run.reference_fasta).name,
+        "parquet_name": Path(run.parquet_path).name,
         "umami_script_tag": umami_script_tag(),
     }
 

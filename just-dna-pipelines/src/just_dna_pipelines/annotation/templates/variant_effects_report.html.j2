@@ -186,7 +186,7 @@ footer { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; color: var(
             <dt>Track changes</dt><dd>the same binned log1p change, the {{ run.top_tracks }} largest of the NTv3 tracks of human samples</dd>
             <dt>Reference</dt><dd><code>{{ reference_fasta_name }}</code> (GRCh38)</dd>
             <dt>Variant set</dt><dd>{{ run.variant_set }}{% if run.region %} {{ run.region }}{% endif %}, cap {{ run.max_variants }}; {{ run.candidates }} candidate{% if run.candidates != 1 %}s{% endif %}</dd>
-            <dt>Results file</dt><dd><code>{{ run.parquet_path }}</code></dd>
+            <dt>Results file</dt><dd><code>{{ parquet_name }}</code>, beside the sample's other results</dd>
             <dt>Licence</dt><dd>Model weights under <a href="{{ model.licence_url }}">{{ model.licence }}</a>, free for research and other non-commercial use with attribution. Model by {{ model.author }}.</dd>
         </dl>
     </details>
