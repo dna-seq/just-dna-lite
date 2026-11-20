@@ -1366,12 +1366,10 @@ items:
   comment: ok, it's not, but be explicit in what it is.
   where: 3.1 Longevity Variants Module (example)
   line: 211
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what the weight is in the same sentence: ''The weight is the module''s curation score, the strength
-    of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose (0.5 for one copy);
-    it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
+  status: addressed
+  now: The weight, 0.95 for the strength of evidence (*w*_SNP) times 0.5 for one copy of the associated allele (*w*_genotype),
+    ranks the curated association; it is not a predicted change in lifespan.
+  why: The sentence says what the weight is and how 0.475 arises. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1428,12 +1426,11 @@ items:
   comment: this is opaque to the non-expert; the next sentence (definition of PRS) should be moved up.
   where: 3.2 Polygenic Risk Scores
   line: 222
-  status: open
-  now: ''
-  why: ''
-  next: Move the definition ('Polygenic risk scores (PRS) aggregate the effects of many variants into a single weighted
-    sum...') to the start of Section 3.2, before the paragraph on traits with several published models, and say
-    there that a model is one published score, one PGS Catalog scoring file.
+  status: addressed
+  now: 'Each published score is a model: one PGS Catalog scoring file, which lists one variant per row with its
+    position, effect allele and weight.'
+  why: The PRS definition now opens Section 3.2, before the paragraph on traits with several models, and defines
+    a model as one PGS Catalog scoring file. Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -1459,10 +1456,11 @@ items:
   comment: what's in a row?
   where: 3.2 Polygenic Risk Scores
   line: 226
-  status: open
-  now: ''
-  why: ''
-  next: 'Say it at first use: ''A scoring file lists one variant per row, with its position, effect allele and weight.'''
+  status: addressed
+  now: 'Each published score is a model: one PGS Catalog scoring file, which lists one variant per row with its
+    position, effect allele and weight.'
+  why: 'A row is defined where scoring files first appear: one variant per row, with its position, effect allele
+    and weight. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1483,11 +1481,13 @@ items:
   comment: parsing this as one entity, 10% of this are then compared to what?
   where: 3.2 Polygenic Risk Scores
   line: 226
-  status: open
-  now: ''
-  why: ''
-  next: 'Name the whole that 10% is a share of: ''rows that cannot be placed or matched carry 10% or more of the
-    score''s total absolute weight (the sum of the absolute weights of all its rows)''.'
+  status: addressed
+  now: 'A file-level audit reads each harmonized GRCh38 scoring file in full and classifies it by whether just-prs
+    can place and match its rows: “as specified”, “approximated” (for example, when rows that cannot be placed or
+    matched carry 10% or more of the file''s total absolute weight, the sum of the absolute weights of all its rows,
+    or dominant or recessive terms scored additively) or “cannot be scored” (Table S5).'
+  why: 'The sentence names the whole: the file''s total absolute weight, the sum over all its rows. Applied by the
+    reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1570,14 +1570,14 @@ items:
   comment: why nine; why three?
   where: 3.2 Polygenic Risk Scores
   line: 230
-  status: open
-  now: ''
-  why: ''
-  next: 'State the fact from just-prs (cleanup.py, BUILD_NORMALIZATION): the Catalog''s metadata spell the original
-    build nine ways (GRCh37, hg19, hg37, GRCh38, hg38, NCBI36, hg18, NCBI35 and NR for not reported), which name
-    three builds, GRCh37, GRCh38 and NCBI36. List them, or write ''the Catalog''s different spellings of each genome
-    build are unified''. For the code: just-prs maps NCBI35 (hg17), an older and different build, to the same value
-    as NCBI36 and calls it ''GRCh36'', a name NCBI never used.'
+  status: addressed
+  now: 'The metadata are cleaned: the nine ways the Catalog spells the genome build a score was developed on (such
+    as GRCh37 and hg19) are mapped to the three builds they name, GRCh37, GRCh38 and NCBI36, or to "not reported",
+    and performance metrics that the Catalog publishes as text, such as "1.55 [1.52,1.58]", are parsed into estimates,
+    confidence intervals and standard errors for odds ratios, hazard ratios, betas, the area under the receiver
+    operating characteristic curve (AUROC) and C-index.'
+  why: The sentence says what the nine labels are (spellings of the build) and names the three builds. Applied by
+    the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1663,14 +1663,11 @@ items:
     sounds unprincipled and arbitrary.
   where: 3.2 Polygenic Risk Scores
   line: 232
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the two levels in one sentence: a trait term is the Experimental Factor Ontology term the PGS Catalog
-    assigns to each score; a concept is the curation''s grouping of trait terms that answer the same reader''s question,
-    so oestrogen-receptor-positive and -negative breast cancer stay separate terms in the Catalog and are grouped
-    under breast cancer only for display. Say that concepts come from the same AI-made curation, pending expert
-    review, and that users can group by the Catalog''s terms instead.'
+  status: addressed
+  now: The Catalog's trait terms stay as they are; concepts group them for display only.
+  why: The paragraph now says the Catalog's trait terms are unchanged and concepts only group them for display;
+    it already says the curation is AI-made and pending review, and that users can group by the Catalog's terms.
+    Applied by the reviser.
   category: Methods and reproducibility
   severity: minor
   stage: writing
@@ -1693,12 +1690,14 @@ items:
   comment: (scores are computed how? it's still unclear what "model" refers to..
   where: 3.2 Polygenic Risk Scores
   line: 236
-  status: open
-  now: ''
-  why: ''
-  next: Define 'model' at its first use in Section 3.2 (C73) as one published polygenic score, a PGS Catalog scoring
-    file, and say here that each reference individual's score is computed as the user's is, by the weighted sum
-    described under the engines below.
+  status: addressed
+  now: just-prs instead scores the 3,202 individuals of the 1000 Genomes reference panel (Byrska-Bishop et al.,
+    2022) with each model, computing each individual's score as it computes the user's, summarizes the observed
+    scores as a mean and standard deviation for each of five superpopulations (African, AFR; admixed American, AMR;
+    East Asian, EAS; European, EUR; South Asian, SAS), and places a user's score on the corresponding normal distribution,
+    so the reference reflects real genotypes and their linkage structure rather than simulated ones.
+  why: '''Model'' is defined at the start of Section 3.2, and the reference sentence says each individual''s score
+    is computed as the user''s is. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1739,11 +1738,10 @@ items:
   comment: how do you know? (goes without saying?)
   where: 3.2 Polygenic Risk Scores
   line: 239
-  status: open
-  now: ''
-  why: ''
-  next: 'Point to the measurement: ''For diploid genotypes both engines compute the same score (they agreed to within
-    5.7 x 10^-14 on 100 scores; Table 4).'''
+  status: addressed
+  now: For diploid genotypes both engines compute the same score (they agreed to within 5.68 × 10⁻¹⁴ on 100 scores;
+    Table 3).
+  why: The claim points to the measurement (Table 3). Applied by the reviser.
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -1783,11 +1781,9 @@ items:
   comment: not, or "not used as"?
   where: 3.2 Polygenic Risk Scores
   line: 239
-  status: open
-  now: ''
-  why: ''
-  next: 'Reword so it cannot be misread: ''PLINK2 is not part of just-prs; it served only as an external comparator
-    in the benchmark (Section 4.2).'''
+  status: addressed
+  now: PLINK2 is not part of just-prs; it served only as an external comparator in the benchmark (Section 4.2).
+  why: Reworded so it cannot be misread. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
