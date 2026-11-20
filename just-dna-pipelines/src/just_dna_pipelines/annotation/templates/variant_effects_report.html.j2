@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ report_title }}{% if sample_name %} · {{ sample_name }}{% endif %}</title>
+<style>
+:root {
+    --blue: #2185d0; --blue-dark: #1667a8; --teal: #00b5ad; --purple: #6435c9;
+    --ink: #1f2933; --muted: #5d6b7a; --line: #d9e2ec; --paper: #ffffff; --canvas: #f5f7fa;
+    --soft-amber: #fff8e6; --amber: #9a6b00;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--canvas); color: var(--ink);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.55;
+}
+a { color: var(--blue-dark); text-underline-offset: 2px; }
+code { padding: 0.1rem 0.3rem; border-radius: 4px; background: #eef1f4; font-size: 0.85em; }
+.top-rule { height: 6px; background: linear-gradient(90deg, var(--blue), var(--teal) 52%, var(--purple)); }
+header, main { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+header { padding-top: 28px; padding-bottom: 12px; }
+h1 { margin: 0 0 4px; font-size: 1.7rem; }
+h2 { margin: 32px 0 10px; font-size: 1.25rem; }
+.subtitle { color: var(--muted); margin: 0; }
+.tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; background: var(--soft-amber);
+       color: var(--amber); font-size: 0.8rem; font-weight: 600; vertical-align: middle; }
+section { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin: 18px 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.02em; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.small { color: var(--muted); font-size: 0.85rem; }
+.table-wrap { overflow-x: auto; }
+ul.tracks { margin: 0; padding-left: 16px; }
+details summary { cursor: pointer; font-weight: 600; }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 0; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+footer { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; color: var(--muted); font-size: 0.85rem; }
+</style>
+{% if umami_script_tag %}
+    {{ umami_script_tag | safe }}
+{% endif %}
+</head>
+<body>
+<div class="top-rule"></div>
+<header>
+    <h1>Predicted variant effects <span class="tag">Research model</span></h1>
+    <p class="subtitle">
+        {% if sample_name %}Sample <strong>{{ sample_name }}</strong> · {% endif %}{{ model.title }} · {{ run.generated_at }}
+    </p>
+</header>
+<main>
+
+<section id="results">
+    <h2 style="margin-top:0">Your results</h2>
+    <p>{{ variant_set_text }} The model scored <strong>{{ run.scored }}</strong>
+        variant{% if run.scored != 1 %}s{% endif %}{% if run.not_assessed %}; <strong>{{ run.not_assessed }}</strong>
+        could not be assessed (listed below with the reason){% endif %}.
+        Variants are ranked by the predicted change in splicing, the score with the clearest evidence behind it at this checkpoint.</p>
+    {% if scored %}
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Variant</th>
+                <th>Gene</th>
+                <th>Your genotype</th>
+                <th>Splice change</th>
+                <th>DNase change</th>
+                <th>Largest track changes</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for v in scored %}
+            <tr>
+                <td class="num">{{ loop.index }}</td>
+                <td>
+                    {% if v.rsid_url %}<a href="{{ v.rsid_url }}">{{ v.rsid }}</a><br>{% elif v.rsid %}{{ v.rsid }}<br>{% endif %}
+                    <span class="small">{{ v.variant }}</span>
+                    {% if v.modules %}<br><span class="small">Found by: {{ v.modules }}</span>{% endif %}
+                </td>
+                <td>{{ v.gene or "" }}</td>
+                <td>{{ v.genotype or "Not stated" }}</td>
+                <td class="num">{{ v.splice_delta }}<br><span class="small">{{ v.splice_change }} · {{ v.splice_channel }}, {{ v.splice_offset_bp }} bp</span></td>
+                <td class="num">{{ v.dnase_delta }}<br><span class="small">{{ v.dnase_biosample }}</span></td>
+                <td>
+                    <ul class="tracks">
+                    {% for t in v.top_tracks %}<li><code>{{ t.track }}</code> {{ t.delta }}</li>{% endfor %}
+                    </ul>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <p class="small">
+        <strong>Splice change</strong>: the largest change, between your variant and the reference sequence, in the
+        predicted chance that a base within {{ run.splice_span_bp }} bases is where a gene's RNA is cut and joined
+        (0 means no change, 1 the largest possible); below it, whether that chance rose (+) or fell (−), which
+        kind of splice site, and how far from the variant.
+        <strong>DNase change</strong>: how much more (+) or less (−) open the DNA around the variant is predicted to be,
+        in the cell type where the change is largest.
+        <strong>Largest track changes</strong>: the same kind of change for other measured signals of human cells,
+        named by their ENCODE experiment.
+    </p>
+    {% else %}
+    <p>No variant could be scored in this run. The section below says why for each one.</p>
+    {% endif %}
+</section>
+
+{% if not_assessed %}
+<section id="not-assessed">
+    <h2 style="margin-top:0">Not assessed</h2>
+    <p>These variants were in the set but the model gave no score for them. Each row says why.</p>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Variant</th><th>Gene</th><th>Your genotype</th><th>Why not</th></tr></thead>
+        <tbody>
+        {% for v in not_assessed %}
+            <tr>
+                <td>
+                    {% if v.rsid_url %}<a href="{{ v.rsid_url }}">{{ v.rsid }}</a><br>{% elif v.rsid %}{{ v.rsid }}<br>{% endif %}
+                    <span class="small">{{ v.variant }}</span>
+                </td>
+                <td>{{ v.gene or "" }}</td>
+                <td>{{ v.genotype or "Not stated" }}</td>
+                <td>{{ v.reason }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</section>
+{% endif %}
+
+<section id="about">
+    <h2 style="margin-top:0">How to read this</h2>
+    <p>A sequence model reads a stretch of DNA and predicts what cells do with it: where a gene's RNA is cut and
+        joined (splicing), how open and accessible the DNA is, and other measured signals. To score a variant, the
+        model reads {{ "{:,}".format(model.window) }} bases around it twice, once as in the reference genome and once
+        with your variant, and the report shows how much the two predictions differ near the variant.</p>
+    <p>These are predictions, not measurements. Nothing here was measured in your cells. A large predicted change
+        is a reason for a researcher to look more closely; it does not mean the variant causes a disease or any
+        noticeable effect, and a small change does not mean the variant is harmless. The scores of one variant are
+        not comparable with another module's weights or with a clinical classification.</p>
+    <p>{{ model.research_note }} Its author reports that its splice change separated disease-causing from harmless
+        ClinVar variants near splice sites with an AUROC of 0.923 on chromosomes held out from training, against 0.839
+        for distance to the splice site alone; that evaluation is small (174 disease-causing variants) and not yet
+        published. Each variant is scored alone, against the reference sequence around it, not together with your
+        other variants nearby.</p>
+    <p>This report is for research and education. It is not a diagnosis and not medical advice. Talk to a doctor or
+        a genetic counsellor before acting on anything in it.</p>
+</section>
+
+<section id="technical">
+    <h2 style="margin-top:0">Technical details</h2>
+    <details>
+        <summary>Model, run and licence</summary>
+        <dl class="facts">
+            <dt>Model</dt><dd>{{ model.title }} (<code>{{ model.id }}</code>), <a href="{{ model.model_card_url }}">{{ model.repo_id }}</a></dd>
+            <dt>Revision</dt><dd><code>{{ model.revision }}</code></dd>
+            <dt>Checkpoint</dt><dd>Training step {{ "{:,}".format(model.checkpoint_step) }} (intermediate)</dd>
+            <dt>Runtime</dt><dd>ONNX Runtime, <code>{{ run.provider }}</code>; model load {{ "%.0f"|format(run.model_load_seconds) }} s, scoring {{ "%.0f"|format(run.scoring_seconds) }} s</dd>
+            <dt>Input window</dt><dd>{{ "{:,}".format(model.window) }} bases, variant at index {{ model.window // 2 }} (0-based), nuclear context</dd>
+            <dt>Splice change</dt><dd>max |alt − ref| over the 4 splice-site probabilities, ±{{ run.splice_span_bp }} bp around the variant</dd>
+            <dt>DNase change</dt><dd>log1p(mean over {{ run.track_bin_bp }} bp centred on the variant), alt − ref, the largest of 13 tracks</dd>
+            <dt>Track changes</dt><dd>the same binned log1p change, the {{ run.top_tracks }} largest of the NTv3 tracks of human samples</dd>
+            <dt>Reference</dt><dd><code>{{ reference_fasta_name }}</code> (GRCh38)</dd>
+            <dt>Variant set</dt><dd>{{ run.variant_set }}{% if run.region %} {{ run.region }}{% endif %}, cap {{ run.max_variants }}; {{ run.candidates }} candidate{% if run.candidates != 1 %}s{% endif %}</dd>
+            <dt>Results file</dt><dd><code>{{ run.parquet_path }}</code></dd>
+            <dt>Licence</dt><dd>Model weights under <a href="{{ model.licence_url }}">{{ model.licence }}</a>, free for research and other non-commercial use with attribution. Model by {{ model.author }}.</dd>
+        </dl>
+    </details>
+</section>
+</main>
+<footer>Generated by just-dna-lite with {{ model.title }} ({{ model.repo_id }} at {{ model.revision[:8] }}).</footer>
+</body>
+</html>

@@ -45,6 +45,7 @@ from just_dna_pipelines.annotation.module_cache import (
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.module_compiler.cli import app as module_compiler_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
+from just_dna_pipelines.predictions.cli import app as predict_app
 from just_dna_enricher.cli import app as enricher_app
 from just_dna_pipelines.lite_mcp.server import DEFAULT_HTTP_PORT as DEFAULT_MCP_PORT
 from just_dna_pipelines.lite_mcp.server import serve as mcp_serve
@@ -67,6 +68,8 @@ app = typer.Typer(
 )
 app.add_typer(module_compiler_app, name="module")
 app.add_typer(v1_port_app, name="v1-port")
+# Genome prediction models: `pipelines predict run --user U --sample S` (variant effects, own report).
+app.add_typer(predict_app, name="predict")
 app.add_typer(agent_app, name="agent")
 # The enricher's own Typer app, mounted whole rather than re-declared. It is the authoring
 # tier that fills `resolution.csv` and the 0.5 fact sidecars, which `module compile` then

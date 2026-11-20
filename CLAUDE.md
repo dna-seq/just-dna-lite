@@ -583,7 +583,8 @@ Architecture and troubleshooting: [docs/DAGSTER_GUIDE.md](docs/DAGSTER_GUIDE.md)
 [docs/CLEAN_SETUP.md](docs/CLEAN_SETUP.md).
 
 Jobs: `normalize_vcf_job` (auto on upload), `annotate_and_report_job` (default: normalize → HF modules
-→ report), `annotate_all_job` (adds Ensembl DuckDB), `annotate_ensembl_only_job`. Ensembl assets
+→ report), `annotate_all_job` (adds Ensembl DuckDB), `annotate_ensembl_only_job`,
+`predict_variant_effects_job` (prediction models, see "Predictions"). Ensembl assets
 (`user_annotated_vcf`, `user_annotated_vcf_duckdb`) **must** depend on `user_vcf_normalized` and take
 `normalized_parquet=`; never re-read the raw VCF.
 
@@ -751,6 +752,37 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
   only. Never hardcode port 8000: `webui.run` picks a free port into `API_URL` / `REFLEX_BACKEND_PORT`;
   `webui/deployment_urls.py` builds the browser URL (`PUBLIC_BACKEND_URL` overrides `API_URL`);
   `backend_api_url` never returns `""`.
+
+## Predictions (`just_dna_pipelines.predictions`)
+
+Genome prediction models score a sample's variants and write a **separate** report (never merged into the
+annotation report). `predictions/models.py` is the list of models, one `PredictionModel` entry each
+(HF repo pinned to a commit, files, window, licence); a second model is a second entry. Today: KronGenome F
+(`just-dna-seq/KronGenome-F-1Mb`, CC BY-NC 4.0, Anton Kulaga, intermediate checkpoint at step 96,000).
+
+- **How**: `predict_variant_effects_job` → `user_variant_effect_predictions` reads `user_vcf_normalized`,
+  takes the variants the latest annotation run matched (called rows only, never `restored_hom_ref`), or every
+  variant in a region of at most 1 Mb, capped (`DEFAULT_MAX_VARIANTS` = 5), and runs the ONNX graph on
+  ONNX Runtime (CUDA when the install offers it, else CPU; the provider is recorded). Each SNV is one call of
+  batch 2: reference and alternate windows of a **fixed 131,072 bases**, variant at index 65,536. Scores:
+  splice delta (max |Δp| of 4 splice channels within ±50 bp), DNase delta and top NTv3 tracks (log1p of the
+  128-bp mean, alt minus ref; NTv3 restricted to human-sample tracks, the rest are other species).
+- **SNV only.** Indels, mitochondrial sites (the graph fixes nuclear context), alleles the sample does not
+  carry, a REF that differs from the FASTA, a window off the contig and rows past the cap stay in the output
+  as `not_assessed` with a reason.
+- **Files**: model files in `<JUST_DNA_PIPELINES_CACHE_DIR>/models/<repo>/<revision>/` (`HfFileSystem.get`
+  file by file; `uv run pipelines predict fetch-model`), plus the session's optimized graph beside it
+  (`model.optimized.ort<version>-<provider>.onnx`: building the session took ~6 minutes on a busy CPU, the
+  saved graph loads in ~12 s). Outputs: `<sample>/krongenome_variant_effects.parquet` and `.json`, and
+  `<sample>/reports/krongenome_variant_effects_<timestamp>.html`, which the Reports tab lists.
+- **Reference FASTA**: `$JUST_DNA_REFERENCE_FASTA`, else `<cache>/reference/grch38/Homo_sapiens.GRCh38.dna.
+  primary_assembly.fa`, else just-prs's lane (`just_prs.reference.reference_fasta_path`, filled by
+  `pipelines predict fetch-reference`, which needs pysam). Read with pyfaidx; contigs meet through
+  `normalize_chrom`. The parquet's polars-bio `start` is the 1-based VCF POS (tested against GRCh38).
+- **Cost**: one SNV took 86–88 s on the loaded 16-core desktop at nice 19 (batch 1: 48 s), so the default
+  cap keeps a run near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model
+  test is `slow` and skips without the cached model).
+- Research model, not a clinical tool: the report says so, and that its scores are predictions.
 
 ## PRS (`just-prs>=0.11.0`, `prs-ui>=0.4.0`)
 
