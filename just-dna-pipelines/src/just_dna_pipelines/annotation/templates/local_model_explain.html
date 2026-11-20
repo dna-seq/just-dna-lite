@@ -115,8 +115,9 @@
         var result = container.closest("article.trait-result");
         var headline = result ? result.querySelector("h4") : null;
         if (headline && headline.textContent.trim()) return headline.textContent.trim();
-        var rsid = /^RSID: (.+)$/m.exec(question);
-        var gene = /^Gene: (.+)$/m.exec(question);
+        // A variant's question lists "- RSID: rs…" and "- Gene: …" (report_logic._build_variant_ai_prompt).
+        var rsid = /^(?:- )?RSID: (.+)$/m.exec(question);
+        var gene = /^(?:- )?Gene: (.+)$/m.exec(question);
         if (rsid) return rsid[1] + (gene ? " (" + gene[1] + ")" : "");
         return gene ? gene[1] : "this result";
     }
