@@ -59,7 +59,7 @@ maintainer; nothing is closed or commented without his word on the text.
 - 2026-11-19: the lead merged `bump/just-dna-format` into local main (49826da); its worktree is removed, and the
   branch is deleted once main is pushed. RM449's recompile is roadmap RM9; republishing waits on the maintainer.
 
-### Drafts waiting for the maintainer's word (2026-11-20, desk question below)
+### Drafts waiting for the maintainer's word (2026-11-20): blocked: desk #68, default nothing posted
 
 Each claim checked against `main` today. Nothing posted.
 
