@@ -38,7 +38,7 @@ the groups, join them, and only then call the step's output annotation.
 
 ## RM6 — The open issues, sorted into plan or answered
 
-**State:** waits until 2026-11-21: the correspondence seat's first reading of the issues · **Owner:** correspondence
+**State:** blocked: desk #68 (draft replies to issues 7, 10, 11 and 17; if nobody answers, nothing is posted) · **Owner:** correspondence
 
 Twelve issues are open, most of them feature suggestions from June 2026 (#7 to #20), with one outside
 pull request (#28, the Windows installer, reviewed in `docs/reviews/`). Several are overtaken by what
