@@ -461,7 +461,7 @@ def _analysis_job_name(
 
 # Canonical tab order — single source of truth used both as the default for the
 # tab_order state var and as the validation set in move_tab.
-DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis"]
+DEFAULT_TAB_ORDER: list[str] = ["input", "prs", "annotated_files", "reports", "analysis", "predictions"]
 
 
 class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
@@ -1483,7 +1483,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
     outputs_expanded: bool = True  # Whether the outputs section is expanded
     run_history_expanded: bool = True  # Whether the run history section is expanded
     new_analysis_expanded: bool = True  # Whether the new analysis section is expanded
-    right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis"
+    right_panel_active_tab: str = "input"  # "input", "prs", "annotated_files", "reports", "analysis", "predictions"
     tab_order: list[str] = DEFAULT_TAB_ORDER  # drag-reorderable tab list
     _drag_tab_id: str = ""  # internal: id of the tab being dragged (cleared after drop)
     show_input_tab_info: bool = True

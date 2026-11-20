@@ -18,6 +18,7 @@ from just_dna_pipelines.annotation.module_cache import (
 from just_dna_pipelines.module_compiler.cli import app as module_app
 from just_dna_pipelines.agents.cli import app as agent_app
 from just_dna_pipelines.v1_port.cli import app as v1_port_app
+from just_dna_pipelines.predictions.cli import app as predict_app
 from just_dna_enricher.cli import app as enricher_app
 from just_dna_pipelines.runtime import environ_guard
 
@@ -34,6 +35,7 @@ app = typer.Typer(
 app.add_typer(module_app, name="module")
 app.add_typer(agent_app, name="agent")
 app.add_typer(v1_port_app, name="v1-port")
+app.add_typer(predict_app, name="predict")
 # The enricher's own Typer app, mounted whole rather than re-declared: it is the
 # authoring tier that produces `resolution.csv` and the 0.5 fact sidecars which
 # `pipelines module compile` then consumes with no reference and no network.

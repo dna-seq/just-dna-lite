@@ -40,6 +40,10 @@ from just_dna_pipelines.annotation.io_managers import (
     user_asset_io_manager,
 )
 from just_dna_pipelines.annotation.registry import load_module_definitions
+from just_dna_pipelines.predictions.assets import (
+    predict_variant_effects_job,
+    user_variant_effect_predictions,
+)
 
 
 # Job for normalizing user VCF to parquet (triggered on upload)
@@ -181,12 +185,18 @@ def _build_definitions() -> Definitions:
         ],
     )
     
-    # 5. Discover and merge module definitions from data/modules/
+    # 5. Genome prediction models (variant effects from a sequence model, own report)
+    _predictions = Definitions(
+        assets=[user_variant_effect_predictions],
+        jobs=[predict_variant_effects_job],
+    )
+
+    # 6. Discover and merge module definitions from data/modules/
     modules_dir = Path("data") / "modules"
     module_defs_list = load_module_definitions(modules_dir)
     
-    # 6. Merge everything
-    all_defs = [_core, _duckdb, _hf_modules, _reports]
+    # 7. Merge everything
+    all_defs = [_core, _duckdb, _hf_modules, _reports, _predictions]
     if module_defs_list:
         all_defs.extend(module_defs_list)
     
