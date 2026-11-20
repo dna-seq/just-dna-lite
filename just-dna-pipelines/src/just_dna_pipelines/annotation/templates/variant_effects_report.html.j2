@@ -85,7 +85,7 @@ footer { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; color: var(
                 </td>
                 <td>{{ v.gene or "" }}</td>
                 <td>{{ v.genotype or "Not stated" }}</td>
-                <td class="num">{{ v.splice_delta }}<br><span class="small">{{ v.splice_change }} · {{ v.splice_channel }}, {{ v.splice_offset_bp }} bp</span></td>
+                <td class="num">{{ v.splice_change }}<br><span class="small">{{ v.splice_channel }}, {{ "%+d"|format(v.splice_offset_bp) }} bp</span></td>
                 <td class="num">{{ v.dnase_delta }}<br><span class="small">{{ v.dnase_biosample }}</span></td>
                 <td>
                     <ul class="tracks">
@@ -99,9 +99,10 @@ footer { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; color: var(
     </div>
     <p class="small">
         <strong>Splice change</strong>: the largest change, between your variant and the reference sequence, in the
-        predicted chance that a base within {{ run.splice_span_bp }} bases is where a gene's RNA is cut and joined
-        (0 means no change, 1 the largest possible); below it, whether that chance rose (+) or fell (−), which
-        kind of splice site, and how far from the variant.
+        predicted chance that a base within {{ run.splice_span_bp }} bases is where a gene's RNA is cut and joined.
+        A chance runs from 0 to 1, so the change can be at most 1; + means the chance rose and − that it fell.
+        Below it: which kind of splice site, and where that base sits relative to the variant along the
+        chromosome (− is towards lower positions).
         <strong>DNase change</strong>: how much more (+) or less (−) open the DNA around the variant is predicted to be,
         in the cell type where the change is largest.
         <strong>Largest track changes</strong>: the same kind of change for other measured signals of human cells,
@@ -112,28 +113,42 @@ footer { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; color: var(
     {% endif %}
 </section>
 
-{% if not_assessed %}
+{% macro skipped_table(rows, with_reason) %}
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Variant</th><th>Gene</th><th>Your genotype</th>{% if with_reason %}<th>Why not</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for v in rows %}
+        <tr>
+            <td>
+                {% if v.rsid_url %}<a href="{{ v.rsid_url }}">{{ v.rsid }}</a><br>{% elif v.rsid %}{{ v.rsid }}<br>{% endif %}
+                <span class="small">{{ v.variant }}</span>
+            </td>
+            <td>{{ v.gene or "" }}</td>
+            <td>{{ v.genotype or "Not stated" }}</td>
+            {% if with_reason %}<td>{{ v.reason }}</td>{% endif %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{% if not_assessed or over_cap %}
 <section id="not-assessed">
     <h2 style="margin-top:0">Not assessed</h2>
+    {% if not_assessed %}
     <p>These variants were in the set but the model gave no score for them. Each row says why.</p>
-    <div class="table-wrap">
-    <table>
-        <thead><tr><th>Variant</th><th>Gene</th><th>Your genotype</th><th>Why not</th></tr></thead>
-        <tbody>
-        {% for v in not_assessed %}
-            <tr>
-                <td>
-                    {% if v.rsid_url %}<a href="{{ v.rsid_url }}">{{ v.rsid }}</a><br>{% elif v.rsid %}{{ v.rsid }}<br>{% endif %}
-                    <span class="small">{{ v.variant }}</span>
-                </td>
-                <td>{{ v.gene or "" }}</td>
-                <td>{{ v.genotype or "Not stated" }}</td>
-                <td>{{ v.reason }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
+    {{ skipped_table(not_assessed, true) }}
+    {% endif %}
+    {% if over_cap %}
+    <p>{{ over_cap | length }} more variant{% if over_cap | length != 1 %}s were{% else %} was{% endif %} past this
+        run's cap of {{ run.max_variants }} and not scored. Run again with a higher cap to include them.</p>
+    <details>
+        <summary>Variants past the cap</summary>
+        {{ skipped_table(over_cap, false) }}
+    </details>
+    {% endif %}
 </section>
 {% endif %}
 

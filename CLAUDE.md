@@ -763,8 +763,8 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
 - **How**: `predict_variant_effects_job` → `user_variant_effect_predictions` reads `user_vcf_normalized`,
   takes the variants the latest annotation run matched (called rows only, never `restored_hom_ref`), or every
   variant in a region of at most 1 Mb, capped (`DEFAULT_MAX_VARIANTS` = 5), and runs the ONNX graph on
-  ONNX Runtime (CUDA when the install offers it, else CPU; the provider is recorded). Each SNV is one call of
-  batch 2: reference and alternate windows of a **fixed 131,072 bases**, variant at index 65,536. Scores:
+  ONNX Runtime (CUDA when the install offers it, else CPU; the provider is recorded). Each SNV is two calls of
+  one row: reference and alternate windows of a **fixed 131,072 bases**, variant at index 65,536. Scores:
   splice delta (max |Δp| of 4 splice channels within ±50 bp), DNase delta and top NTv3 tracks (log1p of the
   128-bp mean, alt minus ref; NTv3 restricted to human-sample tracks, the rest are other species).
 - **SNV only.** Indels, mitochondrial sites (the graph fixes nuclear context), alleles the sample does not
@@ -779,9 +779,10 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
   primary_assembly.fa`, else just-prs's lane (`just_prs.reference.reference_fasta_path`, filled by
   `pipelines predict fetch-reference`, which needs pysam). Read with pyfaidx; contigs meet through
   `normalize_chrom`. The parquet's polars-bio `start` is the 1-based VCF POS (tested against GRCh38).
-- **Cost**: one SNV took 86–88 s on the loaded 16-core desktop at nice 19 (batch 1: 48 s), so the default
-  cap keeps a run near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model
-  test is `slow` and skips without the cached model).
+- **Cost**: on the 16-core desktop at nice 19 one row took 34 s quiet and 48 s under load (a batch of two:
+  63 s / 86 s, but 5.7 GB peak against 3.3 GB, hence one row per call). About 1.5 minutes per SNV keeps the
+  default cap near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model test is
+  `slow` and skips without the cached model).
 - Research model, not a clinical tool: the report says so, and that its scores are predictions.
 
 ## PRS (`just-prs>=0.11.0`, `prs-ui>=0.4.0`)

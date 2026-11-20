@@ -18,9 +18,9 @@ VARIANT_SET_ANNOTATED = "annotated"
 VARIANT_SET_REGION = "region"
 VARIANT_SETS: tuple[str, ...] = (VARIANT_SET_ANNOTATED, VARIANT_SET_REGION)
 
-# Each scored variant is one graph call over two 131,072-base windows: measured 86 s on a loaded
-# 16-core CPU at nice 19, after a model load of several minutes. Five keeps a default run near ten
-# minutes; the UI and CLI raise it.
+# Each scored variant is two graph calls over 131,072-base windows: 68-96 s on the 16-core desktop at
+# nice 19 (quiet to loaded), after a model load of seconds once the optimized graph is saved. Five
+# keeps a default run near ten minutes; the UI and CLI raise it.
 DEFAULT_MAX_VARIANTS = 5
 
 # Largest region a run accepts. A region is scored variant by variant, so its size bounds the work.

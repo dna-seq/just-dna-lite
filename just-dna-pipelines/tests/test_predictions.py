@@ -362,7 +362,7 @@ def test_variant_scores_pick_the_biggest_change_near_the_variant() -> None:
 
 
 class _FakeSession(ModelSession):
-    """Returns outputs whose alternate row differs only in donor + at the variant, by a known amount."""
+    """Alternate-window outputs differ from the reference only in donor + at the variant, by a known amount."""
 
     def __init__(self, window: int) -> None:
         super().__init__(Path("unused.onnx"))
@@ -378,7 +378,8 @@ class _FakeSession(ModelSession):
             "x_dnase": np.zeros((rows, self.window, 3), dtype=np.float32),
             "ntv3": np.zeros((rows, self.window, 5), dtype=np.float32),
         }
-        out["x_splice"][1, self.window // 2, 0] = 0.25
+        if self.calls % 2 == 0:  # the second call of each variant is the alternate window
+            out["x_splice"][0, self.window // 2, 0] = 0.25
         return out
 
 
@@ -402,7 +403,7 @@ def test_score_variants_keeps_every_row_and_scores_only_candidates(small_fasta: 
     results = rank_results(score_variants(classified, reference, session, model, _channels()))
     assert results.schema == pl.Schema(RESULT_SCHEMA)
     assert results.height == rows.height
-    assert session.calls == 1
+    assert session.calls == 2  # reference and alternate, one row each
     assert results.get_column("status").to_list() == [STATUS_SCORED, STATUS_NOT_ASSESSED, STATUS_NOT_ASSESSED]
     top = results.row(0, named=True)
     assert top["splice_delta"] == pytest.approx(0.25) and top["splice_channel"] == "donor +" and top["splice_offset_bp"] == 0
@@ -435,16 +436,19 @@ def _run(scored: int, not_assessed: int) -> PredictionRun:
 def _results() -> pl.DataFrame:
     scored = {
         **_row("7", 1000, "A", "G", "A/G"), "rsid": "rs123", "gene": "CFTR", "status": STATUS_SCORED,
-        "splice_delta": 0.31, "splice_change": -0.31, "splice_channel": "acceptor +", "splice_offset_bp": -2,
+        "splice_delta": 0.31, "splice_change": -0.31, "splice_channel": "acceptor_plus", "splice_offset_bp": -2,
         "dnase_delta": 0.05, "dnase_track": "D1", "dnase_biosample": "liver",
         "top_tracks": [{"track": "ENCSR628PLS", "delta": 0.4}],
     }
     weaker = {**scored, "pos": 2000, "rsid": "not-an-rsid", "splice_delta": 0.01, "splice_change": 0.01}
-    skipped = {
-        **_row("7", 3000, "A", "AT", "A/AT"), "status": STATUS_NOT_ASSESSED, "reason": REASON_INDEL,
-        **{k: None for k in RESULT_SCHEMA if k not in VARIANT_SCHEMA},
-    }
-    return rank_results(pl.DataFrame([skipped, weaker, scored], schema=RESULT_SCHEMA, orient="row"))
+    no_scores = {k: None for k in RESULT_SCHEMA if k not in VARIANT_SCHEMA}
+    skipped = {**_row("7", 3000, "A", "AT", "A/AT"), "status": STATUS_NOT_ASSESSED, "reason": REASON_INDEL, **no_scores}
+    # Two rows past a cap of 1, with the reason the classifier itself writes.
+    capped = classify_variants(
+        pl.DataFrame([_row("8", p, "C", "T", "C/T") for p in (10, 20, 30)], schema=VARIANT_SCHEMA, orient="row"), 1
+    ).filter(pl.col("status") == STATUS_NOT_ASSESSED)
+    past_cap = [{**r, "rsid": f"rs9{r['pos']}", **no_scores} for r in capped.to_dicts()]
+    return rank_results(pl.DataFrame([skipped, weaker, scored, *past_cap], schema=RESULT_SCHEMA, orient="row"))
 
 
 def test_report_ranks_scored_rows_and_lists_not_assessed_with_reasons(tmp_path: Path) -> None:
@@ -459,6 +463,12 @@ def test_report_ranks_scored_rows_and_lists_not_assessed_with_reasons(tmp_path: 
     assert html == report_environment().get_template("variant_effects_report.html.j2").render(**context)
     assert html.index("rs123") < html.index("not-an-rsid") < html.index(REASON_INDEL)
     assert html.index("Your results") < html.index("How to read this") < html.index("Technical details")
+    assert "acceptor site, + strand" in html
+    # Rows past the cap are one sentence and a fold, not a reason repeated on every row.
+    assert [r["rsid"] for r in context["over_cap"]] == ["rs920", "rs930"]
+    assert [r["reason"] for r in context["not_assessed"]] == [REASON_INDEL]
+    assert "2 more variants were past this" in html and html.count("rs920") == 2  # link text and href
+    assert html.count("raise the cap to score it") == 0
     for fact in (KRONGENOME_F.revision, KRONGENOME_F.licence, KRONGENOME_F.author, KRONGENOME_F.model_card_url,
                  "CPUExecutionProvider", "Ünïcode sample", "not a clinical tool", "predictions, not measurements"):
         assert fact in html, fact

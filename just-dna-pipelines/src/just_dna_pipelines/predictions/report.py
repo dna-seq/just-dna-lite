@@ -17,7 +17,7 @@ from just_dna_pipelines.annotation.analytics import umami_script_tag
 from just_dna_pipelines.annotation.report_logic import dbsnp_url, report_environment
 from just_dna_pipelines.predictions.models import PredictionModel
 from just_dna_pipelines.predictions.run_config import VARIANT_SET_REGION
-from just_dna_pipelines.predictions.variants import STATUS_NOT_ASSESSED, STATUS_SCORED
+from just_dna_pipelines.predictions.variants import REASON_OVER_CAP_PREFIX, STATUS_NOT_ASSESSED, STATUS_SCORED
 
 REPORT_TEMPLATE = "variant_effects_report.html.j2"
 
@@ -54,6 +54,15 @@ def _variant_label(row: dict) -> str:
     return f"{row['chrom']}:{row['pos']:,} {row['ref']}>{row['alt']}"
 
 
+# The graph's splice channel names (onnx_meta.json), as a reader would say them.
+SPLICE_CHANNEL_LABELS: dict[str, str] = {
+    "donor_plus": "donor site, + strand",
+    "acceptor_plus": "acceptor site, + strand",
+    "donor_minus": "donor site, − strand",
+    "acceptor_minus": "acceptor site, − strand",
+}
+
+
 def _signed(value: float | None, digits: int = 3) -> str:
     return "" if value is None else f"{value:+.{digits}f}"
 
@@ -69,7 +78,7 @@ def _view_row(row: dict) -> dict:
         "modules": row["modules"],
         "splice_delta": None if row["splice_delta"] is None else f"{row['splice_delta']:.3f}",
         "splice_change": _signed(row["splice_change"]),
-        "splice_channel": row["splice_channel"],
+        "splice_channel": SPLICE_CHANNEL_LABELS.get(row["splice_channel"], row["splice_channel"]),
         "splice_offset_bp": row["splice_offset_bp"],
         "dnase_delta": _signed(row["dnase_delta"]),
         "dnase_biosample": row["dnase_biosample"],
@@ -89,7 +98,10 @@ def variant_set_description(run: PredictionRun) -> str:
 def build_report_context(results: pl.DataFrame, run: PredictionRun, model: PredictionModel) -> dict:
     """Everything the template reads. ``results`` is the run's parquet, already ranked."""
     scored = [_view_row(r) for r in results.filter(pl.col("status") == STATUS_SCORED).to_dicts()]
-    not_assessed = [_view_row(r) for r in results.filter(pl.col("status") == STATUS_NOT_ASSESSED).to_dicts()]
+    skipped = results.filter(pl.col("status") == STATUS_NOT_ASSESSED)
+    past_cap = pl.col("reason").str.starts_with(REASON_OVER_CAP_PREFIX)
+    not_assessed = [_view_row(r) for r in skipped.filter(~past_cap).to_dicts()]
+    over_cap = [_view_row(r) for r in skipped.filter(past_cap).to_dicts()]
     return {
         "report_title": f"Predicted variant effects: {model.title}",
         "sample_name": run.sample_name,
@@ -98,6 +110,7 @@ def build_report_context(results: pl.DataFrame, run: PredictionRun, model: Predi
         "variant_set_text": variant_set_description(run),
         "scored": scored,
         "not_assessed": not_assessed,
+        "over_cap": over_cap,
         "reference_fasta_name": Path(run.reference_fasta).name,
         "umami_script_tag": umami_script_tag(),
     }

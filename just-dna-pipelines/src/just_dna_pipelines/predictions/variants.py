@@ -31,6 +31,8 @@ REASON_INDEL = "Insertion or deletion: this version scores single-base substitut
 REASON_MITOCHONDRIAL = "Mitochondrial DNA: the model's exported graph reads nuclear DNA only."
 REASON_NOT_CARRIED = "The sample does not carry this alternate allele."
 REASON_NO_ALT = "No alternate allele in the file at this position."
+# Rows past the cap: the report folds them into one count rather than a row each.
+REASON_OVER_CAP_PREFIX = "Past the cap of"
 
 # One row per (position, alternate allele), in this column order, whichever selector produced it.
 VARIANT_SCHEMA: dict[str, pl.DataType] = {
@@ -95,7 +97,7 @@ def classify_variants(variants: pl.DataFrame, max_variants: int) -> pl.DataFrame
     over_cap = (
         (pl.col("_rank") > max_variants) if max_variants > 0 else pl.lit(False)
     )
-    cap_reason = f"Past the cap of {max_variants} variants for this run; raise the cap to score it."
+    cap_reason = f"{REASON_OVER_CAP_PREFIX} {max_variants} variants for this run; raise the cap to score it."
     return capped.with_columns(
         pl.when(pl.col("reason").is_null() & over_cap)
         .then(pl.lit(cap_reason))
