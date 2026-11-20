@@ -1845,11 +1845,16 @@ items:
   comment: of what? (of risk??)
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Say it in the caption: ''the median, over the 94 models, of the genome''s percentile in each model''s reference
-    distribution (European)''. It is a percentile of the score, not of risk; absolute risk is a separate card.'
+  status: addressed
+  now: The summary cards give the median, over the 94 models rated High or Moderate quality, of the genome's percentile
+    in each model's reference distribution (a percentile of the score, not of risk), the percentile of the model
+    the interface calls most reliable (the one ranked first by the numeric quality score of Section 3.2, a rule
+    combining reported discrimination, evaluation cohort size and coverage that has not been validated against measured
+    performance), the number of these models (94; the chart's title counts all 101), absolute risk (shown only when
+    such a model has risk data; none here) and the spread of their percentiles, as a standard deviation in percentile
+    points.
+  why: 'The caption says what the median is of: the genome''s percentile in each model''s reference distribution,
+    a percentile of the score, not of risk. Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1875,12 +1880,10 @@ items:
   comment: ??
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Rewrite the chart description: ''Each dot is one model. Its horizontal position is the genome''s standardized
-    score for that model; its vertical position carries no information: the dots are drawn on the density curve,
-    with a small random offset to keep them apart.'''
+  status: addressed
+  now: Each dot is one model.
+  why: 'The chart description is rewritten: horizontal position is the standardized score; vertical position carries
+    no information. Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1904,11 +1907,11 @@ items:
   comment: a number is not a curve
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Same fix as C87: the dot''s height is not data, so drop ''its height is the curve'' and say the dots are
-    drawn on the curve with a small random offset.'
+  status: addressed
+  now: Its horizontal position is the genome's standardized score for that model; its vertical position carries
+    no information, since the dots are drawn on the density curve with a small random offset that keeps them apart.
+  why: '''its height is the curve'' is gone; the dots are drawn on the curve with a random offset. Applied by the
+    reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1931,12 +1934,11 @@ items:
   comment: '#3 is mysteriously different...?'
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the third row in the caption: PGS000061 is a 37-variant score (37 of 37 matched), while the rows
-    around it have about 560,000 to 1.7 million variants, and its publication spells the trait ''Low-density lipoprotein
-    (LDL) cholesterol''. Say that small, older scores sit beside genome-wide ones in the same trait view.'
+  status: addressed
+  now: 'The third, PGS000061, is an older score of 37 variants, shown beside genome-wide scores of 563,946 to 1,679,610
+    variants: small and genome-wide scores for one trait sit side by side in the same view.'
+  why: 'The caption explains the third row: a 37-variant score beside genome-wide ones (counts read from the figure).
+    Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -2106,12 +2108,12 @@ items:
   comment: still hard to parse...
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: 'Rewrite the two sentences in plain order, defining a site (C93): ''The model reads the genome at 53,526
-    positions (sites). Where a variant-only VCF has no record at a site, the genome is assumed to carry the reference
-    allele on both copies; where the VCF''s alleles at a site differ from the model''s, the site is treated as missing.'''
+  status: addressed
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
+  why: The main text now defines a site and says plainly what happens to unlisted sites; the detailed rule, with
+    the missing verb restored, is in Supplementary S16. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2133,11 +2135,11 @@ items:
   comment: what exactly is a site?
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: 'Define it at first use: a site is one of the 53,526 SNV positions the ancestry model reads (the training
-    data described earlier in Section 3.2.2). Same rewrite as C92.'
+  status: addressed
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
+  why: A site is defined at first use (S16 gives the 53,526 positions). Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2158,11 +2160,10 @@ items:
   comment: here, apparantly not even the google-doc grammar tool cannot parse the text
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: The clause 'and sites whose alleles disagree with the model as missing' leaves out its verb ('are coded');
-    the rewrite in C92 fixes it.
+  status: addressed
+  now: Sites (the 53,526 positions the model reads) that a variant-only VCF does not list are coded as homozygous
+    reference, and sites whose alleles disagree with the model are coded as missing.
+  why: The missing verb is restored; the sentence now sits in Supplementary S16. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2338,13 +2339,10 @@ items:
   comment: could you claim that comparison to Plink allows an indirect assessment (if Plink has been assessed)?
   where: 4. Benchmarking and Validation
   line: 296
-  status: open
-  now: ''
-  why: ''
-  next: 'Yes, for one thing only: agreement with PLINK2 (r = 0.99999996; 75 of 100 scores within 10^-3; the largest
-    difference 0.049 on a score of 58.69, PGS000015, per just-prs docs/benchmarks.md) shows that just-prs computes
-    the published weighted sums as a widely used tool does. Add that sentence here; it says nothing about whether
-    annotations are correct or how well a score predicts its trait.'
+  status: addressed
+  now: Agreement with PLINK2 shows that just-prs computes the published weighted sums as an established tool does,
+    and nothing more.
+  why: Yes, for the arithmetic only; Section 4 now says so. Applied by the reviser.
   category: Claims and evidence
   severity: major
   stage: writing
@@ -2414,12 +2412,10 @@ items:
   comment: (?)
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: 'Define ''light use'' at first mention: the workstation was in ordinary desktop use during these runs (load
-    averages of about 1.0 to 1.3, against an idle machine at night; benchmarks/a3/PROTOCOL.md). Supplementary S2
-    uses the term without defining it either.'
+  status: addressed
+  now: Most Generation I runs on Livia Zaharia's genome were made with the desktop in light use, the ordinary everyday
+    use of a workstation, rather than idle at night (Supplementary S2).
+  why: Light use is defined at first mention. Applied by the reviser.
   category: Methods and reproducibility
   severity: minor
   stage: writing
@@ -2440,12 +2436,11 @@ items:
   comment: '?'
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: '''Warm'' is used before Section 4.1 defines it two paragraphs later. Put the setup paragraphs (''We benchmarked...''
-    and ''Generation II annotated each genome... in three modes'') before the results, so warm, full and cold are
-    defined before use (also C99, C101).'
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: Section 4.1's setup paragraphs now come before its results, so warm, full and cold are defined before use.
+    Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2500,10 +2495,10 @@ items:
   comment: '?'
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: 'Same as C98: define the three run modes before this sentence by moving the setup paragraph up.'
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: 'As C98: the run modes are defined before the memory figures. Applied by the reviser.'
   category: Story and structure
   severity: minor
   stage: writing
@@ -2585,11 +2580,10 @@ items:
     text: there's seems to  be no explicit mention of anything else (up until the Table is presented)
   where: 4.1 Annotation Speed
   line: 308
-  status: open
-  now: ''
-  why: ''
-  next: Open the paragraph with what was measured, 'We measured annotation wall time and peak memory of Just-DNA-Lite
-    against the Generation I OakVar-based system...', and put the setup before the results (C98).
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: The paragraph opens with what was measured and comes first in Section 4.1. Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2675,11 +2669,14 @@ items:
   comment: what's in there?
   where: 4.1 Annotation Speed
   line: 312
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain it in a clause: the page cache is the copy of recently read files that the operating system keeps
-    in memory, so a cold run reads the VCF and the module files from disk again.'
+  status: addressed
+  now: 'Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three
+    modes: *warm* runs reuse the sample''s quality-filtered table, so the VCF is not read again; *full* runs start
+    from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run
+    (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating
+    system''s page cache, its in-memory copy of recently read files, has been dropped, so the VCF and the module
+    files are read from disk again.'
+  why: The page cache is explained in a clause. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2759,13 +2756,13 @@ items:
   comment: (is that good?)
   where: 4.2 PRS Computation
   line: 350
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what it means, and that r is the weaker number: across 100 scores of very different sizes r is close
-    to 1 almost by construction (Table 4''s note says the largest scores dominate it). The informative figures are
-    per score: 75 of 100 scores agree with PLINK2 to within 10^-3, and the largest difference is 0.049 on a score
-    of 58.69 (PGS000015), about 0.08% (just-prs docs/benchmarks.md).'
+  status: addressed
+  now: 'Against PLINK2, Pearson *r* was 0.99999996 for DuckDB and Polars alike (Table 3); since *r* across scores
+    of very different sizes is close to 1 almost by construction, the per-score figures say more: 75 of the 100
+    scores agreed with PLINK2 to within 10⁻³, and the largest difference, 0.049, was on PGS000015, whose score is
+    58.69, about 0.08% of it (just-prs repository, `docs/benchmarks.md`).'
+  why: The sentence says r is near 1 almost by construction and gives the per-score agreement (75 of 100 within
+    10^-3), from the just-prs benchmark record of the same rerun. Applied by the reviser.
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -2789,12 +2786,12 @@ items:
   comment: details?
   where: 4.2 PRS Computation
   line: 350
-  status: open
-  now: ''
-  why: ''
-  next: 'Name it: the largest difference is on PGS000015, whose score is 58.69, so 0.049 is about 0.08% of it; the
-    paragraph already says 92% of the remaining difference comes from 30 scores at multi-allelic sites (source:
-    just-prs docs/benchmarks.md, run of 2026-10-11).'
+  status: addressed
+  now: 'Against PLINK2, Pearson *r* was 0.99999996 for DuckDB and Polars alike (Table 3); since *r* across scores
+    of very different sizes is close to 1 almost by construction, the per-score figures say more: 75 of the 100
+    scores agreed with PLINK2 to within 10⁻³, and the largest difference, 0.049, was on PGS000015, whose score is
+    58.69, about 0.08% of it (just-prs repository, `docs/benchmarks.md`).'
+  why: 'The largest difference is named: PGS000015, score 58.69, about 0.08%. Applied by the reviser.'
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -2816,12 +2813,11 @@ items:
   comment: this looks like a measure that wasnt employed before; if so, why now? This is confusing...
   where: 4.2 PRS Computation
   line: 382
-  status: open
-  now: ''
-  why: ''
-  next: 'Link it to coverage, introduced in Section 3.2 for the quality labels, and say why it is reported here:
-    the engines can agree only on variants both match, and 53% is low because restoration was off. Write ''coverage
-    (the share of a score''s variants matched, Section 3.2)''.'
+  status: addressed
+  now: Coverage, the share of a score's variants matched in the genome (Section 3.2), was about half for both tools
+    (median 53% for just-prs and 51% for PLINK2), with the counting of absent loci as reference turned off; the
+    two percentages are not quite the same measure.
+  why: The measure is named as the coverage of Section 3.2. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2908,13 +2904,12 @@ items:
   comment: Again, ???
   where: 4.4 Ancestry Classification
   line: 400
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the untested route in plain words: ''The test classified panel members whose genotypes were all
-    known. A user''s genome is instead projected onto the panel''s components on its own, with every position its
-    VCF does not list assumed to carry the reference allele; that route was not tested, so its accuracy may be lower.''
-    Testing it would be new work (the run''s decision D10).'
+  status: addressed
+  now: 'It is likely an optimistic estimate for real use, which was not tested: the test classified panel members
+    whose genotypes were all known, while a user''s genome is projected onto the panel''s components on its own
+    (with FRAPOSA), with every model position its VCF does not list assumed to carry the reference allele, so its
+    accuracy may be lower.'
+  why: The untested route is explained in plain words. Testing it would be new work. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3078,13 +3073,11 @@ items:
   comment: how bad is that? A non-expert may worry that the mismatch creates errors in 50% of cases..?
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Say how bad: almost every position differs between GRCh37 and GRCh38, so a GRCh37 VCF would match few module
-    rows, with rare chance matches to a different variant at the same number (the reference-allele check of Section
-    2.1 rejects many but not all). Results from such a file are unusable, not slightly off; tell users to check
-    their file''s build. A build check in the pipeline would be new code.'
+  status: addressed
+  now: A GRCh37 file read as GRCh38 would match few module rows, since almost every position differs between the
+    two builds, so its results would be unusable rather than slightly off; users should check their file's build.
+  why: 'The sentence says how bad a build mismatch is (results unusable, not slightly off) and is updated to the
+    code: since commit 5e31431 the web interface refuses a sample that names another build. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -3106,11 +3099,10 @@ items:
   comment: '?'
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Spell it out with a citation: ''the T2T-CHM13 reference, the first complete (telomere-to-telomere) human
-    genome assembly (Nurk et al., 2022), is not supported.'''
+  status: addressed
+  now: The T2T-CHM13 reference, the first complete (telomere-to-telomere) human genome assembly, is not supported.
+  why: 'T2T is spelled out. No citation added: Nurk et al. 2022 is not in the bibliography and was not read for
+    this. Applied by the reviser.'
   category: References
   severity: minor
   stage: writing
@@ -3131,11 +3123,11 @@ items:
   comment: 'see above: does correlation with Plink results establish anything?'
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Same as C96: add that agreement with PLINK2 shows the scores are computed as a widely used tool computes
-    them (the arithmetic), and nothing about whether scores predict their traits or annotations are correct.'
+  status: addressed
+  now: These benchmarks describe computational performance; agreement with PLINK2 shows that the scores are computed
+    as an established tool computes them, and they do not establish predictive accuracy or agreement in rankings
+    across individuals.
+  why: 'As C96: 5.4 says agreement with PLINK2 checks the arithmetic only. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
