@@ -28,8 +28,14 @@ def model_files_present(model: PredictionModel, cache_dir: Path | None = None) -
 
 
 def ensure_model_files(model: PredictionModel, cache_dir: Path | None = None) -> Path:
-    """Download whatever of the model's files is missing or the wrong size; return the directory."""
+    """Download whatever of the model's files is missing or the wrong size; return the directory.
+
+    A file only lands under its own name once complete (it is fetched to ``.downloading`` and renamed),
+    so when every file is present nothing is asked of HuggingFace and a cached model runs offline.
+    """
     directory = model_dir(model, cache_dir)
+    if model_files_present(model, cache_dir):
+        return directory
     directory.mkdir(parents=True, exist_ok=True)
     fs = HfFileSystem(token=get_token())
     with start_action(

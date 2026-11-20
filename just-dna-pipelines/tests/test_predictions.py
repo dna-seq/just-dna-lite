@@ -15,7 +15,8 @@ from dagster import validate_run_config
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.report_logic import report_environment
 from just_dna_pipelines.io import read_vcf_file
-from just_dna_pipelines.predictions.download import model_dir, model_files_present
+from just_dna_pipelines.predictions import download
+from just_dna_pipelines.predictions.download import ensure_model_files, model_dir, model_files_present
 from just_dna_pipelines.predictions.models import KRONGENOME_F, PREDICTION_MODELS, get_prediction_model
 from just_dna_pipelines.predictions.reference import (
     REFERENCE_FASTA_ENV,
@@ -480,6 +481,57 @@ def test_report_with_nothing_scored_says_so(tmp_path: Path) -> None:
     results = _results().filter(pl.col("status") == STATUS_NOT_ASSESSED)
     html = render_prediction_report(results, _run(0, 1), KRONGENOME_F, tmp_path / "r.html").read_text(encoding="utf-8")
     assert "No variant could be scored" in html and REASON_INDEL in html
+
+
+# ── model files ─────────────────────────────────────────────────────────────────────────────────
+
+
+class _FakeHub:
+    """Stands in for HfFileSystem: serves each requested file as ``size`` bytes and counts fetches."""
+
+    sizes: dict[str, int] = {}
+    fetched: list[str] = []
+
+    def __init__(self, token: object = None) -> None:
+        pass
+
+    def info(self, remote: str) -> dict:
+        return {"size": self.sizes[remote.rsplit("/", 1)[1]]}
+
+    def get(self, remote: str, local: str) -> None:
+        name = remote.rsplit("/", 1)[1]
+        type(self).fetched.append(name)
+        Path(local).write_bytes(b"x" * self.sizes[name])
+
+
+def test_model_files_fetch_only_what_is_missing_or_truncated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(download, "HfFileSystem", _FakeHub)
+    _FakeHub.sizes = {name: 10 + i for i, name in enumerate(KRONGENOME_F.files)}
+    _FakeHub.fetched = []
+    directory = model_dir(KRONGENOME_F, tmp_path)
+    directory.mkdir(parents=True)
+    complete, truncated = KRONGENOME_F.files[0], KRONGENOME_F.files[1]
+    (directory / complete).write_bytes(b"x" * _FakeHub.sizes[complete])
+    (directory / truncated).write_bytes(b"x")
+    assert ensure_model_files(KRONGENOME_F, tmp_path) == directory
+    assert set(_FakeHub.fetched) == set(KRONGENOME_F.files) - {complete}
+    assert all((directory / n).stat().st_size == _FakeHub.sizes[n] for n in KRONGENOME_F.files)
+    assert not list(directory.glob("*.downloading"))
+    assert directory == tmp_path / "models" / KRONGENOME_F.repo_id / KRONGENOME_F.revision
+
+
+def test_a_cached_model_needs_no_network(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    directory = model_dir(KRONGENOME_F, tmp_path)
+    directory.mkdir(parents=True)
+    for name in KRONGENOME_F.files:
+        (directory / name).write_bytes(b"x")
+
+    def _no_hub(token: object = None) -> None:
+        raise AssertionError("HuggingFace was asked for a model that is already cached")
+
+    monkeypatch.setattr(download, "HfFileSystem", _no_hub)
+    assert model_files_present(KRONGENOME_F, tmp_path)
+    assert ensure_model_files(KRONGENOME_F, tmp_path) == directory
 
 
 # ── models and job config ───────────────────────────────────────────────────────────────────────
