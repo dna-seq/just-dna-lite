@@ -76,4 +76,4 @@ spec version 2.5.0, all 118 positions resolved, `rs766212849` on one event (2:16
 deletion). Republishing is the maintainer's. Not ours: the published `thrombophilia@2.0.1` that
 RM449 also names; this repository builds thrombophilia as the 1.1.0 port of 9 positions, which lacks
 the named row. The local Ensembl cache was an unfinished pull (chromosomes 9, MT, X, Y missing) and
-completed during the rebuild; it sits in the home directory (14 GB).
+completed during the rebuild (14 GB, moved off the home quota on 2026-11-20).
