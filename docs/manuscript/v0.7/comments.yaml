@@ -928,7 +928,8 @@ items:
   next: 'Add an overview diagram at the start of Section 2: a VCF goes through quality filtering into the annotation
     engine, which joins it with the modules (and optionally Ensembl) and writes the report; the PGS Catalog''s scoring
     files go through just-prs to percentiles; the web interface, the MCP servers and the Python libraries call the
-    same operations. Livia asks Anton; which figures the paper has is the authors'' decision.'
+    same operations. Livia asks Anton; which figures the paper has is the authors'' decision. Desk #75 (default:
+    two diagrams in the main text, the catalogue as a table in S15, drafted by the reviser).'
   category: Figures and tables
   severity: major
   stage: writing
@@ -1090,7 +1091,8 @@ items:
   why: ''
   next: 'A diagram for Section 2.2: a module''s authored files (module_spec.yaml, variants.csv, studies.csv) compiled
     into its Parquet tables and manifest, published to the registry and installed by users. The open proposal to
-    show one real module''s files in the supplement fits beside it.'
+    show one real module''s files in the supplement fits beside it. Desk #75 (default: two diagrams in the main
+    text, the catalogue as a table in S15, drafted by the reviser).'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1514,9 +1516,10 @@ items:
   status: open
   now: ''
   why: ''
-  next: A small figure or table of what the prepared catalogue holds for each score (its scoring file, cleaned metadata,
-    reference distribution, and the ancestry model) and where each part comes from. It is also the place to say
-    what the PGS Catalog is (C48).
+  next: 'A small figure or table of what the prepared catalogue holds for each score (its scoring file, cleaned
+    metadata, reference distribution, and the ancestry model) and where each part comes from. It is also the place
+    to say what the PGS Catalog is (C48). Desk #75 (default: two diagrams in the main text, the catalogue as a table
+    in S15, drafted by the reviser).'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -3905,7 +3908,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well.'
+  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well. Desk #76 (default: as the
+    paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3927,7 +3931,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only.'
+  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only. Desk #76 (default: as the
+    paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3949,7 +3954,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: Confirm the spelling of Alina Fedorova's name in the Acknowledgments (Fedorova or Fyodorova).
+  next: 'Confirm the spelling of Alina Fedorova''s name in the Acknowledgments (Fedorova or Fyodorova). Desk #76
+    (default: as the paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3968,11 +3974,10 @@ items:
     published data give 778 EFO traits among the 6,117 scores. The paper uses 778.'
   where: 1.2 Overview of Just-DNA-Lite
   line: 84
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: Confirm 778 traits (distinct EFO ids among the 6,117 published scores), or say which count the paper should
-    use.
+  why: 'Kept at 778: it is the count of distinct EFO traits among the 6,117 scores in the published data, which
+    the paper reports; the remembered ''about 600'' has no source. Settled by the reviser on the data.'
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -3992,10 +3997,11 @@ items:
     the feature helps.
   where: 3.2 Polygenic Risk Scores
   line: 232
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: Keep or remove the sentence saying the 2,282 direction annotations are AI-made and pending expert review.
+  why: 'Kept: the sentence says the 2,282 direction annotations are AI-made and await expert review, which Supplementary
+    S11 also states and which the paper''s AI-use disclosure requires; removing it would hide how the data were
+    made. Settled by the reviser.'
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -4018,7 +4024,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: Keep the behaviour modules out of the registry examples, or name them.
+  next: 'Keep the behaviour modules out of the registry examples, or name them. Desk #76 (default: as the paper
+    has it).'
   category: Ethics, privacy and scope
   severity: minor
   stage: writing
