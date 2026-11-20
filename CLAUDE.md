@@ -843,6 +843,10 @@ not a VCF liftover and cannot be reused for annotation.
 - **Annotations and reports are per sample** (`data/output/users/{user}/{sample}/`). `select_file`
   clears `output_files` / `report_files` at once; the background loader publishes only when
   `outputs_loaded_for_file == selected_file`, and tab badges and empty states read those gated lists.
+  Both lists sort through `webui.list_sorting.sort_files` by the session's `output_files_sort` /
+  `report_files_sort` (first option = the old order); every order ends on the name. The PRS grid's
+  "Computed" column is ours, added after prs-ui builds the grid (`PRSState._build_prs_results_grid`) from
+  each row's `computed_at`; rows from older checkpoints show it empty. Tests: `tests/test_list_sorting.py`.
 - The right-panel workspace is keyed on `UploadState.selected_file`: remount the whole sample tree, never
   keep per-genome widgets.
 - Use the prs-ui workbench (`prs_workbench_mode_panel`, `trait_selector`, `prs_scores_selector`), with

@@ -1649,8 +1649,10 @@ def output_file_card(file_info: rx.Var[dict]) -> rx.Component:
                     ),
                     rx.el.span(
                         file_info["size_mb"].to(str),
-                        " MB",
+                        " MB · ",
+                        file_info["created_at"].to(str),
                         class_name="ui label",
+                        title="File size, and when this file was written",
                         style={
                             "color": "#666",
                             "fontSize": "0.86rem",
@@ -1840,12 +1842,31 @@ def _vcf_export_button() -> rx.Component:
     )
 
 
+def _sort_selector(options: rx.Var, value: rx.Var, on_change: rx.EventHandler) -> rx.Component:
+    """A small "Sort by" selector above a sample's file list (issues #19, #20)."""
+    return rx.el.div(
+        rx.el.label("Sort by", style={"color": "#666", "fontSize": "0.85rem"}),
+        rx.el.select(
+            rx.foreach(options, lambda opt: rx.el.option(opt["label"], value=opt["value"])),
+            value=value,
+            on_change=on_change,
+            style={"padding": "4px 6px", "borderRadius": "4px", "border": "1px solid #ddd", "fontSize": "0.9rem", "backgroundColor": "#fff"},
+        ),
+        style={"display": "flex", "alignItems": "center", "gap": "6px", "justifyContent": "flex-end", "padding": "6px 10px"},
+    )
+
+
 def _data_files_content() -> rx.Component:
     """Content for the Data Files sub-tab."""
     return rx.cond(
         UploadState.output_file_count > 0,
         rx.el.div(
             _vcf_export_button(),
+            _sort_selector(
+                UploadState.output_files_sort_options,
+                UploadState.output_files_sort,
+                UploadState.set_output_files_sort,
+            ),
             rx.el.div(
                 rx.foreach(UploadState.output_files, output_file_card),
             ),
@@ -1870,6 +1891,11 @@ def _reports_content() -> rx.Component:
     return rx.cond(
         UploadState.has_report_files,
         rx.el.div(
+            _sort_selector(
+                UploadState.report_files_sort_options,
+                UploadState.report_files_sort,
+                UploadState.set_report_files_sort,
+            ),
             rx.foreach(UploadState.report_files, report_file_card),
         ),
         rx.el.div(
