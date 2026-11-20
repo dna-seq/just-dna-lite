@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from webui.pages.annotate import new_analysis_section
 from webui.state import REFERENCE_GENOMES, SUPPORTED_HUMAN_BUILD, unsupported_build_reason
 
 HUMAN = "Homo sapiens"
@@ -51,3 +52,10 @@ def test_other_species_are_not_judged_by_the_human_rule(species: str) -> None:
 
 def test_an_unknown_human_build_is_refused() -> None:
     assert unsupported_build_reason(HUMAN, "custom")
+
+
+def test_the_new_analysis_section_with_the_refusal_banner_builds() -> None:
+    # The banner went in as a fourth positional child of rx.cond, which takes two or three, so the
+    # whole annotate page failed to compile (TypeError in rx.cond) until the banner and the Start
+    # Analysis button were wrapped in one element.
+    assert new_analysis_section() is not None

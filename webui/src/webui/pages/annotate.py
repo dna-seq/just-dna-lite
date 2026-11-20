@@ -2577,29 +2577,32 @@ def new_analysis_section() -> rx.Component:
                     "flexWrap": "wrap",
                 },
             ),
-            rx.cond(
-                UploadState.selected_build_unsupported != "",
-                rx.el.div(
-                    rx.el.div("Reference genome not supported", class_name="header"),
-                    rx.el.p(UploadState.selected_build_unsupported),
-                    class_name="ui warning message",
-                    style={"maxWidth": "760px"},
-                ),
-            ),
-            rx.el.button(
-                UploadState.analysis_button_text,
-                rx.el.i(
-                    "",
-                    class_name=rx.cond(
-                        UploadState.selected_file_is_running,
-                        "spinner loading icon",
-                        "play icon",
+            # The else branch is one element: rx.cond takes at most a true and a false child.
+            rx.el.div(
+                rx.cond(
+                    UploadState.selected_build_unsupported != "",
+                    rx.el.div(
+                        rx.el.div("Reference genome not supported", class_name="header"),
+                        rx.el.p(UploadState.selected_build_unsupported),
+                        class_name="ui warning message",
+                        style={"maxWidth": "760px"},
                     ),
                 ),
-                on_click=UploadState.start_annotation_run,
-                disabled=~UploadState.can_run_annotation,
-                class_name=UploadState.analysis_button_color,
-                style={"maxWidth": "400px"},
+                rx.el.button(
+                    UploadState.analysis_button_text,
+                    rx.el.i(
+                        "",
+                        class_name=rx.cond(
+                            UploadState.selected_file_is_running,
+                            "spinner loading icon",
+                            "play icon",
+                        ),
+                    ),
+                    on_click=UploadState.start_annotation_run,
+                    disabled=~UploadState.can_run_annotation,
+                    class_name=UploadState.analysis_button_color,
+                    style={"maxWidth": "400px"},
+                ),
             ),
         ),
         style={"padding": "0"},
