@@ -2736,12 +2736,14 @@ items:
     interested in speed.
   where: 4.2 PRS Computation
   line: 342
-  status: open
-  now: ''
-  why: ''
-  next: 'How much weight should speed carry? It is one of six Key features (''Fast''), most of Section 4 and part
-    of the Conclusion. Options: keep it; or lead Section 4.2 with the agreement results (Table 4), move the PRS
-    runtimes (Table 3) to Supplementary S3 and shorten the speed claims elsewhere.'
+  status: addressed
+  now: This section asks whether just-prs computes the same scores as the external tool PLINK2 (Chang et al., 2015),
+    which computes the same weighted sum, on one genome. Table 3 gives the answer; Supplementary S3 gives how variants
+    were matched, how the runs were timed and how long each tool took.
+  why: 'Under the default of desk #71: Section 4.2 now asks only whether just-prs and PLINK2 give the same scores
+    (Table 3, formerly Table 4); the PRS runtimes and the former Table 3 moved to Supplementary S3 as Table S3,
+    and the Key feature ''Fast'' points there. Annotation speed (Section 4.1, Table 2) stays as the measured result
+    of the redesign. Applied by the reviser, open for veto.'
   category: Story and structure
   severity: major
   stage: writing
@@ -2875,15 +2877,17 @@ items:
     hopefully implies more than a plausibility estimation.'
   where: 4.3 PGS Catalog Coverage
   line: 394
-  status: open
-  now: ''
-  why: ''
-  next: 'Two parts. (1) The sentence: say it plainly, e.g. ''for these scores a real genome would land far outside
-    the reference distribution, so its percentile would be meaningless''. (2) Georg asks about accountability: ''Can
-    the authors be trusted that any and all AI slop was weeded out because for each statement reported, at least
-    one co-author can 100% vouch for it?'' Decide how the co-authors vouch for the text, for example by assigning
-    each section to a named author who checks every statement against the code, data or source before submission,
-    and say so in the AI-use statement, which now says only ''The authors reviewed the output''.'
+  status: partly
+  now: 'In the reference-distribution release of 2 September 2026, 6,117 of 6,977 scores passed the audit of Section
+    3.2 and 860 were withheld. For 847 of the withheld scores, at least four of the seven test genomes fell in the
+    outermost 1% of the reference distribution (all seven, for 783) and the scale check failed: a real genome would
+    land far outside the reference distribution, so its percentile would mean nothing; the other 13 were withheld
+    because too few of their variants matched the reference panel (12) or their reference distribution had undefined
+    spread (1). The 6,117 scores that passed map to 778 traits of the Experimental Factor Ontology.'
+  why: 'The opaque sentence now says what the failed check means: a real genome would land far outside the reference
+    distribution, so its percentile would mean nothing.'
+  next: 'How the co-authors vouch for each statement given AI drafting, and what Supplementary S11 says of it: desk
+    #74 (default: S11 unchanged; the reviser drafts a per-section sentence with owners left blank).'
   category: Claims and evidence
   severity: major
   stage: now

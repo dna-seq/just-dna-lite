@@ -78,12 +78,12 @@ Just-DNA-Lite is a local, open-source platform for annotating a personal genome 
 The resulting workflow lets users choose published annotation content, apply it to their own genome and inspect the evidence behind the report. The reusable just-prs scoring library adds polygenic scores and reference-population comparisons to the same web interface. Researchers can contribute new annotation modules through the open-source registry, and Model Context Protocol (MCP) servers let AI assistants call the annotation and scoring operations as tools instead of writing their own analysis code. Researchers, including citizen scientists, with different needs enter this workflow at different points; Box 1 names the user groups and where each starts.
 <!-- @/rev C6 -->
 
-<!-- @rev F1 rounds=7 by=claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,co-authors:2026-11-19 -->
+<!-- @rev F1 rounds=8 by=claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28,co-authors:2026-11-19,claude:2026-11-20 -->
 **Key features.**
 
 - **Polygenic scores with the context to read them.** The PGS Catalog publishes polygenic score models as scoring files; just-prs computes them for a genome and adds what a reader needs to judge each result. It infers the genome's ancestry, places each score as a percentile in the matching 1000 Genomes reference population, reports how much of the score the genome covers, labels the result's quality and groups all models for a trait so that their agreement and disagreement are visible. The scoring files, cleaned metadata and audited reference distributions, for 6,117 scores across 778 traits, are downloaded on first use, so users do not need to assemble these (Sections 3.2 and 4.3).
 - **An app store for annotation modules.** Modules are data: versioned tables of variant-trait associations with their sources, written as CSV and YAML without code. Researchers publish them to just-dna-registry, and users browse them in the web interface's Module Catalog (Figure 1a), install them and apply them to their genome, with no new software release (Table 1; Section 3.4).
-- **Fast.** On one workstation, the ten default modules annotate a whole genome in about a minute, more than a hundred times faster than the configured Generation I workflow, and just-prs computes a typical polygenic score from a prepared genome in under a tenth of a second, so all models for a trait can be scored together (Section 4).
+- **Fast.** On one workstation, the ten default modules annotate a whole genome in about a minute, more than a hundred times faster than the configured Generation I workflow, and just-prs computes a typical polygenic score from a prepared genome in under a tenth of a second, so all models for a trait can be scored together (Section 4.1; Supplementary S3).
 - **Three ways in.** The same operations are available from a web interface; from AI assistants (Claude Code, Codex, Cursor and other MCP clients) through two MCP servers and installable plugin skills; and from Python libraries and command-line tools published on PyPI (just-prs, prs-ui, just-dna-format, just-dna-compiler and the just-dna-registry client).
 - **Evidence a reader can follow.** Each matched variant in a report leads to its reported effect, the module's conclusion and its sources, and each polygenic score to its PGS Catalog model, coverage and reference population (Figures 1b, 2 and 3). The links show what each module's curators recorded; whether a module records its sources faithfully was not tested (Section 5.4).
 - **Local.** Annotation and scoring run on the user's computer. Reference data are downloaded; the genome is not uploaded (Section 5.2).
@@ -336,34 +336,24 @@ Generation II annotated each genome with the ten modules of Table 1, with Ensemb
 
 ### **4.2 PRS Computation**
 
-<!-- @rev T5 rounds=6 by=codex:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-11-20 -->
-This section asks two questions of one genome: does just-prs compute the same scores as the external tool PLINK2 (Chang et al., 2015), which computes the same weighted sum, and how long does each take? Tables 3 and 4 give the answers; Supplementary S3 gives how variants were matched and how the runs were timed.
+<!-- @rev T5 rounds=7 by=codex:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-11-20,claude:2026-11-20 -->
+This section asks whether just-prs computes the same scores as the external tool PLINK2 (Chang et al., 2015), which computes the same weighted sum, on one genome. Table 3 gives the answer; Supplementary S3 gives how variants were matched, how the runs were timed and how long each tool took.
 <!-- @/rev T5 -->
 
-<!-- @rev B29 rounds=15 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,codex:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-11-20 -->
-Both just-prs engines and PLINK2 scored 100 PGS Catalog scores (listed in Supplementary S3) on Anton Kulaga's published whole-genome VCF of Section 4.1 (Zenodo 18370498), on the workstation of Table S6. PLINK2 used four compute threads and the just-prs engines one per logical CPU (16), and each PLINK2 time includes starting a separate process, so the speed comparison describes this configuration rather than equal resources.
+<!-- @rev B29 rounds=16 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-13,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,claude:2026-10-19,codex:2026-10-19,claude:2026-10-26,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-11-20,claude:2026-11-20 -->
+Both just-prs engines and PLINK2 scored 100 PGS Catalog scores (listed in Supplementary S3) on Anton Kulaga's published whole-genome VCF of Section 4.1 (Zenodo 18370498), on the workstation of Table S6.
 <!-- @/rev B29 -->
 
-<!-- @rev A3h rounds=5 by=claude:2026-10-19,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28 -->
-The just-prs project reran the same 100 scores on the same genome with just-prs 0.10.2, against the same PLINK2 build reading the PASS records, with PLINK2's score file built as for the fixed input of Supplementary S3 (identifiers for every candidate other allele, and the weights of identifiers that two scoring rows share after liftover summed); both tools read chromosomes 1 to 22 only. Against PLINK2, Pearson *r* was 0.99999996 and the largest score difference 0.049, for DuckDB and Polars alike (Table 4). Median runtimes (min–max) were 0.082 s (0.066–2.80) for DuckDB, 0.309 s (0.292–2.92) for Polars and 0.602 s (0.602–3.51) for PLINK2 (Table 3). Of the remaining absolute difference, 92% came from 30 scores at multi-allelic sites where the effect or other allele is the second or a later alternate allele, and 8% from 15 scores at SNVs where the sample carries a third allele beside the effect allele and just-prs counts the one effect-allele copy.
+<!-- @rev A3h rounds=6 by=claude:2026-10-19,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-11-20 -->
+The just-prs project reran the same 100 scores on the same genome with just-prs 0.10.2, against the same PLINK2 build reading the PASS records, with PLINK2's score file built as for the fixed input of Supplementary S3 (identifiers for every candidate other allele, and the weights of identifiers that two scoring rows share after liftover summed); both tools read chromosomes 1 to 22 only. Against PLINK2, Pearson *r* was 0.99999996 and the largest score difference 0.049, for DuckDB and Polars alike (Table 3). just-prs scored a typical score in under a tenth of a second (median 0.082 s with DuckDB; Supplementary S3). Of the remaining absolute difference, 92% came from 30 scores at multi-allelic sites where the effect or other allele is the second or a later alternate allele, and 8% from 15 scores at SNVs where the sample carries a third allele beside the effect allele and just-prs counts the one effect-allele copy.
 <!-- @/rev A3h -->
 
 <!-- @rev A3b rounds=8 by=claude:2026-10-11,claude:2026-10-12,claude:2026-10-13,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-10-28 -->
 The earlier run with just-prs 0.10.1, which matched genotypes by position alone, is in Supplementary S3 with its recorded protocol.
 <!-- @/rev A3b -->
 
-<!-- @rev B30 rounds=5 by=claude:2026-10-11,claude:2026-10-13,claude:2026-10-26,claude:2026-10-27,claude:2026-10-28 -->
-**Table 3.** Runtime of PRS computation engines (seconds per PGS ID) in the just-prs 0.10.2 rerun. The speedup is PLINK2's median divided by the engine's; leaving out the 7 PGS IDs with ≥ 1M variants, or taking the median of the per-score ratios instead, gives the same values to the precision shown. PLINK2 runs as a separate process whose end the benchmark script notices only at its next memory sample, taken every 0.1 s, so its times can exceed the true run time by up to 0.1 s (90 of its 100 times are 0.602 s, as in the 0.10.1 run); its median therefore lies between about 0.50 and 0.60 s, and the speedups between about 6.1× and 7.3× for DuckDB and between 1.6× and 1.9× for Polars.
-
-| Engine | *N* scored | Median (min–max), s | Mean, s | PLINK2 median ÷ engine median |
-|---|---|---|---|---|
-| just-prs DuckDB | 100 | 0.082 (0.066–2.80) | 0.217 | 7.3× |
-| just-prs Polars | 100 | 0.309 (0.292–2.92) | 0.438 | 1.9× |
-| PLINK2 | 100 | 0.602 (0.602–3.51) | 0.753 | 1.0× |
-<!-- @/rev B30 -->
-
-<!-- @rev C26 rounds=3 by=claude:2026-10-11,claude:2026-10-26,claude:2026-10-27 -->
-**Table 4.** Score concordance between engines in the just-prs 0.10.2 rerun, with PLINK2 given the fixed input. *r* is computed across the scores of one genome, so the largest scores dominate it.
+<!-- @rev C26 rounds=4 by=claude:2026-10-11,claude:2026-10-26,claude:2026-10-27,claude:2026-11-20 -->
+**Table 3.** Score concordance between engines in the just-prs 0.10.2 rerun, with PLINK2 given the fixed input. *r* is computed across the scores of one genome, so the largest scores dominate it.
 
 | Engine pair | *N* PGS | Pearson *r* | Max \|Δ score\| |
 |---|---|---|---|
@@ -384,12 +374,12 @@ About half of each score's variants were found in this genome by both tools (med
 The rerun covers chromosomes 1 to 22; Supplementary S9 reports a run of 195 scores with X, Y, the pseudoautosomal regions and the mitochondrial genome included.
 <!-- @/rev V2 -->
 
-<!-- @rev F6 rounds=2 by=claude:2026-10-28,claude:2026-10-28 -->
+<!-- @rev F6 rounds=3 by=claude:2026-10-28,claude:2026-10-28,claude:2026-11-20 -->
 ### **4.3 PGS Catalog Coverage**
 
 The file-level audit of Section 3.2, run with just-prs 0.10.1 against the PGS Catalog release of 17 September 2026, placed 6,910 of 6,991 scoring files in the “as specified” category, 76 in “approximated” and 5 in “cannot be scored” (Table S5; Figure S5 shows how the weight on unplaceable rows is distributed). These categories assess scoring-file compatibility: the first can include files with some weight on rows that cannot be placed or matched, and none of them establishes complete coverage in an individual genome or predictive validity.
 
-In the reference-distribution release of 2 September 2026, 6,117 of 6,977 scores passed the audit of Section 3.2 and 860 were withheld. For 847 of the withheld scores, at least four of the seven test genomes fell in the outermost 1% of the reference distribution (all seven, for 783) and the scale check failed, so a real genome's score would not have been on the reference scale; the other 13 were withheld because too few of their variants matched the reference panel (12) or their reference distribution had undefined spread (1). The 6,117 scores that passed map to 778 traits of the Experimental Factor Ontology.
+In the reference-distribution release of 2 September 2026, 6,117 of 6,977 scores passed the audit of Section 3.2 and 860 were withheld. For 847 of the withheld scores, at least four of the seven test genomes fell in the outermost 1% of the reference distribution (all seven, for 783) and the scale check failed: a real genome would land far outside the reference distribution, so its percentile would mean nothing; the other 13 were withheld because too few of their variants matched the reference panel (12) or their reference distribution had undefined spread (1). The 6,117 scores that passed map to 778 traits of the Experimental Factor Ontology.
 <!-- @/rev F6 -->
 
 <!-- @rev F7 rounds=4 by=claude:2026-10-28,claude:2026-10-28,claude:2026-10-28,claude:2026-10-28 -->
