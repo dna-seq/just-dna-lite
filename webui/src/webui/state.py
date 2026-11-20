@@ -101,6 +101,7 @@ from webui.list_sorting import (
 from webui.registry_identity import (
     ensure_install_id, load_store_identity, save_store_identity, derive_handle, set_env_var,
 )
+from webui.local_explain import LocalExplainRequest, LocalModelExplainMixin
 from webui.local_llm import (
     API_KEY_ENV as _LOCAL_LLM_API_KEY_ENV,
     BASE_URL_ENV as _LOCAL_LLM_BASE_URL_ENV,
@@ -3607,6 +3608,7 @@ from prs_ui.mixin import SUPERPOPULATION_LABELS as _SUPERPOPULATION_LABELS
 from prs_ui.mixin import TRAIT_GROUP_BY_CONCEPT, TRAIT_GROUP_BY_ONTOLOGY, TRAIT_GROUP_BY_REPORTED
 from prs_ui.mixin import _enriched_to_row_dict as _prs_enriched_to_row_dict
 from prs_ui.mixin import loaded_grid_selection_model as _loaded_grid_selection_model
+from prs_ui.mixin import ai_links_for_selection
 from prs_ui.mixin import normalize_trait_group_by, trait_group_label_expr
 from just_prs import resolve_cache_dir as _prs_resolve_cache_dir
 from just_prs.prs import compute_prs as _compute_prs_fn
@@ -3761,6 +3763,33 @@ async def _write_prs_checkpoint(
         await run_in_compute(checkpoint_in_worker, *args)
     except Exception as exc:
         logger.warning("PRS checkpoint for %s did not land: %s", args[0], exc)
+
+
+def _prs_local_explain_request(
+    view_mode: str,
+    selected_id: str,
+    prs_rows: list[dict[str, Any]],
+    trait_rows: list[dict[str, Any]],
+) -> Optional[LocalExplainRequest]:
+    """The local model's question about the selected (or first) PRS result, from prs-ui's own prompt.
+
+    prs-ui stores each row's Ask-AI links in its ``ai_ask`` payload; the copy-only entry carries the
+    whole prompt (the URL entries are cut to each site's length limit), so the longest copy text is
+    the question. The row is chosen exactly as prs-ui chooses the Ask-AI bar's (``ai_links_for_selection``).
+    """
+    links = ai_links_for_selection(view_mode, selected_id, prs_rows, trait_rows)
+    prompts = [link["copyText"] for link in links if link["copyText"]]
+    if not prompts:
+        return None
+    grouped = view_mode == "grouped"
+    rows = trait_rows if grouped else prs_rows
+    key = "trait" if grouped else "pgs_id"
+    chosen = next((row for row in rows if selected_id and str(row.get(key) or "") == selected_id), rows[0])
+    subject = str(chosen.get(key) or "").strip()
+    trait = "" if grouped else str(chosen.get("trait_reported") or chosen.get("trait") or "").strip()
+    if subject and trait:
+        subject = f"{subject} ({trait})"
+    return LocalExplainRequest(subject=subject or "this result", prompt=max(prompts, key=len))
 
 
 def _prs_ready_parquet_path(parquet_path: str) -> str:
@@ -4010,7 +4039,7 @@ def _restoration_settings_for_parquet(
     return False, "auto"
 
 
-class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State):
+class PRSState(SafeGridMixin, PRSComputeStateMixin, LocalModelExplainMixin, LazyFrameGridMixin, rx.State):
     """PRS computation state — delegates entirely to PRSComputeStateMixin.
 
     The mixin handles score loading, selection, batch compute, quality
@@ -4107,6 +4136,21 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         self._reset_selected_result()
         self._reset_grid_view_state(keep_selection=True)
         self._ignore_empty_selection_replay = True
+        self._reset_local_explanation()
+
+    def _local_explain_request(self) -> Optional[LocalExplainRequest]:
+        """The selected (or first) score or trait, asked the question prs-ui gives the other assistants."""
+        return _prs_local_explain_request(
+            self.prs_view_mode, self.selected_result_id, list(self.prs_results_rows), list(self.trait_summary_rows)
+        )
+
+    @rx.var
+    def local_explain_target(self) -> str:
+        """What "Explain" asks about right now: the selected score or trait, else the first row."""
+        request = _prs_local_explain_request(
+            self.prs_view_mode, self.selected_result_id, list(self.prs_results_rows), list(self.trait_summary_rows)
+        )
+        return request.subject if request else ""
 
     def _build_prs_results_grid(self) -> None:
         """prs-ui's grid, plus a sortable "Computed" column (issue #19)."""

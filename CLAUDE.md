@@ -470,6 +470,14 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   hidden in immutable mode) saves through `set_env_var`; its Test connection is a background event
   (`local_llm.check_connection`). Tests: `tests/test_local_model_explain.py` (a real fake upstream
   under uvicorn).
+- **Results in the web UI use the same local model through `webui.local_explain.LocalModelExplainMixin`**: a
+  state mixes it in and overrides `_local_explain_request` (subject + prompt); the answer streams into
+  state (`stream_explanation`, pushed every 0.25 s) and `webui.components.local_explain.local_explain_panel`
+  shows it as plain text, never Markdown/HTML. `PRSState` asks prs-ui's own prompt for the selected (or
+  first) score or trait: the copy-only entry of the row's `ai_ask` payload, the uncut one
+  (`_prs_local_explain_request`). Same rules as the report button: config only, nothing in immutable mode,
+  `MAX_PROMPT_CHARS`, a token drops a stale answer, a genome switch clears it. Tests:
+  `tests/test_prs_local_explain.py`; the fake OpenAI server is `tests/fake_openai.py`.
 - **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
   never read as one. A result is an open block (plain headline, the
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each
