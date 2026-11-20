@@ -10,6 +10,7 @@ import atexit
 from pathlib import Path
 
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
+from just_dna_lite.inotify import CHECKED_ENV as INOTIFY_CHECKED_ENV, inotify_budget, inotify_preflight
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
@@ -175,6 +176,14 @@ def main() -> None:
     if node_problem:
         print(node_problem, file=sys.stderr, flush=True)
         raise SystemExit(1)
+
+    already_checked = os.environ.get(INOTIFY_CHECKED_ENV) == "1"
+    inotify_refusal, inotify_warning = ("", "") if already_checked else inotify_preflight(inotify_budget())
+    if inotify_refusal:
+        print(inotify_refusal, file=sys.stderr, flush=True)
+        raise SystemExit(1)
+    if inotify_warning:
+        print(inotify_warning, file=sys.stderr, flush=True)
 
     from reflex import constants
     from reflex.utils import processes

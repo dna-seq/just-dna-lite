@@ -21,6 +21,7 @@ with environ_guard():
 
 from just_dna_lite.dagster_maintenance import human_bytes, prune_history, resolve_dagster_home
 from just_dna_lite.frontend_runtime import node_too_old_for_dev_server
+from just_dna_lite.inotify import CHECKED_ENV as INOTIFY_CHECKED_ENV, inotify_budget, inotify_preflight
 from just_dna_lite.process import (
     detached_popen_kwargs,
     dg_dev_argv,
@@ -388,6 +389,14 @@ def start_all(
     if node_problem:
         typer.secho(node_problem, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+    inotify_refusal, inotify_warning = inotify_preflight(inotify_budget())
+    if inotify_refusal:
+        typer.secho(inotify_refusal, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if inotify_warning:
+        typer.secho(inotify_warning, fg=typer.colors.YELLOW, err=True)
+    os.environ[INOTIFY_CHECKED_ENV] = "1"
 
     typer.secho("🏗️  Starting full Just DNA Pipelines stack...", fg=typer.colors.BRIGHT_MAGENTA, bold=True)
 

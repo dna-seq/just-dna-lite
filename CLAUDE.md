@@ -21,6 +21,11 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   `CREATE_NEW_PROCESS_GROUP` on Windows); `just_dna_lite.process` sends SIGINT then SIGKILL (POSIX) or
   `CTRL_BREAK_EVENT` then `TerminateProcess` (Windows). Startup reaps stale Reflex processes holding
   port 3000. A second `uv run start` is last-writer-wins. See `tests/test_process_shutdown.py`.
+- **Preflight before anything spawns** (`start_all`, and `webui.run` unless `JUST_DNA_INOTIFY_CHECKED` says the
+  launcher already did): an outdated Node (`frontend_runtime`) and, on Linux, too few free inotify instances
+  (`just_dna_lite.inotify`: refuse below 4 free, warn below 32, naming the holders and the `sysctl` fix).
+  Out of instances the stack died in watchfiles with "Too many open files (os error 24)".
+  Tests: `tests/test_node_preflight.py`, `tests/test_inotify_preflight.py`.
 - Port cleanup (`_kill_port_owner`, `uv run kill-ports`) goes through `process.find_port_listeners`,
   **listeners only** (a bare `lsof -ti :port` also matches a browser connected to 3000).
   `JUST_DNA_START_KILL_PORTS` stays off by default: 8000/8001 may belong to unrelated tools.
