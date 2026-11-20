@@ -436,13 +436,12 @@ items:
   comment: nothing happening over the last 10 years?
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'The three research-grade tools are cited by their original papers (2010 to 2016), but all are maintained:
-    Table S7 lists VEP 116.3 (2026-10-09), ANNOVAR (2025-03-02) and PLINK 2.0.0-a.7.11 (2026-10-01). Say so in the
-    sentence (for example ''maintained research-grade tools such as...''), and name the recent open-source tools
-    of S5 in the next one.'
+  status: addressed
+  now: At the other end, research-grade tools such as PLINK (Chang et al., 2015), ANNOVAR (Wang et al., 2010) and
+    VEP (McLaren et al., 2016), each still maintained and updated within the last two years (Table S7), are powerful
+    but demand command-line proficiency and a lengthy setup.
+  why: The sentence now says the three tools are maintained, with their recent releases in Table S7 (VEP 116.3,
+    2026-10-09; ANNOVAR, 2025-03-02; PLINK 2.0.0-a.7.11, 2026-10-01).
   category: References
   severity: minor
   stage: writing
@@ -500,13 +499,11 @@ items:
     text: well if it makes it clearer we can say without human coding skills to edit the code directly
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'Write ''annotation sets that users add as data tables, without writing code'' here and in the Abstract,
-    and say once why it matters: a researcher who curates variants can publish them without programming (Section
-    2.2). It does not mean a manual literature search; Anton''s reply (''it means without writing code'') confirms.
-    Livia''s reply proposes ''without the coding skills to edit the code directly''.'
+  status: addressed
+  now: Table S7 compares the documented features of 23 tools for personal-genome annotation, polygenic scoring and
+    AI-assisted interpretation; none of them documents a graphical interface, annotation sets that users add as
+    data tables without writing code, PGS Catalog scoring and ancestry-matched percentiles together.
+  why: '''Without code'' now says what it means: users add annotation sets as data tables, without writing code.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -610,12 +607,12 @@ items:
   comment: (see above)
   where: 1.2 Overview of Just-DNA-Lite
   line: 85
-  status: open
-  now: ''
-  why: ''
-  next: 'Probably points to Georg''s Abstract edit in S3 (''without the need of a software update''); use the same
-    wording here: ''without the need of a new software release''. Livia''s reply adds that modules are versioned,
-    so a new version of a module reaches users without a software release either; say so here.'
+  status: addressed
+  now: Because modules are data and versioned, new modules and new versions of a module reach users through configured
+    repositories or `just-dna-registry` without changes to the annotation engine or a new application release, while
+    evidence review and scientific curation stay with module contributors.
+  why: The Abstract uses Georg's wording ('without the need of a new software release'), and Section 3.4 adds Livia's
+    point that new versions of a module need no release either.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1134,13 +1131,12 @@ items:
   comment: is that defined/detailed anywhere?
   where: 2.3 Web Interface and Self-Exploration
   line: 155
-  status: open
-  now: ''
-  why: ''
-  next: 'It is not defined: the web interface has no feature called self-exploration (the code uses the word only
-    in its disclaimer, ''for research, educational, and self-exploration'' use, in webui/src/webui/pages/annotate.py).
-    Drop it from the heading of Section 2.3 and from the list of what the interface covers, or say once what it
-    means (a user browsing the annotations of their own genome).'
+  status: addressed
+  now: The interface covers file management, module selection (including the optional Ensembl annotation), a sortable
+    and filterable results grid, report download (one HTML report per run, with a section for each selected module)
+    and a Module Catalog from which registry modules are installed (Figure 1a).
+  why: The interface has no feature called self-exploration; the word is dropped from Section 2.3's heading and
+    its list.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1314,10 +1310,10 @@ items:
     to process
   where: 3.1 Longevity Variants Module (example)
   line: 206
-  status: open
-  now: ''
-  why: ''
-  next: Set W_display = w_SNP × w_genotype as a display formula on its own line and define each term after it.
+  status: addressed
+  now: The SNP weight (*w*_SNP) summarizes the strength of statistical evidence for a variant-trait association
+    (number of independent significant studies, reported p-values, number of replicating populations).
+  why: The formula is set as a display equation on its own line, with each term defined after it.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1341,11 +1337,11 @@ items:
     is this about
   where: 3.1 Longevity Variants Module (example)
   line: 211
-  status: open
-  now: ''
-  why: ''
-  next: 'Open ''A report in use.'' with the figure, for example ''Figure 1b shows a stored report row for Anton
-    Kulaga''s public genome: ...'', so the reader knows what the paragraph is about before the details.'
+  status: addressed
+  now: '**A report in use.** Figure 1b shows a row of a stored Longevity Variants report for Anton Kulaga''s public
+    genome, as the report renders it: FOXO3 rs2802292 is called G/T and appears in the insulin-signalling category
+    with a module weight of 0.475.'
+  why: '''A report in use'' now opens with the figure it describes.'
   category: Story and structure
   severity: minor
   stage: writing
@@ -2224,12 +2220,12 @@ items:
     have a page limit?
   where: 3.3 Additional Trait Annotation Modules
   line: 281
-  status: open
-  now: ''
-  why: ''
-  next: Table S4 is a separate Doc of this round ('Supplementary Table S4. Module sources'). Say at first mention
-    where each supplementary table is, and decide with the page limit whether a short version belongs in the main
-    text.
+  status: partly
+  now: Later versions may differ; versions, digests and every source are listed in Supplementary Table S4, a separate
+    table file.
+  why: The first mention of Table S4 now says where it is.
+  next: Whether a short version of Table S4 belongs in the main text depends on the chosen journal's page limit;
+    decide with the journal.
   category: Figures and tables
   severity: minor
   stage: writing
@@ -2293,12 +2289,11 @@ items:
   comment: what if not?
   where: 3.4 Growing the Module Ecosystem
   line: 286
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what happens when it does not: the authorship entries are declared by whoever builds the module and
-    are not verified, so an AI draft left unmarked looks like a human-curated module. Section 5.5 says this; repeat
-    it here in one clause or point to it.'
+  status: addressed
+  now: These entries are declared by whoever builds the module and are not verified, so an AI draft left unmarked
+    reads as a human-curated module (Section 5.5).
+  why: 'Section 3.4 now says what happens when a draft is not marked: the entries are not verified, so an unmarked
+    AI draft reads as human-curated (Section 5.5).'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -2604,11 +2599,10 @@ items:
   comment: not in paper
   where: 4.1 Annotation Speed
   line: 308
-  status: open
-  now: ''
-  why: ''
-  next: Table S6 is in the Supplementary Data Doc (Section S2). Cite it as 'Supplementary Data, Table S6' so a reader
-    of the paper's Doc knows where to look.
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Supplementary Data, Table S6).
+  why: The citation now says Table S6 is in the Supplementary Data.
   category: Figures and tables
   severity: minor
   stage: writing
@@ -3296,13 +3290,10 @@ items:
     possible...
   where: Contribution Statements
   line: 475
-  status: open
-  now: ''
-  why: ''
-  next: Supplementary Note S11 repeats the main Use of AI tools statement almost word for word; its one addition
-    is that 'every number in the benchmark tables is generated by a script from the recorded runs in the repository
-    (docs/manuscript/benchmarks/a3/)'. Move that sentence into the main statement and drop the pointer to S11 (where
-    the statement goes is part of the run's decision D11).
+  status: addressed
+  now: Every number in the benchmark tables is generated by a script from the recorded runs in the repository (`docs/manuscript/benchmarks/a3/`).
+  why: 'The one sentence Supplementary Note S11 adds to the main statement is now in the main Use of AI tools statement;
+    S11 stays as it is (desk #74''s default).'
   category: Submission package
   severity: minor
   stage: final
@@ -3527,12 +3518,12 @@ items:
   comment: stephanie and benjamin nagged me to define weird abbreviations before using them
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved after S23 was accepted; MCP, GRCh38, T2T and PRS are still
-    to spell out at first use. Spell out every abbreviation at its first use, in the Abstract and again in the body:
-    PGS (S23), MCP (Model Context Protocol), GRCh38, T2T and PRS. VCF is already spelled out in the Abstract.'
+  status: addressed
+  now: Researchers can contribute new annotation modules through the open-source registry, and Model Context Protocol
+    (MCP) servers let AI assistants call the annotation and scoring operations as tools instead of writing their
+    own analysis code.
+  why: 'Every abbreviation Livia named is spelled out at first use: PGS and MCP in the Abstract, and in the body
+    MCP (Section 1.2), PRS (Section 2.1), T2T (Section 5.3) and GRCh38 (Box 1, ''the GRCh38 human reference genome'').'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3558,17 +3549,11 @@ items:
     text: we claned PGS catalog as it has mistakes in metadata and some garbage PRS-ses
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved after ''Polygenic scores (further called PGS)'' (S23) was
-    accepted, but the Abstract still does not say what the PGS Catalog is; the authors asked on 2 November that
-    it be explained, for example: ''It computes the scores published in the Polygenic Score (PGS) Catalog, an open
-    database where each score is deposited with its variants and their weights, from a cleaned copy of the Catalog''.
-    Write ''a cleaned copy of the PGS Catalog'': the paper also has a ''Module Catalog'' (Section 2.3), so ''the
-    Catalog'' is ambiguous. Anton''s reply gives the reason for cleaning (''it has mistakes in metadata and some
-    garbage PRS-ses''); if a clause fits, say what cleaning means as Section 3.2 does: metadata normalized, and
-    860 of 6,977 scores withheld because their reference distributions failed the audit.'
+  status: addressed
+  now: It computes the scores of the PGS Catalog, the open database of published polygenic scores, from a cleaned
+    copy of it, places each within a reference population matched to the genome's inferred ancestry, labels its
+    quality and shows all models for a trait side by side, so users see where the models agree and differ.
+  why: The Abstract now says what the PGS Catalog is.
   category: Writing and clarity
   severity: minor
   stage: writing
