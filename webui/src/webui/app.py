@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import logging
@@ -18,7 +19,8 @@ from just_dna_pipelines.annotation.analytics import inject_umami_tracker, umami_
 from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.annotation.resources import get_user_output_dir
 from webui.compute.jobs import kill_all_jobs
-from webui.compute.pool import start_pool, stop_pool
+from webui.compute.pool import run_in_compute, start_pool, stop_pool
+from webui.dagster_reads import delete_orphaned_not_started_runs
 from webui.default_samples import default_samples_future
 from webui.grid import clear_grid_artifacts
 from webui.log_filters import install_log_filters
@@ -640,6 +642,17 @@ app = rx.App(
 )
 
 
+async def _delete_orphaned_runs() -> None:
+    """Delete the runs a failed daemon submission left NOT_STARTED, once per server start, in a worker."""
+    try:
+        deleted = await run_in_compute(delete_orphaned_not_started_runs)
+    except Exception as exc:
+        logger.warning("Orphaned NOT_STARTED runs not cleaned up: %s", exc)
+        return
+    if deleted:
+        print(f"[compute] deleted {deleted} orphaned NOT_STARTED run(s) from Dagster", flush=True)
+
+
 @contextlib.asynccontextmanager
 async def _compute_tier_lifespan() -> AsyncIterator[None]:
     """Own the compute tier for the lifetime of the ASGI app.
@@ -652,9 +665,11 @@ async def _compute_tier_lifespan() -> AsyncIterator[None]:
     """
     clear_grid_artifacts()  # a SIGKILLed previous run leaves ownerless sorted parquet
     start_pool()
+    cleanup = asyncio.create_task(_delete_orphaned_runs())
     try:
         yield
     finally:
+        cleanup.cancel()
         stop_pool()
         killed = kill_all_jobs()
         if killed:

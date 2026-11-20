@@ -16,7 +16,7 @@ from dagster import (
     MetadataValue,
 )
 from dagster._serdes import serialize_value
-from webui.state import (
+from webui.prs_checkpoint import (
     PRS_CHECKPOINT_FILENAME,
     PRS_RESULTS_ASSET_KEY,
     _prs_partition_key,
@@ -24,7 +24,7 @@ from webui.state import (
     restore_prs_checkpoint,
 )
 
-from webui import state
+from webui import prs_checkpoint
 
 
 def _rows(padding: int = 0) -> list[dict[str, Any]]:
@@ -151,7 +151,7 @@ def test_an_event_from_before_the_fix_is_not_read(instance: DagsterInstance, par
             partition=_prs_partition_key(parquet_path),
             metadata={
                 "results": MetadataValue.json({"rows": _rows()}),
-                "format_version": MetadataValue.text(state._prs_results_version()),
+                "format_version": MetadataValue.text(prs_checkpoint._prs_results_version()),
             },
         )
     )
@@ -167,7 +167,7 @@ def test_a_format_version_bump_invalidates_the_checkpoint(
     instance: DagsterInstance, parquet_path: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _checkpoint(instance, parquet_path, _rows())
-    monkeypatch.setattr(state, "_prs_results_version", lambda: "prs-ui=99.0.0")
+    monkeypatch.setattr(prs_checkpoint, "_prs_results_version", lambda: "prs-ui=99.0.0")
 
     restored = restore_prs_checkpoint(instance, _prs_partition_key(parquet_path))
 

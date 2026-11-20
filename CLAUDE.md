@@ -661,8 +661,9 @@ my_job = define_asset_job(name="my_job", selection=..., hooks={resource_summary_
 2. On failure (usually "External pipeline origin must be set"), run the job in a **spawned child** via
    `webui.compute.jobs` (`submit_job` / `await_job`, see `execute_job_with_run_discovery`). Never run
    `execute_in_process` in the ASGI process or its threads.
-3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; startup
-   cancels orphaned `NOT_STARTED` runs. Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
+3. Track in-flight runs in `UploadState._active_inproc_runs` so shutdown can cancel them; server start
+   deletes orphaned `NOT_STARTED` runs once, in a compute worker (`app._delete_orphaned_runs`; it used to run
+   on every page load, where it could delete a run another tab had just created). Manual cleanup: `uv run pipelines cleanup-runs [--status STARTED]
    [--dry-run]`. Fallback runs cannot be re-executed from the Dagster UI.
    **Event-log size is bounded by `uv run pipelines prune-dagster-history`, not by `cleanup-runs`.**
    `report_runless_asset_event` writes rows with an empty `run_id`, so `delete_run` never reaches them
@@ -725,6 +726,14 @@ during hot reload is harmless. After PRS/Compare changes, restart: hot reload ca
 - **Anything over ~1 s is `@rx.event(background=True)`** with brief `async with self:` blocks and the
   work in a pure function off the state lock; snapshot the inputs into locals in the first block. A
   `yield` generator holds the lock for its whole run and freezes the UI. `@rx.background` does not exist.
+  **`background=True` releases the state lock, not the event loop:** a blocking call written between its
+  awaits still freezes every client. `compute_selected_prs` was background yet held the loop 9.4 s on
+  just-prs downloads, because steps added after the per-score executor ran inline; its setup now goes
+  through `_prepare_prs_compute` in the executor and its checkpoint through the compute pool. Dagster
+  reads go to a `webui.compute` worker as plain data (`webui.dagster_reads.dashboard_snapshot` for
+  `on_load`, `webui.prs_checkpoint.*_in_worker` for PRS); a non-background handler may `await
+  run_in_compute(...)` too, which frees the loop while its own session waits. Tests:
+  `tests/test_dagster_off_loop.py` (a loop ticker must not stall 0.2 s while the worker runs).
 - **Upload / select-file handlers return `list[EventSpec]`, never `yield` them.** Reflex 0.9 marks the
   generator's `EventFuture` done when it exhausts, and a yielded EventSpec re-dispatched after that
   raises `Cannot add a child to an EventFuture that is already done`. Same rule as `poll_run_status`.
@@ -834,7 +843,8 @@ not a VCF liftover and cannot be reused for annotation.
   `prs_results`, the chart spec and `prs_results_source_file`; compute snapshots `prs_compute_token` and
   discards stale writes. After updating `prs_results`, rebuild `prs_results_rows` / `_columns` /
   `_column_groups`. Switching the file also clears the comparison.
-- **The PRS checkpoint is a file, the Dagster event is its index** (#35). `checkpoint_prs_results`
+- **The PRS checkpoint is a file, the Dagster event is its index** (#35). `webui.prs_checkpoint` holds it
+  (no Reflex import, so a compute worker loads it); `checkpoint_prs_results`
   writes `prs_results.json` beside the sample (temp name + `os.replace`) and reports a runless
   `prs_results` materialization carrying only `path` and small fields; `restore_prs_checkpoint` reads
   the newest one, gated on `format_version` (`_prs_results_version`: the prs-ui **and** just-prs

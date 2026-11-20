@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import base64
 import gc
-import importlib.metadata
-import json
 import logging
 import os
 import queue
 import re
 import shutil
 import asyncio
+from dataclasses import dataclass
 import tarfile
 import tempfile
 import time
@@ -17,12 +16,11 @@ import zipfile
 import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, ClassVar, Dict, Generator, List, Literal, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Callable, ClassVar, Dict, Generator, List, Optional, Sequence, Union
 
 import polars as pl
 import reflex as rx
 from reflex.event import EventSpec
-from pydantic import BaseModel
 from dagster import DagsterInstance, AssetKey, AssetMaterialization, AssetRecordsFilter, DagsterRunStatus, RunsFilter, MetadataValue
 from just_dna_pipelines.agents.module_creator import read_spec_meta
 from just_dna_pipelines.annotation.annotation_runner import (
@@ -80,7 +78,16 @@ from just_dna_compiler.compiler import content_signature
 from just_dna_format.integrity import IntegrityError, build_artifact
 from just_dna_format.manifest import read_manifest
 from webui.compute.jobs import await_job, forget_job, submit_job
+from webui.compute.pool import run_in_compute
 from webui.dagster_env import get_dagster_instance
+from webui.dagster_reads import dashboard_snapshot, run_status_label
+from webui.prs_checkpoint import (
+    PRS_RESULTS_ASSET_KEY,
+    PrsCheckpoint,
+    _prs_partition_key,
+    checkpoint_in_worker,
+    restore_in_worker,
+)
 from webui.features import module_creator_available, registry_publication_available
 from webui.grid import SafeGridMixin, filter_model_fingerprint, is_stale_grid_view_replay
 from webui.list_sorting import (
@@ -1933,69 +1940,6 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         
         return metadata
 
-    def _extract_metadata_from_materialization(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Extract file_info dict from Dagster materialization metadata.
-        
-        Converts MetadataValue objects back to plain Python values.
-        """
-        file_info: Dict[str, Any] = {}
-        
-        def get_value(mv: Any) -> Any:
-            """Extract value from MetadataValue or return as-is."""
-            if hasattr(mv, 'value'):
-                return mv.value
-            return mv
-        
-        # Well-known fields
-        if "filename" in metadata:
-            file_info["filename"] = get_value(metadata["filename"])
-        if "sample_name" in metadata:
-            file_info["sample_name"] = get_value(metadata["sample_name"])
-        if "species" in metadata:
-            file_info["species"] = get_value(metadata["species"])
-        if "reference_genome" in metadata:
-            file_info["reference_genome"] = get_value(metadata["reference_genome"])
-        if "subject_id" in metadata:
-            file_info["subject_id"] = get_value(metadata["subject_id"])
-        if "sex" in metadata:
-            file_info["sex"] = get_value(metadata["sex"])
-        if "tissue" in metadata:
-            file_info["tissue"] = get_value(metadata["tissue"])
-        if "study_name" in metadata:
-            file_info["study_name"] = get_value(metadata["study_name"])
-        if "description" in metadata:
-            file_info["notes"] = get_value(metadata["description"])
-        if "path" in metadata:
-            file_info["path"] = get_value(metadata["path"])
-        if "size_mb" in metadata:
-            file_info["size_mb"] = get_value(metadata["size_mb"])
-        if "upload_date" in metadata:
-            file_info["upload_date"] = get_value(metadata["upload_date"])
-        if "source" in metadata:
-            file_info["source"] = get_value(metadata["source"])
-        if "zenodo_url" in metadata:
-            file_info["zenodo_url"] = get_value(metadata["zenodo_url"])
-        if "zenodo_license" in metadata:
-            file_info["zenodo_license"] = get_value(metadata["zenodo_license"])
-
-        # Custom fields - prefer the JSON blob if available
-        if "custom_metadata" in metadata:
-            custom = get_value(metadata["custom_metadata"])
-            if isinstance(custom, dict):
-                file_info["custom_fields"] = custom
-        else:
-            # Fallback: extract from individual custom/* keys
-            custom_fields = {}
-            for key, value in metadata.items():
-                if key.startswith("custom/"):
-                    field_name = key[7:]  # Remove "custom/" prefix
-                    custom_fields[field_name] = get_value(value)
-            if custom_fields:
-                file_info["custom_fields"] = custom_fields
-        
-        return file_info
-
     def save_metadata_to_dagster(self):
         """
         Persist current file metadata to Dagster as an AssetMaterialization.
@@ -2024,44 +1968,9 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         
         return rx.toast.success(f"Metadata saved for {sample_name}")
 
-    def _load_metadata_from_dagster(self):
-        """
-        Load file metadata from Dagster materializations.
-        
-        Queries all user_vcf_source partitions for the current user and
-        extracts metadata from the latest materialization of each.
-        """
-        if not self.safe_user_id:
-            return
-        
-        instance = get_dagster_instance()
-        
-        # Get all partitions for this user
-        from just_dna_pipelines.annotation.assets import user_vcf_partitions
-        all_partitions = instance.get_dynamic_partitions(user_vcf_partitions.name)
-        user_partitions = [p for p in all_partitions if p.startswith(f"{self.safe_user_id}/")]
-        
-        for partition_key in user_partitions:
-            # Fetch latest materialization for this partition
-            result = instance.fetch_materializations(
-                records_filter=AssetRecordsFilter(
-                    asset_key=AssetKey("user_vcf_source"),
-                    asset_partitions=[partition_key],
-                ),
-                limit=1,
-            )
-            
-            if not result.records:
-                continue
-            
-            record = result.records[0]
-            mat = record.asset_materialization
-            if not mat or not mat.metadata:
-                continue
-            
-            # Extract metadata
-            dagster_info = self._extract_metadata_from_materialization(mat.metadata)
-            
+    def _apply_vcf_source_info(self, vcf_source_info: Dict[str, Dict[str, Any]]) -> None:
+        """Overlay the metadata stored in Dagster (`user_vcf_source`) on the files on disk."""
+        for partition_key, dagster_info in vcf_source_info.items():
             # Get filename from partition key or metadata
             filename = dagster_info.get("filename")
             if not filename:
@@ -2894,20 +2803,6 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             })
         return result
 
-    def _get_run_status_str(self, status: DagsterRunStatus) -> str:
-        """Convert Dagster run status to string."""
-        status_map = {
-            DagsterRunStatus.QUEUED: "QUEUED",
-            DagsterRunStatus.NOT_STARTED: "QUEUED",
-            DagsterRunStatus.STARTING: "STARTING",
-            DagsterRunStatus.STARTED: "RUNNING",
-            DagsterRunStatus.SUCCESS: "SUCCESS",
-            DagsterRunStatus.FAILURE: "FAILURE",
-            DagsterRunStatus.CANCELED: "CANCELED",
-            DagsterRunStatus.CANCELING: "CANCELING",
-        }
-        return status_map.get(status, "UNKNOWN")
-
     def _try_submit_to_daemon(self, instance: DagsterInstance, run_id: str) -> tuple[bool, str]:
         """
         Attempt to submit run to Dagster daemon.
@@ -3260,7 +3155,7 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             self.polling_active = False
             return
 
-        status_str = self._get_run_status_str(run.status)
+        status_str = run_status_label(run.status)
 
         # Update run in history
         updated_runs = []
@@ -3536,33 +3431,6 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
         self.right_panel_active_tab = "analysis"
         self.new_analysis_expanded = True
 
-    def _cleanup_orphaned_runs(self) -> int:
-        """
-        Clean up orphaned runs on startup by deleting them from Dagster's database.
-        
-        Removes only NOT_STARTED runs (daemon submission failures that never executed).
-        CANCELED runs are preserved as part of run history.
-        
-        Returns the number of runs deleted.
-        """
-        instance = get_dagster_instance()
-        
-        # Get all NOT_STARTED runs (daemon submission failures)
-        from dagster import RunsFilter
-        orphaned_records = instance.get_run_records(
-            filters=RunsFilter(statuses=[DagsterRunStatus.NOT_STARTED]),
-            limit=100,
-        )
-        
-        cleaned_count = 0
-        for record in orphaned_records:
-            run = record.dagster_run
-            # Delete run from Dagster's database
-            instance.delete_run(run.run_id)
-            cleaned_count += 1
-        
-        return cleaned_count
-
     async def on_load(self):
         """Discover existing files and their statuses when the dashboard loads."""
         auth_state = await self.get_state(AuthState)
@@ -3570,11 +3438,6 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             self.safe_user_id = "public"
         else:
             self.safe_user_id = self._get_safe_user_id(auth_state.user_email)
-
-        # Clean up orphaned runs on startup (NOT_STARTED only)
-        cleaned = self._cleanup_orphaned_runs()
-        if cleaned > 0:
-            self._add_log(f"Deleted {cleaned} orphaned NOT_STARTED run(s) from Dagster database")
 
         user_dir = get_user_input_dir() / self.safe_user_id
 
@@ -3621,43 +3484,32 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
                 if sample_info.get("reference_genome"):
                     self.file_metadata[fname]["reference_genome"] = sample_info["reference_genome"]
 
-        # Load persisted metadata from Dagster (overwrites filesystem metadata)
-        self._load_metadata_from_dagster()
-        
-        # Re-sort files by upload_date (newest first) after Dagster metadata is loaded
+        # Everything this page needs from Dagster, read in a compute worker: on the event loop it
+        # held every client for 0.5 to 0.8 s per page load.
+        partition_keys = [f"{self.safe_user_id}/{f.replace('.vcf.gz', '').replace('.vcf', '')}" for f in self.files]
+        try:
+            snapshot = await run_in_compute(dashboard_snapshot, self.safe_user_id, partition_keys)
+        except Exception as exc:
+            logger.warning("Dagster state for the dashboard unavailable: %s", exc)
+            self._add_log(f"Could not read run history from Dagster: {exc}")
+            return follow_up
+        self._apply_vcf_source_info(snapshot.vcf_source_info)
+
+        # Re-sort files by upload_date (newest first) after Dagster metadata is applied
         def sort_key(fname: str) -> str:
             return self.file_metadata.get(fname, {}).get("upload_date", "0000-00-00 00:00")
         self.files = sorted(self.files, key=sort_key, reverse=True)
-        
-        # Sync statuses with Dagster
-        instance = get_dagster_instance()
-        for f in self.files:
-            sample_name = f.replace(".vcf.gz", "").replace(".vcf", "")
-            pk = f"{self.safe_user_id}/{sample_name}"
-            
-            # Check if annotated asset exists using new fetch_materializations API
-            asset_key = AssetKey("user_hf_module_annotations")
-            result = instance.fetch_materializations(
-                records_filter=AssetRecordsFilter(
-                    asset_key=asset_key,
-                    asset_partitions=[pk],
-                ),
-                limit=1,
-            )
-            records = result.records
-            
-            status = "uploaded"
-            if records:
-                status = "completed"
-                
+
+        annotated = set(snapshot.annotated_partitions)
+        for pk in partition_keys:
+            status = "completed" if pk in annotated else "uploaded"
             if pk not in self.asset_statuses:
                 self.asset_statuses[pk] = {}
             self.asset_statuses[pk]["hf_annotated"] = status
             # For backward compatibility with file_statuses computed var
             self.asset_statuses[pk]["annotated"] = status
 
-        # Load recent runs from Dagster
-        await self._load_recent_runs()
+        self.runs = snapshot.runs
         return follow_up
 
     @rx.event(background=True)
@@ -3668,82 +3520,6 @@ class UploadState(SafeGridMixin, LazyFrameGridMixin, rx.State):
             return
         await asyncio.wrap_future(samples_future)
         yield UploadState.on_load
-
-    async def _load_recent_runs(self):
-        """Load recent annotation runs from Dagster."""
-        instance = get_dagster_instance()
-        
-        # Get recent runs for all annotation jobs
-        # Use get_run_records to get timestamps (start_time, end_time are on RunRecord, not DagsterRun)
-        from dagster import RunsFilter
-        annotation_job_names = [
-            "annotate_and_report_job",
-            "annotate_all_job",
-            "annotate_ensembl_only_job",
-            "annotate_with_hf_modules_job",
-        ]
-        all_run_records = []
-        for jn in annotation_job_names:
-            records = instance.get_run_records(
-                filters=RunsFilter(job_name=jn),
-                limit=20,
-            )
-            all_run_records.extend(records)
-        # Merge and sort by start_time descending
-        run_records = sorted(
-            all_run_records,
-            key=lambda r: r.start_time or 0,
-            reverse=True,
-        )[:20]
-        
-        run_list = []
-        for record in run_records:
-            run = record.dagster_run
-            # Extract info from run config - use "ops" key (not "assets")
-            config = run.run_config or {}
-            ops = config.get("ops", {})
-            hf_config = ops.get("user_hf_module_annotations", {}).get("config", {})
-            duckdb_config = ops.get("user_annotated_vcf_duckdb", {}).get("config", {})
-            norm_config = ops.get("user_vcf_normalized", {}).get("config", {})
-            
-            # Get VCF path from whichever config has it (HF, DuckDB, or normalize)
-            vcf_path = hf_config.get("vcf_path") or duckdb_config.get("vcf_path") or norm_config.get("vcf_path", "")
-            filename = Path(vcf_path).name if vcf_path else "unknown"
-            sample_name = hf_config.get("sample_name") or duckdb_config.get("sample_name", "")
-            modules = hf_config.get("modules", [])
-            if duckdb_config and not modules:
-                modules = ["ensembl"]
-            
-            # Timestamps are on RunRecord as Unix timestamps (floats) or create_timestamp as datetime
-            started_at = None
-            ended_at = None
-            if record.start_time:
-                started_at = datetime.fromtimestamp(record.start_time).isoformat()
-            if record.end_time:
-                ended_at = datetime.fromtimestamp(record.end_time).isoformat()
-            
-            run_info = {
-                "run_id": run.run_id,
-                "filename": filename,
-                "sample_name": sample_name,
-                "modules": modules or [],
-                "include_ensembl": bool(duckdb_config),
-                "status": self._get_run_status_str(run.status),
-                "started_at": started_at,
-                "ended_at": ended_at,
-                "output_path": None,
-            }
-            
-            # Check for output if successful
-            if run.status == DagsterRunStatus.SUCCESS and sample_name:
-                user_name = hf_config.get("user_name") or duckdb_config.get("user_name", self.safe_user_id)
-                output_dir = get_user_output_dir() / user_name / sample_name / "modules"
-                if output_dir.exists():
-                    run_info["output_path"] = str(output_dir)
-            
-            run_list.append(run_info)
-        
-        self.runs = run_list
 
 
 class OutputPreviewState(SafeGridMixin, LazyFrameGridMixin, rx.State):
@@ -3934,14 +3710,57 @@ def _get_prs_catalog(cache_dir: str) -> _PRSCatalog:
     return _prs_catalog_instance
 
 
-def _prs_results_version() -> str:
-    """Version tag for stored PRS results.
+@dataclass
+class _PreparedPrsCompute:
+    """What every score of one PRS compute shares, built once per compute."""
 
-    Both libraries shape a stored row: prs-ui builds it, just-prs computes and
-    enriches it (0.10.4 picks the percentile curve by karyotype), so either release
-    makes a checkpoint stale.
+    catalog: _PRSCatalog
+    best_perf_df: pl.DataFrame
+    reference_universe: Optional[_ReferenceUniverse]
+    universe_error: str
+
+
+def _prepare_prs_compute(
+    cache_dir: str,
+    refresh_reference_cache: bool,
+    genome_build: str,
+    any_restoration: bool,
+) -> _PreparedPrsCompute:
+    """Load the catalog and parse the reference-allele universe once for a compute.
+
+    Blocking: each step may download on a cache miss, and the universe is a ~34M-row parse
+    (~8.4 s per score when re-parsed per score, ~1.2 s with this shared handle). The handler
+    runs it in its thread pool, never on the event loop. A universe that cannot be prepared is
+    reported in ``universe_error`` and scoring continues without restoration.
     """
-    return f"prs-ui={importlib.metadata.version('prs-ui')};just-prs={importlib.metadata.version('just-prs')}"
+    catalog = _get_prs_catalog(cache_dir)
+    if refresh_reference_cache:
+        catalog.refresh_reference_cache(panel="1000g")
+    best_perf_df = catalog.best_performance().collect()
+    reference_universe: Optional[_ReferenceUniverse] = None
+    universe_error = ""
+    if any_restoration:
+        try:
+            reference_universe = catalog.prepare_reference_universe(genome_build)
+        except Exception as exc:
+            universe_error = str(exc)
+    return _PreparedPrsCompute(catalog, best_perf_df, reference_universe, universe_error)
+
+
+async def _write_prs_checkpoint(
+    args: Optional[tuple[str, list[dict[str, Any]], str, str, str]],
+) -> None:
+    """Write a PRS checkpoint in a `webui.compute` worker; a failure is logged, never raised.
+
+    The worker opens its own Dagster instance: the ASGI process never touches Dagster from the
+    event loop (it held the loop and the state lock) or from a thread.
+    """
+    if args is None:
+        return
+    try:
+        await run_in_compute(checkpoint_in_worker, *args)
+    except Exception as exc:
+        logger.warning("PRS checkpoint for %s did not land: %s", args[0], exc)
 
 
 def _prs_ready_parquet_path(parquet_path: str) -> str:
@@ -3949,131 +3768,6 @@ def _prs_ready_parquet_path(parquet_path: str) -> str:
     if parquet_path and _parquet_is_ready(Path(parquet_path)):
         return parquet_path
     return ""
-
-
-# The PRS checkpoint keeps its rows in a file beside the sample and only an index entry in
-# Dagster. Rows used to ride in the materialization metadata (~10 MB per compute), and
-# runless events can never be deleted, so the event log grew to 30 GB (issue #35). JSON,
-# not parquet: `risk_estimates_by_method` is a dict keyed by method name, which a struct
-# column would widen to every key seen in any row.
-PRS_CHECKPOINT_FILENAME = "prs_results.json"
-PRS_RESULTS_ASSET_KEY = "prs_results"
-
-
-class PrsCheckpoint(BaseModel):
-    """What the restore path found for one sample's partition."""
-
-    status: Literal["restored", "stale", "absent"]
-    rows: list[dict[str, Any]] = []
-    sample_type: str = ""
-    row_count: int = 0
-
-
-def _prs_partition_key(parquet_path: str) -> str:
-    """``{user}/{sample}`` for a sample's normalized parquet."""
-    p = Path(parquet_path)
-    return f"{p.parent.parent.name}/{p.parent.name}"
-
-
-def _write_prs_checkpoint_file(sample_dir: Path, rows: list[dict[str, Any]]) -> Path:
-    """Write *rows* to the sample's checkpoint file, replacing it atomically.
-
-    A per-write temp name in the same directory, then ``os.replace``: two tabs on one
-    sample must not read each other's half-written file.
-    """
-    payload = json.dumps(rows)
-    sample_dir.mkdir(parents=True, exist_ok=True)
-    final_path = sample_dir / PRS_CHECKPOINT_FILENAME
-    fd, tmp_name = tempfile.mkstemp(dir=sample_dir, prefix=f".{PRS_CHECKPOINT_FILENAME}.", suffix=".tmp")
-    tmp_path = Path(tmp_name)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(payload)
-    tmp_path.chmod(0o644)  # mkstemp creates 0600; match the sample's other outputs
-    os.replace(tmp_path, final_path)
-    return final_path
-
-
-def _read_prs_checkpoint_file(path: Path) -> list[dict[str, Any]] | None:
-    """Rows from a checkpoint file, or ``None`` when it is missing or unreadable."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        logger.warning("PRS checkpoint %s unreadable, recomputing: %s", path, exc)
-        return None
-    if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
-        logger.warning("PRS checkpoint %s is not a list of rows, recomputing", path)
-        return None
-    return data
-
-
-def checkpoint_prs_results(
-    instance: DagsterInstance,
-    parquet_path: str,
-    rows: list[dict[str, Any]],
-    genome_build: str,
-    ancestry: str,
-    sample_type: str,
-) -> Path:
-    """Write *rows* beside the sample and index them with a small Dagster event."""
-    final_path = _write_prs_checkpoint_file(Path(parquet_path).parent, rows)
-    pgs_ids = [r.get("pgs_id", "") for r in rows]
-    instance.report_runless_asset_event(
-        AssetMaterialization(
-            asset_key=PRS_RESULTS_ASSET_KEY,
-            partition=_prs_partition_key(parquet_path),
-            metadata={
-                "path": MetadataValue.path(str(final_path)),
-                "pgs_ids": MetadataValue.text(json.dumps(pgs_ids)),
-                "genome_build": MetadataValue.text(genome_build),
-                "ancestry": MetadataValue.text(ancestry),
-                "sample_type": MetadataValue.text(sample_type),
-                "row_count": MetadataValue.int(len(rows)),
-                "format_version": MetadataValue.text(_prs_results_version()),
-            },
-        )
-    )
-    return final_path
-
-
-def _metadata_text(metadata: dict[str, Any], key: str) -> str:
-    entry = metadata.get(key)
-    return str(entry.value) if entry is not None and hasattr(entry, "value") else ""
-
-
-def restore_prs_checkpoint(instance: DagsterInstance, partition_key: str) -> PrsCheckpoint:
-    """Read the newest checkpoint for *partition_key*.
-
-    An event without a ``path`` (written before issue #35) or a missing or unreadable
-    file counts as no checkpoint, so the caller recomputes.
-    """
-    result = instance.fetch_materializations(
-        records_filter=AssetRecordsFilter(
-            asset_key=AssetKey(PRS_RESULTS_ASSET_KEY),
-            asset_partitions=[partition_key],
-        ),
-        limit=1,
-    )
-    if not result.records:
-        return PrsCheckpoint(status="absent")
-    mat = result.records[0].asset_materialization
-    if not mat or not mat.metadata:
-        return PrsCheckpoint(status="absent")
-    if _metadata_text(mat.metadata, "format_version") != _prs_results_version():
-        return PrsCheckpoint(status="stale")
-    path_text = _metadata_text(mat.metadata, "path")
-    if not path_text:
-        return PrsCheckpoint(status="absent")
-    rows = _read_prs_checkpoint_file(Path(path_text))
-    if rows is None:
-        return PrsCheckpoint(status="absent")
-    rows = [row for row in rows if not str(row.get("sample") or "")]
-    count_text = _metadata_text(mat.metadata, "row_count")
-    return PrsCheckpoint(
-        status="restored",
-        rows=rows,
-        sample_type=_metadata_text(mat.metadata, "sample_type"),
-        row_count=int(count_text) if count_text else len(rows),
-    )
 
 
 def _prs_compute_belongs_to_current_genome(
@@ -4966,8 +4660,8 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
 
         yield from self.initialize_prs()
 
-        if not self.prs_results and ready_parquet_path:
-            self._load_prs_results_from_dagster(_prs_partition_key(ready_parquet_path))
+        if not self.prs_results and ready_parquet_path and not self.prs_force_recompute:
+            yield PRSState.restore_prs_checkpoint_for_file(ready_parquet_path)
 
         yield PRSTraitState.initialize_traits(self.genome_build, ready_parquet_path, self.include_harmonized)
 
@@ -5115,11 +4809,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             )
 
         try:
-            catalog = _get_prs_catalog(cache_dir_str)
-            if refresh_reference_cache:
-                catalog.refresh_reference_cache(panel="1000g")
             cache_path = Path(cache_dir_str) / "scores"
-            best_perf_df = catalog.best_performance().collect()
 
             # WGS samples: restore reference alleles for absent variants (assumed
             # hom-ref) so genome-wide coverage isn't capped at the recorded set.
@@ -5133,15 +4823,27 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
             # reuse the in-memory handle across every selected score, instead of
             # re-parsing + re-joining it per score (the dominant cost — ~8.4 s/score
             # vs ~1.2 s/score with the prepared handle).
-            reference_universe: Optional[_ReferenceUniverse] = None
+            # The catalog, its tables and the universe can each pull from HuggingFace on a cache
+            # miss (75 MB for the universe, then a ~34M-row parse): all of it runs in the thread
+            # pool, like each score below. On the event loop it froze every client for 9 s.
+            loop = asyncio.get_running_loop()
+            prepared = await loop.run_in_executor(
+                None,
+                _prepare_prs_compute,
+                cache_dir_str,
+                refresh_reference_cache,
+                genome_build,
+                any_restoration,
+            )
+            catalog = prepared.catalog
+            best_perf_df = prepared.best_perf_df
+            reference_universe = prepared.reference_universe
+            if prepared.universe_error:
+                logger.warning(
+                    "Reference-allele universe unavailable; scoring without restoration: %s",
+                    prepared.universe_error,
+                )
             if any_restoration:
-                try:
-                    reference_universe = catalog.prepare_reference_universe(genome_build)
-                except Exception as exc:
-                    logger.warning(
-                        "Reference-allele universe unavailable; scoring without restoration: %s",
-                        exc,
-                    )
                 if reference_universe is None:
                     sample_jobs = [
                         (label, path, lf, False, "auto" if restore else mode)
@@ -5174,7 +4876,6 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                     sample_note = f" ({sample_label})" if sample_label else ""
                     self.status_message = f"Computing {i}/{total}: {pgs_id}{sample_note}..."
 
-                loop = asyncio.get_event_loop()
                 try:
                     row = await loop.run_in_executor(
                         None,
@@ -5229,8 +4930,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                     self.prs_results_source_file = source_file
                     self._build_prs_results_grid()
                     self.low_match_warning = any_low_match
-                    if not comparing:
-                        self._checkpoint_prs_to_dagster()
+                    checkpoint_args = None if comparing else self._prs_checkpoint_args()
                     # Invalidate + rebuild the trait summary on EACH added score so
                     # the grouped view tracks computed scores live instead of caching
                     # a stale snapshot (e.g. "13 models" while the rest stream in).
@@ -5241,6 +4941,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                         except Exception as summary_exc:
                             logger.warning("Incremental trait summary rebuild failed: %s", summary_exc)
                     self._ensure_result_chart_selected()
+                await _write_prs_checkpoint(checkpoint_args)
                 gc.collect()
 
             async with self:
@@ -5259,8 +4960,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                 if failed_ids:
                     parts.append(f"{len(failed_ids)} failed: {', '.join(failed_ids[:5])}")
                 self.status_message = "Computed " + "; ".join(parts)
-                if not comparing:
-                    self._checkpoint_prs_to_dagster()
+                final_checkpoint_args = None if comparing else self._prs_checkpoint_args()
                 # Build the trait summary in isolation: the per-score results are
                 # already persisted above, so a summary/UI failure must never
                 # discard them — surface a notice instead of losing the run.
@@ -5275,6 +4975,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                         )
                         self.status_message += " — trait summary unavailable (results saved)"
                     self._ensure_result_chart_selected()
+            await _write_prs_checkpoint(final_checkpoint_args)
         except Exception as exc:
             logger.error("PRS computation failed: %s", exc, exc_info=True)
             async with self:
@@ -5282,34 +4983,40 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
                     self.prs_computing = False
                     self.status_message = f"PRS computation failed: {exc}"
 
-    def _checkpoint_prs_to_dagster(self) -> None:
-        """Persist current PRS results beside the sample for cross-session restore."""
+    def _prs_checkpoint_args(self) -> Optional[tuple[str, list[dict[str, Any]], str, str, str]]:
+        """Snapshot what `checkpoint_in_worker` needs, under the state lock; None when nothing to save."""
         if self.is_multi_sample:
-            return
+            return None
         parquet_path = self.prs_initialized_for_file
         if not parquet_path or not self.prs_results:
-            return
-        try:
-            checkpoint_prs_results(
-                get_dagster_instance(),
-                parquet_path,
-                list(self.prs_results),
-                genome_build=self.genome_build,
-                ancestry=self.selected_ancestry or "",
-                sample_type=self.sample_type,
-            )
-        except Exception as exc:
-            logger.warning("PRS checkpoint for %s did not land: %s", parquet_path, exc, exc_info=True)
+            return None
+        return (
+            parquet_path,
+            list(self.prs_results),
+            self.genome_build,
+            self.selected_ancestry or "",
+            self.sample_type,
+        )
 
-    def _load_prs_results_from_dagster(self, partition_key: str) -> None:
-        """Restore PRS results from the latest checkpoint."""
-        if not partition_key or self.prs_force_recompute:
-            return
+    @rx.event(background=True)
+    async def restore_prs_checkpoint_for_file(self, parquet_path: str) -> None:
+        """Restore a sample's PRS results from its checkpoint, reading Dagster in a worker process.
+
+        The sample may have changed, or a compute may have filled results, while the worker read;
+        either way the checkpoint is dropped.
+        """
         try:
-            checkpoint = restore_prs_checkpoint(get_dagster_instance(), partition_key)
+            checkpoint = await run_in_compute(restore_in_worker, _prs_partition_key(parquet_path))
         except Exception as exc:
             logger.warning("Failed to restore PRS results from Dagster: %s", exc)
             return
+        async with self:
+            if self.prs_initialized_for_file != parquet_path or self.prs_results or self.prs_force_recompute:
+                return
+            self._apply_prs_checkpoint(checkpoint)
+
+    def _apply_prs_checkpoint(self, checkpoint: PrsCheckpoint) -> None:
+        """Show a restored checkpoint's rows as this sample's results."""
         if checkpoint.status == "stale":
             self.status_message = "Stored PRS results are from an older version — please recompute."
             return
@@ -5325,7 +5032,7 @@ class PRSState(SafeGridMixin, PRSComputeStateMixin, LazyFrameGridMixin, rx.State
         try:
             self.build_trait_summary()
         except Exception as summary_exc:
-            logger.warning("Trait summary build after PRS restore failed: %s", summary_exc, exc_info=True)
+            logger.warning("Trait summary build after PRS restore failed: %s", summary_exc)
         self._ensure_result_chart_selected()
         self.status_message = f"Restored {checkpoint.row_count} PRS result(s) from previous session"
 
