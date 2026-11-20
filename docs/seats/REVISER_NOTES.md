@@ -116,3 +116,8 @@ was shown to that session and will not be shown again: its first work is repeate
   75 addressed. Still open: Box 1's user group and its followers (desk #69: C58, S9, S11, S18, C110, C114, C130),
   authorship (#62: C64, C115, C116), carried facts (#76), and C51 to C53, C57, C66, C68 to C70, C72, C90, C91,
   C95, C117, C124, C126 to C128, C132, C134 to C137, C139, C141, C144, C145, C48, C56.
+- **2026-11-20, two more batches.** cdaee05 (C48, C51, C53, C57, C66, C95, C117, C126, C136, C137, C145; C141 partly,
+  page limit with the journal), 4249085 (C68, C69: Table 1's ClinVar rows give their size in variants from Table S4's
+  `variant_count`). The weight formula is now a display equation (renders in the docx). Ledger: 30 open, 88 addressed,
+  4 partly. Still open, no decision needed: C52, C70, C72, C90, C91, C124, C127, C132, C134, C135, C139, C144;
+  C128 waits on the journal; the desk items as before.
