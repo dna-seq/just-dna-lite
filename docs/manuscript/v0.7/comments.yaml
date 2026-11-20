@@ -1808,7 +1808,7 @@ items:
     their review task is/looks.
   where: 3.2 Polygenic Risk Scores
   line: 243
-  status: partly
+  status: addressed
   now: For variant-only whole-genome VCFs, just-prs can count scoring loci absent from the file as homozygous reference,
     which raises coverage on the assumption that those loci were callable; the web interface does so by default
     for a whole-genome sample, and the user can turn it off. For consumer arrays, the library can estimate untyped
@@ -1818,8 +1818,7 @@ items:
   why: 'Moved to the supplement, leaving a plain summary in the main text: Section 2.1''s restoration rules (to
     S12), Section 3.2''s quality-label and ranking rules and the two ways of recovering absent loci (new S15), Section
     3.2.2''s classifier detail (new S16), Section 4.1''s memory figures and the machine''s use during runs (S10,
-    S2). Applied by the reviser under the default, open for veto.'
-  next: Section 4.2's match-rate and timing detail (C107, C147) is the part still in the main text.
+    S2), Section 4.2''s setup and matching detail (S3). Applied by the reviser under the default, open for veto.'
   category: Misplaced detail
   severity: minor
   stage: writing
@@ -2709,12 +2708,13 @@ items:
     please read technical annex section...
   where: 4.2 PRS Computation
   line: 339
-  status: open
-  now: ''
-  why: ''
-  next: Open Section 4.2 with one plain sentence on what is compared and why (the same score computed by just-prs
-    and by PLINK2 on one genome should agree), then the table, then a pointer to Supplementary S3 for the matching
-    details; follows C140.
+  status: addressed
+  now: 'This section asks two questions of one genome: does just-prs compute the same scores as the external tool
+    PLINK2 (Chang et al., 2015), which computes the same weighted sum, and how long does each take? Tables 3 and
+    4 give the answers; Supplementary S3 gives how variants were matched and how the runs were timed.'
+  why: Section 4.2 now opens by saying what is compared and why, then the setup in two sentences, the results and
+    Tables 3 and 4, with the matching and timing detail in Supplementary S3. Applied by the reviser under the default,
+    open for veto.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2846,11 +2846,13 @@ items:
   comment: I admit, I didnt understand anything in this paragraph, cannot comment anything more here...
   where: 4.2 PRS Computation
   line: 382
-  status: open
-  now: ''
-  why: ''
-  next: Rewrite the paragraph for a reader outside the field in two or three sentences (what was matched, why the
-    two tools' counts differ, what the timings include) and move the rest to Supplementary S3, with C85.
+  status: addressed
+  now: About half of each score's variants were found in this genome by both tools (median 53% for just-prs and
+    51% for PLINK2), with the counting of absent loci as reference turned off; the two percentages are not quite
+    the same measure. The timings cover scoring from prepared inputs, and Supplementary S3 gives what each includes.
+  why: The paragraph is now two plain sentences (how much of each score was found, what the timings cover); the
+    full matching and timing detail moved word for word to Supplementary S3. Applied by the reviser under the default,
+    open for veto.
   category: Writing and clarity
   severity: minor
   stage: writing
