@@ -9,8 +9,11 @@ from pathlib import Path
 import zipfile
 
 import reflex as rx
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from eliot import log_message
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response, StreamingResponse
+from openai import OpenAIError
+from pydantic import BaseModel
 from just_dna_pipelines.annotation.analytics import inject_umami_tracker, umami_config
 from just_dna_pipelines.runtime import load_env
 from just_dna_pipelines.annotation.resources import get_user_output_dir
@@ -29,6 +32,15 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 load_env()
 
 from webui.features import module_creator_available  # noqa: E402
+from webui.local_llm import (  # noqa: E402
+    MAX_PROMPT_CHARS,
+    LocalExplanation,
+    LocalModelError,
+    available_local_llm_config,
+    describe_local_llm_failure,
+    inject_local_model_button,
+)
+from just_dna_pipelines.module_config import is_immutable_mode  # noqa: E402
 from webui.pages.dashboard import dashboard_page  # noqa: E402
 from webui.pages.index import index_page  # noqa: E402
 from webui.pages.analysis import analysis_page  # noqa: E402
@@ -326,23 +338,84 @@ def _resolve_report_file(user_id: str, sample_name: str, filename: str) -> Path:
 
 
 @api.get("/api/report/{user_id}/{sample_name}/{filename}", response_model=None)
-async def view_report_file(user_id: str, sample_name: str, filename: str) -> Response:
+async def view_report_file(request: Request, user_id: str, sample_name: str, filename: str) -> Response:
     """
     Serve an HTML report file for viewing in the browser.
-    
+
+    Adds the analytics tag and, when a local model is configured (``webui.local_llm``), the
+    "Local model" button. Both happen here rather than in the generator, so a report written before
+    the model was set up gains the button, and the download route stays byte-identical.
+
     Path: /api/report/{user_id}/{sample_name}/{filename}
     Example: /api/report/anonymous/antku_small/report_20260818_221532.html
     """
     file_path = _resolve_report_file(user_id, sample_name, filename)
 
     html = file_path.read_text(encoding="utf-8")
-    tracked_html = inject_umami_tracker(html)
+    explain_path = request.url_for("explain_with_local_model").path
+    tracked_html = inject_local_model_button(inject_umami_tracker(html), explain_path)
     if tracked_html == html:
         return FileResponse(
             path=str(file_path),
             media_type="text/html",
         )
     return HTMLResponse(content=tracked_html)
+
+
+class ExplainRequest(BaseModel):
+    """The question a report's assistant link carries, sent to the local model instead."""
+
+    prompt: str
+
+
+@api.post("/api/explain-local", name="explain_with_local_model", response_model=None)
+async def explain_with_local_model(body: ExplainRequest) -> Response:
+    """Stream the configured local model's answer to one report question, as plain text.
+
+    The endpoint is the configured one only (``LOCAL_LLM_BASE_URL``); nothing in the request can
+    choose where the question goes. Refused in immutable (public demo) mode, where visitors' genotypes
+    would go to the server operator's model. A failure to start answers 502 with a message that
+    names the endpoint; a failure halfway ends the streamed text with the reason.
+    """
+    if is_immutable_mode():
+        raise HTTPException(
+            status_code=403,
+            detail="Explaining with a local model is turned off on this public demo.",
+        )
+    config = available_local_llm_config()
+    if config is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No local model is set up. Set LOCAL_LLM_BASE_URL in .env.",
+        )
+    prompt = body.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=422, detail="The question is empty.")
+    if len(prompt) > MAX_PROMPT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"The question is {len(prompt)} characters long; the limit is {MAX_PROMPT_CHARS}.",
+        )
+
+    explanation = LocalExplanation(config, prompt)
+    try:
+        model = await explanation.open()
+    except (OpenAIError, LocalModelError) as exc:
+        await explanation.aclose()
+        message = describe_local_llm_failure(config, exc, explanation.model)
+        log_message(
+            message_type="local_llm:explain_failed",
+            endpoint=config.base_url,
+            model=explanation.model,
+            error=repr(exc),
+        )
+        return PlainTextResponse(message, status_code=502)
+
+    return StreamingResponse(
+        explanation.chunks(),
+        media_type="text/plain; charset=utf-8",
+        headers={"X-Local-Model": model, "Cache-Control": "no-store"},
+    )
 
 
 @api.get("/api/download-report/{user_id}/{sample_name}/{filename}")

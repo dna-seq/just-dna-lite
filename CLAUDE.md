@@ -440,6 +440,21 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   third party, never automatically. They are ~half the file size. Keep icons as one `<symbol>` set with
   `<use>`. Phenotype results get the same four (`_build_phenotype_ai_links`); the privacy note lives in
   each button's tooltip and `aria-label`, and in full under *How to read this report*.
+- **The fifth button, "Local model", is added while the backend serves a report, never by the
+  generator.** `GET /api/report/...` inserts `window.JUST_DNA_LOCAL_LLM` (endpoint path, model,
+  base URL) and `templates/local_model_explain.html` before `</head>` when `LOCAL_LLM_BASE_URL` is set
+  and the app is not in immutable mode (`webui.local_llm.inject_local_model_button`), so reports written
+  earlier gain it and `/api/download-report/...` stays byte-identical (a downloaded copy has no backend).
+  The button reads its question from a sibling link's `q` parameter, so every `AI_EXPLAIN_ASSISTANTS`
+  base URL must end in `?q=` (`test_every_assistant_link_carries_the_whole_question_in_q`); do not add
+  a per-row copy of the prompt. It POSTs to `/api/explain-local`, which streams plain text from the
+  configured OpenAI-compatible endpoint (`openai.AsyncOpenAI`, `LOCAL_LLM_MODEL` or else the first id
+  under `/models`, `LOCAL_LLM_API_KEY` optional). The endpoint comes from config only, never the request.
+  Refusals: 403 in immutable mode, 503 unconfigured, 413 over `MAX_PROMPT_CHARS`; a failure to start is a
+  502 whose text names the endpoint, a failure halfway ends the text with the reason. The answer shows
+  in one fixed panel as `textContent`, never in the table (the detail-row sibling rule). Prompts are
+  never logged, only their length. Tests: `tests/test_local_model_explain.py` (a real fake upstream
+  under uvicorn).
 - **Phenotype modules render in `phenotype_section.html.j2`**, each as its own subsection so two of them
   never read as one. A result is an open block (plain headline, the
   module's conclusion, a **More details** fold with the fitting pairs, activity score, phase, how each

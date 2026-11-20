@@ -540,6 +540,77 @@ def test_ai_explain_cell_has_no_external_links_without_an_rsid():
     assert 'class="ai-explain-link ' not in html
 
 
+# ==================================================== the web UI's local-model button
+
+import re
+
+from just_dna_pipelines.annotation.report_logic import (
+    AI_EXPLAIN_ASSISTANTS,
+    LOCAL_MODEL_EXPLAIN_SNIPPET,
+    _build_phenotype_ai_links,
+    _build_phenotype_ai_prompt,
+    _build_variant_ai_prompt,
+)
+
+# Characters a naive encoder mangles: `+` reads back as a space, `&` and `#` end the parameter.
+_AWKWARD_CONCLUSION = "Carriers of A+B differ by 5% & more #1; see ?q=x"
+
+
+@pytest.mark.parametrize("provider,base_url", AI_EXPLAIN_ASSISTANTS)
+def test_every_assistant_link_carries_the_whole_question_in_q(provider: str, base_url: str) -> None:
+    """The local-model button sends the question it reads from a sibling link's `q` parameter.
+
+    The served report gets the button from webui.local_llm, and it keeps no copy of the question of
+    its own, so every base URL must end in `?q=` and the parameter must decode to the full prompt.
+    """
+    assert base_url.endswith("?q="), f"{provider}'s link would hide the question from the local-model button"
+    variant = _build_variant(
+        {"rsid": "rs429358", "gene": "APOE", "genotype": ["C", "T"], "weight": -0.8,
+         "conclusion": _AWKWARD_CONCLUSION},
+        {},
+    )
+    phenotype = {"gene": "ABO", "status": "called", "phenotype": "Blood group A+",
+                 "readings": [{"phenotype": "Blood group A+", "conclusions": [_AWKWARD_CONCLUSION]}],
+                 "sites": [{"rsid": "rs8176719", "chrom": "9", "start": 133257521, "ref": "T",
+                            "observed": ["T", "TC"], "evidence": "called"}]}
+    for links, prompt in (
+        (variant["ai_explain_links"], _build_variant_ai_prompt(variant)),
+        (_build_phenotype_ai_links("Blood groups", phenotype), _build_phenotype_ai_prompt("Blood groups", phenotype)),
+    ):
+        url = next(link["url"] for link in links if link["provider"] == provider.lower())
+        query = urllib.parse.urlsplit(url).query
+        # parse_qs decodes `+` as a space, exactly like the browser's URLSearchParams.
+        assert urllib.parse.parse_qs(query, keep_blank_values=True) == {"q": [prompt]}
+        assert _AWKWARD_CONCLUSION in prompt
+
+
+def test_a_rendered_report_has_the_hooks_the_local_model_button_needs() -> None:
+    """The snippet appends to every `.ai-explain-links` and reads `q` from an `a.ai-explain-link`."""
+    snippet = LOCAL_MODEL_EXPLAIN_SNIPPET.read_text(encoding="utf-8")
+    assert 'querySelectorAll(".ai-explain-links")' in snippet
+    assert 'querySelectorAll("a.ai-explain-link[href]")' in snippet
+    assert 'searchParams.get("q")' in snippet
+    # The answer is model output: it reaches the page as text, never as markup.
+    assert "innerHTML" not in snippet
+    # Served verbatim, never rendered by Jinja.
+    assert "{{" not in snippet and "{%" not in snippet
+
+    variants = [
+        _build_variant({"rsid": f"rs{i}", "gene": "APOE", "genotype": ["C", "T"], "weight": 0.1}, {})
+        for i in (1, 2)
+    ]
+    html = _render(other_modules=[_module_data(variants)])
+    assert html.count('<div class="ai-explain-links">') == len(variants)
+    for i in (1, 2):
+        start = html.index(f"Ask ChatGPT to explain rs{i}.")
+        container = html[html.rindex('<div class="ai-explain-links">', 0, start):html.index("</div>", start)]
+        hrefs = re.findall(r'<a\s+class="ai-explain-link [a-z]+"\s+href="([^"]+)"', container)
+        assert len(hrefs) == len(AI_EXPLAIN_ASSISTANTS)
+        assert all(f"RSID%3A%20rs{i}" in href for href in hrefs)
+    # The generator never writes the button: only the backend adds it, while serving.
+    assert "JUST_DNA_LOCAL_LLM" not in html and "local-llm-panel" not in html
+
+
 def test_a_populated_0_5_axis_reaches_the_html():
     """The test that keeps the deferral honest.
 
