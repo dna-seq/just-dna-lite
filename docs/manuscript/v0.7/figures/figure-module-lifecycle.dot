@@ -1,0 +1,17 @@
+digraph lifecycle {
+  rankdir=LR; nodesep=0.5; ranksep=0.4; newrank=true;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f6f8", color="#5b6770", fontname="Helvetica", fontsize=11];
+  edge [color="#5b6770"];
+  ai [label="just-module-creator\n(optional AI drafting from\nliterature and databases)", style="rounded,dashed,filled"];
+  spec [label="Authored module\nmodule_spec.yaml,\nvariants.csv, studies.csv\n(no code)", fillcolor="#fff4e0"];
+  comp [label="just-dna-compiler\nvalidates and compiles"];
+  art [label="Compiled module\nweights.parquet, annotations.parquet,\nstudies.parquet + manifest\n(identity, integrity, version)", fillcolor="#e8f1fb"];
+  pub [label="Published\njust-dna-registry, or a source\nlisted in modules.yaml"];
+  inst [label="Discovered and installed\n(Module Catalog),\nno software update"];
+  run [label="Annotation engine\nreads the Parquet tables", fillcolor="#e9f5ea"];
+  ai -> spec [style=dashed]; spec -> comp;
+  comp -> art [constraint=false];
+  art -> pub -> inst -> run;
+  {rank=same; ai; art} {rank=same; spec; pub} {rank=same; comp; inst}
+  ai -> art [style=invis];
+}

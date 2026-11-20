@@ -1,0 +1,18 @@
+digraph overview {
+  rankdir=LR; nodesep=0.35; ranksep=0.45;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f6f8", color="#5b6770", fontname="Helvetica", fontsize=11];
+  edge [color="#5b6770", fontname="Helvetica", fontsize=9];
+  ui [label="Web interface  ·  MCP servers (AI assistants)  ·  Python libraries and command line\nstart the same runs", fillcolor="#ffffff", style="rounded,dashed"];
+  vcf [label="User's VCF (GRCh38)\nfrom a provider, a public\nrepository or own pipeline", fillcolor="#fff4e0"];
+  norm [label="Normalization\nquality filters,\nParquet on disk"];
+  ann [label="Module annotation\njoin with each module's\nlead table"];
+  ens [label="Ensembl Variation\n(optional)", style="rounded,dashed,filled"];
+  mods [label="Annotation modules\nParquet tables + manifest\n(registry, HuggingFace, GitHub,\nweb, cloud or local)", fillcolor="#e8f1fb"];
+  rep [label="Report\nParquet + HTML,\neach variant with its sources", fillcolor="#e9f5ea"];
+  pgs [label="Prepared PGS Catalog\nscoring files, cleaned metadata,\n1000 Genomes reference\ndistributions, ancestry model", fillcolor="#e8f1fb"];
+  prs [label="just-prs\npolygenic scoring"];
+  out [label="Percentiles, coverage,\nquality labels, all models\nfor a trait", fillcolor="#e9f5ea"];
+  vcf -> norm -> ann -> rep; mods -> ann; ens -> ann [style=dashed];
+  norm -> prs -> out; pgs -> prs;
+  ui -> norm [style=dotted]; ui -> prs [style=dotted];
+}

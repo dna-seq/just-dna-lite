@@ -339,7 +339,7 @@ The stored report states no module version. It displays the build-digest prefix 
 <!-- @/rev T2 -->
 
 <!-- @rev T4 rounds=1 by=codex:2026-10-19 -->
-**Provenance of the supplied report examples.** The author supplied an [annotation report for Anton Kulaga](https://drive.google.com/file/d/1GN3_GwlYOBQtXHfHzC75RAYv7eJkeScQ/view) and a [separate PRS summary](https://drive.google.com/file/d/1WhxN5YvCjP3dRDFfo7p-vcYs_gPB1cvq/view). The annotation report reproduces the worked row and all five study records above. According to the author's account, the PRS summary followed a separate computation of approximately 4,000 polygenic scores with Just-DNA-Seq and selection and summary of the most interesting findings. “Semi manual” describes that selection and summary, not manual score calculation. This example is separate from the 100-score engine benchmark. The summary alone does not identify every scoring model or the exact software version and settings; those would be needed to reproduce its quantitative summaries. Figure 2 uses recorded annotation fields; the PRS summary is retained as an example of exploration following computation.
+**Provenance of the supplied report examples.** The author supplied an [annotation report for Anton Kulaga](https://drive.google.com/file/d/1GN3_GwlYOBQtXHfHzC75RAYv7eJkeScQ/view) and a [separate PRS summary](https://drive.google.com/file/d/1WhxN5YvCjP3dRDFfo7p-vcYs_gPB1cvq/view). The annotation report reproduces the worked row and all five study records above. According to the author's account, the PRS summary followed a separate computation of approximately 4,000 polygenic scores with Just-DNA-Seq and selection and summary of the most interesting findings. “Semi manual” describes that selection and summary, not manual score calculation. This example is separate from the 100-score engine benchmark. The summary alone does not identify every scoring model or the exact software version and settings; those would be needed to reproduce its quantitative summaries. Figure 4 uses recorded annotation fields; the PRS summary is retained as an example of exploration following computation.
 <!-- @/rev T4 -->
 
 <!-- @rev C85b rounds=1 by=claude:2026-11-20 -->
@@ -351,6 +351,18 @@ For variant-only whole-genome VCFs, just-prs can optionally count absent scoring
 
 For consumer arrays (23andMe, AncestryDNA), precomputed linkage disequilibrium (LD) proxy tables estimate untyped scoring variants from typed ones where suitable tables exist; as of October 2026, the just-prs library reads these files but the platform's web upload does not (Section 5.4).
 <!-- @/rev C85b -->
+
+<!-- @rev C138 rounds=1 by=claude:2026-11-20 -->
+**Table S15.** What the prepared PGS catalogue holds for each score (Section 3.2). It is stored as Parquet and downloaded on first use from the HuggingFace datasets `just-dna-seq/pgs-catalog` and `just-dna-seq/prs-percentiles`.
+
+| Part | What it holds | Where it comes from |
+|---|---|---|
+| Scoring file | The score's variants, effect alleles and weights | The PGS Catalog's harmonized scoring files |
+| Metadata | Genome build (nine labels mapped to three builds or "not reported"); performance metrics parsed into estimates, confidence intervals and standard errors | The PGS Catalog, cleaned |
+| Curation (2,282 scores) | What a higher score means; the concept the score belongs to | AI agents reading the source publications, pending expert review |
+| Reference distribution | Mean and standard deviation of the score in each of five 1000 Genomes superpopulations | The 3,202 individuals of the 1000 Genomes panel, scored with the model |
+| Ancestry model (one for all scores) | The principal-component space and the reference individuals of the classifier (S16) | 1000 Genomes high-coverage panel, folder `data/ancestry` of `just-dna-seq/pgs-catalog` |
+<!-- @/rev C138 -->
 
 <!-- @rev C140 rounds=1 by=claude:2026-11-20 -->
 **S16. The ancestry classifier.** How the reference superpopulation of Section 3.2.2 is chosen.

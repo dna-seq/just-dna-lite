@@ -922,14 +922,17 @@ items:
     @antonkulaga@gmail.com'
   where: '2. System and Methods: Platform Architecture'
   line: 107
-  status: open
-  now: ''
-  why: ''
-  next: 'Add an overview diagram at the start of Section 2: a VCF goes through quality filtering into the annotation
-    engine, which joins it with the modules (and optionally Ensembl) and writes the report; the PGS Catalog''s scoring
-    files go through just-prs to percentiles; the web interface, the MCP servers and the Python libraries call the
-    same operations. Livia asks Anton; which figures the paper has is the authors'' decision. Desk #75 (default:
-    two diagrams in the main text, the catalogue as a table in S15, drafted by the reviser).'
+  status: addressed
+  now: '**Figure 2. How Just-DNA-Lite reads a genome.** The user''s VCF is quality-filtered and written as a Parquet
+    file (Section 2.1). The annotation engine joins it with each selected module''s lead table, and optionally with
+    Ensembl Variation, and writes a report in which each matched variant links to its sources (Sections 2.1 and
+    2.2). just-prs scores the same file against the prepared PGS Catalog and reports each score''s percentile in
+    the matching reference population, its coverage and its quality label (Section 3.2). The web interface, the
+    MCP servers and the Python libraries and command-line tools start the same runs. Drawn for this paper from the
+    text.'
+  why: 'A system overview diagram opens Section 2 as Figure 2. Drafted by the reviser under desk #75''s default,
+    open for veto; the old Figures 2 and 3 are now 4 and 5. The diagrams are plain Graphviz drafts (figures/*.dot)
+    and may need redrawing before submission.'
   category: Figures and tables
   severity: major
   stage: writing
@@ -1086,13 +1089,16 @@ items:
     each paragraph from this section would be nice and explained with a a schema- tink of it a mini slideshow silde'
   where: 2.2 Annotation Modules as Data
   line: 141
-  status: open
-  now: ''
-  why: ''
-  next: 'A diagram for Section 2.2: a module''s authored files (module_spec.yaml, variants.csv, studies.csv) compiled
-    into its Parquet tables and manifest, published to the registry and installed by users. The open proposal to
-    show one real module''s files in the supplement fits beside it. Desk #75 (default: two diagrams in the main
-    text, the catalogue as a table in S15, drafted by the reviser).'
+  status: addressed
+  now: '**Figure 3. The life of an annotation module.** A researcher writes the module as a YAML specification and
+    CSV tables, without code, optionally drafted by an AI assistant with the just-module-creator plugin (Section
+    3.4). just-dna-compiler validates and compiles them into Parquet tables and a manifest that records the module''s
+    identity, integrity and version. The module is published to just-dna-registry or to any source listed in `modules.yaml`,
+    and users discover and install it in the Module Catalog with no software update; the annotation engine reads
+    only the compiled tables. Drawn for this paper from the text.'
+  why: 'A module lifecycle diagram follows Section 2.2''s authoring paragraph as Figure 3. Drafted by the reviser
+    under desk #75''s default, open for veto; the old Figures 2 and 3 are now 4 and 5. The diagrams are plain Graphviz
+    drafts (figures/*.dot) and may need redrawing before submission.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1513,13 +1519,11 @@ items:
     most wellcom in such descriptive parts
   where: 3.2 Polygenic Risk Scores
   line: 230
-  status: open
-  now: ''
-  why: ''
-  next: 'A small figure or table of what the prepared catalogue holds for each score (its scoring file, cleaned
-    metadata, reference distribution, and the ancestry model) and where each part comes from. It is also the place
-    to say what the PGS Catalog is (C48). Desk #75 (default: two diagrams in the main text, the catalogue as a table
-    in S15, drafted by the reviser).'
+  status: addressed
+  now: Table S15. What the prepared PGS catalogue holds for each score (Section 3.2).
+  why: 'What the prepared catalogue holds for each score, and where each part comes from, is Table S15 in Supplementary
+    S15. Drafted by the reviser under desk #75''s default, open for veto; the old Figures 2 and 3 are now 4 and
+    5. The diagrams are plain Graphviz drafts (figures/*.dot) and may need redrawing before submission.'
   category: Figures and tables
   severity: minor
   stage: writing
