@@ -4,17 +4,16 @@
 
 1. ``$JUST_DNA_REFERENCE_FASTA`` (an explicit file);
 2. ``<JUST_DNA_PIPELINES_CACHE_DIR>/reference/grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa``,
-   which ``ensure_reference_fasta`` fills (the ``grch38_reference_fasta`` Dagster asset);
-3. just-prs's reference-FASTA lane (``just_prs.reference.reference_fasta_path("GRCh38")``), so a
-   copy just-prs already fetched is not fetched again.
+   which ``ensure_reference_fasta`` fills (the ``grch38_reference_fasta`` Dagster asset).
 
-All three are the Ensembl primary assembly, whose contigs are unprefixed (``1``, ``X``, ``MT``).
+Both are the Ensembl primary assembly, whose contigs are unprefixed (``1``, ``X``, ``MT``).
 Contig names on both sides go through ``just_dna_format.vrs.normalize_chrom`` before they meet.
 
-**Fetching.** ``ensure_reference_fasta`` streams Ensembl's ``.fa.gz`` (the URL just-prs pins, so the
-release is named in one place), decompresses it on the way to disk and builds the ``.fai`` with
-pyfaidx. just-prs's own downloader needs pysam only to build that index, and pysam has no Windows
-wheels; pyfaidx is pure Python and is what reads the file anyway.
+**Fetching.** ``ensure_reference_fasta`` streams Ensembl's ``.fa.gz``, decompresses it on the way to
+disk and builds the ``.fai`` with pyfaidx, which is also what reads it. Nothing here touches just-prs's
+reference-FASTA lane: that is its precompute cache, filled only by a downloader that needs pysam from
+its ``reference`` extra, so no normal install has it (looking there is how a run on a fresh machine
+ended in "No GRCh38 reference FASTA found").
 
 **Coordinates.** ``user_vcf_normalized.parquet`` keeps polars-bio's ``start``, which is the VCF
 ``POS`` (1-based; ``start == end`` for an SNV). A window of ``size`` bases is centred so that the
@@ -31,14 +30,15 @@ import fsspec
 import numpy as np
 from eliot import log_message, start_action
 from just_dna_format.vrs import normalize_chrom
-from just_prs.reference import REFERENCE_FASTA, reference_fasta_path
 from pyfaidx import Faidx, Fasta
 
 from just_dna_pipelines.annotation.resources import get_cache_dir
 
 REFERENCE_FASTA_ENV = "JUST_DNA_REFERENCE_FASTA"
 GRCH38_FASTA_NAME = "Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-GRCH38_FASTA_URL: str = REFERENCE_FASTA["GRCh38"]["url"]
+GRCH38_FASTA_URL = (
+    "https://ftp.ensembl.org/pub/release-113/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+)
 COPY_CHUNK_BYTES = 16 * 1024 * 1024
 PROGRESS_EVERY_BYTES = 256 * 1024 * 1024
 # A stalled connection fails after this long without data; the whole download has no time limit
@@ -72,7 +72,6 @@ def reference_fasta_candidates() -> list[Path]:
     if explicit:
         candidates.append(Path(explicit).expanduser())
     candidates.append(cached_reference_fasta_path())
-    candidates.append(reference_fasta_path("GRCh38"))
     return candidates
 
 

@@ -607,7 +607,6 @@ def test_the_reference_asset_fetches_into_the_cache_when_none_exists(
     fetch = reference.download_reference_fasta
     monkeypatch.delenv(REFERENCE_FASTA_ENV, raising=False)
     monkeypatch.setattr(reference, "get_cache_dir", lambda: cache)
-    monkeypatch.setattr(reference, "reference_fasta_path", lambda build: tmp_path / "no-prs-copy.fa")
     monkeypatch.setattr(
         reference, "download_reference_fasta", lambda dest, on_progress=None: fetch(dest, f"{fasta_server}/ref.fa.gz", on_progress)
     )
