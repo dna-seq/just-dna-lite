@@ -41,6 +41,7 @@ from just_dna_pipelines.annotation.io_managers import (
 )
 from just_dna_pipelines.annotation.registry import load_module_definitions
 from just_dna_pipelines.predictions.assets import (
+    grch38_reference_fasta,
     predict_variant_effects_job,
     user_variant_effect_predictions,
 )
@@ -187,7 +188,7 @@ def _build_definitions() -> Definitions:
     
     # 5. Genome prediction models (variant effects from a sequence model, own report)
     _predictions = Definitions(
-        assets=[user_variant_effect_predictions],
+        assets=[grch38_reference_fasta, user_variant_effect_predictions],
         jobs=[predict_variant_effects_job],
     )
 

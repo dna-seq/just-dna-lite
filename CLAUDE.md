@@ -829,10 +829,14 @@ annotation report). `predictions/models.py` is the list of models, one `Predicti
   (`model.optimized.ort<version>-<provider>.onnx`: building the session took ~6 minutes on a busy CPU, the
   saved graph loads in ~12 s). Outputs: `<sample>/krongenome_variant_effects.parquet` and `.json`, and
   `<sample>/reports/krongenome_variant_effects_<timestamp>.html`, which the Reports tab lists.
-- **Reference FASTA**: `$JUST_DNA_REFERENCE_FASTA`, else `<cache>/reference/grch38/Homo_sapiens.GRCh38.dna.
-  primary_assembly.fa`, else just-prs's lane (`just_prs.reference.reference_fasta_path`, filled by
-  `pipelines predict fetch-reference`, which needs pysam). Read with pyfaidx; contigs meet through
-  `normalize_chrom`. The parquet's polars-bio `start` is the 1-based VCF POS (tested against GRCh38).
+- **Reference FASTA is the `grch38_reference_fasta` asset** (unpartitioned, cache, in
+  `predict_variant_effects_job`'s selection, so a run on a fresh machine fetches it before scoring). It uses
+  `$JUST_DNA_REFERENCE_FASTA`, else `<cache>/reference/grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa`,
+  else just-prs's copy (`just_prs.reference.reference_fasta_path`); with none, `reference.ensure_reference_fasta`
+  streams Ensembl's `.fa.gz` (URL from just-prs's `REFERENCE_FASTA`) into the cache path, uncompressed, and
+  indexes it with pyfaidx (`pipelines predict fetch-reference` does the same). **No pysam**: just-prs's
+  downloader needs it only for the `.fai`, and it has no Windows wheels. Read with pyfaidx (polars-bio's
+  `scan_fasta` yields whole contigs, no indexed windows); contigs meet through `normalize_chrom`. The parquet's polars-bio `start` is the 1-based VCF POS (tested against GRCh38).
 - **Cost**: on the 16-core desktop at nice 19 one row took 34 s quiet and 48 s under load (a batch of two:
   63 s / 86 s, but 5.7 GB peak against 3.3 GB, hence one row per call). About 1.5 minutes per SNV keeps the
   default cap near ten minutes. Tests: `just-dna-pipelines/tests/test_predictions.py` (the real-model test is

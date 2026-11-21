@@ -171,10 +171,11 @@ Or use a small script that calls `job_def.execute_in_process()` with the correct
 
 ### 5. Genome prediction models (user_variant_effect_predictions)
 
-`predict_variant_effects_job` selects only `user_variant_effect_predictions`
-(`just_dna_pipelines/predictions/`), which reads the existing `user_vcf_normalized.parquet` through the
+`predict_variant_effects_job` selects `grch38_reference_fasta` and `user_variant_effect_predictions`
+(`just_dna_pipelines/predictions/`). The first is the Ensembl GRCh38 FASTA in the cache: fetched and
+indexed the first time (about 900 MB download, 3.1 GB on disk), only checked afterwards. The second reads the existing `user_vcf_normalized.parquet` through the
 IO manager and scores a sample's variants with a sequence model (today one entry, KronGenome F, ONNX
-on ONNX Runtime). Run config names only that asset (`predictions.run_config.prediction_run_config`).
+on ONNX Runtime). Run config names only the prediction asset (`predictions.run_config.prediction_run_config`).
 It needs a normalized sample; the default variant set also needs a finished annotation run.
 
 **Output:**

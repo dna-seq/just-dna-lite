@@ -7,8 +7,11 @@ VCF), scores the chosen variant set with the chosen model, and writes three file
 - ``<sample>/<model.output_stem>.json``: what the run did (``report.PredictionRun``);
 - ``<sample>/reports/<model.output_stem>_<timestamp>.html``: the separate report.
 
-``predict_variant_effects_job`` selects only this asset, so its run config names only it
-(``prediction_run_config``) and the existing normalized parquet is loaded by the IO manager.
+``grch38_reference_fasta`` is the reference genome those windows are cut from: unpartitioned, kept in
+the cache, fetched from Ensembl the first time (``reference.ensure_reference_fasta``) and only checked
+afterwards. ``predict_variant_effects_job`` selects both, so a run on a fresh machine fetches the FASTA
+first instead of failing; its run config still names only the prediction asset
+(``prediction_run_config``), and the existing normalized parquet is loaded by the IO manager.
 """
 
 import time
@@ -32,12 +35,13 @@ from just_dna_pipelines.annotation.resources import get_user_output_dir
 from just_dna_pipelines.annotation.utils import resource_summary_hook
 from just_dna_pipelines.predictions.download import ensure_model_files
 from just_dna_pipelines.predictions.models import DEFAULT_PREDICTION_MODEL, get_prediction_model
-from just_dna_pipelines.predictions.reference import ReferenceGenome, resolve_reference_fasta
+from just_dna_pipelines.predictions.reference import ReferenceGenome, ensure_reference_fasta, resolve_reference_fasta
 from just_dna_pipelines.predictions.report import PredictionRun, render_prediction_report, report_filename
 from just_dna_pipelines.predictions.run_config import (
     DEFAULT_MAX_VARIANTS,
     PREDICTION_ASSET,
     PREDICTION_JOB,
+    REFERENCE_ASSET,
     VARIANT_SET_ANNOTATED,
     VARIANT_SET_REGION,
     VARIANT_SETS,
@@ -73,6 +77,30 @@ class VariantEffectConfig(Config):
 
 
 @asset(
+    name=REFERENCE_ASSET,
+    description="The Ensembl GRCh38 primary assembly (uncompressed FASTA with its .fai), the reference "
+                "windows prediction models read. Fetched once into the pipelines cache.",
+    compute_kind="download",
+    group_name="reference_data",
+    io_manager_key="annotation_cache_io_manager",
+    metadata={"source": "Ensembl", "storage": "cache"},
+)
+def grch38_reference_fasta(context: AssetExecutionContext) -> Output[Path]:
+    with resource_tracker("Provision GRCh38 reference FASTA", context=context):
+        fasta = ensure_reference_fasta(
+            on_progress=lambda written: context.log.info(f"Reference FASTA: {written / 1e9:.1f} GB written")
+        )
+    context.log.info(f"Reference FASTA: {fasta}")
+    return Output(
+        fasta,
+        metadata={
+            "path": MetadataValue.path(str(fasta)),
+            "size_gb": MetadataValue.float(round(fasta.stat().st_size / 1e9, 2)),
+        },
+    )
+
+
+@asset(
     name=PREDICTION_ASSET,
     description="Per-variant effects predicted by a sequence model (reference vs alternate window), "
                 "with a separate HTML report.",
@@ -81,6 +109,7 @@ class VariantEffectConfig(Config):
     partitions_def=user_vcf_partitions,
     io_manager_key="user_asset_io_manager",
     ins={"user_vcf_normalized": AssetIn()},
+    deps=[grch38_reference_fasta],
     op_tags={"dagster/concurrency_key": "variant_effect_prediction"},
     metadata={"partition_type": "user", "output_format": "parquet", "storage": "output"},
 )
@@ -118,7 +147,7 @@ def user_variant_effect_predictions(
         context.log.info(f"{variants.height} variant rows selected, {candidates} to score with {model.title}")
 
         model_dir = ensure_model_files(model)
-        fasta = resolve_reference_fasta()
+        fasta = resolve_reference_fasta()  # grch38_reference_fasta ran first in this job
         reference = ReferenceGenome(fasta)
         session = ModelSession(model_dir / model.onnx_file)
         scoring_started = time.perf_counter()
@@ -183,7 +212,7 @@ def user_variant_effect_predictions(
 
 predict_variant_effects_job = define_asset_job(
     name=PREDICTION_JOB,
-    selection=AssetSelection.assets(PREDICTION_ASSET),
+    selection=AssetSelection.assets(REFERENCE_ASSET, PREDICTION_ASSET),
     description="Score a sample's variants with a genome prediction model and write a separate report.",
     tags={"prediction": "variant_effects", "multi-user": "true"},
     hooks={resource_summary_hook},
