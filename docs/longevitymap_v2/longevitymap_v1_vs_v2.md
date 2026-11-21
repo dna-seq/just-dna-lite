@@ -2,6 +2,8 @@
 
 *2026-11-03. The v1 column is measured on `just-dna-seq/longevitymap@1.2.0`. The v2 column is the design in the requirements document; v2 counts are seed-list figures and are provisional until curation.*
 
+*Update 2026-11-19: the curation is done. Longevity Map 2.0.0 is in `data/modules/longevitymap_v2/` (164 loci, 163 rsIDs, 489 genotype rows; tiers A 15, B 73, C 41, D 35), and `recuration/` says what it found; where the seed-list figures below differ, the curated ones stand. The release: `docs/LONGEVITYMAP_V2_RELEASE.md`.*
+
 | Aspect | v1.2.0 (published) | v2 (designed) |
 |---|---|---|
 | **Primary source** | HAGR LongevityMap Build 3, frozen 2017-06-24. Cited PMIDs 1993–2015, median 2009 | Genome-wide studies 2014–2026: extreme-percentile meta-analysis, ~1M parental lifespans, multivariate healthspan, East Asian and 2025–26 cohorts. LongevityMap kept as a legacy layer |

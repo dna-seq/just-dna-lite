@@ -1,5 +1,7 @@
 # Generation-I Module Parity Plan
 
+> **longevitymap:** 1.2.0, described here, is the frozen Generation I port; 2.0.0 is the evidence re-curation in `data/modules/longevitymap_v2/` ([LONGEVITYMAP_V2_RELEASE.md](LONGEVITYMAP_V2_RELEASE.md)).
+
 This document maps every Generation-I (Gen I) Just-DNA-Seq annotation module to its port status in
 the current (Gen II) `just-dna-format`, and lays out what's needed to reach full feature parity.
 
