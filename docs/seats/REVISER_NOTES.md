@@ -121,3 +121,7 @@ was shown to that session and will not be shown again: its first work is repeate
   `variant_count`). The weight formula is now a display equation (renders in the docx). Ledger: 30 open, 88 addressed,
   4 partly. Still open, no decision needed: C52, C70, C72, C90, C91, C124, C127, C132, C134, C135, C139, C144;
   C128 waits on the journal; the desk items as before.
+- **2026-11-21, desk #69's default applied for veto** (53db27f), after the secretary's silence notice: Box 1's first
+  group "Researchers, including citizen scientists"; S18 and S21 worded to match; C130 and S11 declined with reasons.
+  Update posted on #69. Ledger: 22 open, 95 addressed, 3 partly, 6 declined. Open on the desk: #62, #63, #64, #69
+  (applied, veto open), #71, #72, #74, #75, #76.
