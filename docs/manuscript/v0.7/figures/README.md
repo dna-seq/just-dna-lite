@@ -1,6 +1,6 @@
 # Manuscript figures
 
-The master embeds these files; keep standalone copies for submission. Figure 2 is a reconstruction of selected fields from an actual report, not an interface screenshot. Its source extract is `../supplementary/S13_worked_report_row.json`; regenerate it with `uv run python scripts/manuscript_report_figure.py` from the repository root.
+The master embeds these files; keep standalone copies for submission. Figure 4 is a reconstruction of selected fields from an actual report, not an interface screenshot. Its source extract is `../supplementary/S13_worked_report_row.json`; regenerate it with `uv run python scripts/manuscript_report_figure.py` from the repository root.
 
 | Figure | File | Source | Status |
 |---|---|---|---|
@@ -26,7 +26,7 @@ other people's sample names and is not used again.
   viewport, the FOXO3 rs2802292 row opened with its `+` control and the floating back-to-top button hidden.
   Two clips (the section's summary cards; the table from its header to the end of the second linked study)
   are stacked under the panel.
-- **Figure 3**: the Polygenic Risk Scores tab for Anton Kulaga's public genome, trait "low density lipoprotein
+- **Figure 5**: the Polygenic Risk Scores tab for Anton Kulaga's public genome, trait "low density lipoprotein
   cholesterol measurement" found with the trait search, selected with *Select Filtered* and computed with
   *Compute PRS for Selected Traits* (DuckDB engine, harmonized scores included, absent-locus recovery off);
   the result row then selected in *PRS Results*. The demo scored all 101 models in the background (about an

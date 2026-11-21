@@ -81,3 +81,9 @@ Each claim checked against `main` today. Nothing posted.
   "Planned: sorting PRS runs by date created (#19), and annotations and reports by name, file type or date
   created (#20), is on the roadmap as one item. We will update here when it lands." With the Claude line.
   Moved to the desk as #73 when the maintainer turned away (2026-11-20); default: nothing posted until it ships.
+- **#19, #20 done:** RM10 landed (89eecf9). Closing replies drafted and put to the desk as #77 (#73 withdrawn,
+  superseded); default: nothing posted, both stay open. #19: "Done. The PRS results table now has a Computed column,
+  so you can sort your results by when they were computed. Results computed before this change show it empty. On the
+  main branch (commit 89eecf9)." #20: "Done. A sample's data files can now be sorted by module (the default), name,
+  file type, newest or oldest, and each card shows when its file was written. Reports sort newest first (the
+  default), oldest first or by name. On the main branch (commit 89eecf9)." Both with the Claude line.

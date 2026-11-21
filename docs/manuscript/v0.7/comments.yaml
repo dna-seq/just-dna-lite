@@ -302,12 +302,10 @@ items:
   - inserted: 'Thereof there is a lack of interpretation both in scientific circles but also consumer wise. '
   where: 1.1 Background and Significance
   line: 45
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept the link Livia adds between the researchers'' and the consumers'' sentences (C129; Georg''s C50
-    asks for the same link), in plainer words: ''Interpretation is therefore lacking for researchers and consumers
-    alike.'''
+  status: addressed
+  now: Interpretation is therefore lacking for researchers and consumers alike.
+  why: Livia's link between the researchers' and the consumers' sentences, in plainer words; Georg's C50 asks for
+    the same.
   category: Story and structure
   severity: minor
   stage: writing
@@ -329,12 +327,10 @@ items:
   comment: there no real "glue" between these two sentences
   where: 1.1 Background and Significance
   line: 48
-  status: open
-  now: ''
-  why: ''
-  next: 'Join the two sentences of the first paragraph by saying consumers face the same barrier, for example ''The
-    same barrier faces consumers: many who download their raw data from a testing company...''. Livia''s S24 adds
-    such a link (C129).'
+  status: addressed
+  now: 'Consumers face the same barrier: many who download their raw data from a testing company take it to third-party
+    interpretation tools (Nelson et al., 2019; O''Daniel et al., 2025).'
+  why: 'The consumers'' sentence now opens with the link: they face the same barrier. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -380,11 +376,9 @@ items:
   - inserted: s
   where: 1.1 Background and Significance
   line: 52
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: The 's' left from S25 ('data ... comes'). The paper treats 'data' as plural ('Genomic data are'), so keep
-    'come'.
+  why: 'Not taken: the paper treats ''data'' as plural (''Genomic data are''), so ''come'' stays.'
   category: Writing and clarity
   severity: info
   stage: writing
@@ -416,13 +410,12 @@ items:
   - inserted: '(e.g., xxx, yyy) '
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'Keep the place Georg marked but fill ''(e.g., xxx, yyy)'' from Table S7, one tool per part of the task
-    the sentence lists: OpenCRAVAT (Pagel et al., 2020) for local annotation with installable modules, pgsc_calc
-    (Lambert et al., 2024) or GenoPred (Pain et al., 2024) for ancestry-normalized PGS Catalog scoring, and GeneChat
-    MCP (Costello, 2026) for access from an AI assistant. This also answers C51 and C52.'
+  status: addressed
+  now: Open-source projects between these extremes each cover part of the task, such as local annotation with installable
+    modules (OpenCRAVAT; Pagel et al., 2020), ancestry-normalized scoring of models from the PGS Catalog, the open
+    database of published polygenic scores (pgsc_calc, Lambert et al.
+  why: Filled with one tool per part of the task, from Table S7, with Table S7's citations; Lambert et al. 2024,
+    Pain et al. 2024 and Costello 2026 added to the bibliography.
   category: References
   severity: minor
   stage: writing
@@ -443,13 +436,12 @@ items:
   comment: nothing happening over the last 10 years?
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'The three research-grade tools are cited by their original papers (2010 to 2016), but all are maintained:
-    Table S7 lists VEP 116.3 (2026-10-09), ANNOVAR (2025-03-02) and PLINK 2.0.0-a.7.11 (2026-10-01). Say so in the
-    sentence (for example ''maintained research-grade tools such as...''), and name the recent open-source tools
-    of S5 in the next one.'
+  status: addressed
+  now: At the other end, research-grade tools such as PLINK (Chang et al., 2015), ANNOVAR (Wang et al., 2010) and
+    VEP (McLaren et al., 2016), each still maintained and updated within the last two years (Table S7), are powerful
+    but demand command-line proficiency and a lengthy setup.
+  why: The sentence now says the three tools are maintained, with their recent releases in Table S7 (VEP 116.3,
+    2026-10-09; ANNOVAR, 2025-03-02; PLINK 2.0.0-a.7.11, 2026-10-01).
   category: References
   severity: minor
   stage: writing
@@ -507,13 +499,11 @@ items:
     text: well if it makes it clearer we can say without human coding skills to edit the code directly
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: 'Write ''annotation sets that users add as data tables, without writing code'' here and in the Abstract,
-    and say once why it matters: a researcher who curates variants can publish them without programming (Section
-    2.2). It does not mean a manual literature search; Anton''s reply (''it means without writing code'') confirms.
-    Livia''s reply proposes ''without the coding skills to edit the code directly''.'
+  status: addressed
+  now: Table S7 compares the documented features of 23 tools for personal-genome annotation, polygenic scoring and
+    AI-assisted interpretation; none of them documents a graphical interface, annotation sets that users add as
+    data tables without writing code, PGS Catalog scoring and ancestry-matched percentiles together.
+  why: '''Without code'' now says what it means: users add annotation sets as data tables, without writing code.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -535,11 +525,10 @@ items:
   comment: '"glue" missing'
   where: 1.1 Background and Significance
   line: 60
-  status: open
-  now: ''
-  why: ''
-  next: 'Link the heritability sentence to the next, for example ''Specific loci have also been identified: genetic
-    association studies have repeatedly linked...''.'
+  status: addressed
+  now: 'Specific loci have also been identified: genetic association studies have repeatedly linked loci such as
+    APOE and FOXO3 to longevity (Broer et al., 2015; Caruso et al., 2022).'
+  why: The heritability sentence and the loci sentence are now linked. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -592,13 +581,12 @@ items:
   comment: this conjunction doesnt work
   where: 1.1 Background and Significance
   line: 64
-  status: open
-  now: ''
-  why: ''
-  next: 'The ''and'' makes regulations the subject of ''seek to avoid''. Rewrite: ''Genomic data are among the most
-    sensitive personal information, so uploading them to third-party servers carries risks that individuals want
-    to avoid and that regulations such as the General Data Protection Regulation (GDPR) are meant to limit.'' Livia''s
-    S26 (''both individuals and regulations'') is a smaller fix of the same ''and''.'
+  status: addressed
+  now: Genomic data are among the most sensitive personal information, and uploading them to third-party servers
+    carries risks that both individuals and regulations such as the General Data Protection Regulation (GDPR) seek
+    to avoid.
+  why: Livia Zaharia's S26 ('both individuals and regulations'), applied in 880f68d, makes both the subject of 'seek
+    to avoid'.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -619,12 +607,12 @@ items:
   comment: (see above)
   where: 1.2 Overview of Just-DNA-Lite
   line: 85
-  status: open
-  now: ''
-  why: ''
-  next: 'Probably points to Georg''s Abstract edit in S3 (''without the need of a software update''); use the same
-    wording here: ''without the need of a new software release''. Livia''s reply adds that modules are versioned,
-    so a new version of a module reaches users without a software release either; say so here.'
+  status: addressed
+  now: Because modules are data and versioned, new modules and new versions of a module reach users through configured
+    repositories or `just-dna-registry` without changes to the annotation engine or a new application release, while
+    evidence review and scientific curation stay with module contributors.
+  why: The Abstract uses Georg's wording ('without the need of a new software release'), and Section 3.4 adds Livia's
+    point that new versions of a module need no release either.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -775,11 +763,10 @@ items:
   comment: '?'
   where: 1.2 Overview of Just-DNA-Lite
   line: 97
-  status: open
-  now: ''
-  why: ''
-  next: 'Make the cross-reference readable: ''installed on their own computer from a terminal (installation steps
-    under Code Availability)''.'
+  status: addressed
+  now: The web interface installed on their own computer from a terminal (installation steps under Code Availability),
+    after trying the public demonstration (https://lite.just-dna.life/) |
+  why: The cross-reference now says what is under Code Availability. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -803,11 +790,10 @@ items:
   comment: '?'
   where: 1.2 Overview of Just-DNA-Lite
   line: 97
-  status: open
-  now: ''
-  why: ''
-  next: 'Give the demonstration''s address where the row first names it: ''after trying the public demonstration
-    (https://lite.just-dna.life/)''; the paper gives it only in row 5 and Section 2.3.'
+  status: addressed
+  now: The web interface installed on their own computer from a terminal (installation steps under Code Availability),
+    after trying the public demonstration (https://lite.just-dna.life/) |
+  why: The demonstration's address is given where Box 1 first names it. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -861,13 +847,15 @@ items:
   - deleted: its
   where: 1.2 Overview of Just-DNA-Lite
   line: 100
-  status: open
-  now: ''
-  why: ''
-  next: 'Reword instead: with ''their'', the row says the researcher does not write code, while the paper''s point
-    (Section 1.2: MCP servers ''let AI assistants call the annotation and scoring operations as tools instead of
-    writing their own analysis code'') is that the assistant does not write its own. Write ''instead of the assistant
-    writing its own analysis code''.'
+  status: addressed
+  now: '| Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through
+    typed tools and reads the results, instead of the assistant writing its own analysis code | The two MCP servers
+    and the plugin skills |
+
+    | Educators and students | Show how variant annotation and polygenic scores work, and where models disagree,
+    on real public genomes | The hosted demonstration (https://lite.'
+  why: 'Taken in other words: the row means that the assistant, not the researcher, does not write its own code
+    (Section 1.2).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -887,11 +875,13 @@ items:
   comment: which two??
   where: 1.2 Overview of Just-DNA-Lite
   line: 100
-  status: open
-  now: ''
-  why: ''
-  next: 'Name them where Box 1 and the Key features first mention them: the Just-DNA-Lite MCP server (samples, modules,
-    annotation jobs and results) and just-prs-mcp (polygenic scores), described in Section 3.2.1.'
+  status: addressed
+  now: '- **Three ways in.** The same operations are available from a web interface; from AI assistants (Claude
+    Code, Codex, Cursor and other MCP clients) through two MCP servers (the Just-DNA-Lite server for samples, modules,
+    annotation jobs and results, and just-prs-mcp for polygenic scores; Section 3.2.1) and installable plugin skills;
+    and from Python libraries and command-line tools published on PyPI (just-prs, prs-ui, just-dna-format, just-dna-compiler
+    and the just-dna-registry client).'
+  why: The Key features name the two servers and point to Section 3.2.1. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -922,13 +912,17 @@ items:
     @antonkulaga@gmail.com'
   where: '2. System and Methods: Platform Architecture'
   line: 107
-  status: open
-  now: ''
-  why: ''
-  next: 'Add an overview diagram at the start of Section 2: a VCF goes through quality filtering into the annotation
-    engine, which joins it with the modules (and optionally Ensembl) and writes the report; the PGS Catalog''s scoring
-    files go through just-prs to percentiles; the web interface, the MCP servers and the Python libraries call the
-    same operations. Livia asks Anton; which figures the paper has is the authors'' decision.'
+  status: addressed
+  now: '**Figure 2. How Just-DNA-Lite reads a genome.** The user''s VCF is quality-filtered and written as a Parquet
+    file (Section 2.1). The annotation engine joins it with each selected module''s lead table, and optionally with
+    Ensembl Variation, and writes a report in which each matched variant links to its sources (Sections 2.1 and
+    2.2). just-prs scores the same file against the prepared PGS Catalog and reports each score''s percentile in
+    the matching reference population, its coverage and its quality label (Section 3.2). The web interface, the
+    MCP servers and the Python libraries and command-line tools start the same runs. Drawn for this paper from the
+    text.'
+  why: 'A system overview diagram opens Section 2 as Figure 2. Drafted by the reviser under desk #75''s default,
+    open for veto; the old Figures 2 and 3 are now 4 and 5. The diagrams are plain Graphviz drafts (figures/*.dot)
+    and may need redrawing before submission.'
   category: Figures and tables
   severity: major
   stage: writing
@@ -981,13 +975,12 @@ items:
   comment: is that a problem?
   where: 2.1 Annotation Pipeline
   line: 124
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what it costs: an indel written differently in the VCF and in the module is not matched, so the report
-    can omit a real carrier (a missed finding, never a false match). Add the mitigation the code has: the project''s
-    own module builds re-anchor single-allele indels to ClinVar''s representation before compiling (just-dna-pipelines,
-    v1_port/reanchor.py), but the annotation engine does not normalize indels when it runs.'
+  status: addressed
+  now: 'A differently written indel is therefore missed rather than mismatched: an empty disease-predisposition
+    section does not show that the genome carries none of the module''s indels, since a real carrier can go unreported.'
+  why: 'The sentence says what it costs: a differently written indel is missed, so a real carrier can go unreported,
+    never a false match. The ledger''s earlier suggestion to cite a re-anchoring step is not taken: that step is
+    retired in the code. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -1014,11 +1007,10 @@ items:
   comment: '?'
   where: 2.1 Annotation Pipeline
   line: 124
-  status: open
-  now: ''
-  why: ''
-  next: 'Spell out the inference: ''Because of this, an empty disease-predisposition section does not show that
-    the genome carries none of the module''s indels: a differently written indel is not matched.'''
+  status: addressed
+  now: 'A differently written indel is therefore missed rather than mismatched: an empty disease-predisposition
+    section does not show that the genome carries none of the module''s indels, since a real carrier can go unreported.'
+  why: The inference is spelled out in the same sentence. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1085,12 +1077,16 @@ items:
     each paragraph from this section would be nice and explained with a a schema- tink of it a mini slideshow silde'
   where: 2.2 Annotation Modules as Data
   line: 141
-  status: open
-  now: ''
-  why: ''
-  next: 'A diagram for Section 2.2: a module''s authored files (module_spec.yaml, variants.csv, studies.csv) compiled
-    into its Parquet tables and manifest, published to the registry and installed by users. The open proposal to
-    show one real module''s files in the supplement fits beside it.'
+  status: addressed
+  now: '**Figure 3. The life of an annotation module.** A researcher writes the module as a YAML specification and
+    CSV tables, without code, optionally drafted by an AI assistant with the just-module-creator plugin (Section
+    3.4). just-dna-compiler validates and compiles them into Parquet tables and a manifest that records the module''s
+    identity, integrity and version. The module is published to just-dna-registry or to any source listed in `modules.yaml`,
+    and users discover and install it in the Module Catalog with no software update; the annotation engine reads
+    only the compiled tables. Drawn for this paper from the text.'
+  why: 'A module lifecycle diagram follows Section 2.2''s authoring paragraph as Figure 3. Drafted by the reviser
+    under desk #75''s default, open for veto; the old Figures 2 and 3 are now 4 and 5. The diagrams are plain Graphviz
+    drafts (figures/*.dot) and may need redrawing before submission.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1135,13 +1131,12 @@ items:
   comment: is that defined/detailed anywhere?
   where: 2.3 Web Interface and Self-Exploration
   line: 155
-  status: open
-  now: ''
-  why: ''
-  next: 'It is not defined: the web interface has no feature called self-exploration (the code uses the word only
-    in its disclaimer, ''for research, educational, and self-exploration'' use, in webui/src/webui/pages/annotate.py).
-    Drop it from the heading of Section 2.3 and from the list of what the interface covers, or say once what it
-    means (a user browsing the annotations of their own genome).'
+  status: addressed
+  now: The interface covers file management, module selection (including the optional Ensembl annotation), a sortable
+    and filterable results grid, report download (one HTML report per run, with a section for each selected module)
+    and a Module Catalog from which registry modules are installed (Figure 1a).
+  why: The interface has no feature called self-exploration; the word is dropped from Section 2.3's heading and
+    its list.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1220,15 +1215,12 @@ items:
     much richer than CAD (or lipid/CVD) papers for some specific reason? Please explain/discuss.'
   where: '3. Algorithm and Implementation: Annotation Modules and Polygenic Scoring'
   line: 188
-  status: open
-  now: ''
-  why: ''
-  next: 'Say in Table 1 or Section 3.3 why the module is small: it is a selection ported unchanged from Generation
-    I (variants chosen on meta-analysis p-values and the number of studies across populations), kept as a worked
-    example, not a catalogue of coronary artery disease genetics, while Longevity Map starts from a curated database
-    of 3,144 variants (Tacutu et al., 2018). Do not suggest that the coronary literature is poorer: large GWAS of
-    coronary artery disease report hundreds of loci (cite one if this is said); the difference is how each module
-    was built.'
+  status: addressed
+  now: These modules are small because they are selections ported from Generation I, kept as worked examples of
+    the module format rather than catalogues of each trait's genetics; Longevity Map is larger because it starts
+    from a dedicated database.
+  why: 'Section 3.3 now says why: the hand-curated modules are selections ported from Generation I, kept as worked
+    examples, while Longevity Map starts from a dedicated database.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -1250,13 +1242,11 @@ items:
   comment: 'how many variants (ETC: same issue for the other ClinVar stuff)'
   where: '3. Algorithm and Implementation: Annotation Modules and Polygenic Scoring'
   line: 193
-  status: open
-  now: ''
-  why: ''
-  next: 'Add counts to the three ClinVar rows of Table 1, from Table S4''s lead rows: Cardio 115,382, Cancer 141,616
-    and Pathogenic 618,629, built from 57,696, 70,658 and 308,990 ClinVar records. Name the unit: lead rows are
-    genotype rows, not variants (Longevity Map''s 1,022 lead rows are the 1,022 genotype rows of Section 3.1). The
-    run''s decision D6 asks for count columns in Table 1.'
+  status: addressed
+  now: 'Pathogenic and likely pathogenic variants from ClinVar (release 2026-06-27, review status of at least one
+    star): 57,696 variants in 297 cardiac-disease genes (sources in Table S4) |'
+  why: 'The three ClinVar rows of Table 1 now give their size in variants, as the other rows do, from Table S4''s
+    variant_count: Cardio 57,696, Cancer 70,658, Pathogenic 308,990.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1315,10 +1305,10 @@ items:
     to process
   where: 3.1 Longevity Variants Module (example)
   line: 206
-  status: open
-  now: ''
-  why: ''
-  next: Set W_display = w_SNP × w_genotype as a display formula on its own line and define each term after it.
+  status: addressed
+  now: The SNP weight (*w*_SNP) summarizes the strength of statistical evidence for a variant-trait association
+    (number of independent significant studies, reported p-values, number of replicating populations).
+  why: The formula is set as a display equation on its own line, with each term defined after it.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1342,11 +1332,11 @@ items:
     is this about
   where: 3.1 Longevity Variants Module (example)
   line: 211
-  status: open
-  now: ''
-  why: ''
-  next: 'Open ''A report in use.'' with the figure, for example ''Figure 1b shows a stored report row for Anton
-    Kulaga''s public genome: ...'', so the reader knows what the paragraph is about before the details.'
+  status: addressed
+  now: '**A report in use.** Figure 1b shows a row of a stored Longevity Variants report for Anton Kulaga''s public
+    genome, as the report renders it: FOXO3 rs2802292 is called G/T and appears in the insulin-signalling category
+    with a module weight of 0.475.'
+  why: '''A report in use'' now opens with the figure it describes.'
   category: Story and structure
   severity: minor
   stage: writing
@@ -1367,12 +1357,10 @@ items:
   comment: ok, it's not, but be explicit in what it is.
   where: 3.1 Longevity Variants Module (example)
   line: 211
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what the weight is in the same sentence: ''The weight is the module''s curation score, the strength
-    of evidence for the variant (w_SNP, 0.95 here) times the genotype''s direction and dose (0.5 for one copy);
-    it is not a predicted change in lifespan.'' (Figure 1''s caption gives 0.95 x 0.5 = 0.475.)'
+  status: addressed
+  now: The weight, 0.95 for the strength of evidence (*w*_SNP) times 0.5 for one copy of the associated allele (*w*_genotype),
+    ranks the curated association; it is not a predicted change in lifespan.
+  why: The sentence says what the weight is and how 0.475 arises. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1429,12 +1417,11 @@ items:
   comment: this is opaque to the non-expert; the next sentence (definition of PRS) should be moved up.
   where: 3.2 Polygenic Risk Scores
   line: 222
-  status: open
-  now: ''
-  why: ''
-  next: Move the definition ('Polygenic risk scores (PRS) aggregate the effects of many variants into a single weighted
-    sum...') to the start of Section 3.2, before the paragraph on traits with several published models, and say
-    there that a model is one published score, one PGS Catalog scoring file.
+  status: addressed
+  now: 'Each published score is a model: one PGS Catalog scoring file, which lists one variant per row with its
+    position, effect allele and weight.'
+  why: The PRS definition now opens Section 3.2, before the paragraph on traits with several models, and defines
+    a model as one PGS Catalog scoring file. Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -1460,10 +1447,11 @@ items:
   comment: what's in a row?
   where: 3.2 Polygenic Risk Scores
   line: 226
-  status: open
-  now: ''
-  why: ''
-  next: 'Say it at first use: ''A scoring file lists one variant per row, with its position, effect allele and weight.'''
+  status: addressed
+  now: 'Each published score is a model: one PGS Catalog scoring file, which lists one variant per row with its
+    position, effect allele and weight.'
+  why: 'A row is defined where scoring files first appear: one variant per row, with its position, effect allele
+    and weight. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1484,11 +1472,13 @@ items:
   comment: parsing this as one entity, 10% of this are then compared to what?
   where: 3.2 Polygenic Risk Scores
   line: 226
-  status: open
-  now: ''
-  why: ''
-  next: 'Name the whole that 10% is a share of: ''rows that cannot be placed or matched carry 10% or more of the
-    score''s total absolute weight (the sum of the absolute weights of all its rows)''.'
+  status: addressed
+  now: 'A file-level audit reads each harmonized GRCh38 scoring file in full and classifies it by whether just-prs
+    can place and match its rows: “as specified”, “approximated” (for example, when rows that cannot be placed or
+    matched carry 10% or more of the file''s total absolute weight, the sum of the absolute weights of all its rows,
+    or dominant or recessive terms scored additively) or “cannot be scored” (Table S5).'
+  why: 'The sentence names the whole: the file''s total absolute weight, the sum over all its rows. Applied by the
+    reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1511,12 +1501,11 @@ items:
     most wellcom in such descriptive parts
   where: 3.2 Polygenic Risk Scores
   line: 230
-  status: open
-  now: ''
-  why: ''
-  next: A small figure or table of what the prepared catalogue holds for each score (its scoring file, cleaned metadata,
-    reference distribution, and the ancestry model) and where each part comes from. It is also the place to say
-    what the PGS Catalog is (C48).
+  status: addressed
+  now: Table S15. What the prepared PGS catalogue holds for each score (Section 3.2).
+  why: 'What the prepared catalogue holds for each score, and where each part comes from, is Table S15 in Supplementary
+    S15. Drafted by the reviser under desk #75''s default, open for veto; the old Figures 2 and 3 are now 4 and
+    5. The diagrams are plain Graphviz drafts (figures/*.dot) and may need redrawing before submission.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1572,14 +1561,14 @@ items:
   comment: why nine; why three?
   where: 3.2 Polygenic Risk Scores
   line: 230
-  status: open
-  now: ''
-  why: ''
-  next: 'State the fact from just-prs (cleanup.py, BUILD_NORMALIZATION): the Catalog''s metadata spell the original
-    build nine ways (GRCh37, hg19, hg37, GRCh38, hg38, NCBI36, hg18, NCBI35 and NR for not reported), which name
-    three builds, GRCh37, GRCh38 and NCBI36. List them, or write ''the Catalog''s different spellings of each genome
-    build are unified''. For the code: just-prs maps NCBI35 (hg17), an older and different build, to the same value
-    as NCBI36 and calls it ''GRCh36'', a name NCBI never used.'
+  status: addressed
+  now: 'The metadata are cleaned: the nine ways the Catalog spells the genome build a score was developed on (such
+    as GRCh37 and hg19) are mapped to the three builds they name, GRCh37, GRCh38 and NCBI36, or to "not reported",
+    and performance metrics that the Catalog publishes as text, such as "1.55 [1.52,1.58]", are parsed into estimates,
+    confidence intervals and standard errors for odds ratios, hazard ratios, betas, the area under the receiver
+    operating characteristic curve (AUROC) and C-index.'
+  why: The sentence says what the nine labels are (spellings of the build) and names the three builds. Applied by
+    the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1665,14 +1654,11 @@ items:
     sounds unprincipled and arbitrary.
   where: 3.2 Polygenic Risk Scores
   line: 232
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the two levels in one sentence: a trait term is the Experimental Factor Ontology term the PGS Catalog
-    assigns to each score; a concept is the curation''s grouping of trait terms that answer the same reader''s question,
-    so oestrogen-receptor-positive and -negative breast cancer stay separate terms in the Catalog and are grouped
-    under breast cancer only for display. Say that concepts come from the same AI-made curation, pending expert
-    review, and that users can group by the Catalog''s terms instead.'
+  status: addressed
+  now: The Catalog's trait terms stay as they are; concepts group them for display only.
+  why: The paragraph now says the Catalog's trait terms are unchanged and concepts only group them for display;
+    it already says the curation is AI-made and pending review, and that users can group by the Catalog's terms.
+    Applied by the reviser.
   category: Methods and reproducibility
   severity: minor
   stage: writing
@@ -1695,12 +1681,14 @@ items:
   comment: (scores are computed how? it's still unclear what "model" refers to..
   where: 3.2 Polygenic Risk Scores
   line: 236
-  status: open
-  now: ''
-  why: ''
-  next: Define 'model' at its first use in Section 3.2 (C73) as one published polygenic score, a PGS Catalog scoring
-    file, and say here that each reference individual's score is computed as the user's is, by the weighted sum
-    described under the engines below.
+  status: addressed
+  now: just-prs instead scores the 3,202 individuals of the 1000 Genomes reference panel (Byrska-Bishop et al.,
+    2022) with each model, computing each individual's score as it computes the user's, summarizes the observed
+    scores as a mean and standard deviation for each of five superpopulations (African, AFR; admixed American, AMR;
+    East Asian, EAS; European, EUR; South Asian, SAS), and places a user's score on the corresponding normal distribution,
+    so the reference reflects real genotypes and their linkage structure rather than simulated ones.
+  why: '''Model'' is defined at the start of Section 3.2, and the reference sentence says each individual''s score
+    is computed as the user''s is. Applied by the reviser.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1741,11 +1729,10 @@ items:
   comment: how do you know? (goes without saying?)
   where: 3.2 Polygenic Risk Scores
   line: 239
-  status: open
-  now: ''
-  why: ''
-  next: 'Point to the measurement: ''For diploid genotypes both engines compute the same score (they agreed to within
-    5.7 x 10^-14 on 100 scores; Table 4).'''
+  status: addressed
+  now: For diploid genotypes both engines compute the same score (they agreed to within 5.68 × 10⁻¹⁴ on 100 scores;
+    Table 3).
+  why: The claim points to the measurement (Table 3). Applied by the reviser.
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -1785,11 +1772,9 @@ items:
   comment: not, or "not used as"?
   where: 3.2 Polygenic Risk Scores
   line: 239
-  status: open
-  now: ''
-  why: ''
-  next: 'Reword so it cannot be misread: ''PLINK2 is not part of just-prs; it served only as an external comparator
-    in the benchmark (Section 4.2).'''
+  status: addressed
+  now: PLINK2 is not part of just-prs; it served only as an external comparator in the benchmark (Section 4.2).
+  why: Reworded so it cannot be misread. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1851,11 +1836,16 @@ items:
   comment: of what? (of risk??)
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Say it in the caption: ''the median, over the 94 models, of the genome''s percentile in each model''s reference
-    distribution (European)''. It is a percentile of the score, not of risk; absolute risk is a separate card.'
+  status: addressed
+  now: The summary cards give the median, over the 94 models rated High or Moderate quality, of the genome's percentile
+    in each model's reference distribution (a percentile of the score, not of risk), the percentile of the model
+    the interface calls most reliable (the one ranked first by the numeric quality score of Section 3.2, a rule
+    combining reported discrimination, evaluation cohort size and coverage that has not been validated against measured
+    performance), the number of these models (94; the chart's title counts all 101), absolute risk (shown only when
+    such a model has risk data; none here) and the spread of their percentiles, as a standard deviation in percentile
+    points.
+  why: 'The caption says what the median is of: the genome''s percentile in each model''s reference distribution,
+    a percentile of the score, not of risk. Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1881,12 +1871,10 @@ items:
   comment: ??
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Rewrite the chart description: ''Each dot is one model. Its horizontal position is the genome''s standardized
-    score for that model; its vertical position carries no information: the dots are drawn on the density curve,
-    with a small random offset to keep them apart.'''
+  status: addressed
+  now: Each dot is one model.
+  why: 'The chart description is rewritten: horizontal position is the standardized score; vertical position carries
+    no information. Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1910,11 +1898,11 @@ items:
   comment: a number is not a curve
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Same fix as C87: the dot''s height is not data, so drop ''its height is the curve'' and say the dots are
-    drawn on the curve with a small random offset.'
+  status: addressed
+  now: Its horizontal position is the genome's standardized score for that model; its vertical position carries
+    no information, since the dots are drawn on the density curve with a small random offset that keeps them apart.
+  why: '''its height is the curve'' is gone; the dots are drawn on the curve with a random offset. Applied by the
+    reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -1937,12 +1925,11 @@ items:
   comment: '#3 is mysteriously different...?'
   where: 3.2 Polygenic Risk Scores
   line: 251
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the third row in the caption: PGS000061 is a 37-variant score (37 of 37 matched), while the rows
-    around it have about 560,000 to 1.7 million variants, and its publication spells the trait ''Low-density lipoprotein
-    (LDL) cholesterol''. Say that small, older scores sit beside genome-wide ones in the same trait view.'
+  status: addressed
+  now: 'The third, PGS000061, is an older score of 37 variants, shown beside genome-wide scores of 563,946 to 1,679,610
+    variants: small and genome-wide scores for one trait sit side by side in the same view.'
+  why: 'The caption explains the third row: a 37-variant score beside genome-wide ones (counts read from the figure).
+    Applied by the reviser.'
   category: Figures and tables
   severity: minor
   stage: writing
@@ -2088,11 +2075,10 @@ items:
   - inserted: 'that '
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: Accept Georg's edit ('Model sites that a variant-only VCF does not list'), as part of the rewrite C92 to
-    C94 ask for.
+  status: addressed
+  now: Model sites that a variant-only VCF does not list are assumed to be homozygous reference, so for exome or
+    array input, where most of them are not read, the call rests largely on assumed genotypes.
+  why: Accepted as suggested.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2113,12 +2099,12 @@ items:
   comment: still hard to parse...
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: 'Rewrite the two sentences in plain order, defining a site (C93): ''The model reads the genome at 53,526
-    positions (sites). Where a variant-only VCF has no record at a site, the genome is assumed to carry the reference
-    allele on both copies; where the VCF''s alleles at a site differ from the model''s, the site is treated as missing.'''
+  status: addressed
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
+  why: The main text now defines a site and says plainly what happens to unlisted sites; the detailed rule, with
+    the missing verb restored, is in Supplementary S16. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2140,11 +2126,11 @@ items:
   comment: what exactly is a site?
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: 'Define it at first use: a site is one of the 53,526 SNV positions the ancestry model reads (the training
-    data described earlier in Section 3.2.2). Same rewrite as C92.'
+  status: addressed
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
+  why: A site is defined at first use (S16 gives the 53,526 positions). Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2165,11 +2151,10 @@ items:
   comment: here, apparantly not even the google-doc grammar tool cannot parse the text
   where: 3.2.2 Ancestry Inference
   line: 275
-  status: open
-  now: ''
-  why: ''
-  next: The clause 'and sites whose alleles disagree with the model as missing' leaves out its verb ('are coded');
-    the rewrite in C92 fixes it.
+  status: addressed
+  now: Sites (the 53,526 positions the model reads) that a variant-only VCF does not list are coded as homozygous
+    reference, and sites whose alleles disagree with the model are coded as missing.
+  why: The missing verb is restored; the sentence now sits in Supplementary S16. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2230,12 +2215,12 @@ items:
     have a page limit?
   where: 3.3 Additional Trait Annotation Modules
   line: 281
-  status: open
-  now: ''
-  why: ''
-  next: Table S4 is a separate Doc of this round ('Supplementary Table S4. Module sources'). Say at first mention
-    where each supplementary table is, and decide with the page limit whether a short version belongs in the main
-    text.
+  status: partly
+  now: Later versions may differ; versions, digests and every source are listed in Supplementary Table S4, a separate
+    table file.
+  why: The first mention of Table S4 now says where it is.
+  next: Whether a short version of Table S4 belongs in the main text depends on the chosen journal's page limit;
+    decide with the journal.
   category: Figures and tables
   severity: minor
   stage: writing
@@ -2299,12 +2284,11 @@ items:
   comment: what if not?
   where: 3.4 Growing the Module Ecosystem
   line: 286
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what happens when it does not: the authorship entries are declared by whoever builds the module and
-    are not verified, so an AI draft left unmarked looks like a human-curated module. Section 5.5 says this; repeat
-    it here in one clause or point to it.'
+  status: addressed
+  now: These entries are declared by whoever builds the module and are not verified, so an AI draft left unmarked
+    reads as a human-curated module (Section 5.5).
+  why: 'Section 3.4 now says what happens when a draft is not marked: the entries are not verified, so an unmarked
+    AI draft reads as human-curated (Section 5.5).'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -2345,13 +2329,10 @@ items:
   comment: could you claim that comparison to Plink allows an indirect assessment (if Plink has been assessed)?
   where: 4. Benchmarking and Validation
   line: 296
-  status: open
-  now: ''
-  why: ''
-  next: 'Yes, for one thing only: agreement with PLINK2 (r = 0.99999996; 75 of 100 scores within 10^-3; the largest
-    difference 0.049 on a score of 58.69, PGS000015, per just-prs docs/benchmarks.md) shows that just-prs computes
-    the published weighted sums as a widely used tool does. Add that sentence here; it says nothing about whether
-    annotations are correct or how well a score predicts its trait.'
+  status: addressed
+  now: Agreement with PLINK2 shows that just-prs computes the published weighted sums as an established tool does,
+    and nothing more.
+  why: Yes, for the arithmetic only; Section 4 now says so. Applied by the reviser.
   category: Claims and evidence
   severity: major
   stage: writing
@@ -2382,11 +2363,9 @@ items:
   - inserted: )
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: 'Accept the intent, not the brackets: ''(with Ensembl annotation) on took'' leaves ''on'' stranded. Write
-    ''Generation II with Ensembl annotation turned on took a median of 103.1 s''.'
+  status: addressed
+  now: Generation II with Ensembl annotation turned on took a median of 103.
+  why: 'Taken in plainer words (''turned on''): the brackets would have left ''on'' stranded.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2423,12 +2402,10 @@ items:
   comment: (?)
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: 'Define ''light use'' at first mention: the workstation was in ordinary desktop use during these runs (load
-    averages of about 1.0 to 1.3, against an idle machine at night; benchmarks/a3/PROTOCOL.md). Supplementary S2
-    uses the term without defining it either.'
+  status: addressed
+  now: Most Generation I runs on Livia Zaharia's genome were made with the desktop in light use, the ordinary everyday
+    use of a workstation, rather than idle at night (Supplementary S2).
+  why: Light use is defined at first mention. Applied by the reviser.
   category: Methods and reproducibility
   severity: minor
   stage: writing
@@ -2449,12 +2426,11 @@ items:
   comment: '?'
   where: 4.1 Annotation Speed
   line: 302
-  status: open
-  now: ''
-  why: ''
-  next: '''Warm'' is used before Section 4.1 defines it two paragraphs later. Put the setup paragraphs (''We benchmarked...''
-    and ''Generation II annotated each genome... in three modes'') before the results, so warm, full and cold are
-    defined before use (also C99, C101).'
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: Section 4.1's setup paragraphs now come before its results, so warm, full and cold are defined before use.
+    Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2484,12 +2460,11 @@ items:
   - inserted: 'for '
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: 'Decline as written: with ''for'', the clause loses its verb (''and the repository''s generated tables (...)
-    for the warm and cold runs.''). The original leaves ''gives'' implied; write it out instead: ''and the repository''s
-    generated tables (docs/manuscript/benchmarks/a3/tables.md) give the warm and cold runs.'''
+  status: addressed
+  now: Table S10 gives the full runs, and the repository's generated tables (`docs/manuscript/benchmarks/a3/tables.md`)
+    give the warm and cold runs.
+  why: 'Taken in other words: ''for'' would have left the clause without a verb, so ''give'' is written out. The
+    paragraph is now in Supplementary S10 (C100).'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2510,10 +2485,10 @@ items:
   comment: '?'
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: 'Same as C98: define the three run modes before this sentence by moving the setup paragraph up.'
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: 'As C98: the run modes are defined before the memory figures. Applied by the reviser.'
   category: Story and structure
   severity: minor
   stage: writing
@@ -2595,11 +2570,10 @@ items:
     text: there's seems to  be no explicit mention of anything else (up until the Table is presented)
   where: 4.1 Annotation Speed
   line: 308
-  status: open
-  now: ''
-  why: ''
-  next: Open the paragraph with what was measured, 'We measured annotation wall time and peak memory of Just-DNA-Lite
-    against the Generation I OakVar-based system...', and put the setup before the results (C98).
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Table S6).
+  why: The paragraph opens with what was measured and comes first in Section 4.1. Applied by the reviser.
   category: Story and structure
   severity: minor
   stage: writing
@@ -2620,11 +2594,10 @@ items:
   comment: not in paper
   where: 4.1 Annotation Speed
   line: 308
-  status: open
-  now: ''
-  why: ''
-  next: Table S6 is in the Supplementary Data Doc (Section S2). Cite it as 'Supplementary Data, Table S6' so a reader
-    of the paper's Doc knows where to look.
+  status: addressed
+  now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
+    system on one workstation (Supplementary Data, Table S6).
+  why: The citation now says Table S6 is in the Supplementary Data.
   category: Figures and tables
   severity: minor
   stage: writing
@@ -2685,11 +2658,14 @@ items:
   comment: what's in there?
   where: 4.1 Annotation Speed
   line: 312
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain it in a clause: the page cache is the copy of recently read files that the operating system keeps
-    in memory, so a cold run reads the VCF and the module files from disk again.'
+  status: addressed
+  now: 'Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three
+    modes: *warm* runs reuse the sample''s quality-filtered table, so the VCF is not read again; *full* runs start
+    from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run
+    (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating
+    system''s page cache, its in-memory copy of recently read files, has been dropped, so the VCF and the module
+    files are read from disk again.'
+  why: The page cache is explained in a clause. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2769,13 +2745,13 @@ items:
   comment: (is that good?)
   where: 4.2 PRS Computation
   line: 350
-  status: open
-  now: ''
-  why: ''
-  next: 'Say what it means, and that r is the weaker number: across 100 scores of very different sizes r is close
-    to 1 almost by construction (Table 4''s note says the largest scores dominate it). The informative figures are
-    per score: 75 of 100 scores agree with PLINK2 to within 10^-3, and the largest difference is 0.049 on a score
-    of 58.69 (PGS000015), about 0.08% (just-prs docs/benchmarks.md).'
+  status: addressed
+  now: 'Against PLINK2, Pearson *r* was 0.99999996 for DuckDB and Polars alike (Table 3); since *r* across scores
+    of very different sizes is close to 1 almost by construction, the per-score figures say more: 75 of the 100
+    scores agreed with PLINK2 to within 10⁻³, and the largest difference, 0.049, was on PGS000015, whose score is
+    58.69, about 0.08% of it (just-prs repository, `docs/benchmarks.md`).'
+  why: The sentence says r is near 1 almost by construction and gives the per-score agreement (75 of 100 within
+    10^-3), from the just-prs benchmark record of the same rerun. Applied by the reviser.
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -2799,12 +2775,12 @@ items:
   comment: details?
   where: 4.2 PRS Computation
   line: 350
-  status: open
-  now: ''
-  why: ''
-  next: 'Name it: the largest difference is on PGS000015, whose score is 58.69, so 0.049 is about 0.08% of it; the
-    paragraph already says 92% of the remaining difference comes from 30 scores at multi-allelic sites (source:
-    just-prs docs/benchmarks.md, run of 2026-10-11).'
+  status: addressed
+  now: 'Against PLINK2, Pearson *r* was 0.99999996 for DuckDB and Polars alike (Table 3); since *r* across scores
+    of very different sizes is close to 1 almost by construction, the per-score figures say more: 75 of the 100
+    scores agreed with PLINK2 to within 10⁻³, and the largest difference, 0.049, was on PGS000015, whose score is
+    58.69, about 0.08% of it (just-prs repository, `docs/benchmarks.md`).'
+  why: 'The largest difference is named: PGS000015, score 58.69, about 0.08%. Applied by the reviser.'
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -2826,12 +2802,11 @@ items:
   comment: this looks like a measure that wasnt employed before; if so, why now? This is confusing...
   where: 4.2 PRS Computation
   line: 382
-  status: open
-  now: ''
-  why: ''
-  next: 'Link it to coverage, introduced in Section 3.2 for the quality labels, and say why it is reported here:
-    the engines can agree only on variants both match, and 53% is low because restoration was off. Write ''coverage
-    (the share of a score''s variants matched, Section 3.2)''.'
+  status: addressed
+  now: Coverage, the share of a score's variants matched in the genome (Section 3.2), was about half for both tools
+    (median 53% for just-prs and 51% for PLINK2), with the counting of absent loci as reference turned off; the
+    two percentages are not quite the same measure.
+  why: The measure is named as the coverage of Section 3.2. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -2918,13 +2893,12 @@ items:
   comment: Again, ???
   where: 4.4 Ancestry Classification
   line: 400
-  status: open
-  now: ''
-  why: ''
-  next: 'Explain the untested route in plain words: ''The test classified panel members whose genotypes were all
-    known. A user''s genome is instead projected onto the panel''s components on its own, with every position its
-    VCF does not list assumed to carry the reference allele; that route was not tested, so its accuracy may be lower.''
-    Testing it would be new work (the run''s decision D10).'
+  status: addressed
+  now: 'It is likely an optimistic estimate for real use, which was not tested: the test classified panel members
+    whose genotypes were all known, while a user''s genome is projected onto the panel''s components on its own
+    (with FRAPOSA), with every model position its VCF does not list assumed to carry the reference allele, so its
+    accuracy may be lower.'
+  why: The untested route is explained in plain words. Testing it would be new work. Applied by the reviser.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3063,13 +3037,11 @@ items:
   - inserted: 'assuming a role as citizen scientists, '
   where: '5.3 Platform Philosophy: Transparency and the Right to Read Your Own Genome'
   line: 429
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: 'Decline in this place: inserted here, ''assuming a role as citizen scientists'' makes the right to read
-    one''s own genome sound conditional, while the paragraph grounds it in a right everyone has (GDPR Article 15
-    applies to any data subject). If C58''s reframing is accepted, add it as its own sentence, for example after
-    the first one: ''Many who do so act as citizen scientists.'''
+  why: 'Not inserted here: ''assuming a role as citizen scientists'' would make the right to read one''s own genome
+    sound conditional, while the paragraph grounds it in a right every data subject has (GDPR Article 15). How the
+    paper names its users is desk #69.'
   category: Ethics, privacy and scope
   severity: minor
   stage: writing
@@ -3090,13 +3062,11 @@ items:
   comment: how bad is that? A non-expert may worry that the mismatch creates errors in 50% of cases..?
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Say how bad: almost every position differs between GRCh37 and GRCh38, so a GRCh37 VCF would match few module
-    rows, with rare chance matches to a different variant at the same number (the reference-allele check of Section
-    2.1 rejects many but not all). Results from such a file are unusable, not slightly off; tell users to check
-    their file''s build. A build check in the pipeline would be new code.'
+  status: addressed
+  now: A GRCh37 file read as GRCh38 would match few module rows, since almost every position differs between the
+    two builds, so its results would be unusable rather than slightly off; users should check their file's build.
+  why: 'The sentence says how bad a build mismatch is (results unusable, not slightly off) and is updated to the
+    code: since commit 5e31431 the web interface refuses a sample that names another build. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -3118,11 +3088,10 @@ items:
   comment: '?'
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Spell it out with a citation: ''the T2T-CHM13 reference, the first complete (telomere-to-telomere) human
-    genome assembly (Nurk et al., 2022), is not supported.'''
+  status: addressed
+  now: The T2T-CHM13 reference, the first complete (telomere-to-telomere) human genome assembly, is not supported.
+  why: 'T2T is spelled out. No citation added: Nurk et al. 2022 is not in the bibliography and was not read for
+    this. Applied by the reviser.'
   category: References
   severity: minor
   stage: writing
@@ -3143,11 +3112,11 @@ items:
   comment: 'see above: does correlation with Plink results establish anything?'
   where: 5.4 Limitations
   line: 439
-  status: open
-  now: ''
-  why: ''
-  next: 'Same as C96: add that agreement with PLINK2 shows the scores are computed as a widely used tool computes
-    them (the arithmetic), and nothing about whether scores predict their traits or annotations are correct.'
+  status: addressed
+  now: These benchmarks describe computational performance; agreement with PLINK2 shows that the scores are computed
+    as an established tool computes them, and they do not establish predictive accuracy or agreement in rankings
+    across individuals.
+  why: 'As C96: 5.4 says agreement with PLINK2 checks the arithmetic only. Applied by the reviser.'
   category: Claims and evidence
   severity: major
   stage: writing
@@ -3316,13 +3285,10 @@ items:
     possible...
   where: Contribution Statements
   line: 475
-  status: open
-  now: ''
-  why: ''
-  next: Supplementary Note S11 repeats the main Use of AI tools statement almost word for word; its one addition
-    is that 'every number in the benchmark tables is generated by a script from the recorded runs in the repository
-    (docs/manuscript/benchmarks/a3/)'. Move that sentence into the main statement and drop the pointer to S11 (where
-    the statement goes is part of the run's decision D11).
+  status: addressed
+  now: Every number in the benchmark tables is generated by a script from the recorded runs in the repository (`docs/manuscript/benchmarks/a3/`).
+  why: 'The one sentence Supplementary Note S11 adds to the main statement is now in the main Use of AI tools statement;
+    S11 stays as it is (desk #74''s default).'
   category: Submission package
   severity: minor
   stage: final
@@ -3547,12 +3513,12 @@ items:
   comment: stephanie and benjamin nagged me to define weird abbreviations before using them
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved after S23 was accepted; MCP, GRCh38, T2T and PRS are still
-    to spell out at first use. Spell out every abbreviation at its first use, in the Abstract and again in the body:
-    PGS (S23), MCP (Model Context Protocol), GRCh38, T2T and PRS. VCF is already spelled out in the Abstract.'
+  status: addressed
+  now: Researchers can contribute new annotation modules through the open-source registry, and Model Context Protocol
+    (MCP) servers let AI assistants call the annotation and scoring operations as tools instead of writing their
+    own analysis code.
+  why: 'Every abbreviation Livia named is spelled out at first use: PGS and MCP in the Abstract, and in the body
+    MCP (Section 1.2), PRS (Section 2.1), T2T (Section 5.3) and GRCh38 (Box 1, ''the GRCh38 human reference genome'').'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3578,17 +3544,11 @@ items:
     text: we claned PGS catalog as it has mistakes in metadata and some garbage PRS-ses
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'In the Doc by 1 November, 22:10 UTC: resolved after ''Polygenic scores (further called PGS)'' (S23) was
-    accepted, but the Abstract still does not say what the PGS Catalog is; the authors asked on 2 November that
-    it be explained, for example: ''It computes the scores published in the Polygenic Score (PGS) Catalog, an open
-    database where each score is deposited with its variants and their weights, from a cleaned copy of the Catalog''.
-    Write ''a cleaned copy of the PGS Catalog'': the paper also has a ''Module Catalog'' (Section 2.3), so ''the
-    Catalog'' is ambiguous. Anton''s reply gives the reason for cleaning (''it has mistakes in metadata and some
-    garbage PRS-ses''); if a clause fits, say what cleaning means as Section 3.2 does: metadata normalized, and
-    860 of 6,977 scores withheld because their reference distributions failed the audit.'
+  status: addressed
+  now: It computes the scores of the PGS Catalog, the open database of published polygenic scores, from a cleaned
+    copy of it, places each within a reference population matched to the genome's inferred ancestry, labels its
+    quality and shows all models for a trait side by side, so users see where the models agree and differ.
+  why: The Abstract now says what the PGS Catalog is.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -3905,7 +3865,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well.'
+  next: 'Confirm Anton Kulaga''s affiliations: IBIMA and IBAR only, or SecvADN as well. Desk #76 (default: as the
+    paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3927,7 +3888,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only.'
+  next: 'Confirm Alexey Karmazin''s affiliations: HEALES and SecvADN, or HEALES only. Desk #76 (default: as the
+    paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3949,7 +3911,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: Confirm the spelling of Alina Fedorova's name in the Acknowledgments (Fedorova or Fyodorova).
+  next: 'Confirm the spelling of Alina Fedorova''s name in the Acknowledgments (Fedorova or Fyodorova). Desk #76
+    (default: as the paper has it).'
   category: Submission package
   severity: minor
   stage: final
@@ -3968,11 +3931,10 @@ items:
     published data give 778 EFO traits among the 6,117 scores. The paper uses 778.'
   where: 1.2 Overview of Just-DNA-Lite
   line: 84
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: Confirm 778 traits (distinct EFO ids among the 6,117 published scores), or say which count the paper should
-    use.
+  why: 'Kept at 778: it is the count of distinct EFO traits among the 6,117 scores in the published data, which
+    the paper reports; the remembered ''about 600'' has no source. Settled by the reviser on the data.'
   category: Numbers and statistics
   severity: minor
   stage: writing
@@ -3992,10 +3954,11 @@ items:
     the feature helps.
   where: 3.2 Polygenic Risk Scores
   line: 232
-  status: open
+  status: declined
   now: ''
-  why: ''
-  next: Keep or remove the sentence saying the 2,282 direction annotations are AI-made and pending expert review.
+  why: 'Kept: the sentence says the 2,282 direction annotations are AI-made and await expert review, which Supplementary
+    S11 also states and which the paper''s AI-use disclosure requires; removing it would hide how the data were
+    made. Settled by the reviser.'
   category: Claims and evidence
   severity: minor
   stage: writing
@@ -4018,7 +3981,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: Keep the behaviour modules out of the registry examples, or name them.
+  next: 'Keep the behaviour modules out of the registry examples, or name them. Desk #76 (default: as the paper
+    has it).'
   category: Ethics, privacy and scope
   severity: minor
   stage: writing

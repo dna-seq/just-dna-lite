@@ -103,3 +103,21 @@ was shown to that session and will not be shown again: its first work is repeate
   #74's default leaves S11 unchanged. Open on the desk: #62, #63, #64, #69, #71, #72, #74. Ledger: 94 open, 29
   addressed, 3 partly, 6 not-on-point. Next: schemas and figures (C131, C133, C138), affiliations and names
   (C118 to C121), C122, C123, then the easy tail.
+- **2026-11-20, later.** C121 (778 traits) and C122 (AI caveat kept) settled on the data, declined with reasons.
+  Desk #75 (diagrams) default applied: c84c7e3, new Figures 2 (overview) and 3 (module lifecycle), Graphviz sources
+  in `figures/*.dot`, old Figures 2 and 3 renumbered 4 and 5; Table S15 lists the catalogue's contents. Desk #76
+  (affiliations, Fedorova, behaviour modules): defaults keep the paper as it is. Ledger: 89 open, 32 addressed,
+  3 partly, 2 declined, 6 not-on-point. Next: the easy tail (S5, S12, S13, S16, S17, S20, S24, S29), then the rest.
+- **2026-11-20, the easy tail.** 33ceba8: S5, S12, S13, S16, S17, S24 applied; S20, S29 declined with reasons.
+  Ledger: 81 open, 38 addressed, 3 partly, 4 declined, 6 not-on-point.
+- **2026-11-20, clarity batches** (the ledger's own `next`, no fork): cee136c (Sections 1 and 2), 94c5e68 (3.1, 3.2:
+  the PRS definition now opens 3.2), bbb672a (Section 4 setup before results, Figure 5 caption, ancestry sites,
+  5.4). 5.4 now says the web interface refuses a sample naming another build (5e31431, desk #59). Ledger: 44 open,
+  75 addressed. Still open: Box 1's user group and its followers (desk #69: C58, S9, S11, S18, C110, C114, C130),
+  authorship (#62: C64, C115, C116), carried facts (#76), and C51 to C53, C57, C66, C68 to C70, C72, C90, C91,
+  C95, C117, C124, C126 to C128, C132, C134 to C137, C139, C141, C144, C145, C48, C56.
+- **2026-11-20, two more batches.** cdaee05 (C48, C51, C53, C57, C66, C95, C117, C126, C136, C137, C145; C141 partly,
+  page limit with the journal), 4249085 (C68, C69: Table 1's ClinVar rows give their size in variants from Table S4's
+  `variant_count`). The weight formula is now a display equation (renders in the docx). Ledger: 30 open, 88 addressed,
+  4 partly. Still open, no decision needed: C52, C70, C72, C90, C91, C124, C127, C132, C134, C135, C139, C144;
+  C128 waits on the journal; the desk items as before.
