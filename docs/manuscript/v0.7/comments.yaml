@@ -463,13 +463,13 @@ items:
   comment: 'cite a few recent ones: they are the main comparators after all...'
   where: 1.1 Background and Significance
   line: 55
-  status: open
-  now: ''
-  why: ''
-  next: Name and cite in the text the recent open-source tools of Table S7 that sit between the two extremes (see
-    S5), for example OpenCRAVAT (Pagel et al., 2020), Personal-Genome-Pipeline (GeiserX, 2026), pgsc_calc (Lambert
-    et al., 2024), GenoPred (Pain et al., 2024) and GeneChat MCP (Costello, 2026); today they are cited only in
-    the supplement.
+  status: addressed
+  now: Open-source projects between these extremes each cover part of the task, such as local annotation with installable
+    modules (OpenCRAVAT; Pagel et al., 2020), ancestry-normalized scoring of models from the PGS Catalog, the open
+    database of published polygenic scores (pgsc_calc, Lambert et al., 2024; GenoPred, Pain et al., 2024), or access
+    to a genome from an AI assistant (GeneChat MCP; Costello, 2026).
+  why: 'Answered with S5: the Introduction now names and cites OpenCRAVAT, pgsc_calc, GenoPred and GeneChat MCP
+    between the two extremes.'
   category: References
   severity: major
   stage: writing
@@ -1150,11 +1150,11 @@ items:
     more of somewhat like the demo site since that is live online
   where: 2.3 Web Interface and Self-Exploration
   line: 159
-  status: open
-  now: ''
-  why: ''
-  next: Say once in Section 2.3 that the web interface runs on the user's own computer, and call the hosted site
-    'the public demonstration' everywhere, so the two are not confused; 'UI' works too if the authors prefer it.
+  status: addressed
+  now: Users can install and run the web interface on their own computers to analyse their personal genomes locally;
+    in this paper, 'web interface' means that local installation.
+  why: Section 2.3 says once that the web interface is the local installation, and the hosted site is called the
+    public demonstration throughout.
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -1938,12 +1938,12 @@ items:
   comment: 'so many options. an "evil" reviewer may ask: did you test them all???'
   where: 3.2.1 Standalone PRS Use and MCP Access
   line: 261
-  status: open
-  now: ''
-  why: ''
-  next: Which MCP clients were the two servers actually run with? The repository documents setup for Claude Code
-    and Cursor (docs/MCP_SERVER.md) but records no test across clients. Name only those that were run ('were used
-    with Claude Code and Cursor') and say that other MCP clients should work but were not tried.
+  status: addressed
+  now: Both servers document their setup for Claude Code and Cursor (docs/MCP_SERVER.md; the just-prs README); other
+    clients that speak MCP, such as Codex, use the same protocol but were not compared, and the just-module-creator
+    plugin adds module-authoring skills for Claude Code and Codex (Section 3.4).
+  why: The sentence now names only the clients whose setup is documented (docs/MCP_SERVER.md, the just-prs README)
+    and says other clients were not compared.
   category: Claims and evidence
   severity: major
   stage: writing
@@ -1967,13 +1967,11 @@ items:
     what was tested, what is known to work in what way?'
   where: 3.2.1 Standalone PRS Use and MCP Access
   line: 269
-  status: open
-  now: ''
-  why: ''
-  next: 'State what was tested instead of ''should'': the DuckDB and Polars engines agree to within 5.7 x 10^-14
-    on 100 scores (Table 4); the command line, web UI and just-prs-mcp call the same just-prs scoring code (just-prs-mcp
-    wraps just-prs''s PRSCatalog); the interfaces were not compared with each other, nor the assistants'' explanations
-    checked.'
+  status: addressed
+  now: 'What was tested is that implementation: its DuckDB and Polars engines agree to within 5.68 × 10⁻¹⁴ on 100
+    scores, and its scores agree with PLINK2''s (Section 4.2).'
+  why: '''Should'' replaced by what was tested (engine agreement, agreement with PLINK2) and what was not (interfaces
+    against each other, assistants'' explanations).'
   category: Claims and evidence
   severity: minor
   stage: writing

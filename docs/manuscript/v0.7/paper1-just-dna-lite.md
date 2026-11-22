@@ -89,7 +89,7 @@ The resulting workflow lets users choose published annotation content, apply it 
 - **Local.** Annotation and scoring run on the user's computer. Reference data are downloaded; the genome is not uploaded (Section 5.2).
 <!-- @/rev F1 -->
 
-<!-- @rev F2 rounds=8 by=claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-11-19,claude:2026-11-20,claude:2026-11-20,claude:2026-11-21 -->
+<!-- @rev F2 rounds=9 by=claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28,claude:2026-11-19,claude:2026-11-20,claude:2026-11-20,claude:2026-11-21,claude:2026-11-22 -->
 **Box 1.** Who Just-DNA-Lite is for, and where each user starts.
 
 | User | What they can do | Where to start |
@@ -98,7 +98,7 @@ The resulting workflow lets users choose published annotation content, apply it 
 | Researchers in ageing, genetics or a trait domain | Turn a curated variant list or a literature review into a versioned module that others can install; apply published modules to study genomes; compare all available models for a trait side by side | The module format (CSV and YAML) or the just-module-creator plugin in their AI assistant; the registry |
 | Bioinformaticians and software developers | Use scoring, percentiles, ancestry inference and the module format inside their own pipelines; read every result as Parquet in Python, R or DuckDB | The PyPI libraries and command-line tools; the MCP servers |
 | Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through typed tools and reads the results, instead of the assistant writing its own analysis code | The two MCP servers and the plugin skills |
-| Educators and students | Show how variant annotation and polygenic scores work, and where models disagree, on real public genomes | The hosted demonstration (https://lite.just-dna.life/), which uses public genomes only |
+| Educators and students | Show how variant annotation and polygenic scores work, and where models disagree, on real public genomes | The public demonstration (https://lite.just-dna.life/), which uses public genomes only |
 <!-- @/rev F2 -->
 
 ## **2. System and Methods: Platform Architecture**
@@ -169,8 +169,8 @@ Module discovery uses sources configured in `modules.yaml`, with repository defa
 The interface covers file management, module selection (including the optional Ensembl annotation), a sortable and filterable results grid, report download (<!-- @rev V12 rounds=2 by=claude:2026-10-19,claude:2026-10-26 -->one HTML report per run, with a section for each selected module<!-- @/rev V12 -->) and a Module Catalog from which registry modules are installed (Figure 1a). Each report section opens with summary counts, and each matched variant opens to the module's conclusion and its sources (Figure 1b). Users can browse the full variant table with sorting, filtering and search, cross-referenced against Ensembl for clinical-significance flags, the variant class and whether a phenotype or disease association is recorded. All data can be exported as Parquet for downstream analysis in Python, R, DuckDB or any Arrow-compatible tool. The web interface is written entirely in Python with Reflex<!-- @rev V11 rounds=1 by=claude:2026-10-19 --> (Reflex, 2026)<!-- @/rev V11 -->, a framework that compiles to React.
 <!-- @/rev R10 -->
 
-<!-- @rev N7 rounds=2 by=codex:2026-10-19,claude:2026-10-28 -->
-Users can install and run the web interface on their own computers to analyse their personal genomes locally. A hosted demonstration at https://lite.just-dna.life/ runs on public genomes only; uploads of private genome files are disabled there.
+<!-- @rev N7 rounds=3 by=codex:2026-10-19,claude:2026-10-28,claude:2026-11-22 -->
+Users can install and run the web interface on their own computers to analyse their personal genomes locally; in this paper, 'web interface' means that local installation. The public demonstration at https://lite.just-dna.life/ runs on public genomes only; uploads of private genome files are disabled there.
 <!-- @/rev N7 -->
 
 <!-- @rev N8 rounds=7 by=codex:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,claude:2026-10-27,co-authors:2026-11-19 -->
@@ -273,16 +273,16 @@ For variant-only whole-genome VCFs, just-prs can count scoring loci absent from 
 Users who only want polygenic scores can run just-prs on its own, through its Python API, command-line interface, dedicated web UI, `just-prs-mcp` server or the `/prs` skill of its Claude Code plugin, without the annotation-module workflow.
 <!-- @/rev P5 -->
 
-<!-- @rev J11 rounds=3 by=claude:2026-10-13,claude:2026-10-26,claude:2026-10-28 -->
-Just-DNA-Lite also has its own MCP server for the full workflow (samples, modules, annotation jobs and their results), while `just-prs-mcp` covers PRS alone; both let AI assistants call the software through typed tools. The PRS tools cover catalogue search, model metadata, genome-build and ancestry detection, scoring, reference-population comparison and result-quality assessment. Both servers work with Claude Code, Codex, Cursor and other MCP clients, and the just-module-creator plugin adds module-authoring skills for Claude Code and Codex (Section 3.4).
+<!-- @rev J11 rounds=4 by=claude:2026-10-13,claude:2026-10-26,claude:2026-10-28,claude:2026-11-22 -->
+Just-DNA-Lite also has its own MCP server for the full workflow (samples, modules, annotation jobs and their results), while `just-prs-mcp` covers PRS alone; both let AI assistants call the software through typed tools. The PRS tools cover catalogue search, model metadata, genome-build and ancestry detection, scoring, reference-population comparison and result-quality assessment. Both servers document their setup for Claude Code and Cursor (docs/MCP_SERVER.md; the just-prs README); other clients that speak MCP, such as Codex, use the same protocol but were not compared, and the just-module-creator plugin adds module-authoring skills for Claude Code and Codex (Section 3.4).
 <!-- @/rev J11 -->
 
 <!-- @rev R14 rounds=6 by=robi:2026-09-25,claude:2026-10-19,claude:2026-10-26,claude:2026-10-27,claude:2026-10-27,claude:2026-10-28 -->
 The tools return PGS IDs, variant-match rates, quality labels, reference populations, percentiles and agreement or disagreement among models for a trait. These fields give the assistant computational context, but they do not ensure that the assistant will explain them correctly. Both servers run locally, but a remotely hosted assistant may receive tool outputs containing genomic results. Whether scoring is local and whether the conversation is private are therefore separate questions (Section 5.2).
 <!-- @/rev R14 -->
 
-<!-- @rev J13 rounds=5 by=claude:2026-10-13,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26 -->
-All these interfaces call one scoring implementation, so equivalent inputs, reference data and settings should give equivalent results with the same just-prs version. The engine benchmark in Section 4.2 does not test each interface separately, nor the accuracy of assistant-generated explanations.
+<!-- @rev J13 rounds=6 by=claude:2026-10-13,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-10-26,claude:2026-11-22 -->
+All these interfaces call one scoring implementation. What was tested is that implementation: its DuckDB and Polars engines agree to within 5.68 × 10⁻¹⁴ on 100 scores, and its scores agree with PLINK2's (Section 4.2). The interfaces were not compared with each other, and the accuracy of assistant-generated explanations was not assessed.
 <!-- @/rev J13 -->
 
 ### **3.2.2 Ancestry Inference**
