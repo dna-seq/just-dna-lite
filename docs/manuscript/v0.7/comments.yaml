@@ -1179,8 +1179,11 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Check the hosted demonstration: the text says uploads of private genome files are disabled there. Confirm
-    that https://lite.just-dna.life/ runs in immutable mode (docs/IMMUTABLE_MODE.md) before submission.'
+  next: 'Checked 2026-11-22 by hydrating a session over the site''s own websocket: https://lite.just-dna.life/ answers
+    is_immutable_mode false and allow_zenodo_import true, so uploads are not disabled there and the sentence is not
+    true today. Either the deployment sets JUST_DNA_IMMUTABLE_MODE=true (docs/IMMUTABLE_MODE.md), or the sentence
+    changes; the deployment is the maintainer''s.'
+  decision: true
   category: Claims and evidence
   severity: minor
   stage: now

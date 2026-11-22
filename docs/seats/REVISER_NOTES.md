@@ -134,3 +134,8 @@ was shown to that session and will not be shown again: its first work is repeate
 - **2026-11-22, longevity PR #37** (still open, head ffcfdfe): longevity-loci's lead says it now carries Longevity
   Map 2.0.0 with the 2015–2026 sweep: 172 loci, 513 genotype rows, 697 studies (was 169 / 489 / 679 when the draft
   was checked). Every figure of the section is read again at the merged commit; nothing drafted before the merge.
+- **2026-11-22, later.** ce907e9: Table S15 cited from 3.2; every "Table S" reference resolves (C138; C144 partly,
+  renumbering left to submission). C135 checked: the public demonstration hydrates with `is_immutable_mode` false
+  and `allow_zenodo_import` true (a session over its own `/_event` socket, 13:5x UTC), so the paper's "uploads of
+  private genome files are disabled there" is not true today. C135 open, `decision: true`, told to the maintainer:
+  set `JUST_DNA_IMMUTABLE_MODE=true` on the deployment, or change the sentence. The deployment is not this seat's.
