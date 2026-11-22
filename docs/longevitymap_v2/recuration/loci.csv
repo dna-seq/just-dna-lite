@@ -163,3 +163,11 @@ locus_id,locus,verdict,tier,mechanism,age_of_action,second_signal_of,rsids,row_f
 167,ZBTB46,kept,B,general_ageing,UNKNOWN,99,rs6062322,rows/167-ZBTB46.yaml
 168,CHRNA2-EPHX2,kept,C,smoking_lungs,UNKNOWN,53,rs11780471,rows/168-CHRNA2-EPHX2.yaml
 169,CASC16-TOX3,kept,C,general_ageing,UNKNOWN,82,rs4784227,rows/169-CASC16-TOX3.yaml
+170,CYP26A1-MYOF,kept,C,general_ageing,UNKNOWN,,rs1927465,rows/170-CYP26A1-MYOF.yaml
+171,MYL2-VHRT,kept,C,general_ageing,UNKNOWN,71,rs4426183,rows/171-MYL2-VHRT.yaml
+172,SRRM3-POR,kept,D,general_ageing,UNKNOWN,,rs28689051,rows/172-SRRM3-POR.yaml
+173,B3GLCT,kept,B,general_ageing,UNKNOWN,,rs1043332229,rows/173-B3GLCT.yaml
+174,SMIM7P1,kept,B,general_ageing,UNKNOWN,,rs10198124,rows/174-SMIM7P1.yaml
+175,MYO5B,kept,C,general_ageing,UNKNOWN,,rs78441534,rows/175-MYO5B.yaml
+176,ECHS1,kept,D,general_ageing,UNKNOWN,,rs7894051,rows/176-ECHS1.yaml
+177,NRDE2,kept,D,general_ageing,UNKNOWN,,rs4904670,rows/177-NRDE2.yaml

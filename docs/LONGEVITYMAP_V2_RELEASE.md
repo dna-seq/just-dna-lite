@@ -26,9 +26,9 @@ and 5 write in public.
 uv run pipelines module compile data/modules/longevitymap_v2 -o data/interim/release/longevitymap --strict
 ```
 
-Expected (just-dna-compiler 0.8.5 and 0.8.9 alike): success; 489 weights rows, 679 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
-`sha256:2b3f2e01fe809bcf68862abaf7acab4fc598e02db91510caace380e4a02b23bd` (the polygon rehearsal's content, aebf5e38, with
-the study notes worded for a reader on 2026-11-19: no citation ids or row numbers; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
+Expected (just-dna-compiler 0.8.5 and 0.8.9 alike): success; 513 weights rows, 697 studies, 6 haplotypes, 12 diplotypes, 3 sources; content signature
+`sha256:997b3356f554793d149cc9c2f128dd8115741f96255605891826f7d658b1c024` (longevity-loci 9d87300: 172 loci with the literature
+sweep's rows, the study notes worded for a reader; the same signature from longevity-loci's own build). Warnings: about 20 lines on indel VRS ids that cannot be verified without the reference
 sequence, and `module_not_closed` (see "Before publishing").
 
 ## 2. Read it in the app (local, safe)
@@ -41,7 +41,7 @@ cp -r data/interim/release/longevitymap data/output/modules/longevitymap
 HF_HUB_OFFLINE=1 uv run annotate <a GRCh38 VCF> --user release-check -m longevitymap
 ```
 
-Measured 2026-11-19 on the public demo genome (Zenodo 18370498): 163 of the module's rows matched, 98 of them
+Measured 2026-11-19 on the 164-locus build, on the public demo genome (Zenodo 18370498): 163 of the module's rows matched, 98 of them
 inferred reference genotypes. The module takes the report's generic module section, not the Generation I pathway
 section (`report_logic.uses_longevity_pathways`): its categories are the systems a locus acts through, not the 12
 pathways, and in the pathway section every row dropped out ("0 Total variants"). Remove the local copy afterwards.
@@ -69,11 +69,12 @@ scientific reviewer, read the rendered report first. Known points for them and f
 
 A token that owns `just-dna-seq` is needed (`REGISTRY_TOKEN` and `REGISTRY_TOKEN_SANDBOX` do not). The rehearsal is
 the same command against the polygon (`--url` of the `polygon` store, a test namespace and its token); it was run as
-`test-longevity-loci/longevitymap@2.0.0` on 2026-11-16 (signature aebf5e38, before the study notes were reworded).
+`test-longevity-loci/longevitymap@2.0.0` on 2026-11-16 (signature aebf5e38, the 164-locus build). This build (997b3356) is
+not rehearsed yet; longevity-loci's module seat rehearses it before step 4.
 
 ```bash
 uv run pipelines registry publish just-dna-seq longevitymap 2.0.0 data/modules/longevitymap_v2 \
-  --changelog "2.0.0: re-curated from the evidence (164 loci, tiers A-D, no summed weights); supersedes the 1.2.0 port of HAGR's LongevityMap"
+  --changelog "2.0.0: re-curated from the evidence (172 loci, tiers A-D, no summed weights); supersedes the 1.2.0 port of HAGR's LongevityMap"
 ```
 
 Every file in the spec directory travels, `quote_sources.csv` (the quotes the studies rest on) included.
