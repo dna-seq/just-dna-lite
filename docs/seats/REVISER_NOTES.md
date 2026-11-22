@@ -131,3 +131,6 @@ was shown to that session and will not be shown again: its first work is repeate
   Ledger: 18 open, 99 addressed. Left, no decision: C70 (weight rule, read Kulaga 2024), C72 (vector Figure 4),
   C124, C127, C139 (3.2 structure), C132 (page/line numbers in the build), C135 (check the demo is immutable), C144
   (S-table order); C128 with the journal; desk #62 and #76 items.
+- **2026-11-22, longevity PR #37** (still open, head ffcfdfe): longevity-loci's lead says it now carries Longevity
+  Map 2.0.0 with the 2015–2026 sweep: 172 loci, 513 genotype rows, 697 studies (was 169 / 489 / 679 when the draft
+  was checked). Every figure of the section is read again at the merged commit; nothing drafted before the merge.
