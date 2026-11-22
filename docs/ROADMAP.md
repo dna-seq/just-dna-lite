@@ -7,7 +7,7 @@ before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** waits until 2026-11-25: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b; on 2026-11-21 its head is 3b27dbd (study notes reworded for readers, the spec re-attested), checks green, not merged · **Owner:** lead
+**State:** waits until 2026-11-25: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b, and again on 2026-11-22 at ffcfdfe (the literature sweep's 8 loci: 172 loci, 513 rows, 697 studies; spec valid, routing tests 9 pass, recompiled to content signature 997b3356 as claimed), checks green, mergeable, not merged · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
