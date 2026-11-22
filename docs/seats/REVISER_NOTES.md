@@ -125,3 +125,9 @@ was shown to that session and will not be shown again: its first work is repeate
   group "Researchers, including citizen scientists"; S18 and S21 worded to match; C130 and S11 declined with reasons.
   Update posted on #69. Ledger: 22 open, 95 addressed, 3 partly, 6 declined. Open on the desk: #62, #63, #64, #69
   (applied, veto open), #71, #72, #74, #75, #76.
+- **2026-11-22.** Desk kept current after two silence notices: updates on #71 and #75 (their defaults were applied
+  on 11-20 with no post); #72, #74, #76, #69 true as written. b1c4ff6: C90 (MCP clients only as documented), C91
+  (what was tested, not "should"), C134 (web interface = local; "public demonstration" for the site), C52 (by S5).
+  Ledger: 18 open, 99 addressed. Left, no decision: C70 (weight rule, read Kulaga 2024), C72 (vector Figure 4),
+  C124, C127, C139 (3.2 structure), C132 (page/line numbers in the build), C135 (check the demo is immutable), C144
+  (S-table order); C128 with the journal; desk #62 and #76 items.
