@@ -12,6 +12,7 @@ from just_dna_format.vrs import normalize_chrom
 from just_dna_pipelines.predictions.models import DEFAULT_PREDICTION_MODEL
 
 PREDICTION_ASSET = "user_variant_effect_predictions"
+REFERENCE_ASSET = "grch38_reference_fasta"
 PREDICTION_JOB = "predict_variant_effects_job"
 
 VARIANT_SET_ANNOTATED = "annotated"

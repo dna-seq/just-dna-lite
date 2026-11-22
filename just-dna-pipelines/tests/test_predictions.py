@@ -5,23 +5,32 @@ written here) or, where a test reads the real GRCh38 FASTA or the real model, it
 is not on this machine.
 """
 
+import gzip
 import json
+import threading
+from collections.abc import Iterator
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
-from dagster import validate_run_config
+from dagster import materialize, validate_run_config
 from just_dna_pipelines.annotation.definitions import defs
 from just_dna_pipelines.annotation.report_logic import report_environment
 from just_dna_pipelines.io import read_vcf_file
-from just_dna_pipelines.predictions import download
+from just_dna_pipelines.annotation.io_managers import annotation_cache_io_manager
+from just_dna_pipelines.predictions import download, reference
+from just_dna_pipelines.predictions.assets import grch38_reference_fasta
 from just_dna_pipelines.predictions.download import ensure_model_files, model_dir, model_files_present
 from just_dna_pipelines.predictions.models import KRONGENOME_F, PREDICTION_MODELS, get_prediction_model
 from just_dna_pipelines.predictions.reference import (
     REFERENCE_FASTA_ENV,
     ReferenceGenome,
+    download_reference_fasta,
     encode_bases,
+    ensure_reference_fasta,
     reference_fasta_candidates,
 )
 from just_dna_pipelines.predictions.report import PredictionRun, build_report_context, render_prediction_report
@@ -29,6 +38,7 @@ from just_dna_pipelines.predictions.run_config import (
     MAX_REGION_BP,
     PREDICTION_ASSET,
     PREDICTION_JOB,
+    REFERENCE_ASSET,
     VARIANT_SET_ANNOTATED,
     VARIANT_SET_REGION,
     RegionError,
@@ -535,6 +545,83 @@ def test_a_cached_model_needs_no_network(tmp_path: Path, monkeypatch: pytest.Mon
     assert ensure_model_files(KRONGENOME_F, tmp_path) == directory
 
 
+# ── fetching the reference FASTA ───────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def fasta_server(small_fasta: tuple[Path, dict[str, str]], tmp_path: Path) -> Iterator[str]:
+    """A real HTTP server with the small FASTA gzipped (``ref.fa.gz``) and cut short (``cut.fa.gz``)."""
+    served = tmp_path / "served"
+    served.mkdir()
+    packed = gzip.compress(small_fasta[0].read_bytes())
+    (served / "ref.fa.gz").write_bytes(packed)
+    (served / "cut.fa.gz").write_bytes(packed[: len(packed) // 2])
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(served)))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    thread.join()
+
+
+def test_a_downloaded_fasta_is_uncompressed_indexed_and_readable(
+    fasta_server: str, small_fasta: tuple[Path, dict[str, str]], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(reference, "COPY_CHUNK_BYTES", 500)
+    monkeypatch.setattr(reference, "PROGRESS_EVERY_BYTES", 1)
+    progress: list[int] = []
+    destination = tmp_path / "référence ü" / "GRCh38.fa"
+    assert download_reference_fasta(destination, f"{fasta_server}/ref.fa.gz", progress.append) == destination
+    assert destination.read_bytes() == small_fasta[0].read_bytes()
+    assert destination.with_name("GRCh38.fa.fai").is_file()
+    assert progress == sorted(progress) and progress[-1] == destination.stat().st_size
+    genome = ReferenceGenome(destination)
+    assert genome.bases("1", 1, 60) == small_fasta[1]["chr1"][:60]
+    genome.close()
+    assert sorted(p.name for p in destination.parent.iterdir()) == ["GRCh38.fa", "GRCh38.fa.fai"]
+
+
+@pytest.mark.parametrize("name", ["cut.fa.gz", "missing.fa.gz"])
+def test_a_cut_or_missing_download_leaves_nothing_under_the_final_name(fasta_server: str, tmp_path: Path, name: str) -> None:
+    destination = tmp_path / "cache" / "GRCh38.fa"
+    with pytest.raises((EOFError, FileNotFoundError)):
+        download_reference_fasta(destination, f"{fasta_server}/{name}")
+    assert list(destination.parent.iterdir()) == []
+
+
+def test_an_existing_fasta_is_used_without_a_download(
+    small_fasta: tuple[Path, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _no_download(*args: object, **kwargs: object) -> Path:
+        raise AssertionError("downloaded a FASTA that was already there")
+
+    monkeypatch.setenv(REFERENCE_FASTA_ENV, str(small_fasta[0]))
+    monkeypatch.setattr(reference, "download_reference_fasta", _no_download)
+    assert ensure_reference_fasta() == small_fasta[0]
+
+
+def test_the_reference_asset_fetches_into_the_cache_when_none_exists(
+    fasta_server: str, small_fasta: tuple[Path, dict[str, str]], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = tmp_path / "cache"
+    fetch = reference.download_reference_fasta
+    monkeypatch.delenv(REFERENCE_FASTA_ENV, raising=False)
+    monkeypatch.setattr(reference, "get_cache_dir", lambda: cache)
+    monkeypatch.setattr(
+        reference, "download_reference_fasta", lambda dest, on_progress=None: fetch(dest, f"{fasta_server}/ref.fa.gz", on_progress)
+    )
+    result = materialize([grch38_reference_fasta], resources={"annotation_cache_io_manager": annotation_cache_io_manager})
+    assert result.success
+    fasta = result.output_for_node(REFERENCE_ASSET)
+    assert fasta == reference.cached_reference_fasta_path() and fasta.is_relative_to(cache)
+    assert fasta.read_bytes() == small_fasta[0].read_bytes()
+
+    # A second materialization finds it and fetches nothing.
+    monkeypatch.setattr(reference, "download_reference_fasta", lambda *a, **k: pytest.fail("fetched twice"))
+    again = materialize([grch38_reference_fasta], resources={"annotation_cache_io_manager": annotation_cache_io_manager})
+    assert again.output_for_node(REFERENCE_ASSET) == fasta
+
+
 # ── models and job config ───────────────────────────────────────────────────────────────────────
 
 
@@ -553,7 +640,7 @@ def test_the_prediction_run_config_validates_against_its_job(region: str | None)
     assert set(config["ops"]) == {PREDICTION_ASSET}
     job = defs.resolve_job_def(PREDICTION_JOB)
     validate_run_config(job, config)
-    assert {node.name for node in job.graph.node_defs} == {PREDICTION_ASSET}
+    assert {node.name for node in job.graph.node_defs} == {REFERENCE_ASSET, PREDICTION_ASSET}
 
 
 # ── the real model ──────────────────────────────────────────────────────────────────────────────

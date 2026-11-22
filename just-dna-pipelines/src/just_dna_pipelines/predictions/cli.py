@@ -9,7 +9,6 @@ from typing import Annotated
 
 import typer
 from dagster import DagsterInstance
-from just_prs.reference import download_reference_fasta
 from rich.console import Console
 from rich.table import Table
 
@@ -18,7 +17,7 @@ from just_dna_pipelines.annotation.assets import user_vcf_partitions
 from just_dna_pipelines.annotation.resources import get_user_output_dir
 from just_dna_pipelines.predictions.download import ensure_model_files, model_files_present
 from just_dna_pipelines.predictions.models import DEFAULT_PREDICTION_MODEL, PREDICTION_MODELS, get_prediction_model
-from just_dna_pipelines.predictions.reference import resolve_reference_fasta
+from just_dna_pipelines.predictions.reference import ensure_reference_fasta
 from just_dna_pipelines.predictions.run_config import (
     DEFAULT_MAX_VARIANTS,
     PREDICTION_ASSET,
@@ -58,9 +57,9 @@ def fetch_model(
 
 @app.command("fetch-reference")
 def fetch_reference() -> None:
-    """Fetch the Ensembl GRCh38 primary assembly through just-prs's reference lane (needs pysam)."""
+    """Fetch the Ensembl GRCh38 primary assembly into the pipelines cache (what the grch38_reference_fasta asset does)."""
     load_env()
-    path = download_reference_fasta("GRCh38")
+    path = ensure_reference_fasta(on_progress=lambda written: console.print(f"{written / 1e9:.1f} GB written"))
     console.print(f"[green]Reference FASTA ready:[/green] {path}")
 
 
@@ -88,7 +87,6 @@ def run(
     get_prediction_model(model)
     if region:
         parse_region(region)
-    resolve_reference_fasta()
     ensure_dagster_home()
     partition_key = f"{user}/{sample}"
     normalized = get_user_output_dir() / partition_key / "user_vcf_normalized.parquet"
