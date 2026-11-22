@@ -1182,7 +1182,7 @@ items:
   next: 'Checked 2026-11-22 by hydrating a session over the site''s own websocket: https://lite.just-dna.life/ answers
     is_immutable_mode false and allow_zenodo_import true, so uploads are not disabled there and the sentence is not
     true today. Either the deployment sets JUST_DNA_IMMUTABLE_MODE=true (docs/IMMUTABLE_MODE.md), or the sentence
-    changes; the deployment is the maintainer''s.'
+    changes; the deployment is the maintainer''s (desk #83).'
   decision: true
   category: Claims and evidence
   severity: minor

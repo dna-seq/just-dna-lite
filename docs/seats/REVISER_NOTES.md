@@ -137,5 +137,5 @@ was shown to that session and will not be shown again: its first work is repeate
 - **2026-11-22, later.** ce907e9: Table S15 cited from 3.2; every "Table S" reference resolves (C138; C144 partly,
   renumbering left to submission). C135 checked: the public demonstration hydrates with `is_immutable_mode` false
   and `allow_zenodo_import` true (a session over its own `/_event` socket, 13:5x UTC), so the paper's "uploads of
-  private genome files are disabled there" is not true today. C135 open, `decision: true`, told to the maintainer:
+  private genome files are disabled there" is not true today. C135 open, `decision: true`, on desk #83:
   set `JUST_DNA_IMMUTABLE_MODE=true` on the deployment, or change the sentence. The deployment is not this seat's.
