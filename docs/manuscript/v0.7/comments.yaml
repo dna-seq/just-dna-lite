@@ -2495,11 +2495,15 @@ items:
   comment: so we have this species- maybe put to compare the contents to be sure about numbering as well
   where: 4.1 Annotation Speed
   line: 304
-  status: open
-  now: ''
-  why: ''
-  next: Renumber the supplementary tables in the order the paper first cites them (an open point of the run's figures
-    stage), then check every 'Table S' reference against the Supplementary Data.
+  status: partly
+  now: '**A prepared catalogue.** The scoring files, metadata and reference distributions that just-prs reads are
+    prepared once, stored as Parquet and downloaded on first use from HuggingFace (datasets `just-dna-seq/pgs-catalog`
+    and `just-dna-seq/prs-percentiles`), so users do not assemble them; Table S15 lists what they hold for each
+    score.'
+  why: 'Every ''Table S'' reference was checked against the supplement: each resolves (S4 and S5 are the separate
+    table files), and Table S15, which had no citation in the main text, is now cited.'
+  next: Renumber the supplementary tables in the order the paper first cites them (now S7, S4, S5, S6, S2, S8, then
+    S15) at submission, once the journal's supplement format is known; the S4, S5 and S14 file names move with them.
   category: Figures and tables
   severity: minor
   stage: final
