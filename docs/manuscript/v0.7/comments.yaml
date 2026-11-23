@@ -1259,10 +1259,9 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Give the rule behind the weights, or cite where it is defined: Section 3.1 lists the inputs of w_SNP (''number
-    of independent significant studies, reported p-values, number of replicating populations'') but not how they
-    combine. If the Generation I paper (Kulaga et al., 2024) defines it, cite the section; if not, add the rule
-    to Supplementary S1.'
+  next: 'Section 3.1 is redrafted once longevity-loci''s pull request 37 merges (Longevity Map 2.0.0); its weighting
+    may change there, so the rule is written then, from the merged module, with a table of how each input moves the
+    weight as Livia suggests. Blocked on that merge, not on a decision.'
   category: Methods and reproducibility
   severity: major
   stage: writing
@@ -1377,6 +1376,8 @@ items:
   why: ''
   next: Export Figure 2, a drawn diagram, as vector graphics (SVG or PDF) instead of PNG. Figures 1 and 3 are screenshots
     and stay raster, recaptured at print resolution (the run's decision D6).
+    SVG sources exist beside the three diagram PNGs; using them in the PDF build was asked of the lead on
+    2026-11-23 (the repository channel, topic "manuscript build").
   category: Figures and tables
   severity: minor
   stage: writing
