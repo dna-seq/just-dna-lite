@@ -8,9 +8,11 @@ from typing import Annotated, Optional
 
 import typer
 
+from just_dna_lite.manuscript import build as build_module
 from just_dna_lite.manuscript import s5
 from just_dna_lite.manuscript.build import (
     TECTONIC_ENV_VAR,
+    VECTOR_FIGURES_UNAVAILABLE,
     build_paths,
     latex_to_pdf,
     markdown_to_docx,
@@ -92,6 +94,8 @@ def build(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"wrote {paths.tex}")
+    if build_module.cairosvg is None:
+        typer.echo(f"note: {VECTOR_FIGURES_UNAVAILABLE}", err=True)
     try:
         markdown_to_docx(paths.clean, paths.docx, resource_dir)
     except RuntimeError as exc:

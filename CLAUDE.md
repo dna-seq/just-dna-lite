@@ -959,6 +959,8 @@ not a VCF liftover and cannot be reused for annotation.
 - `uv run manuscript build PATH [--out DIR] [--no-pdf] [--template T]`: clean twin → pandoc LaTeX →
   tectonic PDF in `build/` beside PATH (gitignored). `MANUSCRIPT_TECTONIC` overrides the binary,
   `TECTONIC_CACHE_DIR` keeps the TeX bundle off `~/.cache`. A failed render deletes the old PDF.
+  Review copies carry page and line numbers in both outputs (PDF lines only without `--template`), and
+  the PDF sets a figure from the SVG beside its PNG (cairosvg, else the PNG): `docs/manuscript/README.md`.
 - The same build writes `build/<stem>.docx`, the copy uploaded to Google Drive (also with `--no-pdf`).
   `filters/docx_tables.lua` sizes table columns from their content, and `finish_docx_layout` writes the
   widths in twips, because Google Docs reads the column grid. A table too wide for portrait gets its

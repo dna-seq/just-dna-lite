@@ -156,6 +156,16 @@ with the lint errors if the ledger markers are broken, before writing anything.
   (for example `/data/tectonic-cache`) so the TeX bundle is not cached under `~/.cache`. Both can go
   in `.env` (see `.env.template`); an exported value wins. The first build downloads the bundle and
   takes a few minutes; later builds take seconds.
+- **Review numbering.** Without `--template`, the PDF numbers every line (`filters/line_numbers.tex`,
+  the `lineno` package; table rows are not numbered) and pandoc's article numbers the pages. The .docx
+  has a page number in every section's footer and line numbering counting on across sections, the
+  filter's landscape pages included. Google Docs may drop the line numbers on import; the page footer
+  survives. A venue template decides its own line numbering. (Co-author comment C132 on v0.7.)
+- **Vector figures in the PDF.** A drawn figure whose PNG has an SVG of the same name beside it is set
+  from that SVG, converted to PDF under `build/vector-figures/` by cairosvg (dev group; it loads the
+  system cairo library), and `filters/vector_figures.lua` points the LaTeX at it. Screenshots have no
+  SVG and stay raster; the .docx and the paper's own links stay on the PNG. Without cairosvg or cairo
+  the build says so and the PDF keeps the PNG. (Co-author comment C72 on v0.7.)
 - **No stale PDF.** The previous PDF is deleted before tectonic runs, so a failed render leaves the
   LaTeX and a reported error, never an old PDF that looks current. `--no-pdf` keeps an existing PDF but
   says when it is older than the LaTeX just written.

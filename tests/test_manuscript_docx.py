@@ -31,6 +31,7 @@ from just_dna_lite.manuscript.build import (
     DOCX_MARGIN_TWIPS,
     DOCX_TABLE_FILTER,
     FIGURE_IMAGE_STYLE,
+    PAGE_FOOTER_PART,
     TABLE_FONT,
     TABLE_FONT_PT,
     TABLE_HEADING_STYLE,
@@ -437,6 +438,33 @@ def test_the_reference_styles_carry_borders_font_and_bold(built: tuple[Path, Pat
     for table in docx_tables(docx):
         direct = table.element.find(f"{W}tblPr/{W}tblBorders")
         assert direct is not None and {direct.find(f"{W}{s}").get(f"{W}val") for s in sides} == {"single"}
+
+
+def test_every_section_has_the_page_footer_and_line_numbers(built: tuple[Path, Path]) -> None:
+    """Portrait and landscape sections alike: a Word section inherits no footer from the next one."""
+    _, docx = built
+    with zipfile.ZipFile(docx) as archive:
+        body = ET.fromstring(archive.read("word/document.xml")).find(f"{W}body")
+        relationships = ET.fromstring(archive.read("word/_rels/document.xml.rels"))
+        content_types = archive.read("[Content_Types].xml").decode("utf-8")
+        footer = ET.fromstring(archive.read(PAGE_FOOTER_PART))
+    sections = body.findall(f".//{W}sectPr")
+    assert sections  # the supplement's landscape tables add sections of their own
+    footer_targets = {
+        rel.get("Id"): rel.get("Target") for rel in relationships if rel.get("Type", "").endswith("/footer")
+    }
+    for section in sections:
+        defaults = [r for r in section.findall(f"{W}footerReference") if r.get(f"{W}type") == "default"]
+        assert len(defaults) == 1
+        rel_id = defaults[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+        assert f"word/{footer_targets[rel_id]}" == PAGE_FOOTER_PART
+        numbering = section.findall(f"{W}lnNumType")
+        assert [(n.get(f"{W}countBy"), n.get(f"{W}restart")) for n in numbering] == [("1", "continuous")]
+        order = [child.tag for child in section]
+        assert order.index(f"{W}footerReference") == 0
+        assert order.index(f"{W}pgMar") < order.index(f"{W}lnNumType")
+    assert f'PartName="/{PAGE_FOOTER_PART}"' in content_types
+    assert [field.get(f"{W}instr").strip() for field in footer.iter(f"{W}fldSimple")] == ["PAGE"]
 
 
 def test_every_figure_caption_has_its_image(built: tuple[Path, Path]) -> None:

@@ -15,8 +15,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from just_dna_lite.manuscript import build as build_module
 from just_dna_lite.manuscript.build import (
     TECTONIC_ENV_VAR,
+    VECTOR_FIGURE_DIR_NAME,
     build_paths,
     latex_to_pdf,
     markdown_to_latex,
@@ -100,6 +102,7 @@ def test_a_venue_template_replaces_the_default(tmp_path: Path) -> None:
     tex = paths.tex.read_text(encoding="utf-8")
     assert tex.startswith("% VENUE TEMPLATE")
     assert "\\documentclass" not in tex
+    assert "\\linenumbers" not in tex  # the venue decides its own line numbering
     with pytest.raises(FileNotFoundError):
         markdown_to_latex(paths.clean, paths.tex, source.parent, tmp_path / "absent.latex")
 
@@ -189,6 +192,74 @@ def test_page_count_and_missing_characters_read_the_tex_log(tmp_path: Path) -> N
     )
     assert page_count(log) == 22
     assert missing_characters(log) == {"U+2265 ≥": 2, "U+2194 ↔": 1}
+
+
+def test_without_a_template_every_line_is_numbered(tmp_path: Path) -> None:
+    source, _ = marked_copy(tmp_path)
+    paths = build_paths(source, tmp_path / "out")
+    write_clean_twin(source, paths.clean)
+    markdown_to_latex(paths.clean, paths.tex, source.parent)
+    tex = paths.tex.read_text(encoding="utf-8")
+    preamble, _, _ = tex.partition("\\begin{document}")
+    assert "\\usepackage{lineno}" in preamble
+    assert "\\linenumbers" in preamble
+
+
+PNG_STAND_IN = b"\x89PNG\r\n\x1a\n"  # the LaTeX step names images and never reads them
+SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120pt" height="40pt" viewBox="0 0 120 40">'
+    '<rect x="2" y="2" width="116" height="36" fill="none" stroke="black"/>'
+    '<text x="10" y="25" font-size="12">Größe ≥ 1</text></svg>'
+)
+
+
+@pytest.mark.skipif(build_module.cairosvg is None, reason="cairosvg or the cairo library is missing")
+def test_a_drawn_figure_is_set_from_its_svg_and_a_screenshot_stays_raster(tmp_path: Path) -> None:
+    paper_dir = tmp_path / "paper"
+    figures = paper_dir / "figures"
+    figures.mkdir(parents=True)
+    (figures / "diagram.png").write_bytes(PNG_STAND_IN)
+    (figures / "diagram.svg").write_text(SVG, encoding="utf-8")
+    (figures / "screenshot.png").write_bytes(PNG_STAND_IN)
+    (figures / "orphan.svg").write_text(SVG, encoding="utf-8")  # no PNG twin: never cited, never converted
+    source = paper_dir / "paper.md"
+    source.write_text(
+        "# Title\n\n## Section\n\n![](figures/diagram.png){width=50%}\n\n![](figures/screenshot.png){width=50%}\n",
+        encoding="utf-8",
+    )
+    paths = build_paths(source, paper_dir / "build")
+    write_clean_twin(source, paths.clean)
+    markdown_to_latex(paths.clean, paths.tex, paper_dir)
+
+    vector = paths.tex.parent / VECTOR_FIGURE_DIR_NAME / "figures"
+    assert sorted(p.name for p in vector.iterdir()) == ["diagram.pdf"]
+    assert (vector / "diagram.pdf").read_bytes().startswith(b"%PDF")
+    graphics = re.findall(r"\\includegraphics(?:\[[^\]]*\])?\{([^}]*)\}", paths.tex.read_text(encoding="utf-8"))
+    # Relative to the .tex, which tectonic runs beside; no machine path in the LaTeX.
+    assert graphics == [f"{VECTOR_FIGURE_DIR_NAME}/figures/diagram.pdf", "figures/screenshot.png"]
+
+    # A second build keeps the converted PDF while its SVG is older, and redoes it once the SVG changes.
+    first = (vector / "diagram.pdf").stat().st_mtime_ns
+    markdown_to_latex(paths.clean, paths.tex, paper_dir)
+    assert (vector / "diagram.pdf").stat().st_mtime_ns == first
+    os.utime(figures / "diagram.svg", ns=(first + 10**9, first + 10**9))
+    markdown_to_latex(paths.clean, paths.tex, paper_dir)
+    assert (vector / "diagram.pdf").stat().st_mtime_ns != first
+
+
+def test_without_cairosvg_the_pdf_keeps_the_png(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(build_module, "cairosvg", None)
+    figures = tmp_path / "figures"
+    figures.mkdir()
+    (figures / "diagram.png").write_bytes(PNG_STAND_IN)
+    (figures / "diagram.svg").write_text(SVG, encoding="utf-8")
+    source = tmp_path / "paper.md"
+    source.write_text("# Title\n\n## Section\n\n![](figures/diagram.png)\n", encoding="utf-8")
+    paths = build_paths(source, tmp_path / "out")
+    write_clean_twin(source, paths.clean)
+    markdown_to_latex(paths.clean, paths.tex, tmp_path)
+    assert "{figures/diagram.png}" in paths.tex.read_text(encoding="utf-8")
+    assert not (paths.tex.parent / VECTOR_FIGURE_DIR_NAME).exists()
 
 
 def test_the_real_paper_renders_to_pdf_with_every_character(tmp_path: Path) -> None:

@@ -32,6 +32,7 @@ webui = { workspace = true }
 
 [dependency-groups]
 dev = [
+    "cairosvg>=2.8",
     "ipykernel>=7.3.0",
     "matplotlib>=3.11.2",
     "pypandoc-binary>=1.17",

@@ -26,6 +26,10 @@ try:  # dev dependency group; `manuscript ledger` must keep working without it
     import pypandoc
 except ImportError:
     pypandoc = None
+try:  # dev dependency group; needs the cairo library, which a host may lack (OSError then)
+    import cairosvg
+except (ImportError, OSError):
+    cairosvg = None
 
 from just_dna_lite.manuscript.ledger import CLEAN_SUFFIX, read_source, strip_markers
 
@@ -48,6 +52,15 @@ FONT_VARIABLES = (
     f"mainfontoptions={_DEJAVU_FACES}",
     "monofont=DejaVuSansMono",
     f"monofontoptions={_DEJAVU_FACES.replace('*-Italic', '*-Oblique').replace('*-BoldItalic', '*-BoldOblique')}",
+)
+# PDF review copies: every line numbered unless a venue template decides (C132), and each drawn
+# figure set from its SVG twin as vector graphics (C72).
+LINE_NUMBERS_HEADER = Path(__file__).parent / "filters" / "line_numbers.tex"
+VECTOR_FIGURE_FILTER = Path(__file__).parent / "filters" / "vector_figures.lua"
+VECTOR_FIGURE_DIR_NAME = "vector-figures"
+VECTOR_FIGURES_UNAVAILABLE = (
+    "cairosvg (dev dependency group) or the cairo library it loads is missing: the PDF uses the PNG "
+    "figures; run `uv sync` on a host with cairo for vector figures"
 )
 _PAGES_RE = re.compile(r"Output written on .*? \((?P<pages>[0-9]+) pages?")
 _MISSING_CHAR_RE = re.compile(r"Missing character: There is no (?P<char>.) \(U\+(?P<code>[0-9A-F]+)\)")
@@ -119,10 +132,38 @@ _REFERENCE_TABLE_STYLES = (
     '<w:name w:val="Figure Image"/><w:basedOn w:val="BodyText"/><w:qFormat/>'
     '<w:pPr><w:keepNext/><w:keepLines/><w:jc w:val="center"/></w:pPr></w:style>'
 )
+# Review copies carry page and line numbers (co-author comment C132 on v0.7): a footer with a PAGE
+# field, and every line numbered, counting on across pages and sections. Google Docs may drop the line
+# numbers on import; the page footer survives.
+PAGE_FOOTER_PART = "word/footer1.xml"
+PAGE_FOOTER_REL_ID = "rIdPageFooter"
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_PAGE_FOOTER_XML = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    f'<w:ftr xmlns:w="{_W_NS}" xmlns:r="{_R_NS}"><w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
+    '<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p></w:ftr>'
+)
+_PAGE_FOOTER_RELATIONSHIP = (
+    f'<Relationship Type="{_R_NS}/footer" Id="{PAGE_FOOTER_REL_ID}" Target="footer1.xml" />'
+)
+_PAGE_FOOTER_CONTENT_TYPE = (
+    f'<Override PartName="/{PAGE_FOOTER_PART}" '
+    'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml" />'
+)
+_FOOTER_REFERENCE = f'<w:footerReference w:type="default" r:id="{PAGE_FOOTER_REL_ID}"/>'
+_LINE_NUMBERS = '<w:lnNumType w:countBy="1" w:restart="continuous"/>'
+# OOXML fixes the order of a sectPr's children: header and footer references first, the line
+# numbering after the page size, margins, paper source and borders.
+_SECT_PR_AFTER_REFERENCES = (
+    "w:footnotePr", "w:endnotePr", "w:type", "w:pgSz", "w:pgMar", "w:paperSrc", "w:pgBorders", "w:lnNumType",
+    "w:pgNumType", "w:cols", "w:formProt", "w:vAlign", "w:noEndnote", "w:titlePg", "w:textDirection", "w:bidi",
+    "w:rtlGutter", "w:docGrid", "w:printerSettings", "w:sectPrChange",
+)
+_SECT_PR_AFTER_LINE_NUMBERS = _SECT_PR_AFTER_REFERENCES[_SECT_PR_AFTER_REFERENCES.index("w:pgNumType") :]
 _REFERENCE_SECT_PR = (
-    f'<w:sectPr><w:pgSz w:w="{A4_WIDTH_TWIPS}" w:h="{A4_HEIGHT_TWIPS}"/>'
+    f'<w:sectPr>{_FOOTER_REFERENCE}<w:pgSz w:w="{A4_WIDTH_TWIPS}" w:h="{A4_HEIGHT_TWIPS}"/>'
     f'<w:pgMar w:top="{DOCX_MARGIN_TWIPS}" w:right="{DOCX_MARGIN_TWIPS}" w:bottom="{DOCX_MARGIN_TWIPS}" '
-    f'w:left="{DOCX_MARGIN_TWIPS}" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>'
+    f'w:left="{DOCX_MARGIN_TWIPS}" w:header="567" w:footer="567" w:gutter="0"/>{_LINE_NUMBERS}</w:sectPr>'
 )
 # Read by docx_tables.lua, which removes them before the writer runs.
 _FILTER_METADATA = {
@@ -179,6 +220,10 @@ def markdown_to_latex(clean: Path, tex: Path, resource_dir: Path, template: Opti
 
     *template* is the hook for a venue template (Bioinformatics/OUP and the like): a pandoc LaTeX
     template, see `pandoc -D latex` for the variables it receives. None uses pandoc's own article.
+
+    Without a template every line is numbered (`filters/line_numbers.tex`). A drawn figure whose PNG
+    has an SVG beside it is set from that SVG, converted to PDF (`write_vector_figures`); without
+    cairosvg the PNG stays.
     """
     _require_pypandoc()
     if template is not None and not template.is_file():
@@ -188,9 +233,39 @@ def markdown_to_latex(clean: Path, tex: Path, resource_dir: Path, template: Opti
         args.extend(["-V", variable])
     if template is not None:
         args.append(f"--template={template.resolve()}")
+    else:
+        args.append(f"--include-in-header={LINE_NUMBERS_HEADER}")
     tex.parent.mkdir(parents=True, exist_ok=True)
+    if cairosvg is not None:
+        vector_dir = tex.parent / VECTOR_FIGURE_DIR_NAME
+        write_vector_figures(resource_dir, vector_dir)
+        args.extend(
+            [
+                f"--lua-filter={VECTOR_FIGURE_FILTER}",
+                f"--metadata=vector-figure-dir={vector_dir.resolve()}",
+                f"--metadata=vector-figure-href={VECTOR_FIGURE_DIR_NAME}",
+            ]
+        )
     pypandoc.convert_file(str(clean), "latex", format="markdown", outputfile=str(tex), extra_args=args)
     return tex
+
+
+def write_vector_figures(resource_dir: Path, dest_dir: Path) -> list[Path]:
+    """Convert each SVG under *resource_dir* that has a PNG of the same name beside it to PDF under
+    *dest_dir*, at the same relative path; one already newer than its SVG is kept. Returns the PDFs."""
+    if cairosvg is None:
+        raise RuntimeError(VECTOR_FIGURES_UNAVAILABLE)
+    written: list[Path] = []
+    for svg in sorted(resource_dir.rglob("*.svg")):
+        relative = svg.relative_to(resource_dir)
+        if not svg.with_suffix(".png").is_file() or dest_dir in svg.parents or BUILD_DIR_NAME in relative.parts:
+            continue
+        pdf = dest_dir / relative.with_suffix(".pdf")
+        if not pdf.is_file() or pdf.stat().st_mtime < svg.stat().st_mtime:
+            pdf.parent.mkdir(parents=True, exist_ok=True)
+            cairosvg.svg2pdf(url=str(svg), write_to=str(pdf))
+        written.append(pdf)
+    return written
 
 
 def _require_pypandoc() -> None:
@@ -234,7 +309,16 @@ def write_reference_docx(dest: Path) -> Path:
     ).stdout
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(default)
-    _rewrite_zip_members(dest, {"word/styles.xml": _patch_reference_styles, "word/document.xml": _patch_reference_section})
+    _rewrite_zip_members(
+        dest,
+        {
+            "word/styles.xml": _patch_reference_styles,
+            "word/document.xml": _patch_reference_section,
+            "word/_rels/document.xml.rels": _add_footer_relationship,
+            "[Content_Types].xml": _add_footer_content_type,
+        },
+        additions={PAGE_FOOTER_PART: _PAGE_FOOTER_XML},
+    )
     return dest
 
 
@@ -252,18 +336,39 @@ def _patch_reference_section(xml: str) -> str:
     return patched
 
 
-def _rewrite_zip_members(path: Path, edits: dict[str, Callable[[str], str]]) -> None:
-    """Rewrite the named UTF-8 members of a zip in place, keeping every other member and the order."""
+def _add_footer_relationship(xml: str) -> str:
+    if "</Relationships>" not in xml:
+        raise RuntimeError("pandoc's default reference.docx has no document relationships to extend")
+    return xml.replace("</Relationships>", f"{_PAGE_FOOTER_RELATIONSHIP}</Relationships>")
+
+
+def _add_footer_content_type(xml: str) -> str:
+    if "</Types>" not in xml:
+        raise RuntimeError("pandoc's default reference.docx has no content types to extend")
+    return xml.replace("</Types>", f"{_PAGE_FOOTER_CONTENT_TYPE}</Types>")
+
+
+def _rewrite_zip_members(
+    path: Path, edits: dict[str, Callable[[str], str]], additions: Optional[dict[str, str]] = None
+) -> None:
+    """Rewrite the named UTF-8 members of a zip in place, keeping every other member and the order;
+    *additions* are new members written after them."""
+    additions = additions or {}
     with zipfile.ZipFile(path) as source:
         members = [(info, source.read(info)) for info in source.infolist()]
-    missing = set(edits) - {info.filename for info, _ in members}
+    names = {info.filename for info, _ in members}
+    missing = set(edits) - names
     if missing:
         raise RuntimeError(f"{path} has no {', '.join(sorted(missing))}")
+    if set(additions) & names:
+        raise RuntimeError(f"{path} already has {', '.join(sorted(set(additions) & names))}")
     partial = path.with_name(f"{path.name}.part")
     with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as target:
         for info, data in members:
             edit = edits.get(info.filename)
             target.writestr(info, data if edit is None else edit(data.decode("utf-8")).encode("utf-8"))
+        for name, text in additions.items():
+            target.writestr(name, text.encode("utf-8"))
     partial.replace(path)
 
 
@@ -277,7 +382,9 @@ def finish_docx_layout(docx: Path) -> None:
     landscape), and the "Table" style's borders and cell margins are repeated on the table, for
     importers that ignore table styles. Rows are marked `cantSplit`, so no row is cut across a page
     break. A document that ends on a landscape table would end with an empty portrait section (a
-    blank page); its last section takes the landscape properties instead.
+    blank page); its last section takes the landscape properties instead. Every section gets the page
+    footer and the line numbering of the final one: the filter's landscape sections carry neither, and
+    a Word section inherits no footer from the one after it.
     """
     _rewrite_zip_members(docx, {"word/document.xml": _finish_layout})
 
@@ -288,6 +395,7 @@ def _finish_layout(xml: str) -> str:
     if body is None:
         raise RuntimeError("document.xml has no w:body")
     _close_trailing_section(body)
+    _number_every_section(dom, body)
     pending: list[minidom.Element] = []
     for child in _children(body):
         if child.tagName == "w:tbl":
@@ -318,6 +426,19 @@ def _close_trailing_section(body: minidom.Element) -> None:
         return
     body.replaceChild(section, children[-1])
     body.removeChild(last_paragraph)
+
+
+def _number_every_section(dom: minidom.Document, body: minidom.Element) -> None:
+    sections = [c for c in _children(body) if c.tagName == "w:sectPr"]
+    sections += [s for s in (_paragraph_section(c) for c in _children(body)) if s is not None]
+    for section in sections:
+        if not any(r.getAttribute("w:type") == "default" for r in _children(section, "w:footerReference")):
+            reference = minidom.parseString(
+                f'<root xmlns:w="{_W_NS}" xmlns:r="{_R_NS}">{_FOOTER_REFERENCE}</root>'
+            ).documentElement.firstChild
+            following = next((c for c in _children(section) if c.tagName in _SECT_PR_AFTER_REFERENCES), None)
+            section.insertBefore(dom.importNode(reference, True), following)
+        _insert_before_first(section, _fragment(dom, _LINE_NUMBERS), _SECT_PR_AFTER_LINE_NUMBERS)
 
 
 def _children(node: minidom.Node, tag: Optional[str] = None) -> list[minidom.Element]:
