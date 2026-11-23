@@ -206,14 +206,12 @@ items:
     @antonkulaga@gmail.com'
   where: Abstract
   line: 33
-  status: open
-  now: ''
-  why: ''
-  next: 'Rewrite the just-prs sentence for a reader new to polygenic scores: first what a score is (the published
-    weights of many variants, added up for one genome), then where the scores come from (the PGS Catalog), then
-    what just-prs adds (a matched reference population, a quality label, every model for a trait side by side).
-    Livia''s draft describes a risk per variant, which is closer to the annotation modules; keep the score as a
-    sum over many variants. Livia asks Anton to check the wording.'
+  status: addressed
+  now: A polygenic score adds up the published effects of many variants into one number for a genome.
+  why: 'The sentence now goes one step at a time: what a polygenic score is, where the scores come from (the PGS
+    Catalog), then what just-prs adds. Livia''s draft described a risk per variant, which fits the annotation modules
+    rather than a score, so the score stays a sum over many variants. Livia asked Anton to check this wording; it
+    waits for his veto.'
   category: Writing and clarity
   severity: minor
   stage: writing
@@ -938,9 +936,9 @@ items:
   now: ''
   why: ''
   next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. The build
-    code is the lead's; taken as roadmap item RM11 on 2026-11-23 (5f85893). References follow
-    the journal's style (author and year in the text, the list at the end), so footnote references are not an option
-    for the ladder venues.
+    code is the lead's; taken as roadmap item RM11 on 2026-11-23 (5f85893). References follow the journal's style
+    (author and year in the text, the list at the end), so footnote references are not an option for the ladder
+    venues.
   category: Submission package
   severity: minor
   stage: final
