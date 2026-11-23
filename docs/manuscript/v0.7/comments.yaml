@@ -1519,12 +1519,13 @@ items:
     so restructure and insert graphics'
   where: 3.2 Polygenic Risk Scores
   line: 230
-  status: open
-  now: ''
-  why: ''
-  next: Open Section 3.2 with the whole path in four plain steps (take a published score, match it to the genome,
-    place the result among the matched reference population, label its quality), then one part per step with its
-    special cases. Defining a polygenic score before the trait view (the run's open proposal) is the first move.
+  status: partly
+  now: Scoring a genome takes four steps.
+  why: Section 3.2 now opens with the whole path in four plain steps, and each part is headed by its step (A prepared
+    catalogue; Matching a score to the genome; A reference population; Quality labels and the trait view).
+  next: 'The parts still stand in their old order (quality labels before the reference population and the matching).
+    Moving them into step order, and a diagram of the four steps, are left for the authors to ask for: the paragraphs
+    carry earlier co-authors'' revisions.'
   category: Story and structure
   severity: major
   stage: writing
