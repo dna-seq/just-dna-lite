@@ -939,7 +939,8 @@ items:
   status: open
   now: ''
   why: ''
-  next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. References
+  next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. The build
+    code is the lead's; asked on 2026-11-23 (the repository channel, topic "manuscript build"). References
     follow the journal's style (author and year in the text, the list at the end), so footnote references are not
     an option for the ladder venues.
   category: Submission package
