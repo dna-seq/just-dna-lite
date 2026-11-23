@@ -102,14 +102,12 @@ items:
     the workflow to verify and another produces new references to verify against
   where: 'Just-DNA-Lite: a Local-First, Open-Source Platform for Personal Genome Annotation and Polygenic Risk Scoring'
   line: 3
-  status: open
-  now: ''
-  why: ''
-  next: 'The draft note at the top (it leaves before submission) is the only place that says how this paper and
-    the companion paper divide the work, and Livia finds it convoluted. Say it in two plain sentences, here and
-    where the Abstract or Section 1.2 needs it (C125): this paper presents the workflow that applies published modules
-    and scores to a genome and reports the result; the companion paper presents how new modules are written, checked
-    and published.'
+  status: addressed
+  now: This paper shows how a published module or score is applied to a genome and reported, from the web interface
+    or from an AI assistant.
+  why: 'The draft note now says the split in plain sentences: this paper applies published modules and scores to
+    a genome and reports them, from the web interface or an AI assistant; the companion paper shows how new modules
+    are written, checked and published.'
   category: Story and structure
   severity: minor
   stage: writing
@@ -940,9 +938,9 @@ items:
   now: ''
   why: ''
   next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. The build
-    code is the lead's; asked on 2026-11-23 (the repository channel, topic "manuscript build"). References
-    follow the journal's style (author and year in the text, the list at the end), so footnote references are not
-    an option for the ladder venues.
+    code is the lead's; taken as roadmap item RM11 on 2026-11-23 (5f85893). References follow
+    the journal's style (author and year in the text, the list at the end), so footnote references are not an option
+    for the ladder venues.
   category: Submission package
   severity: minor
   stage: final
@@ -1181,8 +1179,8 @@ items:
   now: ''
   why: ''
   next: 'Checked 2026-11-22 by hydrating a session over the site''s own websocket: https://lite.just-dna.life/ answers
-    is_immutable_mode false and allow_zenodo_import true, so uploads are not disabled there and the sentence is not
-    true today. Either the deployment sets JUST_DNA_IMMUTABLE_MODE=true (docs/IMMUTABLE_MODE.md), or the sentence
+    is_immutable_mode false and allow_zenodo_import true, so uploads are not disabled there and the sentence is
+    not true today. Either the deployment sets JUST_DNA_IMMUTABLE_MODE=true (docs/IMMUTABLE_MODE.md), or the sentence
     changes; the deployment is the maintainer''s (desk #83).'
   decision: true
   category: Claims and evidence
