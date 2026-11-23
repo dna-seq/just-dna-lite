@@ -932,13 +932,14 @@ items:
     of the text but while you read'
   where: 2.1 Annotation Pipeline
   line: 110
-  status: open
-  now: ''
-  why: ''
-  next: Add page and line numbers to the Doc and PDF builds; many journals ask for line numbers at review. The build
-    code is the lead's; taken as roadmap item RM11 on 2026-11-23 (5f85893). References follow the journal's style
-    (author and year in the text, the list at the end), so footnote references are not an option for the ladder
-    venues.
+  status: addressed
+  now: 'A genotype linked to its annotation and sources.** Selected fields from the Longevity Variants report for
+    Anton Kulaga''s public genome: the called FOXO3 genotype, the module''s insulin-signalling category, curation
+    weight and five linked study records.'
+  why: 'The build now numbers pages and lines (RM11, 129a627): the Word copy has a PAGE footer and line numbers
+    in every section, the PDF numbers lines with lineno and pages as before. Footnote references were not taken:
+    the ladder venues use author-year citations with the list at the end. The passage quoted is no answer in the
+    text, since the change is to the build, not the paper.'
   category: Submission package
   severity: minor
   stage: final
@@ -1259,9 +1260,9 @@ items:
   status: open
   now: ''
   why: ''
-  next: 'Section 3.1 is redrafted once longevity-loci''s pull request 37 merges (Longevity Map 2.0.0); its weighting
-    may change there, so the rule is written then, from the merged module, with a table of how each input moves the
-    weight as Livia suggests. Blocked on that merge, not on a decision.'
+  next: Section 3.1 is redrafted once longevity-loci's pull request 37 merges (Longevity Map 2.0.0); its weighting
+    may change there, so the rule is written then, from the merged module, with a table of how each input moves
+    the weight as Livia suggests. Blocked on that merge, not on a decision.
   category: Methods and reproducibility
   severity: major
   stage: writing
@@ -1371,13 +1372,13 @@ items:
   comment: Optimally, figures like thus should be vector graphics, not pixeled screenshots...
   where: 3.1 Longevity Variants Module (example)
   line: 216
-  status: open
-  now: ''
-  why: ''
-  next: Export Figure 2, a drawn diagram, as vector graphics (SVG or PDF) instead of PNG. Figures 1 and 3 are screenshots
-    and stay raster, recaptured at print resolution (the run's decision D6).
-    SVG sources exist beside the three diagram PNGs; using them in the PDF build was asked of the lead on
-    2026-11-23 (the repository channel, topic "manuscript build").
+  status: addressed
+  now: Polygenic scores for one trait in the current web interface.** A screenshot of the trait report for low-density
+    lipoprotein (LDL) cholesterol on Anton Kulaga's public genome.
+  why: The three drawn diagrams, the one commented on (now Figure 4) among them, are set in the PDF from their SVG
+    sources as vector graphics (RM11, 129a627; checked in the built LaTeX on 2026-11-23). The two interface figures
+    stay raster, and, as Livia's reply asks, their captions now say they are screenshots (Figures 1 and 5). The
+    Word copy keeps PNGs, since Google Docs does not take SVG.
   category: Figures and tables
   severity: minor
   stage: writing
@@ -3799,21 +3800,21 @@ items:
   where: 2.3 Web Interface and Self-Exploration
   line: 165
   status: addressed
-  now: '**Figure 1. The Just-DNA-Lite web interface elements.** (**a**) The Module Catalog, which lists the modules
-    published in just-dna-registry. The panel on the left shows the selected module''s publishing account, version
-    picker, variant and gene counts and the button that installs it; each card gives a module''s publishing account,
-    version, variant count and downloads (here from the accounts `eric-mods`, `just-dna-seq` and `ksuha-dna`). (**b**)
-    The Longevity Variants section of an HTML report for Anton Kulaga''s public genome. It opens with counts of
-    matched variants, of positive and negative associations and of inferred genotypes, and the summed module weight;
-    the counts of matched variants and of associations, and the summed weight, include the inferred genotypes. Each
-    table row gives the genotype, the module''s alleles, zygosity, weight and buttons that open a prepared question
-    in an external AI assistant; the first row is an inferred homozygous-reference genotype (Section 2.1). The FOXO3
-    rs2802292 row is open to the module''s conclusion, curation method, direction and priority, and to the first
-    two of its five linked studies, each with its PubMed ID, population and design; its priority of 0.95 (the SNP
-    weight, *w*_SNP, of Section 3.1), times 0.5 for a heterozygous genotype, gives its weight of 0.475. Both panels
-    were captured at https://lite.just-dna.life/ on 26 October 2026 and are cropped; panel b joins two parts of
-    the section, its summary cards and the table of its insulin-signalling category, and leaves out the part between
-    them.'
+  now: '**Figure 1. Screenshots of the Just-DNA-Lite web interface.** (**a**) The Module Catalog, which lists the
+    modules published in just-dna-registry. The panel on the left shows the selected module''s publishing account,
+    version picker, variant and gene counts and the button that installs it; each card gives a module''s publishing
+    account, version, variant count and downloads (here from the accounts `eric-mods`, `just-dna-seq` and `ksuha-dna`).
+    (**b**) The Longevity Variants section of an HTML report for Anton Kulaga''s public genome. It opens with counts
+    of matched variants, of positive and negative associations and of inferred genotypes, and the summed module
+    weight; the counts of matched variants and of associations, and the summed weight, include the inferred genotypes.
+    Each table row gives the genotype, the module''s alleles, zygosity, weight and buttons that open a prepared
+    question in an external AI assistant; the first row is an inferred homozygous-reference genotype (Section 2.1).
+    The FOXO3 rs2802292 row is open to the module''s conclusion, curation method, direction and priority, and to
+    the first two of its five linked studies, each with its PubMed ID, population and design; its priority of 0.95
+    (the SNP weight, *w*_SNP, of Section 3.1), times 0.5 for a heterozygous genotype, gives its weight of 0.475.
+    Both panels were captured at https://lite.just-dna.life/ on 26 October 2026 and are cropped; panel b joins two
+    parts of the section, its summary cards and the table of its insulin-signalling category, and leaves out the
+    part between them.'
   why: Figure 1's title edited in the Doc to 'The Just-DNA-Lite web interface elements.'; carried into the master
     on 2026-11-19 (0eb68c5).
   category: Figures and tables
