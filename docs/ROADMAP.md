@@ -66,6 +66,18 @@ it on the compiled spec in `data/modules/longevitymap_v2/` once the pull request
 the engine call the pairs of a module that has both, with the result in the report's combined
 section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the merge.
 
+## RM11 — Page and line numbers in the manuscript build
+
+**State:** unattended · **Owner:** lead
+
+Co-author comment C132 on paper v0.7 asks for page numbers; review copies usually need line numbers too
+(the reviser's request, 2026-11-23). PDF: with no venue template, add `lineno` and `\linenumbers` to
+the header (pandoc's article already numbers pages). docx: a footer with a PAGE field in the generated
+reference.docx, its `footerReference` copied into every `sectPr` in the layout finisher (the filter's
+landscape sections carry none), and `w:lnNumType` (count by 1, continuous) after `pgMar` in each; a test
+in `tests/test_manuscript_docx.py` that every section has both. Google Docs may drop the line numbers on
+import; the footer survives. No round release is scheduled.
+
 ## RM9 — Republish superhuman with the 0.8.9 compiler's indel fix
 
 **State:** blocked: desk #65 (if nobody answers, nothing is republished) · **Owner:** lead
