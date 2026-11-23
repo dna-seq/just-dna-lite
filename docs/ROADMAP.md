@@ -66,7 +66,7 @@ it on the compiled spec in `data/modules/longevitymap_v2/` once the pull request
 the engine call the pairs of a module that has both, with the result in the report's combined
 section. It blocks publishing 2.0.0 (`docs/LONGEVITYMAP_V2_RELEASE.md`), not the merge.
 
-## RM11 — Page and line numbers in the manuscript build
+## RM11 — Page and line numbers, and vector figures, in the manuscript build
 
 **State:** unattended · **Owner:** lead
 
@@ -77,6 +77,11 @@ reference.docx, its `footerReference` copied into every `sectPr` in the layout f
 landscape sections carry none), and `w:lnNumType` (count by 1, continuous) after `pgMar` in each; a test
 in `tests/test_manuscript_docx.py` that every section has both. Google Docs may drop the line numbers on
 import; the footer survives. No round release is scheduled.
+
+Also here (the reviser, 2026-11-23, comment C72): the drawn figures as vector graphics in the PDF. A
+pandoc filter in the PDF build swaps an image's `.png` for its `.svg` sibling converted to PDF (where
+one exists: three diagrams in `docs/manuscript/v0.7/figures/`); screenshots stay raster, the docx stays
+on PNG, and the paper keeps citing the `.png`.
 
 ## RM9 — Republish superhuman with the 0.8.9 compiler's indel fix
 
