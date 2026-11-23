@@ -139,3 +139,9 @@ was shown to that session and will not be shown again: its first work is repeate
   and `allow_zenodo_import` true (a session over its own `/_event` socket, 13:5x UTC), so the paper's "uploads of
   private genome files are disabled there" is not true today. C135 open, `decision: true`, on desk #83:
   set `JUST_DNA_IMMUTABLE_MODE=true` on the deployment, or change the sentence. The deployment is not this seat's.
+- **2026-11-23.** C135 on desk #83 (the demo accepts uploads). C132 taken by the lead as RM11 (page and line
+  numbers in both builds). 9707337 C124 (the boundary with the companion paper in plain sentences), 3331ee0 C127
+  (Abstract: what a PGS is first; waits for Anton's veto, Livia asked him), a05c730 C139 partly (3.2 opens with four
+  steps, parts headed by step; reordering and a diagram left to the authors). `runs.py apply` refused a new
+  paragraph and the run-in heads ("replaying the edits ... does not give the clean text"), so those went in by hand
+  as `@rev C139a`–`d`. Ledger: 14 open, 101 addressed, 5 partly. Left without a decision: C70, C72.
