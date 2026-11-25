@@ -145,3 +145,10 @@ was shown to that session and will not be shown again: its first work is repeate
   steps, parts headed by step; reordering and a diagram left to the authors). `runs.py apply` refused a new
   paragraph and the run-in heads ("replaying the edits ... does not give the clean text"), so those went in by hand
   as `@rev C139a`–`d`. Ledger: 14 open, 101 addressed, 5 partly. Left without a decision: C70, C72.
+- **2026-11-23 to 11-25.** RM11 landed (129a627): the .docx has a PAGE footer and line numbers, the .tex `lineno`
+  and the three diagrams from their SVGs. 2e59df4 closes C132 and C72; Figures 1 and 5 now say they are
+  screenshots (Livia's reply to C72). The PDF does not build on the cluster login node (the .venv tectonic needs GLIBC 2.35+);
+  check vector figures in the .tex. `comments.py status` lists 20 `now` quotes not found verbatim, the same 20 at
+  2e59df4's parent: older entries, not fixed yet. Demo re-checked 2026-11-24, still uploads on (#83 updated);
+  #75 updated. #64 is manuscript-skills' question, not this seat's. Ledger: 12 open, 103 addressed, 5 partly.
+  Open on the desk (this seat's): #62, #63, #69, #71, #72, #74, #75, #76, #83. PR #37 still open at ffcfdfe.
