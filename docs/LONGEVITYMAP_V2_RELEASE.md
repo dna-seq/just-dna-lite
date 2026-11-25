@@ -69,8 +69,8 @@ scientific reviewer, read the rendered report first. Known points for them and f
 
 A token that owns `just-dna-seq` is needed (`REGISTRY_TOKEN` and `REGISTRY_TOKEN_SANDBOX` do not). The rehearsal is
 the same command against the polygon (`--url` of the `polygon` store, a test namespace and its token); it was run as
-`test-longevity-loci/longevitymap@2.0.0` on 2026-11-16 (signature aebf5e38, the 164-locus build). This build (997b3356) is
-not rehearsed yet; longevity-loci's module seat rehearses it before step 4.
+`test-longevity-loci/longevitymap@2.0.0`, last on 2026-11-25 with this build: the registry reports content signature
+997b3356, the same as the local compile. (An earlier 2.0.1 there, from 2026-11-17, is not this build.)
 
 ```bash
 uv run pipelines registry publish just-dna-seq longevitymap 2.0.0 data/modules/longevitymap_v2 \
