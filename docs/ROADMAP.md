@@ -7,7 +7,7 @@ before that day is carried as backlog. The lead seat keeps it (`docs/seats/LEAD.
 
 ## RM4 — longevity-loci's re-curated longevity module, in the app and in the paper
 
-**State:** waits until 2026-11-30: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b, and again on 2026-11-22 at ffcfdfe (the literature sweep's 8 loci: 172 loci, 513 rows, 697 studies; spec valid, routing tests 9 pass, recompiled to content signature 997b3356 as claimed); on 2026-11-25 still at ffcfdfe, checks green, mergeable, not merged · **Owner:** lead
+**State:** waits until 2026-11-30: the maintainer's merge of pull request 37, reviewed by the lead on 2026-11-19 at bcd2f7b, and again on 2026-11-22 at ffcfdfe (the literature sweep's 8 loci: 172 loci, 513 rows, 697 studies; spec valid, routing tests 9 pass, recompiled to content signature 997b3356 as claimed); re-checked on 2026-11-26 at e023a0f (re-enriched resolution metadata, polygon rehearsal recorded in the runbook; spec valid, 171 variants, 697 studies, routing tests 9 pass on the branch's own code), checks green, mergeable, not merged · **Owner:** lead
 
 The repository `dna-seq/longevity-loci` re-curated the longevity module; its lead is building a deck
 comparing it with the Generation I port this repository publishes as Longevity Map (asked by the
@@ -48,11 +48,13 @@ or a close; nothing is posted without the maintainer's word on that text.
 
 ## RM7 — A module's digest is shown, never verified
 
-**State:** waits until 2026-11-26: put the design question (what a local or sandbox module shows) to the maintainer · **Owner:** lead
+**State:** unattended: built under desk #92's default (warn and go on) unless the maintainer picks otherwise · **Owner:** lead
 
 The report prints each module's `artifact.digest` as the module's own claim; nothing calls
-`verify_manifest` (`CLAUDE.md`, "Report"). Wiring it with `require_marketplace=True` rejects every
-local compile, so the design question is what a local or sandbox module shows instead.
+`verify_manifest` (`CLAUDE.md`, "Report"). The format library's own docstring settles the call
+sites: `require_marketplace=True` for a registry install, `False` for a local compile or a
+HuggingFace module (files and digest still checked in full). Open on desk #92: what a mismatch
+does, a warning on the module (the default) or the module left out of the run.
 
 ## RM8 — A weights-led module's haplotype pairs are never called
 
