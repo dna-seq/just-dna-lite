@@ -4,10 +4,14 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI
 - **What we use:** the Catalog's client; it moves with the format pin, since a mismatched pair refuses to publish
-- **Read mark:** 0.34.2, read 2026-11-22.
+- **Read mark:** 0.34.3, read 2026-11-26.
 - **Last checked:** 2026-11-22 (release watcher)
 
 ## Entries
+
+### 0.34.3 (read 2026-11-26)
+
+The PyPI wheels of 0.34.2 and 0.34.3 differ only in metadata: the format, compiler and enricher floors rise to `>=0.8.10` (its `compiler` and `server` extras too), matching our own floors since ac050cb. No code change. Verdict: no action; the lock picks it up at the next relock.
 
 ### 0.30.0 to 0.34.0 (read 2026-11-19)
 
