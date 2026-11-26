@@ -4,10 +4,16 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI; https://github.com/dna-seq/just-dna-compiler
 - **What we use:** `validate_spec`, `compile_module`, `reverse_module`; the module build under `v1_port/`
-- **Read mark:** 0.8.10, read 2026-11-26.
-- **Last checked:** 2026-11-26 (release watcher, 0.8.10)
+- **Read mark:** 0.9.0, read 2026-11-26.
+- **Last checked:** 2026-11-26 (release watcher, 0.9.0)
 
 ## Entries
+
+### 0.9.0 (read 2026-11-26)
+
+A minor, all three at 0.9.0 with floors `>=0.9.0` (the enricher imports format's new `snapshot.parse_release`). The compiler's source did not change and no compiled artifact moves: the 22 reference modules compile to the same bytes, no recompile or re-derivation. New: the enricher reads reference data from local disk, then the registry's proxy, then Hugging Face (`RemoteSnapshots`, `SnapshotRouteUnavailable`); `LANE_STATES` gains `stale`; Ensembl groups (consequence, clinical flags, frequencies) pull through `cache pull --only ensembl --groups` and read from `locations.ensembl_group_dir` (RM437, upstream's item for us, INTEGRATION_0_9 § 3); `EnsemblSettings` batch values out of range now raise. Upgrade note: INTEGRATION_0_9.md at tag v0.9.0.
+
+Bump on `bump/just-dna-format-0.9` (1fc8fbe): format contract tests 105 passed, 4 skipped. **Held:** both registry servers report format 0.8.10 (`/api/v1/version`, 2026-11-26), and `contract_compatible` refuses a 0.x minor mismatch, so a 0.9 client cannot exchange modules with them. Merge once a server reports format 0.9 (the registry's floor moves with it). Meanwhile main's floors (`>=0.8.10`, no ceiling) let any `uv lock --upgrade` take 0.9: told the lead. Reading the Ensembl groups is adoption work, the lead's through the roadmap. Verdict: **bump ready, waits on the registries**.
 
 ### 0.8.10 (read 2026-11-26)
 

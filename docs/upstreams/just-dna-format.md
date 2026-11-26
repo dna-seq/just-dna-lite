@@ -4,10 +4,14 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI; https://github.com/dna-seq/just-dna-compiler
 - **What we use:** the authored module schema, manifest, vocabulary, alleles, layout and VRS helpers (`CLAUDE.md`, "Shared format libraries")
-- **Read mark:** 0.8.10, read 2026-11-26.
-- **Last checked:** 2026-11-26 (release watcher, 0.8.10)
+- **Read mark:** 0.9.0, read 2026-11-26.
+- **Last checked:** 2026-11-26 (release watcher, 0.9.0)
 
 ## Entries
+
+### 0.9.0 (read 2026-11-26)
+
+Released with the compiler; see `just-dna-compiler.md`, 0.9.0. Bump on `bump/just-dna-format-0.9` (1fc8fbe), held until the registries serve format 0.9.
 
 ### 0.8.10 (read 2026-11-26)
 
