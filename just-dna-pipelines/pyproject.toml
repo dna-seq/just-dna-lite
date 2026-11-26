@@ -29,9 +29,9 @@ dependencies = [
     # block, so this pin is what lets us read modules the registry now publishes. The enricher's
     # `ensembl` lane (`just-dna-seq/ensembl_variations_split`) is the only Ensembl downloader here.
     # The bare `just-dna-enricher` (no `[atlas]` extra) still pulls no protobuf floor.
-    "just-dna-compiler>=0.8.9",
-    "just-dna-enricher>=0.8.9",
-    "just-dna-format>=0.8.9",
+    "just-dna-compiler>=0.8.10",
+    "just-dna-enricher>=0.8.10",
+    "just-dna-format>=0.8.10",
     # agno 3.x imports the mcp 2.x names (`MCPError`, `streamable_http_client`) and `fastmcp`,
     # all declared only under its `[mcp]` extra. Depend on the extra rather than re-listing its
     # members: the 2026-09 relock floated agno to 3.0.10 against a bare `mcp<2.0` cap here, and

@@ -65,7 +65,7 @@ and `just-prs` are sometimes added to the workspace; both are **read-only**. Che
   The report sorts with a total order (`report_logic._display_tiebreak`): rows tied on |weight| once
   listed in a different order on every run (rs429358 / rs7412 swapped between two runs on one sample). Our polars now
   matches the compiler workspace's, so `compilation.toolchain` no longer differs on that axis.
-- Format libs: `just-dna-format/compiler/enricher>=0.8.9` (the 0.8 line, cut 2026-11-05; upstream
+- Format libs: `just-dna-format/compiler/enricher>=0.8.10` (the 0.8 line, cut 2026-11-05; upstream
   `docs/INTEGRATION_0_8.md` is the adoption guide). After an upgrade, read upstream's "After upgrading" steps
   **before** the next cache pull: 0.8.8 asks to check each lane's `pull-record.json` for a missing
   `release_sha256` first (on 2026-11-18 only `ensembl_variations` lacked it, and that lane publishes no
