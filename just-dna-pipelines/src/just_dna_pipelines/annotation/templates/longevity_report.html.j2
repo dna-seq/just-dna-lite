@@ -507,6 +507,9 @@ table.ui tbody tr.variant-summary:hover { background: var(--soft-blue); }
     white-space: nowrap;
 }
 .exclusion-badge.failed { border: 1px solid #a02c2c; background: rgba(219, 40, 40, 0.12); color: #912d2b; }
+.files-mismatch { border: 1px solid #a02c2c; background: rgba(219, 40, 40, 0.08); border-radius: 6px; padding: 0.6rem 0.9rem; margin: 0.6rem 0 1rem; }
+.files-mismatch p { margin: 0.2rem 0; }
+.files-mismatch-label { color: #912d2b; }
 .exclusion-badge.skipped { border: 1px solid var(--line-strong); background: var(--paper); color: var(--muted); }
 
 #toTop {
@@ -936,6 +939,7 @@ window.addEventListener("scroll", function() {
     <section class="report-section" id="variants">
         <p class="section-kicker">Module results</p>
         <h2>{{ module_display_names.get("longevitymap", "Longevity Variants") }}</h2>
+        {% set files_module = "longevitymap" %}{% include "files_mismatch.html.j2" %}
         <p class="section-intro">
             Longevity is a complex phenotype influenced by genetics, environment, and lifestyle.
             These findings are matched to longevity-associated variants and grouped by biological
@@ -986,6 +990,7 @@ window.addEventListener("scroll", function() {
     <section class="report-section" id="module-{{ mod.module_name }}">
         <p class="section-kicker">Module results</p>
         <h2>{{ mod.display_name }}</h2>
+        {% set files_module = mod.module_name %}{% include "files_mismatch.html.j2" %}
         {% if mod.variants %}
         <p class="section-intro">
             The <strong>{{ mod.display_name }}</strong> module matched {{ mod.summary.total_variants }}
@@ -1018,6 +1023,7 @@ window.addEventListener("scroll", function() {
     <section class="report-section" id="module-{{ mod.module_name }}">
         <p class="section-kicker">Pharmacogenomics</p>
         <h2>{{ mod.display_name }}</h2>
+        {% set files_module = mod.module_name %}{% include "files_mismatch.html.j2" %}
         {% if mod.drugs %}
         <p class="section-intro">
             Results are grouped by drug and ranked by ClinPGx evidence level. Level 1A indicates a
@@ -1150,7 +1156,9 @@ window.addEventListener("scroll", function() {
                             <tr data-preview-row{% if loop.index > preview_row_limit %} class="preview-overflow"{% endif %}>
                                 <td>{{ m.display_name }}<br><small>{{ m.name }}</small></td>
                                 <td>{% if m.version %}{{ m.version }}{% else %}<em>Not stated</em>{% endif %}</td>
-                                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}</td>
+                                <td>{% if m.digest_short %}<code title="{{ m.digest }}">{{ m.digest_short }}</code>{% else %}<em>Not stated</em>{% endif %}
+                                    {#- RM7: the check is a separate answer from the claim above, never folded into it. #}
+                                    <br>{% if m.files_match is sameas true %}<small>Files match</small>{% elif m.files_match is sameas false %}<small class="files-mismatch-label" title="{{ m.files_check }}">Files do not match the module's fingerprint</small>{% else %}<small><em>Files not checked</em></small>{% endif %}</td>
                                 {# The module's own explanation, kept verbatim. An absent value must not
                                    imply that weights from different modules are comparable. #}
                                 <td class="cell-wrap">{% if m.weighting %}<small>{{ m.weighting }}</small>{% else %}<em>Not stated</em>{% endif %}</td>

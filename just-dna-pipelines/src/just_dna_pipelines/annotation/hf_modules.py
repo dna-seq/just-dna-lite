@@ -14,6 +14,7 @@ from typing import Literal, Optional
 
 import polars as pl
 from eliot import log_message
+from just_dna_format.integrity import IntegrityError, verify_manifest
 from just_dna_format.manifest import ModuleManifest, read_manifest
 from pydantic import BaseModel, Field, model_validator
 
@@ -980,9 +981,9 @@ def read_module_provenance(
     before manifests existed — every one of ours on HuggingFace today — still answers `None` to all
     three, which is the honest answer rather than a degraded one.
 
-    The digest is the value the module **claims** — read from its manifest, not recomputed. Nothing
-    in this repo calls `just_dna_format.integrity.verify_manifest`, so recording it ties a report to
-    a stated identity, not to a checked one. Do not present it to a reader as verification.
+    The digest is the value the module **claims** — read from its manifest, not recomputed here.
+    Whether the files match it is `check_module_files`, a separate answer the engine records beside
+    it; only that answer may be presented to a reader as a check.
 
     `weighting` is the module's own statement of what its authored `weight` column *means* — scale,
     method, free-text note (format 0.6, RM92). It exists because `weight` is a bare float with no
@@ -1037,6 +1038,36 @@ def read_module_provenance(
     return (version, digest, weighting)
 
 
+def check_module_files(info: Optional[ModuleInfo]) -> tuple[Optional[bool], str]:
+    """Whether the module's files on this machine are the ones its own manifest describes (RM7).
+
+    ``(True, "")`` when every artifact file hashes to its declared value and the recomputed
+    ``artifact.digest`` equals the manifest's; ``(False, reason)`` when they do not, with the format
+    library's own words; ``(None, reason)`` when nothing was checked. ``None`` is never "fine".
+
+    Two call sites of ``verify_manifest``, as its docstring prescribes: a Catalog install (the
+    manifest carries the registry's ``published_at``) must also say the registry compiled it
+    (``require_marketplace=True``); a local compile has no registry behind it, so only the hashes and
+    the digest are checked. A module read in place from HuggingFace or another remote source has no
+    directory here: checking it would mean downloading every file the engine reads by URL, so it is
+    reported as not checked.
+    """
+    module_dir = local_module_dir(info)
+    if module_dir is None:
+        return None, "read in place from its source, so its files were not checked on this machine"
+    manifest_path = module_dir / "manifest.json"
+    if not manifest_path.exists():
+        return None, "it has no manifest.json to check its files against"
+    manifest, reason = _read_manifest_or_reason(manifest_path)
+    if manifest is None:
+        return None, f"its manifest.json could not be read: {reason}"
+    try:
+        verify_manifest(module_dir, manifest, require_marketplace=module_source(info) == "catalog")
+    except IntegrityError as exc:
+        return False, str(exc)
+    return True, ""
+
+
 class ModuleOutputMapping(BaseModel):
     """Mapping of output files to their source modules."""
     module: str
@@ -1057,6 +1088,11 @@ class ModuleOutputMapping(BaseModel):
     # What the module says its `weight` column means (format 0.6, RM92), verbatim. `None` means the
     # module has not said, which a reader must not take as "these weights are comparable".
     weighting: Optional[str] = None
+    # Whether the module's files matched its own manifest when this run read them
+    # (`check_module_files`): True, False, or None for not checked (a remote module, no manifest).
+    # `files_check` carries the reason for False or None. A manifest written before RM7 reads None.
+    files_match: Optional[bool] = None
+    files_check: Optional[str] = None
     # A phenotype module (haplotypes + a combiner) is annotated by the diplotype caller, not the
     # weights engine, and writes `{module}_phenotypes.parquet` instead of a weights parquet. Default
     # "variant" keeps every manifest written before this valid, and its variant counts untouched.

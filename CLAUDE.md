@@ -439,8 +439,16 @@ inverts on reference records (RM57); for gVCF use `MIN_DP` with interval contain
   verbatim. Otherwise a silent skip reads as "nothing found".
 - **Modules in this report** renders `version` / `digest` / `source_url` / `weighting` from
   `read_module_provenance`. All tri-state: `None` renders *Not stated*. Version falls back to the spec
-  (`module_config.spec_version`). **The digest is the module's claim, not verified**: nothing calls
-  `verify_manifest` yet. If you wire it, `require_marketplace=True` rejects every local compile.
+  (`module_config.spec_version`). The digest is the module's claim; **whether the files match it is
+  `hf_modules.check_module_files`** (RM7), run per module by the engine and kept on
+  `ModuleOutputMapping.files_match` / `files_check`: `verify_manifest` with
+  `require_marketplace=True` for a Catalog install (`module_source == "catalog"`), `False` for a local
+  compile (`True` would reject every one). Tri-state: a module read in place from HuggingFace or another
+  remote source, or one with no readable manifest, is *Files not checked*, never "fine". A mismatch is
+  desk #92's default: a warning at the top of the module's section (`files_mismatch.html.j2`, included
+  in all four section kinds) and in the table, results still shown; leaving the module out instead is
+  `skipped[...]; continue` beside the check in `annotate_vcf_with_all_modules`. Tests:
+  `just-dna-pipelines/tests/test_module_files_check.py`.
 - Source credits list terms only for `layer == "annotation"`; permission booleans are tri-state.
 - Variant tables are one macro (`variant_rows` / `variant_table`). JS constraints: the detail row is the
   immediate next sibling; preview rows carry `data-preview-row` (the detail row must not);

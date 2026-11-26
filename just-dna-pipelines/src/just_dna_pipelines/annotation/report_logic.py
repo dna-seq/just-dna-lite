@@ -2020,8 +2020,9 @@ def build_module_provenance(
     Every field is reported exactly as far as it was established. A module discovered on
     HuggingFace has no manifest fetched at all (``scan_module_table`` reads the parquet URL and
     nothing else), so its version and digest are genuinely unknown here, and the template says so
-    rather than implying an unversioned module. The digest is the module's own claim, never
-    verified against the files — see ``read_module_provenance``.
+    rather than implying an unversioned module. The digest is the module's own claim; whether the
+    files matched it is ``files_match`` (``check_module_files``, RM7): True, False, or None when the
+    run did not check (a remote module, or a manifest written before the check existed).
     """
     rows: list[dict] = []
     for name in module_names:
@@ -2046,9 +2047,20 @@ def build_module_provenance(
                 "source_url": (output.source_url if output else None)
                 or (info.source_url if info is not None else "")
                 or "",
+                "files_match": output.files_match if output else None,
+                "files_check": (output.files_check if output else None) or "",
             }
         )
     return rows
+
+
+def files_mismatch_warnings(module_provenance: list[dict]) -> dict[str, str]:
+    """Module name to the library's reason, for every module whose files did not match (RM7).
+
+    The template puts this at the top of the module's own section (desk #92's default: warn and go
+    on), so a reader meets it before the results it qualifies.
+    """
+    return {row["name"]: row["files_check"] for row in module_provenance if row["files_match"] is False}
 
 
 def generate_longevity_report(
@@ -2178,6 +2190,7 @@ def generate_longevity_report(
             phenotype_modules=phenotype_modules,
             credits=credits,
             module_provenance=module_provenance,
+            files_mismatch=files_mismatch_warnings(module_provenance),
             module_exclusions=module_exclusions,
             module_display_names=MODULE_DISPLAY_NAMES,
             umami_script_tag=umami_script_tag(),

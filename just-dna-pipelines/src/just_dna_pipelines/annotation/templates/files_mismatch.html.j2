@@ -1,0 +1,11 @@
+{# RM7, desk #92's default: a module whose files no longer match its own manifest still shows its
+   results, under this warning at the top of its section. `files_module` names the module. #}
+{% set files_reason = (files_mismatch | default({})).get(files_module) %}
+{% if files_reason %}
+<div class="files-mismatch" role="note">
+    <p><strong>This module's files do not match its own fingerprint.</strong> A file was changed,
+    cut short or replaced after the module was built, so the results below may not be the ones its
+    authors published.</p>
+    <p><small>{{ files_reason }}</small></p>
+</div>
+{% endif %}

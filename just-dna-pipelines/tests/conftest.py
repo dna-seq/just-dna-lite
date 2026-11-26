@@ -63,7 +63,12 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def enable_eliot_stdout():
-    """Ensure Eliot logs are pretty-printed to stdout during the test session."""
-    to_nice_stdout()
+def enable_eliot_stdout(tmp_path_factory):
+    """Ensure Eliot logs are pretty-printed to stdout during the test session.
+
+    The JSON copy goes to pytest's own temp dir: pycomfort's default is a fixed
+    `/tmp/just_semantic_search_logs`, which on a shared host may belong to another account, and
+    then every test in this package errors at setup with `PermissionError`.
+    """
+    to_nice_stdout(output_file=tmp_path_factory.mktemp("eliot") / "log.json")
     yield

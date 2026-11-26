@@ -46,16 +46,6 @@ has landed (#7 and #11, the MCP server and the module-creator plugin; #10, the A
 reports). The correspondence seat reads them once and proposes, for each, a roadmap item, an answer
 or a close; nothing is posted without the maintainer's word on that text.
 
-## RM7 — A module's digest is shown, never verified
-
-**State:** unattended: built under desk #92's default (warn and go on) unless the maintainer picks otherwise · **Owner:** lead
-
-The report prints each module's `artifact.digest` as the module's own claim; nothing calls
-`verify_manifest` (`CLAUDE.md`, "Report"). The format library's own docstring settles the call
-sites: `require_marketplace=True` for a registry install, `False` for a local compile or a
-HuggingFace module (files and digest still checked in full). Open on desk #92: what a mismatch
-does, a warning on the module (the default) or the module left out of the run.
-
 ## RM8 — A weights-led module's haplotype pairs are never called
 
 **State:** waits until 2026-11-30: pull request 37 merged, so the spec is on the trunk (not merged on 2026-11-25) · **Owner:** lead

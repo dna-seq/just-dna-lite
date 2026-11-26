@@ -313,6 +313,7 @@
         <h3>{{ mod.display_name }}</h3>
         {% if mod.description %}<p class="section-intro">{{ mod.description }}</p>{% endif %}
         {% endif %}
+        {% set files_module = mod.module_name %}{% include "files_mismatch.html.j2" %}
 
         {% if mod.genes|length > 1 %}
         <div class="trait-glance">

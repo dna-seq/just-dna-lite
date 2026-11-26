@@ -237,8 +237,9 @@ def module_register_compiled(
     produces a fresh `artifact.digest` — so what you annotate with is not the artifact you built and
     meant to test. This command copies the compiled bytes as they are.
 
-    Registering verifies nothing. Nothing in this repo calls `verify_manifest`, so a clean
-    annotation run says the module joined to your genome, not that the module is correct.
+    Registering verifies nothing. Each annotation run checks the copied files against the module's
+    own manifest (`check_module_files`, shown in the report), which says the bytes are the ones
+    built, not that the module is correct.
     """
     source = Path(module_dir).resolve()
     module_name = name or source.name

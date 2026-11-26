@@ -30,6 +30,7 @@ from just_dna_pipelines.annotation.hf_modules import (
     get_module_info,
     module_kind,
     read_module_provenance,
+    check_module_files,
     ModuleInfo,
 )
 from just_dna_pipelines.annotation.configs import HfModuleAnnotationConfig
@@ -754,6 +755,15 @@ def annotate_vcf_with_all_modules(
             logger.info(f"Processing module: {module_name}")
             info = module_infos[module_name]
 
+            # Do the module's files match its own manifest (RM7)? Desk #92's default: a mismatch is
+            # a warning on the module in the report, and the run goes on. Leaving the module out
+            # instead is `skipped[module_name] = ...; continue` here.
+            files_match, files_check = check_module_files(info)
+            if files_match is False:
+                logger.warning(
+                    f"  {module_name}: files do not match the module's manifest: {files_check}"
+                )
+
             # A compound-phenotype module (haplotypes + a combiner) is a different kind of
             # annotation: the diplotype caller reads a gene's sites together, where the weights
             # engine reads one position at a time. Dispatch on `module_kind` *before* the weights
@@ -798,6 +808,8 @@ def annotate_vcf_with_all_modules(
                         digest=module_digest,
                         weighting=module_weighting,
                         source_url=info.source_url or info.lead_url or None,
+                        files_match=files_match,
+                        files_check=files_check or None,
                     )
                 )
                 logger.info(
@@ -862,6 +874,8 @@ def annotate_vcf_with_all_modules(
                 digest=module_digest,
                 weighting=module_weighting,
                 source_url=info.source_url or info.lead_url or None,
+                files_match=files_match,
+                files_check=files_check or None,
             )
             
             total_annotated += num_weights
