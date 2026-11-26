@@ -4,10 +4,14 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI; https://github.com/dna-seq/just-dna-compiler
 - **What we use:** `validate_spec`, `compile_module`, `reverse_module`; the module build under `v1_port/`
-- **Read mark:** 0.8.9, read 2026-11-19.
-- **Last checked:** 2026-11-19 (release watcher baseline)
+- **Read mark:** 0.8.10, read 2026-11-26.
+- **Last checked:** 2026-11-26 (release watcher, 0.8.10)
 
 ## Entries
+
+### 0.8.10 (read 2026-11-26)
+
+A patch to all three packages, floors between them at `>=0.8.10`. **RM453** (the known issue named at 0.8.9): an rsID row at a mirrored indel site that no second source placed gets both spellings again, as before 0.8.9, instead of no position. **RM456**: `compile_module` no longer raises on Python 3.13 over a `logs/` directory it may list but not search. **RM455**: a pull record that is not UTF-8 reads as unreadable; a `batch_size` below 1 raises `ValueError`; additive names `CacheLane.payload_filename`, `net.check_batch_size`. Format 0.8.10 changes only its release record. Upstream's after-upgrading steps: raise the floors (done on `bump/just-dna-format`, a207450, format contract tests 105 passed); recompile a module 0.8.9 compiled carrying RM449's "neither is filled and the position remains unset" sentence (our v1_port builds are still compiler 0.7.2, so this rides the rebuild already open); no re-derivation needed. Verdict: **bump handed to the lead; recompile stays with the rebuild**.
 
 ### 0.8.6 to 0.8.9 (read 2026-11-19)
 

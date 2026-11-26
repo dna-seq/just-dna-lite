@@ -4,10 +4,14 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI; https://github.com/dna-seq/just-dna-compiler
 - **What we use:** enrichment, the DuckDB Ensembl resolver and the snapshot lanes that own the caches
-- **Read mark:** 0.8.9, read 2026-11-19.
-- **Last checked:** 2026-11-19 (release watcher baseline)
+- **Read mark:** 0.8.10, read 2026-11-26.
+- **Last checked:** 2026-11-26 (release watcher, 0.8.10)
 
 ## Entries
+
+### 0.8.10 (read 2026-11-26)
+
+Released with the compiler; see `just-dna-compiler.md`, 0.8.10. Bump on `bump/just-dna-format` (a207450).
 
 - **Waiting upstream:** the Ensembl snapshot's `groups/` sidecars (consequence, ClinVar, frequencies) are not pulled, so our Ensembl join adds rsIDs only. Reported as S150, taken as RM437, planned for 0.9. Roadmap RM5 waits on it.
 
