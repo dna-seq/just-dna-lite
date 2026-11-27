@@ -87,3 +87,14 @@ Each claim checked against `main` today. Nothing posted.
   main branch (commit 89eecf9)." #20: "Done. A sample's data files can now be sorted by module (the default), name,
   file type, newest or oldest, and each card shows when its file was written. Reports sort newest first (the
   default), oldest first or by name. On the main branch (commit 89eecf9)." Both with the Claude line.
+
+### 2026-11-28 — outside pull request 38
+
+- **PR 38** (chenyangsu, fork, opened 2026-11-27): the phenotype caller split polars-bio's `|`-joined
+  multi-allelic ALT on `,`; a `0|2` call raised `IndexError`. Reproduced on main's own code. Review:
+  `docs/reviews/pr-38-pipe-delimited-alt.md` (cbe2631), verdict correct. Its tests were **not** run here: the
+  session's safety check refused running an outside branch, and the repo has no `docs/TRUST.md`; its CI waits
+  for a maintainer's approval. Merge told to the lead (#just-dna-lite > inbox). Public reply: `blocked: desk #98`,
+  default nothing posted. If approved: `gh pr comment 38 --body-file` with the quoted text from the review.
+- **Format 0.9.0 bump**: `bump/just-dna-format-0.9` (1fc8fbe), held until a registry reports format 0.9
+  (both at 0.8.10 on 2026-11-28). Recheck daily.
