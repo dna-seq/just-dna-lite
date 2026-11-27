@@ -29,7 +29,7 @@ from just_dna_pipelines.annotation.phenotype_caller import (
     gather_site_evidence,
     load_phenotype_definition,
 )
-from just_dna_pipelines.io import resolve_split_multiallelic_genotypes
+from just_dna_pipelines.io import read_vcf_file, resolve_split_multiallelic_genotypes
 from just_dna_pipelines.annotation.restoration import (
     CallsetScope,
     RestorationContext,
@@ -330,6 +330,93 @@ class TestPhaseSets:
         assert site.observed == ["A", "C"]
         # GT cannot say which homolog carries C, so the row is read unphased.
         assert site.phased_alleles is None
+
+
+class TestPipeDelimitedMultiAllelicAlt:
+    """polars-bio joins multi-allelic VCF ALT values with ``|`` (e.g. ``A|C``)."""
+
+    def test_phased_multiallelic_vcf_preserves_phase_through_read_vcf_file(
+        self, hfe_def: GeneDefinition, tmp_path: Path
+    ) -> None:
+        vcf_path = tmp_path / "hfe_multiallelic.vcf"
+        vcf_path.write_text(
+            "##fileformat=VCFv4.2\n"
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE\n"
+            "6\t26092913\trs1800562\tG\tA,C\t50\tPASS\t.\tGT:PS\t0|1:26090951\n"
+            "6\t26090951\trs1799945\tC\tG,T\t50\tPASS\t.\tGT:PS\t1|0:26090951\n"
+        )
+        lf = read_vcf_file(vcf_path, with_formats=True, save_parquet=None)
+        assert set(lf.collect()["alt"].to_list()) == {"A|C", "G|T"}
+
+        ctx = build_restoration_context(lf, 10_000)
+        evidence = gather_site_evidence(lf, hfe_def, ctx)
+        assert {s.phase_set for s in evidence} == {26090951}
+        call = call_gene("hfe_compound_het", hfe_def, evidence)
+        assert call.status == "called"
+        assert call.phenotype == "One C282Y and one H63D change, on different copies"
+        assert call.phase_would_decide is False
+
+    def test_second_alt_allele_in_pipe_delimited_vcf_does_not_raise(
+        self, hfe_def: GeneDefinition, tmp_path: Path
+    ) -> None:
+        vcf_path = tmp_path / "hfe_alt2.vcf"
+        vcf_path.write_text(
+            "##fileformat=VCFv4.2\n"
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE\n"
+            "6\t26092913\trs1800562\tG\tC,A\t50\tPASS\t.\tGT:PS\t0|2:26090951\n"
+            "6\t26090951\trs1799945\tC\tT,G\t50\tPASS\t.\tGT:PS\t2|0:26090951\n"
+        )
+        lf = read_vcf_file(vcf_path, with_formats=True, save_parquet=None)
+        ctx = build_restoration_context(lf, 10_000)
+        evidence = gather_site_evidence(lf, hfe_def, ctx)
+        call = call_gene("hfe_compound_het", hfe_def, evidence)
+        assert call.status == "called"
+        assert call.phenotype == "One C282Y and one H63D change, on different copies"
+
+    def test_pipe_delimited_position_relevance_and_indel_window(self, abo_def: GeneDefinition) -> None:
+        # Multi-allelic indel in Ensembl spelling (G>A|GC, GT=0/2) matches ABO 261 via indel_window
+        # and translates into the module's spelling ["T", "TC"].
+        vcf = pl.DataFrame(
+            {
+                "chrom": ["9", "9", "9"],
+                "start": [133255928, 133255935, 133257520],
+                "rsid": [None, None, None],
+                "ref": ["C", "G", "G"],
+                "alt": ["A|G", "A|T", "A|GC"],
+                "filter": ["PASS", "PASS", "PASS"],
+                "GT": ["0/2", "0/2", "0/2"],
+                "genotype": [["C", "G"], ["G", "T"], ["G", "GC"]],
+            },
+            schema_overrides={"start": pl.UInt32, "genotype": pl.List(pl.String)},
+        ).lazy()
+        evidence = gather_site_evidence(vcf, abo_def, _wgs(vcf))
+        site_261 = next(e for e in evidence if f"{e.chrom}:{e.start}" == ABO_261)
+        assert (site_261.matched_by, site_261.observed) == ("indel_window", ["T", "TC"])
+        call = call_gene("abo_phenotype", abo_def, evidence)
+        assert (call.status, call.phenotype) == ("called", "Blood group B (III)")
+
+        # Position relevance tiebreaker prefers the pipe-delimited record carrying a defining allele
+        # over an unrelated SNV at the same anchor.
+        tie_vcf = pl.DataFrame(
+            {
+                "chrom": ["9", "9", "9", "9"],
+                "start": [133255928, 133255935, 133257521, 133257521],
+                "rsid": [None, None, None, None],
+                "ref": ["C", "G", "T", "T"],
+                "alt": ["G", "T", "A", "G|TC"],
+                "filter": ["PASS", "PASS", "PASS", "PASS"],
+                "GT": ["0/1", "0/1", "0/1", "0/2"],
+                "genotype": [["C", "G"], ["G", "T"], ["A", "T"], ["T", "TC"]],
+            },
+            schema_overrides={"start": pl.UInt32, "genotype": pl.List(pl.String)},
+        ).lazy()
+        tie_evidence = gather_site_evidence(tie_vcf, abo_def, _wgs(tie_vcf))
+        tie_261 = next(e for e in tie_evidence if f"{e.chrom}:{e.start}" == ABO_261)
+        assert (tie_261.matched_by, tie_261.observed) == ("position", ["T", "TC"])
 
 
 @pytest.fixture(scope="module")

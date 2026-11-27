@@ -307,6 +307,14 @@ def load_phenotype_definition(module_name: str, info: ModuleInfo) -> PhenotypeDe
 
 
 _GT_INDEX = re.compile(r"\d+|\.")
+_ALT_SPLIT = re.compile(r"[,|]")
+
+
+def _split_alt(alt: Optional[str]) -> list[str]:
+    """Split a multi-allelic ALT string delimited by ``,`` (VCF) or ``|`` (polars-bio)."""
+    if not alt:
+        return []
+    return [allele for allele in _ALT_SPLIT.split(alt) if allele]
 
 
 def _record_alleles(gt: Optional[str], ref: str, alt: Optional[str]) -> Optional[list[str]]:
@@ -319,7 +327,7 @@ def _record_alleles(gt: Optional[str], ref: str, alt: Optional[str]) -> Optional
     indices = _GT_INDEX.findall(gt)
     if not indices or "." in indices:
         return None
-    pool = [ref] + (alt.split(",") if alt else [])
+    pool = [ref] + _split_alt(alt)
     return [pool[int(i)] for i in indices]
 
 
@@ -399,7 +407,7 @@ def gather_site_evidence(
     )
     for row in pos.sort(["_key", "alt"], nulls_last=True).iter_rows(named=True):
         meta = gene_def.site_meta[row["_key"]]
-        relevant = bool(set((row.get("alt") or "").split(",")) & (meta["alleles"] - {meta["ref"]}))
+        relevant = bool(set(_split_alt(row.get("alt"))) & (meta["alleles"] - {meta["ref"]}))
         current = matched.get(row["_key"])
         if current is None or (relevant and not current["relevant"]):
             matched[row["_key"]] = {"record": row, "matched_by": "position", "relevant": relevant}
@@ -451,7 +459,7 @@ def gather_site_evidence(
             row
             for row in window.iter_rows(named=True)
             if row.get("alt")
-            and any(parsimony_reduce([row["ref"], alt]) in events for alt in row["alt"].split(","))
+            and any(parsimony_reduce([row["ref"], alt]) in events for alt in _split_alt(row.get("alt")))
         ]
         if len(hits) == 1:
             matched[key] = {"record": hits[0], "matched_by": "indel_window", "relevant": True}
@@ -499,7 +507,7 @@ def gather_site_evidence(
                 read_from_stored = False
             if matched[key]["matched_by"] == "indel_window":
                 ordered = _translate(
-                    ordered, record["ref"], (record.get("alt") or "").split(","), meta
+                    ordered, record["ref"], _split_alt(record.get("alt")), meta
                 )
             if not ordered:
                 evidence.append(SiteEvidence(**base, observed=None, evidence="no_call",
