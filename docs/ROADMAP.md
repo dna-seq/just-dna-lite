@@ -28,7 +28,13 @@ supplements under `docs/longevitymap_v2/`); the lead reviews it, the maintainer 
 
 ## RM5 — The Ensembl join adds rsIDs only
 
-**State:** waits until 2026-12-02: look for the enricher release that pulls the snapshot's `groups/` sidecars (upstream S150, RM437, planned for 0.9) · **Owner:** lead
+**State:** after a registry serves format 0.9 (`/api/v1/version`; both said 0.8.10 on 2026-11-26) · **Owner:** lead
+
+Enricher 0.9.0 is out (2026-11-26) and pulls the groups (`--groups`, upstream RM437). The
+correspondence seat's `bump/just-dna-format-0.9` (1fc8fbe, local) raises the three format libs to
+`>=0.9.0`; it is not merged, because `contract_compatible` refuses a 0.8 server with a 0.9 client and
+the Catalog would stop working. Until it lands, relock with `--upgrade-package`: a plain
+`uv lock --upgrade` takes 0.9 under the open `>=0.8.10` floors. Merge it first, then build what follows.
 
 Since the enricher's split snapshot replaced our downloader, the Ensembl step carries `chrom, start,
 ref, alt, id` and no consequence, ClinVar or frequency columns (`CLAUDE.md`, "Build traps"). The
