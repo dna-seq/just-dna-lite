@@ -1,0 +1,173 @@
+locus_id,locus,verdict,tier,mechanism,age_of_action,second_signal_of,rsids,row_file
+1,ECE1,re-tiered,D,general_ageing,UNKNOWN,,rs12143832,rows/1-ECE1.yaml
+2,PABPC4,kept,B,metabolism,UNKNOWN,,rs3768321,rows/2-PABPC4.yaml
+3,PCSK9 R46L,re-tiered,C,heart_vessels,UNKNOWN,,rs11591147,rows/3-PCSK9_R46L.yaml
+4,LINC02796,kept,B,metabolism,UNKNOWN,,rs2613508,rows/4-LINC02796.yaml
+5,FPGT / TNNI3K,kept,B,general_ageing,UNKNOWN,,rs146254978,rows/5-FPGT_TNNI3K.yaml
+6,CELSR2,kept,B,heart_vessels,UNKNOWN,,rs646776,rows/6-CELSR2.yaml
+7,MAGI3,kept,B,immune_inflammation,UNKNOWN,,rs1230666,rows/7-MAGI3.yaml
+8,IL6R Asp358Ala,re-tiered,C,immune_inflammation,UNKNOWN,,rs2228145,rows/8-IL6R_Asp358Ala.yaml
+9,PMF1,kept,C,general_ageing,UNKNOWN,,rs2758603,rows/9-PMF1.yaml
+10,RABGAP1L,re-tiered,C,general_ageing,UNKNOWN,,rs10798302,rows/10-RABGAP1L.yaml
+11,LINC01875,kept,B,metabolism,MIDLIFE,,rs6744653,rows/11-LINC01875.yaml
+12,KCNK3,kept,A,heart_vessels,UNKNOWN,,rs1275922,rows/12-KCNK3.yaml
+13,PRKD3,kept,B,general_ageing,UNKNOWN,,rs577106756,rows/13-PRKD3.yaml
+14,LINC01122,kept,B,metabolism,UNKNOWN,,rs980183,rows/14-LINC01122.yaml
+15,AFF3,kept,B,general_ageing,UNKNOWN,,rs78438918,rows/15-AFF3.yaml
+16,LRP1B,re-tiered,C,general_ageing,UNKNOWN,,rs117898573,rows/16-LRP1B.yaml
+17,CASP8,kept,B,skin_sun,UNKNOWN,,rs10197246,rows/17-CASP8.yaml
+18,TMEM43,kept,B,general_ageing,UNKNOWN,,rs1043943,rows/18-TMEM43.yaml
+19,HMGB3P12,re-tiered,C,general_ageing,UNKNOWN,,rs78043944,rows/19-HMGB3P12.yaml
+20,RNU1-96P,kept,B,heart_vessels,UNKNOWN,,rs2643826,rows/20-RNU1-96P.yaml
+21,IP6K1,kept,A,general_ageing,UNKNOWN,,rs9872864,rows/21-IP6K1.yaml
+22,KALRN,re-tiered,D,general_ageing,UNKNOWN,,rs3830412,rows/22-KALRN.yaml
+23,TERC,kept,A,ageing_markers,UNKNOWN,,rs10936599,rows/23-TERC.yaml
+24,NLGN1,kept,B,metabolism,UNKNOWN,,rs472103,rows/24-NLGN1.yaml
+25,HTT,kept,A,general_ageing,LIFELONG,,rs61348208,rows/25-HTT.yaml
+26,GPR78,re-tiered,D,general_ageing,UNKNOWN,,rs7676745,rows/26-GPR78.yaml
+27,LINC02513,kept,B,heart_vessels,UNKNOWN,,rs17499404,rows/27-LINC02513.yaml
+28,RNU1-63P,kept,B,general_ageing,UNKNOWN,,rs28637671,rows/28-RNU1-63P.yaml
+29,MAML3,kept,B,general_ageing,UNKNOWN,,rs36072649,rows/29-MAML3.yaml
+30,TERT,kept,B,ageing_markers,UNKNOWN,,rs2736100,rows/30-TERT.yaml
+31,LINC02064,re-tiered,B,general_ageing,UNKNOWN,,rs649357,rows/31-LINC02064.yaml
+32,intergenic 5q14,re-tiered,C,general_ageing,UNKNOWN,,rs138499810,rows/32-intergenic_5q14.yaml
+33,5q33.3 (EBF1 region),kept,B,general_ageing,UNKNOWN,,rs2149954,rows/33-5q33.3_EBF1_region.yaml
+34,LINC01411,re-tiered,D,general_ageing,UNKNOWN,,rs138762279,rows/34-LINC01411.yaml
+35,IRF4,kept,B,skin_sun,UNKNOWN,,rs12203592,rows/35-IRF4.yaml
+36,COX11P1,kept,B,general_ageing,UNKNOWN,,rs6902687,rows/36-COX11P1.yaml
+37,HCP5,kept,B,general_ageing,LIFELONG,,rs3130507,rows/37-HCP5.yaml
+38,HLA-DQA1,kept,B,immune_inflammation,MIDLIFE,,rs34967069,rows/38-HLA-DQA1.yaml
+39,ILRUN,kept,B,general_ageing,UNKNOWN,,rs6907508,rows/39-ILRUN.yaml
+40,ABCC10,kept,B,general_ageing,UNKNOWN,,rs7742789,rows/40-ABCC10.yaml
+41,PRDM13,re-tiered,D,general_ageing,UNKNOWN,,rs114658003,rows/41-PRDM13.yaml
+42,BEND3,kept,B,general_ageing,UNKNOWN,,rs1627804,rows/42-BEND3.yaml
+43,FOXO3,kept,B,general_ageing,UNKNOWN,,rs2802292,rows/43-FOXO3.yaml
+44,,re-tiered,D,general_ageing,UNKNOWN,,rs76888380,rows/44.yaml
+45,PRELID1P1,re-tiered,D,general_ageing,UNKNOWN,,rs1262476,rows/45-PRELID1P1.yaml
+46,LPA,kept,A,heart_vessels,MIDLIFE,,rs10455872,rows/46-LPA.yaml
+47,AP5Z1,kept,B,general_ageing,UNKNOWN,,rs371933919,rows/47-AP5Z1.yaml
+48,IL6,re-tiered,D,general_ageing,UNKNOWN,,rs2069837,rows/48-IL6.yaml
+49,BMPER,re-tiered,D,general_ageing,UNKNOWN,,rs17169634,rows/49-BMPER.yaml
+50,FOXP2,kept,B,general_ageing,UNKNOWN,,rs12705966,rows/50-FOXP2.yaml
+51,ZC3HC1,kept,B,heart_vessels,UNKNOWN,,rs56179563,rows/51-ZC3HC1.yaml
+52,LPL,kept,B,heart_vessels,UNKNOWN,,rs268,rows/52-LPL.yaml
+53,EPHX2,kept,B,general_ageing,UNKNOWN,,rs7844965,rows/53-EPHX2.yaml
+54,PURG,re-tiered,C,general_ageing,UNKNOWN,,rs11783562,rows/54-PURG.yaml
+55,RP1,re-tiered,D,general_ageing,UNKNOWN,,rs35262860,rows/55-RP1.yaml
+56,TOX,kept,B,general_ageing,UNKNOWN,,rs13262617,rows/56-TOX.yaml
+57,CDKN2B-AS1,kept,A,heart_vessels,MIDLIFE,,rs1556516,rows/57-CDKN2B-AS1.yaml
+58,ALDH1B1,kept,B,general_ageing,UNKNOWN,,rs10973748,rows/58-ALDH1B1.yaml
+59,ABO,kept,B,heart_vessels,MIDLIFE,,rs2519093,rows/59-ABO.yaml
+60,LINC02907,re-tiered,D,general_ageing,UNKNOWN,,rs75824829,rows/60-LINC02907.yaml
+61,CELF2,kept,B,general_ageing,UNKNOWN,,rs547541271,rows/61-CELF2.yaml
+62,LINC00865,re-tiered,D,general_ageing,UNKNOWN,,rs11186068,rows/62-LINC00865.yaml
+63,TCF7L2,kept,B,metabolism,UNKNOWN,,rs35198068,rows/63-TCF7L2.yaml
+64,BET1L,kept,B,general_ageing,UNKNOWN,,rs76612380,rows/64-BET1L.yaml
+65,HSD17B12,re-tiered,C,general_ageing,UNKNOWN,,rs4755737,rows/65-HSD17B12.yaml
+66,TYR,kept,B,skin_sun,UNKNOWN,,rs1126809,rows/66-TYR.yaml
+67,TTC12,kept,B,general_ageing,UNKNOWN,,rs61905747,rows/67-TTC12.yaml
+68,USP2-AS1,kept,B,general_ageing,UNKNOWN,,rs139137459,rows/68-USP2-AS1.yaml
+69,PRPF40B,kept,B,general_ageing,UNKNOWN,,rs55686423,rows/69-PRPF40B.yaml
+70,FGD6,kept,B,heart_vessels,UNKNOWN,,rs12830425,rows/70-FGD6.yaml
+71,ATXN2,kept,B,heart_vessels,LIFELONG,,rs11065979,rows/71-ATXN2.yaml
+72,ANKRD20A9P,re-tiered,D,general_ageing,UNKNOWN,,rs2440012,rows/72-ANKRD20A9P.yaml
+73,KL (KL-VS,kept,C,legacy_candidate,UNKNOWN,,rs9536314,rows/73-KL_KL-VS.yaml
+74,(intergenic),kept,B,general_ageing,LIFELONG,,rs61949650,rows/74-intergenic.yaml
+75,,re-tiered,C,general_ageing,UNKNOWN,,rs35257605,rows/75.yaml
+76,PROX2,kept,B,general_ageing,UNKNOWN,,rs61978928,rows/76-PROX2.yaml
+77,APBA2,re-tiered,C,general_ageing,UNKNOWN,,rs77184423,rows/77-APBA2.yaml
+78,CIBAR1P1,kept,B,general_ageing,UNKNOWN,,rs28455998,rows/78-CIBAR1P1.yaml
+79,SEMA6D,re-tiered,A,general_ageing,UNKNOWN,,rs74011415,rows/79-SEMA6D.yaml
+80,CHRNB4,re-tiered,B,smoking_lungs,MIDLIFE,,rs8042849,rows/80-CHRNB4.yaml
+81,FES/FURIN,kept,A,heart_vessels,UNKNOWN,,rs6224,rows/81-FES_FURIN.yaml
+82,CASC16,kept,B,metabolism,UNKNOWN,,rs4783780,rows/82-CASC16.yaml
+83,FTO,re-tiered,B,metabolism,UNKNOWN,,rs1421085,rows/83-FTO.yaml
+84,CETP,re-tiered,C,general_ageing,UNKNOWN,,rs3764261,rows/84-CETP.yaml
+85,DHODH,kept,B,heart_vessels,UNKNOWN,,rs12924886,rows/85-DHODH.yaml
+86,DEF8,re-tiered,D,general_ageing,UNKNOWN,,rs4268748,rows/86-DEF8.yaml
+87,DHX58,kept,B,general_ageing,UNKNOWN,,rs34891485,rows/87-DHX58.yaml
+88,B4GALNT2P1,kept,B,general_ageing,UNKNOWN,,rs940088,rows/88-B4GALNT2P1.yaml
+89,FN3KRP,re-tiered,D,general_ageing,UNKNOWN,,rs1046896,rows/89-FN3KRP.yaml
+90,MC2R,kept,B,general_ageing,UNKNOWN,,rs28926173,rows/90-MC2R.yaml
+91,MC4R,kept,C,general_ageing,UNKNOWN,,rs17782313,rows/91-MC4R.yaml
+92,FBXO15,re-tiered,C,general_ageing,UNKNOWN,,rs77546126,rows/92-FBXO15.yaml
+93,LDLR,kept,A,heart_vessels,MIDLIFE,,rs142158911,rows/93-LDLR.yaml
+94,CEP89,re-tiered,D,general_ageing,UNKNOWN,,rs62127362,rows/94-CEP89.yaml
+95,EGLN2 .. CYP2A6,kept,B,general_ageing,UNKNOWN,,rs12461964,rows/95-EGLN2_.._CYP2A6.yaml
+96,APOE,kept,A,brain_memory,LATE,,rs429358 rs7412,rows/96-APOE.yaml
+97,C20orf187,re-tiered,D,general_ageing,UNKNOWN,,rs6108784,rows/97-C20orf187.yaml
+98,NOL4L,re-tiered,D,general_ageing,UNKNOWN,,rs159428,rows/98-NOL4L.yaml
+99,CHRNA4,kept,B,smoking_lungs,UNKNOWN,,rs2273500,rows/99-CHRNA4.yaml
+100,PARVB,re-tiered,D,general_ageing,UNKNOWN,,rs62227724,rows/100-PARVB.yaml
+101,GBX2/ASB18,kept,B,general_ageing,UNKNOWN,,rs10211471,rows/101-GBX2_ASB18.yaml
+103,,re-tiered,C,general_ageing,UNKNOWN,,rs1049053,rows/103.yaml
+105,NHLRC1,kept,B,ageing_markers,UNKNOWN,,rs10949481,rows/105-NHLRC1.yaml
+106,LONP1,kept,B,ageing_markers,UNKNOWN,,rs11085147,rows/106-LONP1.yaml
+107,SLC16A6,kept,C,general_ageing,UNKNOWN,,rs112262188,rows/107-SLC16A6.yaml
+108,POM121C,kept,B,general_ageing,UNKNOWN,,rs113160991,rows/108-POM121C.yaml
+109,PSMF1/RSPO4,re-tiered,D,general_ageing,UNKNOWN,,rs113181552,rows/109-PSMF1_RSPO4.yaml
+110,,re-tiered,D,general_ageing,UNKNOWN,,rs116362179,rows/110.yaml
+111,intergenic chr7,re-tiered,C,general_ageing,UNKNOWN,,rs117082375,rows/111-intergenic_chr7.yaml
+112,IBA57,kept,B,ageing_markers,UNKNOWN,,rs117530284,rows/112-IBA57.yaml
+113,intergenic chr6,re-tiered,D,general_ageing,UNKNOWN,,rs12189947,rows/113-intergenic_chr6.yaml
+114,TFAM,kept,A,ageing_markers,UNKNOWN,,rs12247015,rows/114-TFAM.yaml
+115,KLF3,kept,B,ageing_markers,UNKNOWN,,rs13132853,rows/115-KLF3.yaml
+116,CLEC3B (p.S106G),kept,C,general_ageing,UNKNOWN,,rs13963,rows/116-CLEC3B_p.S106G.yaml
+117,GRIK2,re-tiered,D,general_ageing,UNKNOWN,,rs1416280,rows/117-GRIK2.yaml
+118,RPLP0P2 (chr11),kept,C,general_ageing,UNKNOWN,,rs145265196,rows/118-RPLP0P2_chr11.yaml
+119,intergenic chr18,re-tiered,D,general_ageing,UNKNOWN,,rs1468966,rows/119-intergenic_chr18.yaml
+120,SIK3,kept,C,general_ageing,UNKNOWN,,rs147730555,rows/120-SIK3.yaml
+121,IHH,re-tiered,D,general_ageing,UNKNOWN,,rs149554120,rows/121-IHH.yaml
+122,LOC105377527,re-tiered,D,general_ageing,UNKNOWN,,rs10610954,rows/122-LOC105377527.yaml
+123,intergenic chr1,kept,C,general_ageing,UNKNOWN,,rs184517867,rows/123-intergenic_chr1.yaml
+124,RPS6,kept,C,general_ageing,UNKNOWN,,rs189871470,rows/124-RPS6.yaml
+125,PRAC2,kept,C,general_ageing,UNKNOWN,,rs199607933,rows/125-PRAC2.yaml
+126,FOCAD,kept,C,general_ageing,UNKNOWN,,rs199678370,rows/126-FOCAD.yaml
+127,CGAS (p.D452V),kept,D,general_ageing,UNKNOWN,,rs200818241,rows/127-CGAS_p.D452V.yaml
+128,F2RL3/SIN3B,kept,B,ageing_markers,UNKNOWN,,rs2227341,rows/128-F2RL3_SIN3B.yaml
+129,KANSL1,kept,B,ageing_markers,UNKNOWN,,rs4327091,rows/129-KANSL1.yaml
+130,HLA-B*57:01 tag (HCP5),re-tiered,C,general_ageing,UNKNOWN,,rs2395029,rows/130-HLA-B_57_01_tag_HCP5.yaml
+131,NUAK1,re-tiered,D,general_ageing,UNKNOWN,,rs2730486,rows/131-NUAK1.yaml
+132,TERT,kept,B,ageing_markers,UNKNOWN,,rs2736099,rows/132-TERT.yaml
+133,TERT,kept,A,ageing_markers,UNKNOWN,,rs2853677,rows/133-TERT.yaml
+134,,re-tiered,D,general_ageing,UNKNOWN,,rs2860197,rows/134.yaml
+135,HLA-DRB1*15:01 tag,re-tiered,C,general_ageing,UNKNOWN,,rs3135388,rows/135-HLA-DRB1_15_01_tag.yaml
+136,RDH5,re-tiered,D,general_ageing,UNKNOWN,,rs3138136,rows/136-RDH5.yaml
+137,intergenic chr5,re-tiered,D,general_ageing,UNKNOWN,,rs34459993,rows/137-intergenic_chr5.yaml
+138,MUC5B/MUC5AC,kept,C,smoking_lungs,UNKNOWN,,rs35705950,rows/138-MUC5B_MUC5AC.yaml
+139,ZNF806,re-tiered,C,general_ageing,UNKNOWN,,rs373800184,rows/139-ZNF806.yaml
+140,FLCN,kept,C,general_ageing,UNKNOWN,,rs41419545,rows/140-FLCN.yaml
+141,NDUFV3,kept,B,ageing_markers,UNKNOWN,,rs4148974,rows/141-NDUFV3.yaml
+143,NAF1,kept,A,ageing_markers,UNKNOWN,,rs4691895,rows/143-NAF1.yaml
+144,POT1,kept,A,ageing_markers,UNKNOWN,,rs59294613,rows/144-POT1.yaml
+145,TSC22D2,kept,B,ageing_markers,UNKNOWN,,rs59633341,rows/145-TSC22D2.yaml
+146,intergenic chr10,re-tiered,D,general_ageing,UNKNOWN,,rs61838431,rows/146-intergenic_chr10.yaml
+147,KIF13B,re-tiered,D,general_ageing,UNKNOWN,,rs62502826,rows/147-KIF13B.yaml
+148,SLC9A2,kept,C,general_ageing,UNKNOWN,,rs6543176,rows/148-SLC9A2.yaml
+149,CREB3L3,kept,B,ageing_markers,UNKNOWN,,rs73538174,rows/149-CREB3L3.yaml
+150,intergenic chr9,re-tiered,D,general_ageing,UNKNOWN,,rs75526165,rows/150-intergenic_chr9.yaml
+151,EYS (intronic),re-tiered,C,general_ageing,UNKNOWN,,rs75571981,rows/151-EYS_intronic.yaml
+152,intergenic chr17 (GWAS Catalog maps ANKFN1/RPL39P33),kept,C,general_ageing,UNKNOWN,,rs75737809,rows/152-intergenic_chr17_GWAS_Catalog_maps_ANKFN1_RPL39P33.yaml
+153,TERT,kept,A,ageing_markers,UNKNOWN,,rs7705526,rows/153-TERT.yaml
+154,,re-tiered,D,general_ageing,UNKNOWN,,rs7754015,rows/154.yaml
+155,EMG1/LPCAT3/C1S,kept,C,general_ageing,UNKNOWN,,rs79159347,rows/155-EMG1_LPCAT3_C1S.yaml
+156,intergenic chr3,kept,C,general_ageing,UNKNOWN,,rs79645902,rows/156-intergenic_chr3.yaml
+159,HLA-DQB1,kept,C,immune_inflammation,UNKNOWN,,rs9275160,rows/159-HLA-DQB1.yaml
+160,STN1/OBFC1,kept,B,ageing_markers,UNKNOWN,,rs9419958,rows/160-STN1_OBFC1.yaml
+161,BLNK/DNTT,kept,B,ageing_markers,UNKNOWN,,rs941997,rows/161-BLNK_DNTT.yaml
+162,RNU6-699P,kept,C,general_ageing,UNKNOWN,28,rs13141210,rows/162-RNU6-699P.yaml
+163,ADD1,kept,C,general_ageing,UNKNOWN,25,rs16843603,rows/163-ADD1.yaml
+164,MSANTD1,kept,C,general_ageing,UNKNOWN,25,rs114298671,rows/164-MSANTD1.yaml
+165,MICA/MICB,kept,B,general_ageing,UNKNOWN,37,rs3131621,rows/165-MICA_MICB.yaml
+166,LPL-3UTR,kept,B,heart_vessels,UNKNOWN,52,rs15285,rows/166-LPL-3UTR.yaml
+167,ZBTB46,kept,B,general_ageing,UNKNOWN,99,rs6062322,rows/167-ZBTB46.yaml
+168,CHRNA2-EPHX2,kept,C,smoking_lungs,UNKNOWN,53,rs11780471,rows/168-CHRNA2-EPHX2.yaml
+169,CASC16-TOX3,kept,C,general_ageing,UNKNOWN,82,rs4784227,rows/169-CASC16-TOX3.yaml
+170,CYP26A1-MYOF,kept,C,general_ageing,UNKNOWN,,rs1927465,rows/170-CYP26A1-MYOF.yaml
+171,MYL2-VHRT,kept,C,general_ageing,UNKNOWN,71,rs4426183,rows/171-MYL2-VHRT.yaml
+172,SRRM3-POR,kept,D,general_ageing,UNKNOWN,,rs28689051,rows/172-SRRM3-POR.yaml
+173,B3GLCT,kept,B,general_ageing,UNKNOWN,,rs1043332229,rows/173-B3GLCT.yaml
+174,SMIM7P1,kept,B,general_ageing,UNKNOWN,,rs10198124,rows/174-SMIM7P1.yaml
+175,MYO5B,kept,C,general_ageing,UNKNOWN,,rs78441534,rows/175-MYO5B.yaml
+176,ECHS1,kept,D,general_ageing,UNKNOWN,,rs7894051,rows/176-ECHS1.yaml
+177,NRDE2,kept,D,general_ageing,UNKNOWN,,rs4904670,rows/177-NRDE2.yaml

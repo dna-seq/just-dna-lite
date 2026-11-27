@@ -1,0 +1,26 @@
+schema_version: '1.0'
+# longevitymap 2.0.0, the re-curation (docs/longevitymap_v2/longevitymap_v2_requirements.md, §6 and §9).
+# Title (D3), weighting (D1) and the defaults (§6.2) are the requirements' recommended defaults, not yet the
+# person's decisions (§11); docs/seats/MODULE_NOTES.md tracks which are settled.
+module:
+  title: Longevity genetics
+  description: Variants linked to lifespan and healthy ageing, graded by evidence tier.
+  report_title: Longevity genetics
+  icon: heart-pulse
+  icon_set: fomantic
+  color: '#21ba45'
+  name: longevitymap
+  version: 2.0.0
+defaults:
+  curator: just-dna-seq
+  method: literature-curated, evidence-tiered
+genome_build: GRCh38
+weighting:
+  scale: none
+  method: no weights authored; rows are ordered by priority, derived from the evidence tier
+  note: this module authors no weights; read direction, tier (flags) and the polygenic score; weights are deliberately absent so no per-SNP sum is formed.
+authorship:
+  - who: claude-opus-5-5
+    role: created
+    kind: [ai, agent]
+    at: '2026-11-10'
