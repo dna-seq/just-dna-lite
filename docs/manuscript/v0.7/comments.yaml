@@ -833,10 +833,7 @@ items:
   status: addressed
   now: '| Users of AI assistants | Ask in plain language while the assistant runs annotation and scoring through
     typed tools and reads the results, instead of the assistant writing its own analysis code | The two MCP servers
-    and the plugin skills |
-
-    | Educators and students | Show how variant annotation and polygenic scores work, and where models disagree,
-    on real public genomes | The hosted demonstration (https://lite.'
+    and the plugin skills |'
   why: 'Taken in other words: the row means that the assistant, not the researcher, does not write its own code
     (Section 1.2).'
   category: Writing and clarity
@@ -1491,7 +1488,10 @@ items:
   where: 3.2 Polygenic Risk Scores
   line: 230
   status: addressed
-  now: Table S15. What the prepared PGS catalogue holds for each score (Section 3.2).
+  now: '**A prepared catalogue.** The scoring files, metadata and reference distributions that just-prs reads are
+    prepared once, stored as Parquet and downloaded on first use from HuggingFace (datasets `just-dna-seq/pgs-catalog`
+    and `just-dna-seq/prs-percentiles`), so users do not assemble them; Table S15 lists what they hold for each
+    score.'
   why: 'What the prepared catalogue holds for each score, and where each part comes from, is Table S15 in Supplementary
     S15. Drafted by the reviser under desk #75''s default, open for veto; the old Figures 2 and 3 are now 4 and
     5. The diagrams are plain Graphviz drafts (figures/*.dot) and may need redrawing before submission.'
@@ -2013,12 +2013,12 @@ items:
     individuals (Manichaikul et al., 2010) of the 1000 Genomes high-coverage panel (Byrska-Bishop et al., 2022)
     and downloaded as a fixed model. A principal component analysis of common, independent SNVs in the panel (Chang
     et al., 2015) defines the space; the user's genome is projected into it with the method of FRAPOSA (Zhang et
-    al., 2020) and takes the superpopulation most common among its nearest reference individuals. Model sites a
-    variant-only VCF does not list are assumed to be homozygous reference, so for exome or array input, where most
-    of them are not read, the call rests largely on assumed genotypes. When too few of the model's sites can be
-    used, the ancestry is reported as unknown and the user chooses the reference. Supplementary S16 gives the panel,
-    its quality control, the projection and the thresholds; Section 4.4 reports how well the classifier separates
-    the reference superpopulations.
+    al., 2020) and takes the superpopulation most common among its nearest reference individuals. The model reads
+    the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not list are assumed
+    to be homozygous reference, so for exome or array input, where most of them are not read, the call rests largely
+    on assumed genotypes. When too few of the model's sites can be used, the ancestry is reported as unknown and
+    the user chooses the reference. Supplementary S16 gives the panel, its quality control, the projection and the
+    thresholds; Section 4.4 reports how well the classifier separates the reference superpopulations.
   why: Section 3.2.2 now explains in plain terms how the reference population is chosen; the panel, kinship filter,
     pruning thresholds, FRAPOSA projection and neighbour counts moved word for word to the new Supplementary S16.
     Applied by the reviser under the default, open for veto.
@@ -2064,8 +2064,9 @@ items:
   where: 3.2.2 Ancestry Inference
   line: 275
   status: addressed
-  now: Model sites that a variant-only VCF does not list are assumed to be homozygous reference, so for exome or
-    array input, where most of them are not read, the call rests largely on assumed genotypes.
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
   why: Accepted as suggested.
   category: Writing and clarity
   severity: minor
@@ -2140,8 +2141,9 @@ items:
   where: 3.2.2 Ancestry Inference
   line: 275
   status: addressed
-  now: Sites (the 53,526 positions the model reads) that a variant-only VCF does not list are coded as homozygous
-    reference, and sites whose alleles disagree with the model are coded as missing.
+  now: The model reads the genome at a fixed set of SNV positions (sites); sites that a variant-only VCF does not
+    list are assumed to be homozygous reference, so for exome or array input, where most of them are not read, the
+    call rests largely on assumed genotypes.
   why: The missing verb is restored; the sentence now sits in Supplementary S16. Applied by the reviser.
   category: Writing and clarity
   severity: minor
@@ -2177,9 +2179,11 @@ items:
     artery disease (SNPs selected on meta-study p-values and the number of studies across populations), lipid metabolism
     (selected by the same criteria), VO2 max (published studies of the oxygen-uptake response to exercise training,
     mostly candidate-gene and cohort studies) and Superhuman (rare protective alleles from the Church laboratory''s
-    Protective and Enhancing Alleles list, checked against the primary literature). Table S4 gives each module''s
-    curation and every source it cites. These modules work by joining the user''s VCF against curated variant-trait
-    databases and then adding annotation columns (weight, state, gene, conclusion) to matching variants.'
+    Protective and Enhancing Alleles list, checked against the primary literature). These modules are small because
+    they are selections ported from Generation I, kept as worked examples of the module format rather than catalogues
+    of each trait''s genetics; Longevity Map is larger because it starts from a dedicated database. Table S4 gives
+    each module''s curation and every source it cites. These modules work by joining the user''s VCF against curated
+    variant-trait databases and then adding annotation columns (weight, state, gene, conclusion) to matching variants.'
   why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
     for his veto.
   category: Writing and clarity
@@ -2243,14 +2247,16 @@ items:
   where: 3.4 Growing the Module Ecosystem
   line: 286
   status: addressed
-  now: Because modules are data, new content reaches users through configured repositories or `just-dna-registry`
-    without changes to the annotation engine or a new application release, while evidence review and scientific
-    curation stay with module contributors. Rather than embedding its own assistant, the platform exposes its operations
-    to the AI assistants users already employ. Modules can be drafted in such an assistant through the just-module-creator
-    plugin (github.com/dna-seq/just-module-creator); the result is the same kind of artifact, validated and compiled
-    the same way. Its manifest can mark it as AI-generated through its authorship entries, which tag each contributor
-    as human or AI. Through the platform's MCP server, the assistant can then install the draft, annotate a genome
-    with it and inspect the result (Section 3.2.1).
+  now: Because modules are data and versioned, new modules and new versions of a module reach users through configured
+    repositories or `just-dna-registry` without changes to the annotation engine or a new application release, while
+    evidence review and scientific curation stay with module contributors. Rather than embedding its own assistant,
+    the platform exposes its operations to the AI assistants users already employ. Modules can be drafted in such
+    an assistant through the just-module-creator plugin (github.com/dna-seq/just-module-creator); the result is
+    the same kind of artifact, validated and compiled the same way. Its manifest can mark it as AI-generated through
+    its authorship entries, which tag each contributor as human or AI. These entries are declared by whoever builds
+    the module and are not verified, so an AI draft left unmarked reads as a human-curated module (Section 5.5).
+    Through the platform's MCP server, the assistant can then install the draft, annotate a genome with it and inspect
+    the result (Section 3.2.1).
   why: The co-author's suggested edit, applied by the reviser on 2026-11-19 while the maintainer was away, open
     for his veto.
   category: Writing and clarity
@@ -2416,7 +2422,7 @@ items:
   line: 302
   status: addressed
   now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
-    system on one workstation (Table S6).
+    system on one workstation (Supplementary Data, Table S6).
   why: Section 4.1's setup paragraphs now come before its results, so warm, full and cold are defined before use.
     Applied by the reviser.
   category: Story and structure
@@ -2449,8 +2455,12 @@ items:
   where: 4.1 Annotation Speed
   line: 304
   status: addressed
-  now: Table S10 gives the full runs, and the repository's generated tables (`docs/manuscript/benchmarks/a3/tables.md`)
-    give the warm and cold runs.
+  now: 'Generation II annotated each genome with the ten modules of Table 1, with Ensembl annotation off, in three
+    modes: *warm* runs reuse the sample''s quality-filtered table, so the VCF is not read again; *full* runs start
+    from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run
+    (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating
+    system''s page cache, its in-memory copy of recently read files, has been dropped, so the VCF and the module
+    files are read from disk again.'
   why: 'Taken in other words: ''for'' would have left the clause without a verb, so ''give'' is written out. The
     paragraph is now in Supplementary S10 (C100).'
   category: Writing and clarity
@@ -2475,7 +2485,7 @@ items:
   line: 304
   status: addressed
   now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
-    system on one workstation (Table S6).
+    system on one workstation (Supplementary Data, Table S6).
   why: 'As C98: the run modes are defined before the memory figures. Applied by the reviser.'
   category: Story and structure
   severity: minor
@@ -2564,7 +2574,7 @@ items:
   line: 308
   status: addressed
   now: We measured the annotation wall time and peak memory of Just-DNA-Lite against the Generation I OakVar-based
-    system on one workstation (Table S6).
+    system on one workstation (Supplementary Data, Table S6).
   why: The paragraph opens with what was measured and comes first in Section 4.1. Applied by the reviser.
   category: Story and structure
   severity: minor
@@ -2619,8 +2629,9 @@ items:
     modes: *warm* runs reuse the sample''s quality-filtered table, so the VCF is not read again; *full* runs start
     from a fresh instance and read the VCF, as every OakVar run does, so they are the counterpart of an OakVar run
     (same VCF and same kind of report, not the same computation); *cold* runs are full runs after the operating
-    system''s page cache has been dropped. Generation I was OakVar 2.13.1 (Oak Bioinformatics, 2026) with its modules
-    and annotation databases installed from the OakVar store, run on the published call set and on Livia Zaharia''s
+    system''s page cache, its in-memory copy of recently read files, has been dropped, so the VCF and the module
+    files are read from disk again. Generation I was OakVar 2.13.1 (Oak Bioinformatics, 2026) with its modules and
+    annotation databases installed from the OakVar store, run on the published call set and on Livia Zaharia''s
     genome, and with its dbSNP annotator alone against Generation II with Ensembl annotation on. Supplementary S2
     gives the run order, how the machine was used during each series and the Generation I setup.'
   why: The run modes stay in Section 4.1; which series ran with the machine idle or in light desktop use moved to
@@ -2681,9 +2692,8 @@ items:
   where: 4.2 PRS Computation
   line: 339
   status: addressed
-  now: 'This section asks two questions of one genome: does just-prs compute the same scores as the external tool
-    PLINK2 (Chang et al., 2015), which computes the same weighted sum, and how long does each take? Tables 3 and
-    4 give the answers; Supplementary S3 gives how variants were matched and how the runs were timed.'
+  now: This section asks whether just-prs computes the same scores as the external tool PLINK2 (Chang et al., 2015),
+    which computes the same weighted sum, on one genome.
   why: Section 4.2 now opens by saying what is compared and why, then the setup in two sentences, the results and
     Tables 3 and 4, with the matching and timing detail in Supplementary S3. Applied by the reviser under the default,
     open for veto.
@@ -2820,9 +2830,9 @@ items:
   where: 4.2 PRS Computation
   line: 382
   status: addressed
-  now: About half of each score's variants were found in this genome by both tools (median 53% for just-prs and
-    51% for PLINK2), with the counting of absent loci as reference turned off; the two percentages are not quite
-    the same measure. The timings cover scoring from prepared inputs, and Supplementary S3 gives what each includes.
+  now: Coverage, the share of a score's variants matched in the genome (Section 3.2), was about half for both tools
+    (median 53% for just-prs and 51% for PLINK2), with the counting of absent loci as reference turned off; the
+    two percentages are not quite the same measure.
   why: The paragraph is now two plain sentences (how much of each score was found, what the timings cover); the
     full matching and timing detail moved word for word to Supplementary S3. Applied by the reviser under the default,
     open for veto.
@@ -2995,7 +3005,7 @@ items:
     a privacy assessment of their own. In an annotation report, each variant row with an rsID has buttons that open
     a prepared question about it in ChatGPT, Claude, Perplexity or Grok. Following one sends that variant's genotype,
     gene and stored interpretation to that provider. A polygenic-score trait report has the same buttons (Figure
-    3), and following one sends that trait's results, model by model, to the provider. When an assistant uses an
+    5), and following one sends that trait's results, model by model, to the provider. When an assistant uses an
     external model provider, prompts and tool outputs may transmit sensitive results even if the raw VCF remains
     local. Privacy therefore depends on the deployment, the selected services and the information shared with them.
     The platform's local architecture alone does not establish regulatory compliance.
@@ -3356,9 +3366,8 @@ items:
   where: Abstract
   line: 29
   status: addressed
-  now: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published evidence
-    on the user's own computer. Its web platform annotates a whole-genome variant file (VCF) and computes polygenic
-    risk scores locally, so the genome does not have to be uploaded to a third-party server.
+  now: This paper presents Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against
+    published evidence on the user's own computer.
   why: Accepted in the Doc in other words ('uploaded to a third-party server' rather than 'to the Internet'); carried
     into the master on 2026-11-19 (0eb68c5).
   category: Writing and clarity
@@ -3382,9 +3391,8 @@ items:
   where: Abstract
   line: 31
   status: addressed
-  now: Just-DNA-Lite is the core of an open-source ecosystem for reading a personal genome against published evidence
-    on the user's own computer. Its web platform annotates a whole-genome variant file (VCF) and computes polygenic
-    risk scores locally, so the genome does not have to be uploaded to a third-party server.
+  now: This paper presents Just-DNA-Lite, the core of an open-source ecosystem for reading a personal genome against
+    published evidence on the user's own computer.
   why: Answered by the Abstract's 'uploaded to a third-party server', accepted in the Doc; carried into the master
     on 2026-11-19 (0eb68c5).
   category: Writing and clarity
@@ -3439,7 +3447,7 @@ items:
   now: What the platform reports comes from modules, versioned tables of variant-trait associations that researchers
     write with no coding involved. Ready-made modules cover longevity, disease predisposition and drug response.
     Researchers publish new modules to just-dna-registry, an open registry that works like an app store, where users
-    browse, install and apply them without the need of a software update. The just-module-creator plugin drafts
+    browse, install and apply them without the need of a new software release. The just-module-creator plugin drafts
     modules from the literature and public databases employing an AI assistant of the researcher's choice.
   why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
@@ -3467,10 +3475,7 @@ items:
   where: Abstract
   line: 33
   status: addressed
-  now: Every matched variant links to its reported effect and its sources. Polygenic scores (further called PGS)
-    come from just-prs, a library that also works on its own. It computes PGS Catalog scores from a cleaned copy
-    of the Catalog, places each within a reference population matched to the genome's inferred ancestry, labels
-    its quality and shows all models for a trait side by side, so users see where the models agree and differ.
+  now: A polygenic score adds up the published effects of many variants into one number for a genome.
   why: Accepted in the v0.7 Doc; carried into the master on 2026-11-19 (0eb68c5), signed as the co-authors' edit.
   category: Writing and clarity
   severity: minor
@@ -3525,9 +3530,8 @@ items:
   where: Abstract
   line: 33
   status: addressed
-  now: It computes the scores of the PGS Catalog, the open database of published polygenic scores, from a cleaned
-    copy of it, places each within a reference population matched to the genome's inferred ancestry, labels its
-    quality and shows all models for a trait side by side, so users see where the models agree and differ.
+  now: just-prs computes the scores of the PGS Catalog, the open database of published polygenic scores, from a
+    cleaned copy of it.
   why: The Abstract now says what the PGS Catalog is.
   category: Writing and clarity
   severity: minor
