@@ -28,7 +28,7 @@ supplements under `docs/longevitymap_v2/`); the lead reviews it, the maintainer 
 
 ## RM5 — The Ensembl join adds rsIDs only
 
-**State:** after a registry serves format 0.9 (`/api/v1/version`; both said 0.8.10 on 2026-11-26) · **Owner:** lead
+**State:** waits until 2026-12-02: re-check whether a registry serves format 0.9 (`/api/v1/version`; both said 0.8.10 on 2026-11-26) · **Owner:** lead
 
 Enricher 0.9.0 is out (2026-11-26) and pulls the groups (`--groups`, upstream RM437). The
 correspondence seat's `bump/just-dna-format-0.9` (1fc8fbe, local) raises the three format libs to
