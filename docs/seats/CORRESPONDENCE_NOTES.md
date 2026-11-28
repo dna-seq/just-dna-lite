@@ -98,3 +98,7 @@ Each claim checked against `main` today. Nothing posted.
   default nothing posted. If approved: `gh pr comment 38 --body-file` with the quoted text from the review.
 - **Format 0.9.0 bump**: `bump/just-dna-format-0.9` (1fc8fbe), held until a registry reports format 0.9
   (both at 0.8.10 on 2026-11-28). Recheck daily.
+- **Issue 39** (cmd-localhorst, outside, 2026-11-28): a call rejected by the quality filter can be restored as
+  hom-ref, because `user_vcf_normalized` drops it and `build_restoration_context` reads the normalized parquet
+  (also `restorable_sites` in the phenotype caller). Confirmed by reading main a6e9150. Fix proposed to the
+  lead (#just-dna-lite > inbox). Reply: `blocked: desk #101`, default nothing posted until the fix lands.
