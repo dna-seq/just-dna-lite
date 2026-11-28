@@ -157,3 +157,6 @@ was shown to that session and will not be shown again: its first work is repeate
   hom-ref. Supplementary S12 says restoration is "at sites the caller did not emit", which main does not keep today.
   The fix is the lead's. Default: if it has not landed by the next release of the paper, S12 reads "at sites with no
   call left after quality filtering" instead. PR #37 still open at e023a0f; no desk answers since 11-24.
+  Same day: the lead's f5140aa fixed it (filtered-out positions kept beside the parquet and counted as emitted,
+  RefCall included; restoration off when that record is missing). Read in restoration.py: S12 stands as written,
+  no edit. The default above is void.
