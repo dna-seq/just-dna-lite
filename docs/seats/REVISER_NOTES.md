@@ -152,3 +152,8 @@ was shown to that session and will not be shown again: its first work is repeate
   2e59df4's parent: older entries, not fixed yet. Demo re-checked 2026-11-24, still uploads on (#83 updated);
   #75 updated. #64 is manuscript-skills' question, not this seat's. Ledger: 12 open, 103 addressed, 5 partly.
   Open on the desk (this seat's): #62, #63, #69, #71, #72, #74, #75, #76, #83. PR #37 still open at ffcfdfe.
+- **2026-11-28.** d6a2cdf: the 20 stale `now` quotes fixed; `comments.py status` reports 0 problems. GitHub issue 39
+  (correspondence, confirmed on main a6e9150): a site the caller emitted but the quality filter dropped is restored as
+  hom-ref. Supplementary S12 says restoration is "at sites the caller did not emit", which main does not keep today.
+  The fix is the lead's. Default: if it has not landed by the next release of the paper, S12 reads "at sites with no
+  call left after quality filtering" instead. PR #37 still open at e023a0f; no desk answers since 11-24.
