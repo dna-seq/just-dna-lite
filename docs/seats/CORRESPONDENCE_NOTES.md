@@ -101,4 +101,4 @@ Each claim checked against `main` today. Nothing posted.
 - **Issue 39** (cmd-localhorst, outside, 2026-11-28): a call rejected by the quality filter can be restored as
   hom-ref, because `user_vcf_normalized` drops it and `build_restoration_context` reads the normalized parquet
   (also `restorable_sites` in the phenotype caller). Confirmed by reading main a6e9150. Fix proposed to the
-  lead (#just-dna-lite > inbox). Reply: `blocked: desk #101`, default nothing posted until the fix lands.
+  lead (#just-dna-lite > inbox). Fixed by the lead in f5140aa. Reply: `blocked: desk #102` (#101 withdrawn), default nothing posted.
