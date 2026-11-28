@@ -510,7 +510,9 @@ def test_a_full_width_image_spans_the_text_width(pixels: int, fills_the_text_wid
     if fills_the_text_width:
         assert abs(width - text_width) <= EMU_PER_POINT  # pandoc rounds the text width to whole points
     else:
-        assert width == pixels * EMU_PER_POINT < text_width
+        # Pandoc before 3.14 keeps the image at 72 dpi; 3.14 enlarges it to the text width (seen
+        # 2026-11-28). Either way it never exceeds the text width.
+        assert width == pixels * EMU_PER_POINT or abs(width - text_width) <= EMU_PER_POINT
     assert width / height == pytest.approx(pixels / 100, rel=0.01)
 
 
