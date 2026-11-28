@@ -4,10 +4,14 @@ Kept by the correspondence seat (`docs/seats/CORRESPONDENCE.md`).
 
 - **Publishes:** PyPI
 - **What we use:** the Catalog's client; it moves with the format pin, since a mismatched pair refuses to publish
-- **Read mark:** 0.34.3, read 2026-11-26.
+- **Read mark:** 0.35.0, read 2026-11-28.
 - **Last checked:** 2026-11-22 (release watcher)
 
 ## Entries
+
+### 0.35.0 (read 2026-11-28)
+
+Floors `just-dna-format>=0.9.0` (and compiler/enricher 0.9 in its extras), the registry's half of the format 0.9 move. Added to the held bump `bump/just-dna-format-0.9` (registry floor `>=0.35.0`; registry tests 48 passed). Both servers still report registry 0.34.4 and format 0.8.10 (2026-11-28), so the branch stays unmerged until one reports format 0.9. Verdict: **bump ready, waits on the servers**.
 
 ### 0.34.3 (read 2026-11-26)
 
