@@ -43,6 +43,7 @@ from just_dna_pipelines.annotation.resources import (
     ensure_vcf_in_user_input_dir,
 )
 from just_dna_pipelines.annotation.logic import annotate_vcf_with_ensembl
+from just_dna_pipelines.annotation.restoration import FILTERED_OUT_SITES_NAME
 
 #: The Ensembl snapshot's repository, as just-dna-enricher pulls it (its `ensembl` lane).
 ENSEMBL_REPO_ID: str = SNAPSHOT_REPO_IDS["ensembl"]
@@ -217,8 +218,10 @@ def quality_filters_config(context: AssetExecutionContext) -> Output[dict]:
 # What `user_vcf_normalized` derives from a VCF beyond the quality filters. Bump it whenever the same
 # VCF and the same filters would now be written differently, so `normalized_parquet_is_current` stops
 # reusing parquets written by the older code. 2: rows of a VCF split one per ALT carry their site's
-# genotype (resolve_split_multiallelic_genotypes). A materialization that records none is version 1.
-NORMALIZATION_VERSION = 2
+# genotype (resolve_split_multiallelic_genotypes). 3: the positions the quality filter dropped are kept
+# beside the parquet (FILTERED_OUT_SITES_NAME), so restoration never reads a rejected call as an absent
+# site (GitHub issue 39). A materialization that records none is version 1.
+NORMALIZATION_VERSION = 3
 
 
 @asset(
@@ -252,7 +255,9 @@ def user_vcf_normalized(
     2. Rename 'id' column to 'rsid'
     3. Compute genotype column from GT + ref + alt
     4. Apply quality filters from modules.yaml (FILTER, min depth, min qual)
-    5. Give rows of a VCF split one per ALT (`bcftools norm -m-`) their site's genotype: a split
+    5. Keep the (chrom, start) of every record the filter dropped in `FILTERED_OUT_SITES_NAME` beside
+       the parquet: the caller emitted them, so restoration must not read them as absent
+    6. Give rows of a VCF split one per ALT (`bcftools norm -m-`) their site's genotype: a split
        `1/2` reads `1/0` + `0/1`, whose `0` is the other ALT, not REF
        (`io.resolve_split_multiallelic_genotypes`)
 
@@ -301,6 +306,10 @@ def user_vcf_normalized(
         # --- Quality filtering ---
         rows_before_filter: int | None = None
         filter_expr = build_quality_filter_expr(filters, lf.collect_schema().names())
+        # `filter` keeps only rows where the expression is true, so a null verdict is a drop too.
+        filtered_out_lf = (
+            lf.filter(~filter_expr.fill_null(False)) if filter_expr is not None else lf.head(0)
+        ).select("chrom", "start").unique().sort(["chrom", "start"])
 
         if filter_expr is not None:
             # Materialize row count before filtering (reads parquet metadata only
@@ -355,6 +364,15 @@ def user_vcf_normalized(
         if split.groups_skipped:
             logger.info(f"Shared positions left as written, by reason: {split.groups_skipped}")
         row_count = pl.scan_parquet(str(temp_output_path)).select(pl.len()).collect().item()
+        filtered_out_path = output_dir / FILTERED_OUT_SITES_NAME
+        filtered_out_temp = filtered_out_path.with_name(
+            f"{filtered_out_path.stem}.{context.run.run_id}.tmp{filtered_out_path.suffix}"
+        )
+        filtered_out_lf.sink_parquet(str(filtered_out_temp), compression=config.compression)
+        filtered_out_count = pl.scan_parquet(str(filtered_out_temp)).select(pl.len()).collect().item()
+        # Replaced right before the parquet, so a sample that never had a record gets none until its
+        # parquet is complete; a missing record turns restoration off (hf_logic), never on.
+        filtered_out_temp.replace(filtered_out_path)
         temp_output_path.replace(output_path)
 
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
@@ -378,6 +396,7 @@ def user_vcf_normalized(
         metadata_dict["rows_removed"] = MetadataValue.int(rows_before_filter - row_count)
     metadata_dict["quality_filters_hash"] = MetadataValue.text(filters.config_hash())
     metadata_dict["normalization_version"] = MetadataValue.int(NORMALIZATION_VERSION)
+    metadata_dict["filtered_out_sites"] = MetadataValue.int(filtered_out_count)
     metadata_dict["split_multiallelic_rows_resolved"] = MetadataValue.int(split.rows_resolved)
     metadata_dict["split_multiallelic_groups_skipped"] = MetadataValue.json(split.groups_skipped)
 

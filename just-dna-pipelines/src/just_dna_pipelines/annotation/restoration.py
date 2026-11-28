@@ -113,6 +113,12 @@ MIN_WGS_SITES: int = 1_000_000
 #: it weights a gap by its length instead of counting it once.
 MIN_WGS_BREADTH: float = 0.75
 
+#: Written by ``user_vcf_normalized`` beside ``user_vcf_normalized.parquet``: the ``(chrom, start)`` of
+#: every record the quality filter dropped, so restoration can tell "the caller rejected its call here"
+#: from "the caller emitted nothing here" (GitHub issue 39). Always written, empty when nothing was
+#: dropped; a normalized parquet without it predates the record.
+FILTERED_OUT_SITES_NAME = "user_vcf_filtered_out_sites.parquet"
+
 #: Scaffolds, alt contigs and decoys carry a handful of calls each and would skew the gap
 #: distribution, so density is measured on the primary assembly only.
 _PRIMARY_CONTIG = r"^(?:\d+|X|Y|MT)$"
@@ -136,6 +142,14 @@ class RestorationContext:
     # a callset that cannot restore anyway, or when it could not be provisioned (the reason says).
     hard_regions: Optional[pl.DataFrame] = None
     hard_regions_reason: str = ""
+    # Positions the caller emitted that our quality filter then dropped (`user_vcf_normalized` keeps
+    # them in FILTERED_OUT_SITES_NAME beside the parquet). They are absent from ``called_sites`` but
+    # were seen: a rejected `0/1` is not evidence of `0/0`, so they are never restored (GitHub issue
+    # 39). They do not count as coverage for the flank or the scope; only passing calls do.
+    filtered_out_sites: Optional[pl.DataFrame] = None
+    # Non-empty when the parquet was filtered but no record of what the filter dropped exists (one
+    # normalized before that record was kept). Restoration is then off, with this as the reason.
+    filtered_out_unknown: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -152,7 +166,18 @@ class RestorationContext:
         only be a guess at what these two already measure, and a wrong one would either fabricate
         rows on an exome or withhold real results on a genome.
         """
-        return self.mode == GenotypeInputMode.VARIANT_ONLY and self.scope == CallsetScope.WGS
+        return (
+            self.mode == GenotypeInputMode.VARIANT_ONLY
+            and self.scope == CallsetScope.WGS
+            and not self.filtered_out_unknown
+        )
+
+    @property
+    def emitted_sites(self) -> pl.DataFrame:
+        """Every position the caller emitted a record at: the passing calls plus the filtered-out."""
+        if self.filtered_out_sites is None or not self.filtered_out_sites.height:
+            return self.called_sites
+        return pl.concat([self.called_sites, self.filtered_out_sites.select("chrom", "start")]).unique()
 
 
 def _coverage_breadth(primary: pl.DataFrame, max_flank_bp: int) -> float:
@@ -248,7 +273,10 @@ def infer_genotype_input_mode(vcf_lf: pl.LazyFrame) -> GenotypeInputMode:
 
 
 def build_restoration_context(
-    vcf_lf: pl.LazyFrame, max_flank_bp: int
+    vcf_lf: pl.LazyFrame,
+    max_flank_bp: int,
+    filtered_out_sites: Optional[pl.LazyFrame] = None,
+    filtered_out_unknown: str = "",
 ) -> RestorationContext:
     """Collect the sample-side inputs restoration needs, once per run.
 
@@ -256,6 +284,10 @@ def build_restoration_context(
     test — on a WGS genome that is a 4.3M-row frame and a normal run has twelve modules. The
     hard-region mask is loaded only for a callset that can restore at all, so an exome or a test
     frame never touches the network for it.
+
+    ``filtered_out_sites`` are the ``(chrom, start)`` the quality filter dropped, which restoration
+    must treat as emitted; ``filtered_out_unknown`` says why they cannot be known, and turns
+    restoration off (see :class:`RestorationContext`).
     """
     mode = infer_genotype_input_mode(vcf_lf)
     called_sites = (
@@ -267,7 +299,13 @@ def build_restoration_context(
     scope, reason = detect_callset_scope(called_sites, max_flank_bp)
     hard_regions: Optional[pl.DataFrame] = None
     hard_regions_reason = "not loaded: this callset does not support restoration"
-    if mode == GenotypeInputMode.VARIANT_ONLY and scope == CallsetScope.WGS:
+    filtered_out: Optional[pl.DataFrame] = None
+    if filtered_out_sites is not None:
+        filtered_out = filtered_out_sites.select(
+            pl.col("chrom").cast(called_sites.schema["chrom"]),
+            pl.col("start").cast(called_sites.schema["start"]),
+        ).unique().collect()
+    if mode == GenotypeInputMode.VARIANT_ONLY and scope == CallsetScope.WGS and not filtered_out_unknown:
         hard_regions, hard_regions_reason = load_hard_regions()
     return RestorationContext(
         called_sites=called_sites,
@@ -277,6 +315,8 @@ def build_restoration_context(
         max_flank_bp=max_flank_bp,
         hard_regions=hard_regions,
         hard_regions_reason=hard_regions_reason,
+        filtered_out_sites=filtered_out,
+        filtered_out_unknown=filtered_out_unknown,
     )
 
 
@@ -472,6 +512,8 @@ def restorable_sites(
     if not context.enabled:
         return sites_lf.head(0)
     absent = _absent_sites(sites_lf, called_sites)
+    if context.filtered_out_sites is not None and context.filtered_out_sites.height:
+        absent = _absent_sites(absent, context.filtered_out_sites.select("chrom", "start"))
     absent = _callability_gate(absent, context)
     return _with_flanking_distance(absent, called_sites, context.max_flank_bp)
 
@@ -504,7 +546,7 @@ def restored_rows(
     if not stats["hom_ref_rows"]:
         return None, stats
 
-    absent = _absent_sites(candidates, context.called_sites)
+    absent = _absent_sites(candidates, context.emitted_sites)
     stats["absent"] = absent.select(pl.len()).collect().item()
     if not stats["absent"]:
         return None, stats

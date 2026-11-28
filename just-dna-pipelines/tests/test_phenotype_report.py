@@ -126,7 +126,7 @@ class TestDeletionReadingOnTheCard:
 
         from just_dna_pipelines.annotation.restoration import CallsetScope, RestorationContext
 
-        def forced(vcf_lf, max_flank_bp):
+        def forced(vcf_lf, max_flank_bp, *_filtered_out):
             called = vcf_lf.select("chrom", "start").unique().sort(["chrom", "start"]).collect()
             mask = pl.DataFrame({"chrom": ["22"], "region_start": [0], "region_end": [1]},
                                 schema={"chrom": pl.String, "region_start": pl.Int64, "region_end": pl.Int64})

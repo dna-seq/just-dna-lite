@@ -397,7 +397,13 @@ person. **No on/off flag**: `RestorationContext.enabled` measures the callset. G
 - **Whole-genome**, per `detect_callset_scope`: `MIN_WGS_SITES` (1M) and `MIN_WGS_BREADTH` (0.75, share
   of span within one flank of a call; WGS measures ~0.95, a clustered callset ~0.21). Do not replace
   breadth with a gap percentile; clustered calls fool it.
-- The site was **not emitted** by the caller.
+- The site was **not emitted** by the caller, **counting records the quality filter dropped**: a rejected `0/1`
+  is not evidence of `0/0` (GitHub issue 39). `user_vcf_normalized` writes their `(chrom, start)` to
+  `restoration.FILTERED_OUT_SITES_NAME` beside the parquet (always, empty when nothing was dropped); the engine
+  passes it to `build_restoration_context`, and a normalized parquet without it turns restoration **off**, with
+  the reason logged. Only passing calls count as coverage for the flank and the scope. `RefCall` records are
+  dropped records too, so a low-confidence reference call is never upgraded to a restored one. Tests:
+  `just-dna-pipelines/tests/test_filtered_out_sites.py`.
 - A called variant within `restoration_max_flank_bp` (default 10 kb), recorded on `restored_flank_bp`.
   Not a callability proof, so restored rows render with an `inferred` badge. Never merge the two
   categories.
@@ -620,7 +626,7 @@ disables; absent section = no filtering) is applied in `user_vcf_normalized`. A 
   `normalized_parquet_is_current` reuses a parquet only when it equals the code's (none recorded reads as
   1). Bump it whenever the same VCF and filters would now be written differently: the quality-filter hash
   alone cannot see a code change, so a fix to normalization otherwise never reaches parquets already on
-  disk. Version 2 is the split multi-allelic genotype. Test:
+  disk. Version 2 is the split multi-allelic genotype; 3 adds the record of filtered-out sites. Test:
   `test_a_parquet_from_older_normalization_code_is_normalized_again`.
 
 ## Dagster pipeline

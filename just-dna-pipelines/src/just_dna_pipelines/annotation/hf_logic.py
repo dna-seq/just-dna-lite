@@ -39,6 +39,7 @@ from just_dna_pipelines.annotation.phenotype_caller import call_phenotype_module
 from just_dna_pipelines.annotation.restoration import (
     EVIDENCE_CALLED,
     EVIDENCE_COLUMN,
+    FILTERED_OUT_SITES_NAME,
     RestorationContext,
     build_restoration_context,
     restored_rows,
@@ -711,9 +712,22 @@ def annotate_vcf_with_all_modules(
     logger.info(f"Annotating with modules: {selected_names}")
     
     with resource_tracker("Annotate VCF with HF Modules") as tracker:
+        # What the quality filter dropped: emitted by the caller, so never restored (GitHub issue 39).
+        # A VCF prepared here is not quality-filtered, so it drops nothing.
+        filtered_out_lf: Optional[pl.LazyFrame] = None
+        filtered_out_unknown = ""
         if normalized_parquet_path is not None and normalized_parquet_path.exists():
             logger.info(f"Using pre-normalized parquet: {normalized_parquet_path}")
             vcf_lf = pl.scan_parquet(str(normalized_parquet_path))
+            filtered_out_path = normalized_parquet_path.with_name(FILTERED_OUT_SITES_NAME)
+            if filtered_out_path.exists():
+                filtered_out_lf = _normalize_vcf_contigs(pl.scan_parquet(str(filtered_out_path)))
+            else:
+                filtered_out_unknown = (
+                    f"no {FILTERED_OUT_SITES_NAME} beside the normalized parquet, so the sites the "
+                    "quality filter dropped are unknown and an absent site cannot be told from a "
+                    "rejected call; normalize the sample again"
+                )
         else:
             logger.info(f"Preparing VCF from scratch: {vcf_path}")
             vcf_lf = prepare_vcf_for_module_annotation(
@@ -730,12 +744,15 @@ def annotate_vcf_with_all_modules(
         # Sample-side inputs for reference-genotype restoration, computed once for all modules: the
         # callset's own (chrom, start) set is a 4.3M-row frame on a WGS genome and every module
         # would otherwise rebuild it.
-        restoration = build_restoration_context(vcf_lf, config.restoration_max_flank_bp)
+        restoration = build_restoration_context(
+            vcf_lf, config.restoration_max_flank_bp, filtered_out_lf, filtered_out_unknown
+        )
         logger.info(
             f"Reference-genotype restoration: "
             f"{'ON' if restoration.enabled else 'OFF'} — callset is "
             f"{restoration.mode.value} / {restoration.scope.value}; {restoration.scope_reason}"
             + (f" (flank <= {config.restoration_max_flank_bp:,} bp)" if restoration.enabled else "")
+            + (f"; {restoration.filtered_out_unknown}" if restoration.filtered_out_unknown else "")
         )
         if restoration.enabled:
             logger.info(f"Restoration hard-region mask: {restoration.hard_regions_reason}")
